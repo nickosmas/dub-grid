@@ -1,8 +1,9 @@
 "use client";
 
-import { CircleAlert, CircleCheck, Info, LoaderCircle, TriangleAlert, X } from "lucide-react";
+import { LoaderCircle, X } from "lucide-react";
 import { Toaster, toast, type ExternalToast } from "sonner";
 import { withToastDuration } from "./toast-duration";
+import { StatusIcon } from "./ui/StatusIcon";
 
 type ToastMethod = "success" | "error" | "info" | "warning" | "message" | "loading";
 
@@ -75,10 +76,10 @@ if (typeof window !== "undefined" && !globalThis.__dubgridToastPatched) {
 }
 
 const ICONS = {
-  success: <CircleCheck strokeWidth={2} aria-hidden />,
-  error: <CircleAlert strokeWidth={2} aria-hidden />,
-  warning: <TriangleAlert strokeWidth={2} aria-hidden />,
-  info: <Info strokeWidth={2} aria-hidden />,
+  success: <StatusIcon tone="success" size={28} />,
+  error: <StatusIcon tone="danger" size={28} />,
+  warning: <StatusIcon tone="warning" size={28} />,
+  info: <StatusIcon tone="info" size={28} />,
   loading: <LoaderCircle strokeWidth={2} className="animate-spin" aria-hidden />,
   close: <X strokeWidth={2} aria-hidden />,
 };

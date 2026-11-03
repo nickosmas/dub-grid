@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { CircleAlert, CircleCheck, Info, TriangleAlert, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { StatusIcon } from "./StatusIcon";
 
 export type BannerTone = "info" | "success" | "warning" | "danger";
 
@@ -23,16 +24,34 @@ const BAR_TONE_CLASSES: Record<BannerTone, string> = {
     "border-[var(--dg-color-banner-danger-vivid-border)] bg-[var(--dg-color-banner-danger-vivid-bg)] text-[var(--dg-color-banner-danger-vivid-text)]",
 };
 
-const DEFAULT_ICONS: Record<BannerTone, LucideIcon> = {
-  info: Info,
-  success: CircleCheck,
-  warning: TriangleAlert,
-  danger: CircleAlert,
+// The icon colour, and the tint its marks are cut out to. Whole class names, so
+// Tailwind sees them.
+const ICON_CLASSES: Record<BannerTone, string> = {
+  info: "text-[var(--dg-color-banner-info-icon)] [--dg-icon-cut:var(--dg-color-banner-info-bg)]",
+  success:
+    "text-[var(--dg-color-banner-success-icon)] [--dg-icon-cut:var(--dg-color-banner-success-bg)]",
+  warning:
+    "text-[var(--dg-color-banner-warning-icon)] [--dg-icon-cut:var(--dg-color-banner-warning-bg)]",
+  danger:
+    "text-[var(--dg-color-banner-danger-icon)] [--dg-icon-cut:var(--dg-color-banner-danger-bg)]",
+};
+
+// A bar's fill is the tone itself, so its icon is white with the fill behind.
+const BAR_ICON_CLASSES: Record<BannerTone, string> = {
+  info: "text-white [--dg-icon-cut:var(--dg-color-banner-info-vivid-bg)]",
+  success: "text-white [--dg-icon-cut:var(--dg-color-banner-success-vivid-bg)]",
+  warning:
+    "text-[var(--dg-color-banner-warning-vivid-text)] [--dg-icon-cut:var(--dg-color-banner-warning-vivid-bg)]",
+  danger: "text-white [--dg-icon-cut:var(--dg-color-banner-danger-vivid-bg)]",
 };
 
 export interface BannerProps {
   tone: BannerTone;
-  /** A glyph that fits the meaning, such as `AlarmClock` for a time limit. Defaults per tone. */
+  /**
+   * A glyph that fits the meaning, such as `Clock` for a time limit, drawn
+   * solid when it has a solid form and in a tone circle otherwise. Defaults
+   * to the tone's own shape.
+   */
   icon?: LucideIcon;
   /** Optional bold first line. */
   title?: ReactNode;
@@ -58,7 +77,6 @@ export function Banner({
   "aria-label": ariaLabel,
   className,
 }: BannerProps) {
-  const Glyph = icon ?? DEFAULT_ICONS[tone];
   const shape =
     layout === "bar"
       ? "items-center justify-center border-b px-4 py-2"
@@ -72,7 +90,12 @@ export function Banner({
     >
       {/* One line tall, so the glyph sits on the first line however many follow. */}
       <span className="flex h-[1lh] shrink-0 items-center">
-        <Glyph width={16} height={16} strokeWidth={2} aria-hidden="true" />
+        <StatusIcon
+          tone={tone}
+          icon={icon}
+          size={20}
+          className={layout === "bar" ? BAR_ICON_CLASSES[tone] : ICON_CLASSES[tone]}
+        />
       </span>
       <div className={`flex min-w-0 flex-col gap-1 ${layout === "bar" ? "" : "flex-1"}`}>
         {title ? <span className="font-semibold">{title}</span> : null}
