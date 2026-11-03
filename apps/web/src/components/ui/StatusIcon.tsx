@@ -1,8 +1,10 @@
 import {
   AlarmClock,
+  Calendar1,
+  Monitor,
+  Users,
   Plane,
   CalendarCheck,
-  CalendarCog,
   CalendarDays,
   CalendarOff,
   CalendarRange,
@@ -12,14 +14,12 @@ import {
   FilePen,
   FileWarning,
   FlaskConical,
-  MonitorSmartphone,
   Pause,
   ShieldOff,
   Trash2,
   UserCheck,
   UserMinus,
   UserPlus,
-  UserSearch,
   CircleCheck,
   CircleCheckBig,
   CircleX,
@@ -38,11 +38,18 @@ import {
 import type { StatusIconTone } from "@dubgrid/design-tokens";
 
 /**
- * A Lucide shape drawn solid: `fill` paths in the icon colour, `stroke` paths
- * as lines in the icon colour, and `cut` marks (lines) and `cutFill` shapes in
- * the colour behind the icon, so they read as holes.
+ * A Lucide shape drawn solid: `fill` paths filled, `stroke` paths as lines,
+ * `cut` marks (lines) and `cutFill` shapes cut out as holes, and `front`
+ * shapes drawn last with a gap cut around them, for one shape in front of
+ * another.
  */
-type SolidGlyph = { fill: string[]; stroke?: string[]; cut?: string[]; cutFill?: string[] };
+type SolidGlyph = {
+  fill: string[];
+  stroke?: string[];
+  cut?: string[];
+  cutFill?: string[];
+  front?: string[];
+};
 
 const CIRCLE = "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z";
 const MAIL = "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
@@ -79,6 +86,28 @@ const TONE_GLYPHS: Record<StatusIconTone, SolidGlyph> = {
 // so an icon drawn in a ring needs an entry here, or it shows a ring in a disc.
 const SOLID_GLYPHS = new Map<LucideIcon, SolidGlyph>([
   [
+    Users,
+    {
+      fill: ["M16 2.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7z", "M13 14h6a4 4 0 0 1 4 4v2H13z"],
+      front: [PERSON_HEAD, PERSON_BODY],
+    },
+  ],
+  [
+    Calendar1,
+    {
+      fill: ["M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"],
+      stroke: ["M16 2v3", "M8 2v3"],
+      cut: ["M2 9h20", "M11 13h1v4"],
+    },
+  ],
+  [
+    Monitor,
+    {
+      fill: ["M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"],
+      stroke: ["M8 21h8", "M12 17v4"],
+    },
+  ],
+  [
     Plane,
     {
       fill: [
@@ -94,7 +123,6 @@ const SOLID_GLYPHS = new Map<LucideIcon, SolidGlyph>([
   ],
   [CalendarX, calendar("m14 14-4 4", "m10 14 4 4")],
   [CalendarX2, calendar("m14 14-4 4", "m10 14 4 4")],
-  [CalendarCog, calendar("M12 16a2 2 0 1 0 0 .01")],
   [CalendarOff, calendar("m4 4 16 16")],
   [
     Trash2,
@@ -141,26 +169,9 @@ const SOLID_GLYPHS = new Map<LucideIcon, SolidGlyph>([
       cut: ["m4 4 16 16"],
     },
   ],
-  [
-    MonitorSmartphone,
-    {
-      fill: [
-        "M4 4h12a2 2 0 0 1 2 2v2h-2a2 2 0 0 0-2 2v5H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
-        "M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z",
-      ],
-      stroke: ["M9 15v4", "M6.5 19h5"],
-    },
-  ],
   [UserPlus, person("M19 8v6", "M22 11h-6")],
   [UserMinus, person("M22 11h-6")],
   [UserCheck, person("m16 11 2 2 4-4")],
-  [
-    UserSearch,
-    {
-      fill: ["M10 3a4 4 0 1 0 0 8a4 4 0 1 0 0-8z", "M3 21v-2a4 4 0 0 1 4-4h4v6z"],
-      stroke: ["M17 14a3 3 0 1 0 0 6a3 3 0 1 0 0-6z", "m21 21-1.9-1.9"],
-    },
-  ],
   [CircleCheck, TONE_GLYPHS.success],
   [CircleCheckBig, TONE_GLYPHS.success],
   [Info, TONE_GLYPHS.info],
@@ -281,6 +292,8 @@ export function StatusIcon({ tone, icon, size, className, markColor }: StatusIco
     ...(glyph.cut ?? []),
     "f",
     ...(glyph.cutFill ?? []),
+    "o",
+    ...(glyph.front ?? []),
   ]);
   return (
     <svg
@@ -319,6 +332,20 @@ export function StatusIcon({ tone, icon, size, className, markColor }: StatusIco
         ))}
         {glyph.cutFill?.map((d) => (
           <path key={d} d={d} fill="black" stroke="black" strokeWidth={0.5} />
+        ))}
+        {glyph.front?.map((d) => (
+          <path key={`gap-${d}`} d={d} fill="black" stroke="black" strokeWidth={5} />
+        ))}
+        {glyph.front?.map((d) => (
+          <path
+            key={d}
+            d={d}
+            fill="white"
+            stroke="white"
+            strokeWidth={2}
+            strokeLinejoin="miter"
+            strokeMiterlimit={2.5}
+          />
         ))}
       </mask>
       {markColor ? glyph.fill.map((d) => <path key={d} d={d} fill={markColor} />) : null}

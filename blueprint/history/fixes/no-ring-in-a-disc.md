@@ -52,6 +52,13 @@ Owner decisions, 2026-11-03:
   alarm clock and envelope icons. The owner chose to keep these over another
   icon set after comparing 11 (2026-11-03).
 
+- **Better icons for three banners** (owner's picks, 2026-11-03): two
+  people for possible duplicates in bulk import (was a person with a
+  magnifier), a monitor for Schedule open elsewhere (was a monitor and phone),
+  and a calendar with a 1 for a series changed on one day only (was a
+  calendar with a cog). `front` shapes draw one figure in front of another
+  with a gap cut around it. Calling off and Session ended keep their icons.
+
 Toasts keep their size and timing; their marks stay white through a
 `markColor`, as decided on 2026-11-02.
 
@@ -63,8 +70,9 @@ Toasts keep their size and timing; their marks stay white through a
       Schedule's bars.
 - [x] **3.** `StatusSymbol` for the status cards and Change status; Away as
       a plane.
-- [x] **4.** Real holes and tight fills in `StatusIcon`; toasts pass a white
-      `markColor`.
+- [x] **4.** Real holes and mitred fills in `StatusIcon`; toasts pass a
+      white `markColor`.
+- [x] **5.** Two people, monitor and calendar with a 1 in their banners.
 
 ## Verify
 
