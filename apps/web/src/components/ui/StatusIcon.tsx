@@ -230,73 +230,91 @@ const SOLID_GLYPHS = new Map<LucideIcon, SolidGlyph>([
   ],
 ]);
 
+// Ids only need to be unique per shape: two icons with the same shape can
+// share one mask, since a mask holds no colour.
+function shapeId(prefix: string, parts: readonly string[]): string {
+  let hash = 5381;
+  for (const ch of parts.join("|")) hash = ((hash << 5) + hash + ch.charCodeAt(0)) | 0;
+  return `${prefix}-${(hash >>> 0).toString(36)}`;
+}
+
 export interface StatusIconProps {
   tone: StatusIconTone;
   /** An own icon in place of the tone's shape. */
   icon?: LucideIcon;
   size: number;
-  /**
-   * Sets `color` (the icon) and `--dg-icon-cut` (the colour behind it, which
-   * its marks are drawn in).
-   */
+  /** Sets `color`, which the icon is drawn in. */
   className?: string;
+  /** Fills the marks with a colour of their own instead of leaving them as holes. */
+  markColor?: string;
 }
 
-/** A tone or own icon drawn solid, with its marks cut out to the background. */
-export function StatusIcon({ tone, icon, size, className }: StatusIconProps) {
+/**
+ * A tone or own icon drawn solid, its marks cut out as real holes, so they
+ * show whatever is behind the icon. The fill follows the line icon's path
+ * without its line, which keeps corners sharp, and the view is cropped by
+ * that line's width so the icon stays as large as the line icon.
+ */
+export function StatusIcon({ tone, icon, size, className, markColor }: StatusIconProps) {
   const solid = icon ? SOLID_GLYPHS.get(icon) : TONE_GLYPHS[tone];
 
   if (icon && !solid) {
     const Glyph = icon;
+    const id = shapeId("dg-disc", [Glyph.displayName ?? "icon"]);
     return (
       <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className={className}>
-        <path d={CIRCLE} fill="currentColor" />
-        <Glyph
-          x={5.25}
-          y={5.25}
-          width={13.5}
-          height={13.5}
-          strokeWidth={2.4}
-          className="text-[var(--dg-icon-cut)]"
-        />
+        <mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <path d={CIRCLE} fill="white" />
+          <Glyph x={5.25} y={5.25} width={13.5} height={13.5} strokeWidth={2.4} color="black" />
+        </mask>
+        <rect width="24" height="24" fill="currentColor" mask={`url(#${id})`} />
       </svg>
     );
   }
 
   const glyph = solid ?? TONE_GLYPHS[tone];
+  const id = shapeId("dg-solid", [
+    ...glyph.fill,
+    "s",
+    ...(glyph.stroke ?? []),
+    "c",
+    ...(glyph.cut ?? []),
+    "f",
+    ...(glyph.cutFill ?? []),
+  ]);
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="1 1 22 22"
       aria-hidden="true"
       className={`overflow-visible ${className ?? ""}`}
-      strokeLinecap="round"
-      strokeLinejoin="round"
     >
-      {glyph.fill.map((d) => (
-        <path key={d} d={d} fill="currentColor" stroke="currentColor" strokeWidth={2} />
-      ))}
-      {glyph.stroke?.map((d) => (
-        <path key={d} d={d} fill="none" stroke="currentColor" strokeWidth={2} />
-      ))}
-      {glyph.cut?.map((d) => (
-        <path
-          key={d}
-          d={d}
-          fill="none"
-          strokeWidth={2.25}
-          className="stroke-[var(--dg-icon-cut)]"
-        />
-      ))}
-      {glyph.cutFill?.map((d) => (
-        <path
-          key={d}
-          d={d}
-          strokeWidth={0.5}
-          className="fill-[var(--dg-icon-cut)] stroke-[var(--dg-icon-cut)]"
-        />
-      ))}
+      <mask
+        id={id}
+        maskUnits="userSpaceOnUse"
+        x="-2"
+        y="-2"
+        width="28"
+        height="28"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {glyph.fill.map((d) => (
+          <path key={d} d={d} fill="white" />
+        ))}
+        {glyph.stroke?.map((d) => (
+          <path key={d} d={d} fill="none" stroke="white" strokeWidth={2} />
+        ))}
+        {glyph.cut?.map((d) => (
+          <path key={d} d={d} fill="none" stroke="black" strokeWidth={2.25} />
+        ))}
+        {glyph.cutFill?.map((d) => (
+          <path key={d} d={d} fill="black" stroke="black" strokeWidth={0.5} />
+        ))}
+      </mask>
+      {markColor ? glyph.fill.map((d) => <path key={d} d={d} fill={markColor} />) : null}
+      <rect x="-2" y="-2" width="28" height="28" fill="currentColor" mask={`url(#${id})`} />
     </svg>
   );
 }

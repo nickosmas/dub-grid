@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { Mail, MailX } from "lucide-react";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -68,19 +68,16 @@ export function InvitationCard({
         aria-label="Invitation"
         data-slot="employee-invitation-card"
         data-invitation={state.kind}
-        style={
-          {
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "12px 14px",
-            borderRadius: "var(--dg-radius-lg)",
-            minWidth: 0,
-            border: "1px solid var(--dg-color-border)",
-            background: "var(--dg-color-surface)",
-            "--dg-icon-cut": "var(--dg-color-surface)",
-          } as CSSProperties
-        }
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "12px 14px",
+          borderRadius: "var(--dg-radius-lg)",
+          minWidth: 0,
+          border: "1px solid var(--dg-color-border)",
+          background: "var(--dg-color-surface)",
+        }}
       >
         <StatusSymbol
           icon={state.kind === "expired" ? MailX : Mail}

@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { CalendarDays } from "lucide-react";
 import { describeStatusCard } from "@dubgrid/domain";
 import type { AbsenceType, Employee } from "@/types";
@@ -98,14 +98,11 @@ export function EmployeeStatusCard({
     <section
       aria-label="Staff status"
       data-status={current.kind}
-      style={
-        {
-          ...cardStyle,
-          border: `1px solid ${active ? "var(--dg-color-border)" : colors.border}`,
-          background: active ? "var(--dg-color-surface)" : colors.bg,
-          "--dg-icon-cut": active ? "var(--dg-color-surface)" : colors.bg,
-        } as CSSProperties
-      }
+      style={{
+        ...cardStyle,
+        border: `1px solid ${active ? "var(--dg-color-border)" : colors.border}`,
+        background: active ? "var(--dg-color-surface)" : colors.bg,
+      }}
     >
       <StatusSymbol icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
       <CardText
@@ -123,14 +120,11 @@ export function EmployeeStatusCard({
         <section
           aria-label="First day"
           data-status="starts"
-          style={
-            {
-              ...cardStyle,
-              border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
-              background: "var(--dg-color-surface)",
-              "--dg-icon-cut": "var(--dg-color-surface)",
-            } as CSSProperties
-          }
+          style={{
+            ...cardStyle,
+            border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
+            background: "var(--dg-color-surface)",
+          }}
         >
           <StatusSymbol icon={CalendarDays} tone="warning" />
           <CardText
@@ -145,14 +139,11 @@ export function EmployeeStatusCard({
         <section
           aria-label="Planned"
           data-status="planned"
-          style={
-            {
-              ...cardStyle,
-              border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
-              background: "var(--dg-color-surface)",
-              "--dg-icon-cut": "var(--dg-color-surface)",
-            } as CSSProperties
-          }
+          style={{
+            ...cardStyle,
+            border: `1px dashed ${STATUS_TONE_COLORS.warning.border}`,
+            background: "var(--dg-color-surface)",
+          }}
         >
           <StatusSymbol icon={CalendarDays} tone="warning" />
           <CardText

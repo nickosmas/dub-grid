@@ -42,7 +42,16 @@ Owner decisions, 2026-11-03:
   card, Change status, the mark beside a name, the "You're away" bar and the
   Mark away dialog. Mobile keeps the moon (its icon sets have no match).
 
-Toasts are unchanged.
+- **Crisper solids.** Marks are cut out as real holes through an SVG mask,
+  in place of lines painted in the background colour, so they stay sharp and
+  show whatever is behind; the `--dg-icon-cut` wiring is gone. Fills follow
+  the line icon's path without tracing it with a 2px line, which kept corners
+  rounded and filled narrow gaps, and the view is cropped by that line's
+  width so icons stay as large as before. The owner chose to keep these over
+  another icon set after comparing 11 (2026-11-03).
+
+Toasts keep their size and timing; their marks stay white through a
+`markColor`, as decided on 2026-11-02.
 
 ## Build steps
 
@@ -52,6 +61,8 @@ Toasts are unchanged.
       Schedule's bars.
 - [x] **3.** `StatusSymbol` for the status cards and Change status; Away as
       a plane.
+- [x] **4.** Real holes and tight fills in `StatusIcon`; toasts pass a white
+      `markColor`.
 
 ## Verify
 

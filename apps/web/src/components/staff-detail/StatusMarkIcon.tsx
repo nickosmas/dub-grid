@@ -101,8 +101,7 @@ const SYMBOL_COLORS: Record<StatusTone, string> = {
 
 /**
  * A status's icon drawn solid in its tone, as banners draw theirs, for the
- * status card and the Change staff status dialog. Its marks are cut out to
- * `--dg-icon-cut`, which the card it sits on sets to its own background.
+ * status card and the Change staff status dialog.
  */
 export function StatusSymbol({ icon, tone }: { icon: LucideIcon; tone: StatusTone }) {
   return (

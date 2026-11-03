@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/Button";
 
@@ -52,22 +52,19 @@ export function RadioCardList<T extends string | number>({
             onClick={() => {
               if (!disabled) onChange(option.value);
             }}
-            style={
-              {
-                display: "flex",
-                alignItems: option.icon ? "center" : "flex-start",
-                gap: 12,
-                padding: "12px 14px",
-                borderRadius: "var(--dg-radius-lg)",
-                border: `1px solid ${checked ? "var(--dg-color-primary)" : "var(--dg-color-border)"}`,
-                background: checked ? "var(--dg-color-primary-bg)" : "var(--dg-color-surface)",
-                "--dg-icon-cut": checked ? "var(--dg-color-primary-bg)" : "var(--dg-color-surface)",
-                textAlign: "left",
-                font: "inherit",
-                cursor: disabled ? "not-allowed" : "pointer",
-                opacity: disabled ? 0.6 : undefined,
-              } as CSSProperties
-            }
+            style={{
+              display: "flex",
+              alignItems: option.icon ? "center" : "flex-start",
+              gap: 12,
+              padding: "12px 14px",
+              borderRadius: "var(--dg-radius-lg)",
+              border: `1px solid ${checked ? "var(--dg-color-primary)" : "var(--dg-color-border)"}`,
+              background: checked ? "var(--dg-color-primary-bg)" : "var(--dg-color-surface)",
+              textAlign: "left",
+              font: "inherit",
+              cursor: disabled ? "not-allowed" : "pointer",
+              opacity: disabled ? 0.6 : undefined,
+            }}
           >
             {option.icon ?? (
               <span
