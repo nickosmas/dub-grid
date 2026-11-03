@@ -1,5 +1,24 @@
 import {
   AlarmClock,
+  CalendarCheck,
+  CalendarCog,
+  CalendarDays,
+  CalendarOff,
+  CalendarRange,
+  CalendarX,
+  CalendarX2,
+  CreditCard,
+  FilePen,
+  FileWarning,
+  FlaskConical,
+  MonitorSmartphone,
+  Pause,
+  ShieldOff,
+  Trash2,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  UserSearch,
   CircleCheck,
   CircleCheckBig,
   CircleX,
@@ -27,6 +46,18 @@ type SolidGlyph = { fill: string[]; stroke?: string[]; cut?: string[]; cutFill?:
 const CIRCLE = "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z";
 const MAIL = "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
 const MAIL_FLAP = "m21 7.5-8.47 5.4a1 1 0 0 1-1.06 0L3 7.5";
+const CALENDAR = "M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
+const PAGE = "M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z";
+const PERSON_HEAD = "M9 3a4 4 0 1 0 0 8a4 4 0 1 0 0-8z";
+const PERSON_BODY = "M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2z";
+
+function calendar(...marks: string[]): SolidGlyph {
+  return { fill: [CALENDAR], stroke: ["M8 2v4", "M16 2v4"], cut: ["M2 10h20", ...marks] };
+}
+
+function person(...marks: string[]): SolidGlyph {
+  return { fill: [PERSON_HEAD, PERSON_BODY], stroke: marks };
+}
 
 const TONE_GLYPHS: Record<StatusIconTone, SolidGlyph> = {
   success: { fill: [CIRCLE], cut: ["m8.5 12 2.5 2.5 4.5-5"] },
@@ -46,6 +77,81 @@ const TONE_GLYPHS: Record<StatusIconTone, SolidGlyph> = {
 // Own icons with a natural solid form. Any other own icon sits in a tone circle,
 // so an icon drawn in a ring needs an entry here, or it shows a ring in a disc.
 const SOLID_GLYPHS = new Map<LucideIcon, SolidGlyph>([
+  [CalendarCheck, calendar("m9 16 2 2 4-4")],
+  [CalendarRange, calendar("M17 14h-6", "M13 18H7", "M7 14h.01", "M17 18h.01")],
+  [
+    CalendarDays,
+    calendar("M8 14h.01", "M12 14h.01", "M16 14h.01", "M8 18h.01", "M12 18h.01", "M16 18h.01"),
+  ],
+  [CalendarX, calendar("m14 14-4 4", "m10 14 4 4")],
+  [CalendarX2, calendar("m14 14-4 4", "m10 14 4 4")],
+  [CalendarCog, calendar("M12 16a2 2 0 1 0 0 .01")],
+  [CalendarOff, calendar("m4 4 16 16")],
+  [
+    Trash2,
+    {
+      fill: ["M5 6h14v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"],
+      stroke: ["M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
+      cut: ["M10 11v6", "M14 11v6"],
+    },
+  ],
+  [
+    CreditCard,
+    {
+      fill: ["M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"],
+      cut: ["M1 10h22", "M6 15h4"],
+    },
+  ],
+  [
+    Pause,
+    {
+      fill: [
+        "M6 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z",
+        "M15 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z",
+      ],
+    },
+  ],
+  [FileWarning, { fill: [PAGE], cut: ["M12 10v4", "M12 17.5h.01"] }],
+  [FilePen, { fill: [PAGE], cut: ["m8.5 17.5 6-6"] }],
+  [
+    FlaskConical,
+    {
+      fill: [
+        "M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2z",
+      ],
+      stroke: ["M8.5 2h7"],
+      cut: ["M6.5 15h11"],
+    },
+  ],
+  [
+    ShieldOff,
+    {
+      fill: [
+        "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+      ],
+      cut: ["m4 4 16 16"],
+    },
+  ],
+  [
+    MonitorSmartphone,
+    {
+      fill: [
+        "M4 4h12a2 2 0 0 1 2 2v2h-2a2 2 0 0 0-2 2v5H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+        "M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z",
+      ],
+      stroke: ["M9 15v4", "M6.5 19h5"],
+    },
+  ],
+  [UserPlus, person("M19 8v6", "M22 11h-6")],
+  [UserMinus, person("M22 11h-6")],
+  [UserCheck, person("m16 11 2 2 4-4")],
+  [
+    UserSearch,
+    {
+      fill: ["M10 3a4 4 0 1 0 0 8a4 4 0 1 0 0-8z", "M3 21v-2a4 4 0 0 1 4-4h4v6z"],
+      stroke: ["M17 14a3 3 0 1 0 0 6a3 3 0 1 0 0-6z", "m21 21-1.9-1.9"],
+    },
+  ],
   [CircleCheck, TONE_GLYPHS.success],
   [CircleCheckBig, TONE_GLYPHS.success],
   [Info, TONE_GLYPHS.info],
@@ -137,11 +243,11 @@ export function StatusIcon({ tone, icon, size, className }: StatusIconProps) {
       <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className={className}>
         <path d={CIRCLE} fill="currentColor" />
         <Glyph
-          x={6}
-          y={6}
-          width={12}
-          height={12}
-          strokeWidth={2.5}
+          x={5.25}
+          y={5.25}
+          width={13.5}
+          height={13.5}
+          strokeWidth={2.4}
           className="text-[var(--dg-icon-cut)]"
         />
       </svg>

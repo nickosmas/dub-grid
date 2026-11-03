@@ -4,6 +4,8 @@ import { StatusIcon } from "./StatusIcon";
 
 export type BannerTone = "info" | "success" | "warning" | "danger";
 
+const BANNER_ICON_SIZE = 25;
+
 const TONE_CLASSES: Record<BannerTone, string> = {
   info: "border-[var(--dg-color-banner-info-border)] bg-[var(--dg-color-banner-info-bg)] text-[var(--dg-color-banner-info-text)]",
   success:
@@ -80,7 +82,7 @@ export function Banner({
   const shape =
     layout === "bar"
       ? "items-center justify-center border-b px-4 py-2"
-      : "items-start rounded-[10px] border px-3.5 py-3";
+      : "items-center rounded-[10px] border px-3.5 py-3";
 
   return (
     <div
@@ -88,12 +90,12 @@ export function Banner({
       aria-label={ariaLabel}
       className={`flex gap-2.5 text-[13px] font-medium leading-[1.5] ${shape} ${layout === "bar" ? BAR_TONE_CLASSES[tone] : TONE_CLASSES[tone]} ${className ?? ""}`}
     >
-      {/* One line tall, so the glyph sits on the first line however many follow. */}
-      <span className="flex h-[1lh] shrink-0 items-center">
+      {/* Centered on the text, however many lines it runs. */}
+      <span className="flex shrink-0">
         <StatusIcon
           tone={tone}
           icon={icon}
-          size={20}
+          size={BANNER_ICON_SIZE}
           className={layout === "bar" ? BAR_ICON_CLASSES[tone] : ICON_CLASSES[tone]}
         />
       </span>
@@ -103,5 +105,17 @@ export function Banner({
       </div>
       {action ? <div className="flex shrink-0 items-center self-center">{action}</div> : null}
     </div>
+  );
+}
+
+/** A banner's icon on its own, for a notice that lays out its own row on a banner tint. */
+export function BannerIcon({ tone, icon }: { tone: BannerTone; icon?: LucideIcon }) {
+  return (
+    <StatusIcon
+      tone={tone}
+      icon={icon}
+      size={BANNER_ICON_SIZE}
+      className={`shrink-0 ${ICON_CLASSES[tone]}`}
+    />
   );
 }

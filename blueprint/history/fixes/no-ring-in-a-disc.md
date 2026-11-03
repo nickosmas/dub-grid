@@ -1,4 +1,4 @@
-# Fix: No ring icon inside a disc
+# Fix: Banner icons drawn solid, without a ring inside a disc
 
 **Type:** Fix
 **Status:** verified
@@ -7,24 +7,42 @@
 ## The problem
 
 `StatusIcon` (web banners since #300) draws an own icon with no solid form in
-white inside a tone-coloured disc. An icon that is already drawn in a ring
+white inside a tone-coloured disc. An icon already drawn in a ring
 (`CircleCheck`, `CircleX`, `Info`, `AlarmClock`) then shows its ring inside
 the disc: two circles around a small mark. The owner saw it on the Settings >
-Billing seats banner ("this kind of design is a big no", 2026-11-03).
+Billing seats banner ("this kind of design is a big no", 2026-11-03). The
+Schedule's own bars still drew a thin 16px outline, and every banner icon sat
+on the first line of text.
 
 ## The fix
 
-Those four icons get solid forms, so each draws as one shape: `CircleCheck`
-and `Info` take the success and info tone shapes, `CircleX` a solid circle
-with the X cut out, and `AlarmClock` a solid face with its bells and feet as
-lines and its hands cut out.
+Owner decisions, 2026-11-03:
+
+- **No disc where the icon has a body.** The four ring icons and 17 more
+  (calendars, trash, credit card, pause, file warning, file pen, flask,
+  shield off, monitor and phone, and the four person icons) draw as one solid
+  shape with their marks cut out. Only line icons with nothing to fill
+  (refresh, repeat, replace, unplug) stay in a disc, with a larger mark (13.5
+  of 24 units, was 12).
+- **25px.** Banner icons go from 20px to 25px (30px was tried and was too big).
+- **Centered.** A banner's icon is centered on all of its text, not its first
+  line.
+- **Schedule's bars** (draft changes, unpublished and published in other
+  weeks, open elsewhere, session ended, bulk delete) use the same icon through
+  `BannerIcon`. "Also unpublished in other weeks" shows the file with a pen,
+  as Draft changes does, in place of the calendar.
+
+Toasts are unchanged.
 
 ## Build steps
 
-- [x] **1.** Solid forms in `StatusIcon`, with a test that each draws one
+- [x] **1.** Solid forms in `StatusIcon`, with a test that ring icons draw one
       `svg` and that an icon with no solid form still sits in a disc.
+- [x] **2.** Banner icons at 25px and centered; `BannerIcon` in the
+      Schedule's bars.
 
 ## Verify
 
-`StatusIcon.test.tsx` (5 tests), web `type-check`, ESLint and Prettier on the
-changed files. The four icons rendered before and after at 56px.
+`StatusIcon.test.tsx`, the web UI tests, web `type-check`, ESLint and
+Prettier. Rendered the real `Banner` with compiled Tailwind, and every banner
+icon solid and in a disc, at 24, 25 and 30px.

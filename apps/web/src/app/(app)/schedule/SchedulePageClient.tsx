@@ -67,10 +67,11 @@ import {
 import { OpenShiftStaffingModal } from "@/components/schedule/OpenShiftStaffingModal";
 import { Hint } from "@/components/ui/hint";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
+import { BannerIcon } from "@/components/ui/Banner";
 import { hint } from "@/components/ui/hint.types";
 import {
   CalendarCheck,
-  CalendarRange,
+  FilePen,
   Trash2,
   Unplug,
   X,
@@ -8641,7 +8642,7 @@ function SchedulerContent({
           >
             {isSessionEnded && (
               <div className="dg-draft-banner no-print" role="status">
-                <Unplug size={16} className="shrink-0" aria-hidden="true" />
+                <BannerIcon tone="warning" icon={Unplug} />
                 <strong>Schedule session ended</strong>
                 <span>
                   This tab is read-only. Any unsaved schedule changes here were not saved.
@@ -8666,7 +8667,7 @@ function SchedulerContent({
             )}
             {isBulkDeleteMode && (
               <div className="dg-draft-banner dg-draft-banner--danger no-print">
-                <Trash2 size={16} className="shrink-0" aria-hidden="true" />
+                <BannerIcon tone="danger" icon={Trash2} />
                 <span style={{ fontWeight: 700 }}>Bulk delete</span>
                 <span style={{ fontSize: "var(--dg-fs-caption)", marginLeft: 4 }}>
                   {`${bulkDeleteSelectedKeys.size} selected of ${visibleBulkDeleteTargets.length} removable visible entr${visibleBulkDeleteTargets.length === 1 ? "y" : "ies"}`}
@@ -8739,7 +8740,7 @@ function SchedulerContent({
                   className="dg-draft-banner dg-draft-banner--info no-print"
                   data-tour="draft-banner-other-weeks"
                 >
-                  <CalendarRange size={16} className="shrink-0" aria-hidden="true" />
+                  <BannerIcon tone="info" icon={FilePen} />
                   <span style={{ fontWeight: 600 }}>Also unpublished in other weeks:</span>
                   <span>
                     {(() => {
@@ -8818,7 +8819,7 @@ function SchedulerContent({
                   spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
                 return (
                   <div className="dg-draft-banner dg-draft-banner--info no-print">
-                    <CalendarCheck size={16} className="shrink-0" aria-hidden="true" />
+                    <BannerIcon tone="info" icon={CalendarCheck} />
                     <span style={{ fontWeight: 600 }}>Recently published:</span>
                     <span>
                       {`${totalChanges} change${totalChanges === 1 ? "" : "s"} in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`}
@@ -8880,7 +8881,7 @@ function SchedulerContent({
                 const latest = inWindowPublishHistory[0];
                 return (
                   <div className="dg-draft-banner dg-draft-banner--info no-print">
-                    <CalendarCheck size={16} className="shrink-0" aria-hidden="true" />
+                    <BannerIcon tone="info" icon={CalendarCheck} />
                     <span style={{ fontWeight: 600 }}>
                       Published{" "}
                       {(() => {
