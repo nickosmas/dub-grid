@@ -1443,8 +1443,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   width: 28px !important;
   height: 28px !important;
   margin: 0 !important;
-  /* The icon's marks are white on its filled shape. */
-  --dg-icon-cut: #ffffff;
 }
 [data-sonner-toast] [data-icon] svg {
   width: 28px !important;

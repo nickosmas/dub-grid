@@ -144,11 +144,10 @@ describe("BillingSettings", () => {
   it("counts down a running trial and lists billing history without names", async () => {
     renderBillingSettings();
 
-    expect(await screen.findByText("Trial days left")).toBeInTheDocument();
     expect(
-      screen.getByRole("img", { name: "14 days: Left in your free trial" }),
+      await screen.findByRole("img", { name: "14 days: Left in your free trial" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Seats in use", { selector: "span" })).toBeInTheDocument();
+    expect(screen.queryByText("Trial days left")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Billing history" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Event" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "By" })).toBeInTheDocument();
@@ -192,16 +191,18 @@ describe("BillingSettings", () => {
     expect(await screen.findByText("Your free trial hasn't started yet.")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Your 14-day free trial begins the first time a Super Admin signs in. You won't be charged until you start a subscription.",
+        "It begins the first time a Super Admin signs in. You won't be charged until you start a subscription.",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Trial days left")).not.toBeInTheDocument();
+    expect(screen.getByText("At first sign-in")).toBeInTheDocument();
   });
 
   it("does not show sign out while billing is available", async () => {
     renderBillingSettings();
 
-    expect(await screen.findByText("Trial days left")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("img", { name: "14 days: Left in your free trial" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
   });
 
@@ -302,10 +303,9 @@ describe("BillingSettings", () => {
 
     expect(
       await screen.findByText(
-        /Your organization stays open, and you won't be charged while billing is paused\. Your trial days don't count down while it's paused\./,
+        "Your organization stays open, you won't be charged, and your trial days don't count down while it's paused. If you have questions, contact us.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("They don't count down while billing is paused.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Start subscription" })).not.toBeInTheDocument();
     const row = screen.getAllByText("Billing paused.").find((node) => node.closest("tr"));
     expect(row?.closest("tr")).toHaveTextContent("DubGrid");
@@ -358,8 +358,11 @@ describe("BillingSettings", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage billing" })).toBeInTheDocument();
+    expect(screen.getByText("Seats in use")).toBeInTheDocument();
+    expect(screen.getByText("Paid seats")).toBeInTheDocument();
+    expect(screen.getByText("Not billed")).toBeInTheDocument();
     expect(screen.getByText("Offboarded staff")).toBeInTheDocument();
-    expect(screen.getByText("6 in use, 3 not billed")).toBeInTheDocument();
+    expect(screen.queryByText(/in use, \d+ not billed/)).not.toBeInTheDocument();
   });
 
   it("explains in plain words when online billing isn't set up", async () => {

@@ -194,10 +194,15 @@ export function FooterNote({ children }: { children: ReactNode }) {
   );
 }
 
-/** Peer buttons at one width: the full row on a phone, side by side beside the note on wider screens. */
+/**
+ * Peer buttons at one width: the full row on a phone, side by side beside the note on wider screens.
+ * On a phone the global 18px button padding leaves too little room for two labels, so it is
+ * tightened here (important, since that rule sits outside the utility layer), and a label that
+ * still does not fit truncates.
+ */
 export function FooterActions({ children }: { children: ReactNode }) {
   return (
-    <div className="grid w-full shrink-0 auto-cols-fr grid-flow-col gap-2 sm:w-auto [&_.dg-btn]:w-full [&_.dg-btn]:justify-center">
+    <div className="grid w-full shrink-0 auto-cols-fr grid-flow-col gap-2 sm:w-auto [&_.dg-btn]:w-full [&_.dg-btn]:justify-center [&_.dg-btn]:min-w-0 max-sm:[&_.dg-btn]:px-3!">
       {children}
     </div>
   );

@@ -5,7 +5,7 @@ import { CalendarDays } from "lucide-react";
 import { describeStatusCard } from "@dubgrid/domain";
 import type { AbsenceType, Employee } from "@/types";
 import { formatDateKey } from "@/lib/utils";
-import { STATUS_KIND_ICONS, STATUS_TONE_COLORS, StatusIconCircle } from "./StatusMarkIcon";
+import { STATUS_KIND_ICONS, STATUS_TONE_COLORS, StatusSymbol } from "./StatusMarkIcon";
 
 interface EmployeeStatusCardProps {
   employee: Employee;
@@ -104,7 +104,7 @@ export function EmployeeStatusCard({
         background: active ? "var(--dg-color-surface)" : colors.bg,
       }}
     >
-      <StatusIconCircle icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
+      <StatusSymbol icon={STATUS_KIND_ICONS[current.kind]} tone={current.tone} />
       <CardText
         title={current.title}
         detail={current.detail}
@@ -126,7 +126,7 @@ export function EmployeeStatusCard({
             background: "var(--dg-color-surface)",
           }}
         >
-          <StatusIconCircle icon={CalendarDays} tone="warning" />
+          <StatusSymbol icon={CalendarDays} tone="warning" />
           <CardText
             eyebrow="First day"
             title={starts.title}
@@ -145,7 +145,7 @@ export function EmployeeStatusCard({
             background: "var(--dg-color-surface)",
           }}
         >
-          <StatusIconCircle icon={CalendarDays} tone="warning" />
+          <StatusSymbol icon={CalendarDays} tone="warning" />
           <CardText
             eyebrow="Planned"
             title={planned.title}

@@ -1,7 +1,32 @@
 import {
+  AlarmClock,
+  Calendar1,
+  Monitor,
+  Users,
+  Plane,
+  CalendarCheck,
+  CalendarDays,
+  CalendarOff,
+  CalendarRange,
+  CalendarX,
+  CalendarX2,
+  CreditCard,
+  FilePen,
+  FileWarning,
+  FlaskConical,
+  Pause,
+  ShieldOff,
+  Trash2,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  CircleCheck,
+  CircleCheckBig,
+  CircleX,
   Clock,
   Eye,
   Hourglass,
+  Info,
   Lock,
   Mail,
   MailX,
@@ -13,15 +38,34 @@ import {
 import type { StatusIconTone } from "@dubgrid/design-tokens";
 
 /**
- * A Lucide shape drawn solid: `fill` paths in the icon colour, `stroke` paths
- * as lines in the icon colour, and `cut` marks (lines) and `cutFill` shapes in
- * the colour behind the icon, so they read as holes.
+ * A Lucide shape drawn solid: `fill` paths filled, `stroke` paths as lines,
+ * `cut` marks (lines) and `cutFill` shapes cut out as holes, and `front`
+ * shapes drawn last with a gap cut around them, for one shape in front of
+ * another.
  */
-type SolidGlyph = { fill: string[]; stroke?: string[]; cut?: string[]; cutFill?: string[] };
+type SolidGlyph = {
+  fill: string[];
+  stroke?: string[];
+  cut?: string[];
+  cutFill?: string[];
+  front?: string[];
+};
 
 const CIRCLE = "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z";
 const MAIL = "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
 const MAIL_FLAP = "m21 7.5-8.47 5.4a1 1 0 0 1-1.06 0L3 7.5";
+const CALENDAR = "M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
+const PAGE = "M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z";
+const PERSON_HEAD = "M9 3a4 4 0 1 0 0 8a4 4 0 1 0 0-8z";
+const PERSON_BODY = "M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2z";
+
+function calendar(...marks: string[]): SolidGlyph {
+  return { fill: [CALENDAR], stroke: ["M8 2v4", "M16 2v4"], cut: ["M2 10h20", ...marks] };
+}
+
+function person(...marks: string[]): SolidGlyph {
+  return { fill: [PERSON_HEAD, PERSON_BODY], stroke: marks };
+}
 
 const TONE_GLYPHS: Record<StatusIconTone, SolidGlyph> = {
   success: { fill: [CIRCLE], cut: ["m8.5 12 2.5 2.5 4.5-5"] },
@@ -38,8 +82,108 @@ const TONE_GLYPHS: Record<StatusIconTone, SolidGlyph> = {
   },
 };
 
-// Own icons with a natural solid form. Any other own icon sits in a tone circle.
+// Own icons with a natural solid form. Any other own icon sits in a tone circle,
+// so an icon drawn in a ring needs an entry here, or it shows a ring in a disc.
 const SOLID_GLYPHS = new Map<LucideIcon, SolidGlyph>([
+  [
+    Users,
+    {
+      fill: ["M16 2.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7z", "M13 14h6a4 4 0 0 1 4 4v2H13z"],
+      front: [PERSON_HEAD, PERSON_BODY],
+    },
+  ],
+  [
+    Calendar1,
+    {
+      fill: ["M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"],
+      stroke: ["M16 2v3", "M8 2v3"],
+      cut: ["M2 9h20", "M11 13h1v4"],
+    },
+  ],
+  [
+    Monitor,
+    {
+      fill: ["M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"],
+      stroke: ["M8 21h8", "M12 17v4"],
+    },
+  ],
+  [
+    Plane,
+    {
+      fill: [
+        "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z",
+      ],
+    },
+  ],
+  [CalendarCheck, calendar("m9 16 2 2 4-4")],
+  [CalendarRange, calendar("M17 14h-6", "M13 18H7", "M7 14h.01", "M17 18h.01")],
+  [
+    CalendarDays,
+    calendar("M8 14h.01", "M12 14h.01", "M16 14h.01", "M8 18h.01", "M12 18h.01", "M16 18h.01"),
+  ],
+  [CalendarX, calendar("m14 14-4 4", "m10 14 4 4")],
+  [CalendarX2, calendar("m14 14-4 4", "m10 14 4 4")],
+  [CalendarOff, calendar("m4 4 16 16")],
+  [
+    Trash2,
+    {
+      fill: ["M5 6h14v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"],
+      stroke: ["M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
+      cut: ["M10 11v6", "M14 11v6"],
+    },
+  ],
+  [
+    CreditCard,
+    {
+      fill: ["M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"],
+      cut: ["M1 10h22", "M6 15h4"],
+    },
+  ],
+  [
+    Pause,
+    {
+      fill: [
+        "M6 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z",
+        "M15 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z",
+      ],
+    },
+  ],
+  [FileWarning, { fill: [PAGE], cut: ["M12 10v4", "M12 17.5h.01"] }],
+  [FilePen, { fill: [PAGE], cut: ["m8.5 17.5 6-6"] }],
+  [
+    FlaskConical,
+    {
+      fill: [
+        "M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2z",
+      ],
+      stroke: ["M8.5 2h7"],
+      cut: ["M6.5 15h11"],
+    },
+  ],
+  [
+    ShieldOff,
+    {
+      fill: [
+        "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+      ],
+      cut: ["m4 4 16 16"],
+    },
+  ],
+  [UserPlus, person("M19 8v6", "M22 11h-6")],
+  [UserMinus, person("M22 11h-6")],
+  [UserCheck, person("m16 11 2 2 4-4")],
+  [CircleCheck, TONE_GLYPHS.success],
+  [CircleCheckBig, TONE_GLYPHS.success],
+  [Info, TONE_GLYPHS.info],
+  [CircleX, { fill: [CIRCLE], cut: ["m15 9-6 6", "m9 9 6 6"] }],
+  [
+    AlarmClock,
+    {
+      fill: ["M12 5a8 8 0 1 0 0 16a8 8 0 1 0 0-16z"],
+      stroke: ["M5 3 2 6", "m22 6-3-3", "M6.38 18.7 4 21", "M17.64 18.67 20 21"],
+      cut: ["M12 9v4l2 2"],
+    },
+  ],
   [
     Lock,
     {
@@ -97,40 +241,60 @@ const SOLID_GLYPHS = new Map<LucideIcon, SolidGlyph>([
   ],
 ]);
 
+// Ids only need to be unique per shape: two icons with the same shape can
+// share one mask, since a mask holds no colour.
+function shapeId(prefix: string, parts: readonly string[]): string {
+  let hash = 5381;
+  for (const ch of parts.join("|")) hash = ((hash << 5) + hash + ch.charCodeAt(0)) | 0;
+  return `${prefix}-${(hash >>> 0).toString(36)}`;
+}
+
 export interface StatusIconProps {
   tone: StatusIconTone;
   /** An own icon in place of the tone's shape. */
   icon?: LucideIcon;
   size: number;
-  /**
-   * Sets `color` (the icon) and `--dg-icon-cut` (the colour behind it, which
-   * its marks are drawn in).
-   */
+  /** Sets `color`, which the icon is drawn in. */
   className?: string;
+  /** Fills the marks with a colour of their own instead of leaving them as holes. */
+  markColor?: string;
 }
 
-/** A tone or own icon drawn solid, with its marks cut out to the background. */
-export function StatusIcon({ tone, icon, size, className }: StatusIconProps) {
+/**
+ * A tone or own icon drawn solid, its marks cut out as real holes, so they
+ * show whatever is behind the icon. The fill is traced with the line icon's
+ * own 2px line, so every part and gap matches the line icon, with mitred
+ * joins so its corners stay sharp.
+ */
+export function StatusIcon({ tone, icon, size, className, markColor }: StatusIconProps) {
   const solid = icon ? SOLID_GLYPHS.get(icon) : TONE_GLYPHS[tone];
 
   if (icon && !solid) {
     const Glyph = icon;
+    const id = shapeId("dg-disc", [Glyph.displayName ?? "icon"]);
     return (
       <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className={className}>
-        <path d={CIRCLE} fill="currentColor" />
-        <Glyph
-          x={6}
-          y={6}
-          width={12}
-          height={12}
-          strokeWidth={2.5}
-          className="text-[var(--dg-icon-cut)]"
-        />
+        <mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <path d={CIRCLE} fill="white" />
+          <Glyph x={5.25} y={5.25} width={13.5} height={13.5} strokeWidth={2.4} color="black" />
+        </mask>
+        <rect width="24" height="24" fill="currentColor" mask={`url(#${id})`} />
       </svg>
     );
   }
 
   const glyph = solid ?? TONE_GLYPHS[tone];
+  const id = shapeId("dg-solid", [
+    ...glyph.fill,
+    "s",
+    ...(glyph.stroke ?? []),
+    "c",
+    ...(glyph.cut ?? []),
+    "f",
+    ...(glyph.cutFill ?? []),
+    "o",
+    ...(glyph.front ?? []),
+  ]);
   return (
     <svg
       width={size}
@@ -138,32 +302,54 @@ export function StatusIcon({ tone, icon, size, className }: StatusIconProps) {
       viewBox="0 0 24 24"
       aria-hidden="true"
       className={`overflow-visible ${className ?? ""}`}
-      strokeLinecap="round"
-      strokeLinejoin="round"
     >
-      {glyph.fill.map((d) => (
-        <path key={d} d={d} fill="currentColor" stroke="currentColor" strokeWidth={2} />
-      ))}
-      {glyph.stroke?.map((d) => (
-        <path key={d} d={d} fill="none" stroke="currentColor" strokeWidth={2} />
-      ))}
-      {glyph.cut?.map((d) => (
-        <path
-          key={d}
-          d={d}
-          fill="none"
-          strokeWidth={2.25}
-          className="stroke-[var(--dg-icon-cut)]"
-        />
-      ))}
-      {glyph.cutFill?.map((d) => (
-        <path
-          key={d}
-          d={d}
-          strokeWidth={0.5}
-          className="fill-[var(--dg-icon-cut)] stroke-[var(--dg-icon-cut)]"
-        />
-      ))}
+      <mask
+        id={id}
+        maskUnits="userSpaceOnUse"
+        x="-2"
+        y="-2"
+        width="28"
+        height="28"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {glyph.fill.map((d) => (
+          <path
+            key={d}
+            d={d}
+            fill="white"
+            stroke="white"
+            strokeWidth={2}
+            strokeLinejoin="miter"
+            strokeMiterlimit={2.5}
+          />
+        ))}
+        {glyph.stroke?.map((d) => (
+          <path key={d} d={d} fill="none" stroke="white" strokeWidth={2} />
+        ))}
+        {glyph.cut?.map((d) => (
+          <path key={d} d={d} fill="none" stroke="black" strokeWidth={2} />
+        ))}
+        {glyph.cutFill?.map((d) => (
+          <path key={d} d={d} fill="black" stroke="black" strokeWidth={0.5} />
+        ))}
+        {glyph.front?.map((d) => (
+          <path key={`gap-${d}`} d={d} fill="black" stroke="black" strokeWidth={5} />
+        ))}
+        {glyph.front?.map((d) => (
+          <path
+            key={d}
+            d={d}
+            fill="white"
+            stroke="white"
+            strokeWidth={2}
+            strokeLinejoin="miter"
+            strokeMiterlimit={2.5}
+          />
+        ))}
+      </mask>
+      {markColor ? glyph.fill.map((d) => <path key={d} d={d} fill={markColor} />) : null}
+      <rect x="-2" y="-2" width="28" height="28" fill="currentColor" mask={`url(#${id})`} />
     </svg>
   );
 }
