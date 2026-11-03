@@ -28,9 +28,10 @@ status cards stay white with their borders.
 - **Status cards stay white**, as in production, with their borders. A
   status written in its tone's colour (Away, Suspended, Planned, First day)
   draws its icon in that same colour; amber is a step lighter than warning
-  text (amber 700, 5:1 on white). A plan's dashed outline is drawn with
-  longer, spaced dashes in that amber muted toward the gray border, as quiet
-  as a plain border but still amber. Beside a neutral title (Active, the
+  text (amber 700, 5:1 on white). A plan keeps its original dashed border,
+  a tad darker: the pale amber border a quarter of the way to its icon's
+  amber. Matching it to the icon, and drawn longer muted dashes, were tried
+  and dropped. Beside a neutral title (Active, the
   invitation card, Change status options) the icon keeps the tone's bright
   colour, as toasts do. Banner tints for status cards and pale cards with an
   outlined icon in a circle were tried and dropped (owner, 2026-11-03).
@@ -42,8 +43,7 @@ Toasts are unchanged. Web only; mobile keeps its own colours.
 - [x] **1.** `Banner` and `StatusSymbol` take the text colour; the banner
       icon tokens go.
 - [x] **2.** Lighter shared colours and no banner borders.
-- [x] **3.** White status cards; a tinted status shares its icon's colour;
-      a plan's outline has long, muted amber dashes.
+- [x] **3.** White status cards; a tinted status shares its icon's colour.
 
 ## Verify
 

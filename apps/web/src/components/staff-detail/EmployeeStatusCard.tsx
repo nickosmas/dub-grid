@@ -64,30 +64,8 @@ function CardText({
   );
 }
 
-// A CSS dashed border can't set its dash length, so a plan's outline is drawn:
-// long, spaced dashes in amber muted toward the gray border, so it keeps its
-// colour as quietly as a plain border.
-const PLAN_OUTLINE = `color-mix(in srgb, ${STATUS_TONE_COLORS.warning.text} 45%, var(--dg-color-border))`;
-
-function PlanOutline() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="pointer-events-none absolute -inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] overflow-visible"
-    >
-      <rect
-        x="0.5"
-        y="0.5"
-        rx="9.5"
-        className="h-[calc(100%-1px)] w-[calc(100%-1px)]"
-        fill="none"
-        stroke={PLAN_OUTLINE}
-        strokeWidth={1}
-        strokeDasharray="7 5"
-      />
-    </svg>
-  );
-}
+// A plan's dashes: the pale amber border, a quarter of the way to its icon's amber.
+const PLAN_BORDER = `color-mix(in srgb, ${STATUS_TONE_COLORS.warning.border} 75%, ${STATUS_TONE_COLORS.warning.text})`;
 
 /**
  * Where someone stands, at the top of their profile, in the dialog's words:
@@ -151,12 +129,10 @@ export function EmployeeStatusCard({
           data-status="starts"
           style={{
             ...cardStyle,
-            position: "relative",
-            border: "1px solid transparent",
+            border: `1px dashed ${PLAN_BORDER}`,
             background: "var(--dg-color-surface)",
           }}
         >
-          <PlanOutline />
           <StatusSymbol
             icon={CalendarDays}
             tone="warning"
@@ -176,12 +152,10 @@ export function EmployeeStatusCard({
           data-status="planned"
           style={{
             ...cardStyle,
-            position: "relative",
-            border: "1px solid transparent",
+            border: `1px dashed ${PLAN_BORDER}`,
             background: "var(--dg-color-surface)",
           }}
         >
-          <PlanOutline />
           <StatusSymbol
             icon={CalendarDays}
             tone="warning"
