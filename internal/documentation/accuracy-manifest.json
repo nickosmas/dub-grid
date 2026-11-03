@@ -386,7 +386,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9219dce150b0500e06aabf7e8f37782c2325d94779e9cf310931193777cc427e"
+      "evidenceFingerprint": "sha256:05ff6912268e3f7490ae266651b98d42b93a920d2d9d32ea198821aa56a4ee00"
     },
     {
       "id": "draft-publish",
@@ -616,7 +616,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:19d0fcd6ddb62a39c6eccbbc86cc044375e978f66e35fae93363ccedffca0dfa"
+      "evidenceFingerprint": "sha256:614cd29ea4c72e3827d203c149f4299f2617126b4cd7411ddc3cfae498fd840d"
     },
     {
       "id": "dashboard",
@@ -690,7 +690,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cd4279763361234d81cb406ec7b543675dcab9c99bd1fbe3a60d1b1138c545be"
+      "evidenceFingerprint": "sha256:b8d010a28c12166308b4478c50dc52e403ca4f2c1d093182ccc53e98ef0d5976"
     },
     {
       "id": "roster",
@@ -764,7 +764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2495be0f0891eaf3bb69f72f2c10c7d40141bd98db395efed6991c8dd33ff7f6"
+      "evidenceFingerprint": "sha256:ea4740ff4d1d7cafb9547792cf5d6b092614ac4282ba8ac8d3ebd96ebdf5df0b"
     },
     {
       "id": "person-detail",
@@ -845,7 +845,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2d1c8528372d5c0a0c02dc5c7776288c3ab945dbd62a8e1fd265f45daadd5bc6"
+      "evidenceFingerprint": "sha256:3990dfce1e93bf03ea66d1b576ec8e2c96b9f76aeef981db9ee80c3498ffc2fb"
     },
     {
       "id": "invitations",
@@ -908,7 +908,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:38e4aff98e487f235676d77ac87d716c332cfaab3f163a6721940f2c5ef41d5d"
+      "evidenceFingerprint": "sha256:b4ec1b42dc09b80f809b1f6a38f4aa3f6af9e539f6b1b64b412c23c8a8bb4d72"
     },
     {
       "id": "organization",
@@ -1321,7 +1321,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b94bbeaa41382e6143430040a8007887ad6d8c9453e4b01f62882cd26a1e74b5"
+      "evidenceFingerprint": "sha256:dc0ab68fa30ba0e5affb1bb386d16b5be363bb10c3d3f0d1fe3dc06f270a51af"
     },
     {
       "id": "alerts",
@@ -1387,7 +1387,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:9c2ef203040b9bba15d452bad2c47e9dd772a971db4db0ed184d576d55dd0228"
+      "evidenceFingerprint": "sha256:a19b0c9ecaaa55694d166263cbaa512a76d35d5ef6c8aba5de585612e1c4d9d5"
     },
     {
       "id": "reports",
@@ -1439,7 +1439,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:227033f0f34774aeed5a3ab894688f50b46f9449a865918353b319f88a378de1"
+      "evidenceFingerprint": "sha256:fa29f479451cae0f6d27b9b7224e9f3f143d741841a0be281281188c8ac42e74"
     },
     {
       "id": "profile",
@@ -1514,7 +1514,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1e002dc3888d92d8591da2e93d3159c8ece3a98792f2f1c3e6f175207c954448"
+      "evidenceFingerprint": "sha256:112026e15167492c955d3a4e73206668aa510d86220d998af9ba76b8eccd0359"
     },
     {
       "id": "security-sessions",
@@ -1593,7 +1593,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2cf1a34edfaa2200e541b301f1ef1c1fb90ba8be0383e871bb70da377c26219d"
+      "evidenceFingerprint": "sha256:34ba9b3f272d8c755519d11da635a2d7db1d99559fb05bd46e65bc1f5ac12df8"
     },
     {
       "id": "privacy-controls",
@@ -2090,7 +2090,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:028c842fba29e02b31007cdc250a8b7fd149626469169ba9b66897914c7f2531"
+      "evidenceFingerprint": "sha256:47536da02f4e4e46eb6f5c1dca061b622aa855306aec1b9553e27de51c7d1de6"
     },
     {
       "id": "integrations-exports",
@@ -2148,7 +2148,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:bc28355ff400b9469d293301c2096af4aa0385f3a4d7be632ac3a576fde838c9"
+      "evidenceFingerprint": "sha256:8a592c89d5b857b12cb20f5122adb1b38b8a1158ff8ab96c856fc1fb4676fd3e"
     }
   ],
   "surfaceExclusions": [
