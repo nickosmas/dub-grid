@@ -73,15 +73,7 @@ function SeatCard({
         borderRadius: "var(--dg-radius-lg)",
       }}
     >
-      <span
-        style={{
-          fontSize: "var(--dg-fs-caption)",
-          fontWeight: 600,
-          color: "var(--dg-color-text-muted)",
-        }}
-      >
-        {label}
-      </span>
+      <span className="dg-type-content-group-heading">{label}</span>
       <span className="dg-tabular-nums" style={{ fontSize: 28, fontWeight: 700, lineHeight: 1 }}>
         {value}
       </span>
