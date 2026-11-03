@@ -37,7 +37,7 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
     warning: {
       bg: "var(--dg-color-warning-bg)",
       border: "var(--dg-color-warning-border)",
-      text: "var(--dg-color-warning-text)",
+      text: "var(--dg-color-status-warning-text)",
     },
     danger: {
       bg: "var(--dg-color-danger-bg)",
@@ -52,32 +52,15 @@ export const STATUS_TONE_COLORS: Record<StatusTone, { bg: string; border: string
   };
 
 /**
- * A status card's fill, border and the one colour its icon and status share:
- * the same tint and colour a banner of that tone uses.
+ * A status icon's bright tone colour, as toasts use: status cards and Change
+ * status options sit on white with neutral text, so the icon carries the tone.
  */
-export const STATUS_CARD_COLORS: Record<StatusTone, { bg: string; border: string; text: string }> =
-  {
-    success: {
-      bg: "var(--dg-color-banner-success-bg)",
-      border: "var(--dg-color-banner-success-border)",
-      text: "var(--dg-color-banner-success-text)",
-    },
-    warning: {
-      bg: "var(--dg-color-banner-warning-bg)",
-      border: "var(--dg-color-banner-warning-border)",
-      text: "var(--dg-color-banner-warning-text)",
-    },
-    danger: {
-      bg: "var(--dg-color-banner-danger-bg)",
-      border: "var(--dg-color-banner-danger-border)",
-      text: "var(--dg-color-banner-danger-text)",
-    },
-    neutral: {
-      bg: "var(--dg-color-bg-secondary)",
-      border: "var(--dg-color-border)",
-      text: "var(--dg-color-text-secondary)",
-    },
-  };
+const STATUS_ICON_COLORS: Record<StatusTone, string> = {
+  success: "var(--dg-color-toast-icon-success)",
+  warning: "var(--dg-color-toast-icon-warning)",
+  danger: "var(--dg-color-toast-icon-danger)",
+  neutral: "var(--dg-color-text-muted)",
+};
 
 /**
  * The status icon drawn right after a person's name: a lock for Suspended, a
@@ -121,17 +104,17 @@ export function StatusIcon({ kind, size = 13 }: { kind: StatusMarkKind; size?: n
 }
 
 /**
- * A status's icon drawn solid in its tone's text colour, the colour its card
- * writes the status in, for the status card and the Change staff status dialog.
+ * A status's icon drawn solid, for the status cards and Change status. Beside
+ * a status written in its tone's colour, it takes that colour (`color`);
+ * beside neutral text, the tone's bright colour.
  */
 export function StatusSymbol({
   icon,
   tone,
-  color = STATUS_TONE_COLORS[tone].text,
+  color = STATUS_ICON_COLORS[tone],
 }: {
   icon: LucideIcon;
   tone: StatusTone;
-  /** The colour of the text beside it, when that isn't the tone's own. */
   color?: string;
 }) {
   return (

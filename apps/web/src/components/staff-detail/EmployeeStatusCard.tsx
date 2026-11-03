@@ -5,7 +5,7 @@ import { CalendarDays } from "lucide-react";
 import { describeStatusCard } from "@dubgrid/domain";
 import type { AbsenceType, Employee } from "@/types";
 import { formatDateKey } from "@/lib/utils";
-import { STATUS_CARD_COLORS, STATUS_KIND_ICONS, StatusSymbol } from "./StatusMarkIcon";
+import { STATUS_KIND_ICONS, STATUS_TONE_COLORS, StatusSymbol } from "./StatusMarkIcon";
 
 interface EmployeeStatusCardProps {
   employee: Employee;
@@ -64,10 +64,35 @@ function CardText({
   );
 }
 
+// A CSS dashed border can't set its dash length, so a plan's outline is drawn:
+// long, spaced dashes in amber muted toward the gray border, so it keeps its
+// colour as quietly as a plain border.
+const PLAN_OUTLINE = `color-mix(in srgb, ${STATUS_TONE_COLORS.warning.text} 45%, var(--dg-color-border))`;
+
+function PlanOutline() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute -inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] overflow-visible"
+    >
+      <rect
+        x="0.5"
+        y="0.5"
+        rx="9.5"
+        className="h-[calc(100%-1px)] w-[calc(100%-1px)]"
+        fill="none"
+        stroke={PLAN_OUTLINE}
+        strokeWidth={1}
+        strokeDasharray="7 5"
+      />
+    </svg>
+  );
+}
+
 /**
  * Where someone stands, at the top of their profile, in the dialog's words:
- * tinted like a banner of their tone, with a dashed card for a first day
- * still ahead (51g4) and one for a change planned for later.
+ * tinted like their pill, white while Active, with a dashed card for a first
+ * day still ahead (51g4) and one for a change planned for later.
  */
 export function EmployeeStatusCard({
   employee,
@@ -83,8 +108,8 @@ export function EmployeeStatusCard({
     absenceName,
     today: formatDateKey(new Date()),
   });
-  const colors = STATUS_CARD_COLORS[current.tone];
-  const planColors = STATUS_CARD_COLORS.warning;
+  const active = current.kind === "active";
+  const colors = STATUS_TONE_COLORS[current.tone];
   const cardStyle = {
     display: "flex",
     alignItems: "center",
@@ -100,16 +125,20 @@ export function EmployeeStatusCard({
       data-status={current.kind}
       style={{
         ...cardStyle,
-        border: `1px solid ${colors.border}`,
-        background: colors.bg,
+        border: `1px solid ${active ? "var(--dg-color-border)" : colors.border}`,
+        background: active ? "var(--dg-color-surface)" : colors.bg,
       }}
     >
       <StatusSymbol
         icon={STATUS_KIND_ICONS[current.kind]}
         tone={current.tone}
-        color={colors.text}
+        color={active ? undefined : colors.text}
       />
-      <CardText title={current.title} detail={current.detail} color={colors.text} />
+      <CardText
+        title={current.title}
+        detail={current.detail}
+        color={active ? "var(--dg-color-text-primary)" : colors.text}
+      />
       {action ? <div className="shrink-0">{action}</div> : null}
     </section>
   );
@@ -122,16 +151,22 @@ export function EmployeeStatusCard({
           data-status="starts"
           style={{
             ...cardStyle,
-            border: `1px dashed ${planColors.border}`,
-            background: planColors.bg,
+            position: "relative",
+            border: "1px solid transparent",
+            background: "var(--dg-color-surface)",
           }}
         >
-          <StatusSymbol icon={CalendarDays} tone="warning" color={planColors.text} />
+          <PlanOutline />
+          <StatusSymbol
+            icon={CalendarDays}
+            tone="warning"
+            color={STATUS_TONE_COLORS.warning.text}
+          />
           <CardText
             eyebrow="First day"
             title={starts.title}
             detail={starts.detail}
-            color={planColors.text}
+            color={STATUS_TONE_COLORS.warning.text}
           />
         </section>
       ) : null}
@@ -141,16 +176,22 @@ export function EmployeeStatusCard({
           data-status="planned"
           style={{
             ...cardStyle,
-            border: `1px dashed ${planColors.border}`,
-            background: planColors.bg,
+            position: "relative",
+            border: "1px solid transparent",
+            background: "var(--dg-color-surface)",
           }}
         >
-          <StatusSymbol icon={CalendarDays} tone="warning" color={planColors.text} />
+          <PlanOutline />
+          <StatusSymbol
+            icon={CalendarDays}
+            tone="warning"
+            color={STATUS_TONE_COLORS.warning.text}
+          />
           <CardText
             eyebrow="Planned"
             title={planned.title}
             detail={planned.detail}
-            color={planColors.text}
+            color={STATUS_TONE_COLORS.warning.text}
           />
           {planAction ? <div className="shrink-0">{planAction}</div> : null}
         </section>

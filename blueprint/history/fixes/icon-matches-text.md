@@ -14,8 +14,8 @@ dark (owner, 2026-11-03).
 
 ## The fix
 
-Owner decisions, 2026-11-03: one shared colour, no banner borders, and status
-cards on the banners' stronger tints with their borders kept.
+Owner decisions, 2026-11-03: one shared colour and no borders for banners;
+status cards stay white with their borders.
 
 - **One colour.** A banner's icon and text share one colour, a step lighter
   than before in light mode and as light as text allows on the tint (amber
@@ -25,11 +25,15 @@ cards on the banners' stronger tints with their borders kept.
 - **No banner borders.** Banners, full-width bars, the Schedule's bars, the
   recurring schedule's editing notice and the landing page's draft banner
   lose their border.
-- **Status cards match banners.** The status, First day, Planned and
-  invitation cards take the tint, border and shared colour of a banner of
-  their tone (`STATUS_CARD_COLORS`), keeping their borders (dashed for
-  plans); the Active and invitation cards, white before, are tinted too.
-  Change status options keep their outline and tone colours.
+- **Status cards stay white**, as in production, with their borders. A
+  status written in its tone's colour (Away, Suspended, Planned, First day)
+  draws its icon in that same colour; amber is a step lighter than warning
+  text (amber 700, 5:1 on white). A plan's dashed outline is drawn with
+  longer, spaced dashes in that amber muted toward the gray border, as quiet
+  as a plain border but still amber. Beside a neutral title (Active, the
+  invitation card, Change status options) the icon keeps the tone's bright
+  colour, as toasts do. Banner tints for status cards and pale cards with an
+  outlined icon in a circle were tried and dropped (owner, 2026-11-03).
 
 Toasts are unchanged. Web only; mobile keeps its own colours.
 
@@ -37,8 +41,9 @@ Toasts are unchanged. Web only; mobile keeps its own colours.
 
 - [x] **1.** `Banner` and `StatusSymbol` take the text colour; the banner
       icon tokens go.
-- [x] **2.** Lighter shared colours and no banner borders; status cards on
-      banner tints with their borders.
+- [x] **2.** Lighter shared colours and no banner borders.
+- [x] **3.** White status cards; a tinted status shares its icon's colour;
+      a plan's outline has long, muted amber dashes.
 
 ## Verify
 
