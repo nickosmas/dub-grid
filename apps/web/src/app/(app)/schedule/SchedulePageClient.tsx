@@ -73,7 +73,7 @@ import {
   CalendarCheck,
   FilePen,
   Trash2,
-  Unplug,
+  Lock,
   X,
   CircleCheck,
   CalendarPlus,
@@ -8642,7 +8642,7 @@ function SchedulerContent({
           >
             {isSessionEnded && (
               <div className="dg-draft-banner no-print" role="status">
-                <BannerIcon tone="warning" icon={Unplug} />
+                <BannerIcon tone="warning" icon={Lock} />
                 <strong>Schedule session ended</strong>
                 <span>
                   This tab is read-only. Any unsaved schedule changes here were not saved.
