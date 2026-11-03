@@ -797,7 +797,6 @@ function SchedulerContent({
   const [showPublishDiff, setShowPublishDiff] = useState(false);
   const [showPublishHistory, setShowPublishHistory] = useState(false);
   const lastViewedRef = useRef<string | null>(null);
-  const hasShownChangeToast = useRef(false);
   const pageRootRef = useRef<HTMLDivElement>(null);
   const stickyChromeRef = useRef<HTMLDivElement>(null);
   const [activeOperation, setActiveOperation] = useState<ScheduleOperation | null>(null);
@@ -1635,25 +1634,6 @@ function SchedulerContent({
         // The grid is usable before this lands, so a publish or a picked
         // history entry may have set the history first; that one is newer.
         setPublishHistory((current) => (current.length > 0 ? current : recentPublishes));
-      }
-
-      // Show "what changed" toast once per mount
-      if (recentPublishes.length > 0 && !hasShownChangeToast.current) {
-        hasShownChangeToast.current = true;
-        const allChanges = recentPublishes.flatMap((e) => e.changes);
-        const newCount = allChanges.filter((c) => c.kind === "new").length;
-        const modCount = allChanges.filter((c) => c.kind === "modified").length;
-        const delCount = allChanges.filter((c) => c.kind === "deleted").length;
-        const parts: string[] = [];
-        if (newCount > 0) parts.push(`${newCount} new`);
-        if (modCount > 0) parts.push(`${modCount} modified`);
-        if (delCount > 0) parts.push(`${delCount} removed`);
-        if (parts.length > 0) {
-          toast.info(
-            `${allChanges.length} shift${allChanges.length !== 1 ? "s" : ""} changed since your last visit: ${parts.join(", ")}`,
-            { duration: 6000 },
-          );
-        }
       }
 
       // Fire-and-forget: update last-viewed timestamp for this user, only once
