@@ -1,5 +1,6 @@
 import {
   AlarmClock,
+  PlaneTakeoff,
   CalendarCheck,
   CalendarCog,
   CalendarDays,
@@ -77,6 +78,15 @@ const TONE_GLYPHS: Record<StatusIconTone, SolidGlyph> = {
 // Own icons with a natural solid form. Any other own icon sits in a tone circle,
 // so an icon drawn in a ring needs an entry here, or it shows a ring in a disc.
 const SOLID_GLYPHS = new Map<LucideIcon, SolidGlyph>([
+  [
+    PlaneTakeoff,
+    {
+      fill: [
+        "M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z",
+      ],
+      stroke: ["M2 22h20"],
+    },
+  ],
   [CalendarCheck, calendar("m9 16 2 2 4-4")],
   [CalendarRange, calendar("M17 14h-6", "M13 18H7", "M7 14h.01", "M17 18h.01")],
   [

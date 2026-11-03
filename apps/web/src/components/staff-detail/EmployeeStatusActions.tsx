@@ -23,7 +23,7 @@ import {
   suggestedStatusChoice,
   type StatusAction,
 } from "@dubgrid/domain";
-import { STATUS_KIND_ICONS, StatusIconCircle } from "./StatusMarkIcon";
+import { STATUS_KIND_ICONS, StatusSymbol } from "./StatusMarkIcon";
 
 export interface EmployeeStatusActionsProps {
   employee: Employee;
@@ -826,10 +826,9 @@ export function EmployeeStatusActions({
                     detail: option.unavailableReason ?? option.detail,
                     disabled: !option.available,
                     icon: (
-                      <StatusIconCircle
+                      <StatusSymbol
                         icon={STATUS_KIND_ICONS[option.kind]}
                         tone={CHOICE_TONES[option.kind]}
-                        size={30}
                       />
                     ),
                   }))}

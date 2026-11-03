@@ -1,6 +1,6 @@
 "use client";
 
-import { Moon } from "lucide-react";
+import { PlaneTakeoff } from "lucide-react";
 import { usePermissions } from "@/hooks";
 import { Banner } from "@/components/ui/Banner";
 
@@ -11,7 +11,7 @@ export default function InactiveAccountBanner() {
 
   // Info, not a warning: being away isn't something to fix.
   return (
-    <Banner icon={Moon} layout="bar" role="status" tone="info">
+    <Banner icon={PlaneTakeoff} layout="bar" role="status" tone="info">
       You&apos;re away.
     </Banner>
   );

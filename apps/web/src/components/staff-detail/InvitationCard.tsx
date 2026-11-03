@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Mail, MailX } from "lucide-react";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { INVITATION_ACTION_COPY } from "@/components/staff/useInvitationActionConfirm";
 import { describeInvitationCard, type PersonAccountState } from "@/lib/person-account-state";
-import { StatusIconCircle } from "./StatusMarkIcon";
+import { StatusSymbol } from "./StatusMarkIcon";
 
 type Result = Promise<boolean | void> | boolean | void;
 
@@ -68,18 +68,21 @@ export function InvitationCard({
         aria-label="Invitation"
         data-slot="employee-invitation-card"
         data-invitation={state.kind}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "12px 14px",
-          borderRadius: "var(--dg-radius-lg)",
-          minWidth: 0,
-          border: "1px solid var(--dg-color-border)",
-          background: "var(--dg-color-surface)",
-        }}
+        style={
+          {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 14px",
+            borderRadius: "var(--dg-radius-lg)",
+            minWidth: 0,
+            border: "1px solid var(--dg-color-border)",
+            background: "var(--dg-color-surface)",
+            "--dg-icon-cut": "var(--dg-color-surface)",
+          } as CSSProperties
+        }
       >
-        <StatusIconCircle
+        <StatusSymbol
           icon={state.kind === "expired" ? MailX : Mail}
           tone={invitation ? "warning" : "neutral"}
         />
