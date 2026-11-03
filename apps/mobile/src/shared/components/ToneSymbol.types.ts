@@ -7,6 +7,6 @@ export type ToneSymbolProps = {
   size: number;
   /** The filled shape. */
   color: string;
-  /** The mark on the shape; Android's glyphs cut it out to whatever is behind. */
+  /** The mark on the shape (iOS); Android's glyphs cut it out to whatever is behind. */
   markColor: string;
 };
