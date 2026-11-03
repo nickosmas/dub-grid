@@ -379,6 +379,17 @@
   --dg-color-banner-success-bg: #cbead3;
   --dg-color-banner-success-border: #93cca0;
   --dg-color-banner-success-text: #16452b;
+  /* A banner's solid icon: the brightest of its hue that still stands off the
+     tint (@dubgrid/design-tokens bannerIconColor). Toasts sit on a neutral
+     card, so theirs take the bright fills in both themes. */
+  --dg-color-banner-danger-icon: #dc2626;
+  --dg-color-banner-warning-icon: #d97706;
+  --dg-color-banner-info-icon: #2563eb;
+  --dg-color-banner-success-icon: #15803d;
+  --dg-color-toast-icon-success: #16a34a;
+  --dg-color-toast-icon-warning: #f59e0b;
+  --dg-color-toast-icon-info: #2563eb;
+  --dg-color-toast-icon-danger: #dc2626;
   /* The sticky bars across the top of the page (Banner layout="bar") are
      solid so they call for attention, and stay the same in dark mode. White
      clears 4.8:1 on each fill; amber carries dark text at 7:1. */
@@ -538,6 +549,10 @@
   --dg-color-banner-success-bg: #163b25;
   --dg-color-banner-success-border: #245e3a;
   --dg-color-banner-success-text: #bfe9cc;
+  --dg-color-banner-danger-icon: #f87171;
+  --dg-color-banner-warning-icon: #fbbf24;
+  --dg-color-banner-info-icon: #60a5fa;
+  --dg-color-banner-success-icon: #4ade80;
   --dg-color-today-bg: #152238;
   --dg-color-today-text: #93c5fd;
   --dg-color-today-border: #2c5282;
@@ -1405,9 +1420,8 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 /* ── Dashboard Card ─────────────────────────────────────── */
 /* ── Form Layout Helpers ───────────────────────────────── */
 /* ── Toast Overrides (Sonner) ───────────────────────────── */
-/* A quiet neutral card for every type; only the icon carries the tone. The
-   icon, title, action and close share the title's first 20px line, and the
-   28px buttons overhang the padding by 4px so the card stays 52px tall. */
+/* A quiet neutral card for every type; only the icon carries the tone, as a
+   28px filled shape. The text, action and close center on the icon. */
 [data-sonner-toaster] {
   --width: min(400px, calc(100vw - 32px)) !important;
   --border-radius: var(--dg-radius-2xl) !important;
@@ -1420,33 +1434,35 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   border: 1px solid var(--dg-color-border) !important;
   border-radius: var(--dg-radius-2xl) !important;
   box-shadow: var(--shadow-menu) !important;
-  padding: 16px 8px 16px 16px !important;
+  padding: 14px 8px 14px 14px !important;
   width: var(--width) !important;
-  align-items: flex-start !important;
+  align-items: center !important;
   gap: 12px !important;
 }
 [data-sonner-toast] [data-icon] {
-  width: 20px !important;
-  height: 20px !important;
+  width: 28px !important;
+  height: 28px !important;
   margin: 0 !important;
+  /* The icon's marks are white on its filled shape. */
+  --dg-icon-cut: #ffffff;
 }
 [data-sonner-toast] [data-icon] svg {
-  width: 20px !important;
-  height: 20px !important;
+  width: 28px !important;
+  height: 28px !important;
   margin: 0 !important;
 }
 [data-sonner-toast][data-type="success"] [data-icon] {
-  color: var(--dg-color-success-solid);
+  color: var(--dg-color-toast-icon-success);
 }
 [data-sonner-toast][data-type="error"] [data-icon] {
-  color: var(--dg-color-danger);
+  color: var(--dg-color-toast-icon-danger);
 }
 [data-sonner-toast][data-type="warning"] [data-icon] {
-  color: var(--dg-color-warning-dark);
+  color: var(--dg-color-toast-icon-warning);
 }
 [data-sonner-toast][data-type="info"] [data-icon],
 [data-sonner-toast][data-type="loading"] [data-icon] {
-  color: var(--dg-color-info);
+  color: var(--dg-color-toast-icon-info);
 }
 [data-sonner-toast] [data-content] {
   flex: 1 1 auto;
@@ -1470,7 +1486,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   order: 3;
   flex-shrink: 0;
   height: 28px !important;
-  margin: -4px 0 !important;
+  margin: 0 !important;
   border: none !important;
   border-radius: var(--dg-radius-md) !important;
   background: transparent !important;
