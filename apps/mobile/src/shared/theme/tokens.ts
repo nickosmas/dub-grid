@@ -120,6 +120,8 @@ const MOBILE_LIGHT = {
    * surfaces "fully native").
    */
   background: "#F2F2F7",
+  /** The one flat gray every empty-state scene is drawn in: iOS's systemGray3. */
+  emptySceneInk: "#C7C7CC",
   /**
    * Neutral control fill — the Filter button, chips, the segmented-control
    * track, and `tone="plain"`.
@@ -204,6 +206,7 @@ const MOBILE_DARK = {
    */
   background: "#000000",
   surface: "#1C1C1E",
+  emptySceneInk: "#48484A",
   controlNeutralBg: "#26262B",
   /**
    * Dark counterpart, softened alongside the light one. A dark hairline needs

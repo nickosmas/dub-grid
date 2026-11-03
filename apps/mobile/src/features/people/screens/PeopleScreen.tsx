@@ -286,6 +286,26 @@ export default function PeopleScreen() {
       managementUsersQuery.refetch(),
     ]),
   );
+  // A search names what it was looking for and keeps the field's own clear
+  // control; filters alone get a Clear filters button, since nothing on
+  // screen undoes them otherwise.
+  function noMatchCopy(searchHint: string) {
+    const query = searchValue.trim();
+    if (query) {
+      return {
+        scene: "people-nomatch" as const,
+        title: `No one matches \u201c${query}\u201d`,
+        body: searchHint,
+      };
+    }
+    return {
+      scene: "people-nomatch" as const,
+      title: "No one matches these filters",
+      actionLabel: "Clear filters",
+      onAction: clearFilters,
+    };
+  }
+
   /** Clears the half you're looking at; the other keeps its own filters. */
   function clearFilters() {
     if (isManagementTab) {
@@ -1054,35 +1074,31 @@ export default function PeopleScreen() {
         managementUsers.length === 0 ? (
           <EmptyStateCard
             fillScreen
-            body="Nobody is on an administrative team yet. Invite someone, or add someone from their staff profile."
-            iconName="briefcase-outline"
+            body="Add someone from their staff profile."
+            scene="admin-team-none"
             title="Nobody on an administrative team yet"
           />
         ) : filteredManagementUsers.length === 0 ? (
           <EmptyStateCard
             fillScreen
-            body="Try a different name, email, department, or access role."
-            iconName="search-outline"
-            title="No matches"
+            {...noMatchCopy("Check the spelling, or search by email or access role.")}
           />
         ) : null
       ) : visiblePeople.length === 0 ? (
         <EmptyStateCard
           fillScreen
-          body="Teammates will appear here once they're added to your organization."
-          iconName="people-outline"
+          body="Teammates show here once they're added."
+          scene="teammates-none"
           title="No teammates yet"
         />
       ) : filteredPeople.length === 0 ? (
         <EmptyStateCard
           fillScreen
-          body={
+          {...noMatchCopy(
             regularUserMode
-              ? `Try a different name, ${singularLabelNoun(focusAreaLabel)}, ${singularLabelNoun(certificationLabel)}, or ${singularLabelNoun(roleLabel)}.`
-              : `Try a different name, email, phone, ${singularLabelNoun(focusAreaLabel)}, ${singularLabelNoun(certificationLabel)}, or ${singularLabelNoun(roleLabel)}.`
-          }
-          iconName="search-outline"
-          title="No matches"
+              ? `Check the spelling, or search by ${singularLabelNoun(focusAreaLabel)}, ${singularLabelNoun(certificationLabel)} or ${singularLabelNoun(roleLabel)}.`
+              : `Check the spelling, or search by email, phone, ${singularLabelNoun(focusAreaLabel)} or ${singularLabelNoun(roleLabel)}.`,
+          )}
         />
       ) : null}
       <ManagementUserActionsSheet

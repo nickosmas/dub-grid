@@ -110,7 +110,20 @@ export default function ActivityExpandedScreen() {
       />
 
       {filtered.length === 0 ? (
-        <EmptyStateCard iconName="options-outline" title="No activity matches this filter" />
+        activeFilterCount > 0 ? (
+          <EmptyStateCard
+            actionLabel="Clear filter"
+            onAction={() => setTypeFilter("all")}
+            scene="activity-filtered"
+            title="No activity matches this filter"
+          />
+        ) : (
+          <EmptyStateCard
+            body="Publishes, shift changes and requests show here."
+            scene="activity-empty"
+            title="No recent activity"
+          />
+        )
       ) : (
         <DashboardListSection
           caption={`${filtered.length} ${filtered.length === 1 ? "event" : "events"}`}

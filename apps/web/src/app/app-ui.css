@@ -3364,8 +3364,23 @@ button.dg-cc-sg-main {
   inset: 0;
   pointer-events: none;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--dg-color-surface) 62%, transparent),
+    transparent
+  );
   animation: dg-shimmer 1.5s linear infinite;
+}
+/* The light sweep is the white surface; on a dark page that would flash, so
+   dark mode sweeps a faint lift of the text color over the dark base. */
+.dark :where(.dg-skeleton)::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--dg-color-text-primary) 6%, transparent),
+    transparent
+  );
 }
 .dg-skeleton--text {
   height: 14px;
@@ -3383,6 +3398,19 @@ button.dg-cc-sg-main {
 .dg-skeleton--card {
   height: 120px;
   border-radius: var(--dg-radius-md);
+}
+/* These sheets are unlayered, so a Tailwind rounded or bg utility can't
+   override the base rule; shapes and fills that vary go through modifiers. */
+.dg-skeleton--round {
+  border-radius: 999px;
+}
+.dg-skeleton--control {
+  border-radius: var(--dg-radius-md);
+}
+/* On a strip already filled with the base gray, such as a table heading or a
+   striped row. */
+.dg-skeleton--on-muted {
+  background: var(--dg-color-border);
 }
 .dg-auth-logo-block--compact {
   gap: 8px;

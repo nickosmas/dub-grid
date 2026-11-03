@@ -80,7 +80,7 @@ describe("DashboardHeroCard", () => {
 
     expect(screen.getByText("Not published yet")).toBeInTheDocument();
     expect(
-      screen.getByText("Coverage and open gaps will appear after this period is published."),
+      screen.getByText("Coverage and open shifts show here once this period is published."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Set staffing needs")).not.toBeInTheDocument();
     expect(screen.queryByText("100%")).not.toBeInTheDocument();

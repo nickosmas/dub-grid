@@ -50,6 +50,12 @@ export default defineConfig(async () => {
         // seem to be initialized"). Any screen importing it (AppSplashScreen,
         // OnboardingScreen) crashed at module-eval. Route it to the passthrough
         // stub so animated components render as plain RN primitives.
+        // react-native-svg ships Flow and native views that jsdom can't run;
+        // the stub renders each shape as an inert element.
+        {
+          find: /^react-native-svg$/,
+          replacement: path.resolve(__dirname, "./src/test/react-native-svg-stub.tsx"),
+        },
         {
           find: /^react-native-reanimated$/,
           replacement: path.resolve(__dirname, "./src/test/reanimated-stub.tsx"),

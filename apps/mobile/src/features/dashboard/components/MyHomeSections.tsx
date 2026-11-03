@@ -127,6 +127,7 @@ export function MyHomeSections({
         featuredItem={hero.item}
         hasWeekItems={hasScheduledDay}
         shiftmates={shiftmates}
+        weekDays={weekDays}
         status={hero.status}
         timing={heroTiming}
         onPress={hero.item ? () => openShiftDetail(hero.item!.entry) : undefined}

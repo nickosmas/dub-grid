@@ -132,7 +132,7 @@ export default function AddToScheduleScreen() {
   if (contentState.kind === "loading") {
     return (
       <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
-        {contentState.showSkeleton ? <PersonFormSkeleton /> : null}
+        {contentState.showSkeleton ? <PersonFormSkeleton chipGroups={3} sections={[]} /> : null}
       </Screen>
     );
   }
@@ -159,16 +159,21 @@ export default function AddToScheduleScreen() {
   if (!person || !draft || !canManageEmployees || person.status === "removed") {
     return (
       <Screen bottomPaddingMode="tabbed">
-        <EmptyStateCard
-          body={
-            person && !canManageEmployees
-              ? "You don't have permission to change staff assignments."
-              : "This teammate isn't in your directory anymore."
-          }
-          fillScreen
-          iconName="lock-closed-outline"
-          title="Scheduling unavailable"
-        />
+        {person && !canManageEmployees ? (
+          <EmptyStateCard
+            body="Your access role can't change staff assignments."
+            fillScreen
+            scene="scheduling-locked"
+            title="Scheduling unavailable"
+          />
+        ) : (
+          <EmptyStateCard
+            body="This teammate isn't in your directory anymore."
+            fillScreen
+            scene="person-not-found"
+            title="Person not found"
+          />
+        )}
       </Screen>
     );
   }
@@ -207,10 +212,10 @@ export default function AddToScheduleScreen() {
     <Screen bottomPaddingMode="tabbed">
       {focusAreas.length === 0 ? (
         <EmptyStateCard
-          body={`There are no ${focusAreaLabel.toLowerCase()} yet. Add one in Settings on the web before putting anyone on the schedule.`}
+          body="Add one in Settings on the web before putting anyone on the schedule."
           fillScreen
-          iconName="albums-outline"
-          title={`No ${focusAreaLabel.toLowerCase()}`}
+          scene="no-areas"
+          title={`No ${focusAreaLabel} yet`}
         />
       ) : (
         <>

@@ -467,7 +467,7 @@ describe("ReportsPageContent", () => {
       expect(screen.getByText("No matching requests for this range.")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("reports-empty-state").style.border).toContain("dashed");
+    expect(screen.getByTestId("reports-empty-state")).toBeInTheDocument();
     expect(screen.queryByText("Requests")).not.toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();

@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 
 const STATUS_COLORS = {
   green: { bg: "var(--dg-color-success-border)", text: "var(--dg-color-success-text)" },
@@ -129,9 +130,22 @@ export default function ExpandedCoverage({
                 <EmptyState
                   size="compact"
                   title={
-                    isPartial
-                      ? "No coverage data on published dates for this filter"
-                      : "No coverage data for this filter"
+                    filter === "all"
+                      ? isPartial
+                        ? "No coverage data on published dates"
+                        : "No coverage data"
+                      : isPartial
+                        ? "No coverage data on published dates for this filter"
+                        : "No coverage data for this filter"
+                  }
+                  action={
+                    filter === "all" ? undefined : (
+                      <ClearFiltersButton
+                        activeFilterCount={1}
+                        onClear={() => setFilter("all")}
+                        small
+                      />
+                    )
                   }
                 />
               ) : (

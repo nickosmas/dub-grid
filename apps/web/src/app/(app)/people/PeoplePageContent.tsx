@@ -1,13 +1,17 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
+import { PeopleDirectorySkeleton } from "@/components/LoadingSkeletons";
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
+import { MOBILE, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useSkeletonGate } from "@/hooks/useSkeletonGate";
 import type { NewEmployeeData } from "@/components/AddEmployeeModal";
 import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
 import { queryKeys } from "@/lib/query-keys";
@@ -20,6 +24,9 @@ import {
   type NewStaffInvite,
 } from "@/features/employees/client/new-staff-invites";
 import { createOrganizationInvitation } from "@/features/organization/client";
+
+// The People sections other than the directory, which draw their own content.
+const OTHER_SECTIONS = new Set(["requests", "recurring-schedule"]);
 
 function PeopleContent() {
   const {
@@ -157,6 +164,25 @@ function PeopleContent() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const isLoading = refLoading || empLoading || permsLoading;
+  const showSkeleton = useSkeletonGate(isLoading);
+  const isMobile = useMediaQuery(MOBILE);
+  const searchParams = useSearchParams();
+  // StaffView shows its sub-navigation only with a second section to switch to.
+  const withSidebar =
+    !isMobile &&
+    (permsLoading ||
+      canManageEmployees ||
+      isSuperAdmin ||
+      isGridmaster ||
+      Boolean((orgId ?? org?.id) && canViewRecurringShifts));
+  const [sidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return localStorage.getItem("dg-sidebar-manual-collapse") === "true";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     if (!permsLoading && !canViewStaff) {
@@ -175,8 +201,22 @@ function PeopleContent() {
   // the viewer can't access People, render nothing — the useEffect above is
   // already navigating away, so flashing a fake loading bar to an
   // unauthorized user just wastes a paint. (audit L1)
+  const skeleton = showSkeleton ? (
+    <PeopleDirectorySkeleton
+      withSidebar={withSidebar}
+      sidebarCollapsed={sidebarCollapsed}
+      showSummaries={permsLoading || canManageEmployees}
+      showDirectory={!OTHER_SECTIONS.has(searchParams.get("section") ?? "")}
+      certificationCards={refLoading ? undefined : certifications.length + 2}
+    />
+  ) : null;
   if (permsLoading) {
-    return <ProgressBar loading />;
+    return (
+      <>
+        <ProgressBar loading />
+        {skeleton}
+      </>
+    );
   }
   if (!canViewStaff) {
     return null;
@@ -198,7 +238,8 @@ function PeopleContent() {
       {inviteStepUp.dialog}
       {focusAreaQuestion.dialog}
 
-      {!isLoading && (
+      {skeleton}
+      {!isLoading && !showSkeleton && (
         <>
           <StaffView
             employees={staffEmployees}

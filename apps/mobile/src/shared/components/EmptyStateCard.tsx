@@ -1,32 +1,29 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { Button } from "./Button";
-import { CONTENT_UNAVAILABLE_ICON_SIZE } from "./ContentUnavailable";
+import { EmptyScene } from "./empty-scene/EmptyScene";
+import type { EmptySceneKind } from "./empty-scene/scenes";
+import type { EmptySceneWeek } from "./empty-scene/week-scene";
 import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { MAX_FONT_SCALE, mobileText, type MobileColors, mobileSpace } from "../theme/tokens";
 
 /**
- * Empty states are centred: a symbol, then the copy, then the way out.
+ * Empty states are centred: a scene, then the copy, then the way out.
  *
- * `iconName` is required rather than defaulted. The default used to be
- * `sparkles-outline`, which is how the "AI" sparkle reached every screen that
- * forgot to pass one — a decorative glyph nothing in the product earns.
- * `design/no-decorative-ai-icons` now fails the build on it, and the prop stays
- * required so an empty state always names what it stands for.
+ * Each empty state has its own scene (`empty-scene/scenes.ts`), drawn on the
+ * "Empty states and skeletons" canvas, so the picture says what is missing.
+ * An action belongs only where the next step is on this screen (owner,
+ * 2026-11-03): clearing a filter, trying again.
  *
  * `compact` renders inside a card. Neither variant draws a panel of its own:
  * the card is already a bounded, lifted surface, so a box inside it reads as an
  * outline sticker rather than as structure.
- *
- * The symbol is plain, in the secondary colour, as iOS's
- * ContentUnavailableView and Material's empty state draw it: a disc behind it
- * read as a drawn badge rather than the system's own empty page.
  */
 export function EmptyStateCard({
-  iconName,
+  scene,
+  sceneWeek,
   title,
   body,
   actionLabel,
@@ -35,7 +32,9 @@ export function EmptyStateCard({
   compact = false,
   fillScreen = false,
 }: {
-  iconName: keyof typeof Ionicons.glyphMap;
+  scene: EmptySceneKind;
+  /** The viewer's week, so a "this week" scene marks the right days. */
+  sceneWeek?: EmptySceneWeek;
   title: string;
   body?: string;
   actionLabel?: string;
@@ -62,11 +61,7 @@ export function EmptyStateCard({
   return (
     <View style={[variant.card, isFilling ? fillScreenAnchorStyles.fill : null]}>
       {isFilling ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
-      <Ionicons
-        color={mobileColors.textSubtle}
-        name={iconName}
-        size={compact ? COMPACT_ICON_SIZE : CONTENT_UNAVAILABLE_ICON_SIZE}
-      />
+      <EmptyScene kind={scene} size={compact ? "card" : "page"} week={sceneWeek} />
       <View style={variant.copy}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={variant.title}>
           {title}
@@ -97,8 +92,6 @@ export function EmptyStateCard({
     </View>
   );
 }
-
-const COMPACT_ICON_SIZE = 32;
 
 // Owns the page: sits on the ground itself, with no panel behind it.
 const createStyles = (mobileColors: MobileColors) =>

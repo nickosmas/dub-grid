@@ -26,12 +26,6 @@ const PADDING: Record<EmptyStateSize, string> = {
   inline: "24px 16px",
 };
 
-const RADIUS: Record<EmptyStateSize, number> = {
-  default: 14,
-  compact: 10,
-  inline: 10,
-};
-
 const OUTER_GAP: Record<EmptyStateSize, number> = {
   default: 16,
   compact: 10,
@@ -70,9 +64,6 @@ export function EmptyState({
       style={{
         padding: PADDING[size],
         textAlign: "center",
-        background: "var(--dg-color-surface)",
-        borderRadius: RADIUS[size],
-        border: "1px dashed var(--dg-color-border)",
         color: "var(--dg-color-text-muted)",
         display: "flex",
         flexDirection: "column",
@@ -86,7 +77,7 @@ export function EmptyState({
         <div
           style={{
             color: "var(--dg-color-text-faint)",
-            background: "var(--dg-color-bg)",
+            background: "var(--dg-color-bg-secondary)",
             padding: ICON_PADDING[size],
             borderRadius: "50%",
             display: "flex",

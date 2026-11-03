@@ -75,7 +75,7 @@ export function getOpenShiftsEmptyCopy(coverageWindow: MobileCoverageWindow = "p
   if (coverageWindow === "unpublished") {
     return {
       title: "Not published yet",
-      body: "Open shifts will appear after this period is published.",
+      body: "Open shifts show here once this period is published.",
     };
   }
   if (coverageWindow === "partial") {
@@ -84,7 +84,7 @@ export function getOpenShiftsEmptyCopy(coverageWindow: MobileCoverageWindow = "p
       body: "Only published dates are counted here.",
     };
   }
-  return { title: "No open shifts right now" };
+  return { title: "No open shifts right now", body: "Every published shift is covered." };
 }
 
 const createStyles = (mobileColors: MobileColors) =>

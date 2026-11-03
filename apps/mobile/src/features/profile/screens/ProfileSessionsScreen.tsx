@@ -232,8 +232,8 @@ export default function ProfileSessionsScreen() {
             {active.length === 0 ? (
               <EmptyStateCard
                 compact
-                body="We couldn't find any active sessions for this account."
-                iconName="phone-portrait-outline"
+                body="Devices you sign in on show here."
+                scene="no-devices"
                 title="No devices signed in"
               />
             ) : (

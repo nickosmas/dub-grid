@@ -81,6 +81,7 @@ export default function NotificationDetailScreen() {
   const isResolvingNotification =
     detailQuery.isLoading || (!accessToken && Boolean(id) && !cachedNotification);
   const showSkeleton = useSkeletonGate(!notification && isResolvingNotification);
+  const showForwardingSkeleton = useSkeletonGate(Boolean(notification));
 
   // Forward exactly once per alert; a refetch or a token refresh must not
   // push a second screen.
@@ -149,8 +150,8 @@ export default function NotificationDetailScreen() {
       <Screen>
         <EmptyStateCard
           fillScreen
-          body="That alert is no longer accessible."
-          iconName="notifications-off-outline"
+          body="That alert is no longer available."
+          scene="alert-gone"
           title="Alert not available"
         />
       </Screen>
@@ -160,7 +161,7 @@ export default function NotificationDetailScreen() {
   // The forward is in flight; keep the placeholder up rather than a flash of nothing.
   return (
     <Screen scrollEnabled={false}>
-      <NotificationDetailSkeleton />
+      {showForwardingSkeleton ? <NotificationDetailSkeleton /> : null}
     </Screen>
   );
 }

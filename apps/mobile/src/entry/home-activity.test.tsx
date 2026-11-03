@@ -83,7 +83,7 @@ describe("ActivityExpandedScreen", () => {
 
     render(<ActivityExpandedScreen />);
 
-    expect(screen.getByText("No activity matches this filter")).toBeInTheDocument();
+    expect(screen.getByText("No recent activity")).toBeInTheDocument();
   });
 
   it("filters activity across all four event types via the filter sheet", () => {

@@ -27,9 +27,7 @@ export default function PendingApprovalsExpandedScreen() {
       // A skeleton stands in for content; it must not scroll, and there is
       // nothing to pull-to-refresh while the thing is still loading.
       <Screen bottomPaddingMode="tabbed" scrollEnabled={false}>
-        {contentState.showSkeleton ? (
-          <DashboardListSkeleton showFilterHeader={false} variant="text" />
-        ) : null}
+        {contentState.showSkeleton ? <DashboardListSkeleton variant="text" /> : null}
       </Screen>
     );
   }
@@ -64,7 +62,7 @@ export default function PendingApprovalsExpandedScreen() {
       onRefresh={manualRefresh.refresh}
     >
       {requests.length === 0 ? (
-        <EmptyStateCard iconName="checkmark-circle" title="No requests are waiting on you" />
+        <EmptyStateCard scene="approvals-clear" title="No requests are waiting on you" />
       ) : (
         <DashboardListSection
           caption={`${requests.length} ${requests.length === 1 ? "request" : "requests"}`}

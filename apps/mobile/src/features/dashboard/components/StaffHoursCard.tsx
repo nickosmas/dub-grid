@@ -74,7 +74,7 @@ export function StaffHoursCard({
       ) : (
         <EmptyStateCard
           compact
-          iconName="checkmark-circle"
+          scene="hours-clear"
           title={`No one is over ${thresholdHours}h this period`}
         />
       )}

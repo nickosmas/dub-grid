@@ -15,7 +15,7 @@ describe("getOpenShiftsEmptyCopy", () => {
   it("says an unpublished period has nothing to show yet, not that nothing is open", () => {
     expect(getOpenShiftsEmptyCopy("unpublished")).toEqual({
       title: "Not published yet",
-      body: "Open shifts will appear after this period is published.",
+      body: "Open shifts show here once this period is published.",
     });
   });
 
@@ -24,6 +24,9 @@ describe("getOpenShiftsEmptyCopy", () => {
   });
 
   it("keeps the plain empty state for a published period", () => {
-    expect(getOpenShiftsEmptyCopy()).toEqual({ title: "No open shifts right now" });
+    expect(getOpenShiftsEmptyCopy()).toEqual({
+      title: "No open shifts right now",
+      body: "Every published shift is covered.",
+    });
   });
 });

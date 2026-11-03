@@ -179,13 +179,9 @@ export function AdminHomeScreen() {
         onRefresh={manualRefresh.refresh}
       >
         <EmptyStateCard
-          actionLabel="Refresh"
-          body="There's nothing to show for this organization yet. Pull to refresh once your schedule is set up."
+          body="Your numbers show here once the schedule is set up."
           fillScreen
-          iconName="stats-chart-outline"
-          onAction={() => {
-            void dashboardQuery.refetch();
-          }}
+          scene="dashboard-empty"
           title="No dashboard data yet"
         />
       </Screen>

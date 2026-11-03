@@ -11,6 +11,7 @@ import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
+import { TableSkeleton } from "@/components/LoadingSkeletons";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
@@ -994,7 +995,9 @@ function ReportsContent() {
 
         {appliedRequest && !reportsQuery.error ? (
           <section style={hasVisibleRows ? tableShellStyle : undefined}>
-            {hasVisibleRows ? (
+            {!reportsQuery.data ? (
+              <TableSkeleton label="Loading the report" />
+            ) : hasVisibleRows ? (
               <div style={{ overflowX: "auto" }}>
                 <table style={tableStyle}>
                   <thead>
@@ -1023,7 +1026,7 @@ function ReportsContent() {
               <EmptyState
                 data-testid="reports-empty-state"
                 description="Try a different date range or adjust the selected filters."
-                heading={preview?.emptyText ?? "Loading reports"}
+                heading={preview?.emptyText}
                 icon={<FileText size={28} />}
               />
             )}
