@@ -15,7 +15,10 @@ describe("shouldRetryMobileQuery", () => {
     expect(shouldRetryMobileQuery(2, refused(503))).toBe(false);
   });
 
-  it("leaves a network failure to the reconnect refetch", () => {
-    expect(shouldRetryMobileQuery(0, new TypeError("Network request failed"))).toBe(false);
+  it("retries a dropped connection twice, as a server failure", () => {
+    const dropped = new TypeError("Network request failed");
+    expect(shouldRetryMobileQuery(0, dropped)).toBe(true);
+    expect(shouldRetryMobileQuery(1, dropped)).toBe(true);
+    expect(shouldRetryMobileQuery(2, dropped)).toBe(false);
   });
 });

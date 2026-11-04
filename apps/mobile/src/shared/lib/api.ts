@@ -91,6 +91,7 @@ import {
   isSameMobileAuthIdentity,
 } from "./access-token";
 import { getMobileEnvConfig } from "./env";
+import { reportServerReached } from "./network-state-source";
 import { getStoredValue, setStoredValue } from "./local-storage";
 
 type SupabaseSessionLike = {
@@ -259,6 +260,7 @@ async function mobileRequest<T>(
       onTransportErrorMessage: createMobileTransportErrorMessage,
       onNonJsonErrorMessage: createNonJsonApiErrorMessage,
       onResponse: (response: Response) => {
+        reportServerReached();
         serverTiming = response.headers?.get?.("server-timing") ?? null;
       },
     });
