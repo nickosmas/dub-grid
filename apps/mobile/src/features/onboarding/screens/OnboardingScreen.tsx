@@ -163,7 +163,7 @@ export default function OnboardingScreen() {
       <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
         <View style={styles.headerRow}>
           <View style={styles.brand}>
-            <DubGridLockup color={mobileColors.textPrimary} fontSize={20} />
+            <DubGridLockup color={mobileColors.textPrimary} fontSize={30} />
           </View>
           {/* Hidden rather than removed on the last slide, where the footer's
               own actions are the way on: unmounting it let the header row

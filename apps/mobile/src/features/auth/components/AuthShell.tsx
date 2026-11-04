@@ -56,7 +56,7 @@ export function AuthShell({
           edge lines up with the copy instead of drifting out on wide screens. */}
         <View style={styles.brandRow}>
           <Pressable style={styles.brandHeader} onLongPress={onBrandLongPress}>
-            <DubGridLockup color={mobileColors.textPrimary} fontSize={20} />
+            <DubGridLockup color={mobileColors.textPrimary} fontSize={30} />
           </Pressable>
         </View>
         {/* One scroll view that knows about the keyboard, in place of a
