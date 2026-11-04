@@ -43,7 +43,6 @@ import {
   ShiftCoverRequestsSection,
   UpcomingShiftsSection,
   JobPill,
-  PreviousShiftRow,
   getInitials,
   getSegmentScheduleNotes,
 } from "../components/MyScheduleSections";
@@ -1833,7 +1832,6 @@ function TeamShiftMemberRow({
           </View>
           {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
           <ScheduleNoteLabels notes={notes} />
-          <PreviousShiftRow change={change} />
           {splitChipLabel ? (
             <View style={styles.teamMemberSplitBadgeRow}>
               <SplitShiftBadge count={row.alternateShiftTitles.length + 1} label={splitChipLabel} />
