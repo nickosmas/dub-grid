@@ -9,6 +9,7 @@ import {
   type EmptySceneKind,
   type EmptySceneShape,
 } from "./scenes";
+import { daySceneShapes, type EmptySceneDay } from "./day-scene";
 import { weekSceneShapes, type EmptySceneWeek } from "./week-scene";
 
 /** Inside a card the scene draws at this share of its page size. */
@@ -23,11 +24,14 @@ export const EmptyScene = memo(function EmptyScene({
   kind,
   size = "page",
   week,
+  day,
 }: {
   kind: EmptySceneKind;
   size?: "page" | "card";
   /** The viewer's week, for the two "this week" scenes. */
   week?: EmptySceneWeek;
+  /** The day the screen is on, for the day scene's tile. */
+  day?: EmptySceneDay;
 }) {
   const mobileColors = useMobileColors();
   const scale = size === "card" ? CARD_SCALE : 1;
@@ -44,14 +48,23 @@ export const EmptyScene = memo(function EmptyScene({
       width={Math.round(EMPTY_SCENE_WIDTH * scale)}
     >
       <G fill="none" strokeLinecap="round" strokeLinejoin="round">
-        {(week && (kind === "me-week-empty" || kind === "me-week-done")
-          ? weekSceneShapes(kind, week)
-          : EMPTY_SCENES[kind]
-        ).map((shape, index) => renderShape(shape, index, paint))}
+        {sceneShapes(kind, week, day).map((shape, index) => renderShape(shape, index, paint))}
       </G>
     </Svg>
   );
 });
+
+function sceneShapes(
+  kind: EmptySceneKind,
+  week: EmptySceneWeek | undefined,
+  day: EmptySceneDay | undefined,
+): readonly EmptySceneShape[] {
+  if (week && (kind === "me-week-empty" || kind === "me-week-done")) {
+    return weekSceneShapes(kind, week);
+  }
+  if (day && kind === "team-day-empty") return daySceneShapes(day);
+  return EMPTY_SCENES[kind];
+}
 
 function renderShape(shape: EmptySceneShape, key: number, paint: { ink: string; ground: string }) {
   const common = {

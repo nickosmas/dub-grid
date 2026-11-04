@@ -4,6 +4,7 @@ import { Text } from "./Text";
 import { Button } from "./Button";
 import { EmptyScene } from "./empty-scene/EmptyScene";
 import type { EmptySceneKind } from "./empty-scene/scenes";
+import type { EmptySceneDay } from "./empty-scene/day-scene";
 import type { EmptySceneWeek } from "./empty-scene/week-scene";
 import { fillScreenAnchorStyles } from "./fill-screen-anchor";
 import { useMobileColors } from "../providers/ThemeModeProvider";
@@ -24,6 +25,7 @@ import { MAX_FONT_SCALE, mobileText, type MobileColors, mobileSpace } from "../t
 export function EmptyStateCard({
   scene,
   sceneWeek,
+  sceneDay,
   title,
   body,
   actionLabel,
@@ -35,6 +37,8 @@ export function EmptyStateCard({
   scene: EmptySceneKind;
   /** The viewer's week, so a "this week" scene marks the right days. */
   sceneWeek?: EmptySceneWeek;
+  /** The day the screen is on, so a day scene names it. */
+  sceneDay?: EmptySceneDay;
   title: string;
   body?: string;
   actionLabel?: string;
@@ -61,7 +65,7 @@ export function EmptyStateCard({
   return (
     <View style={[variant.card, isFilling ? fillScreenAnchorStyles.fill : null]}>
       {isFilling ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
-      <EmptyScene kind={scene} size={compact ? "card" : "page"} week={sceneWeek} />
+      <EmptyScene day={sceneDay} kind={scene} size={compact ? "card" : "page"} week={sceneWeek} />
       <View style={variant.copy}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={variant.title}>
           {title}

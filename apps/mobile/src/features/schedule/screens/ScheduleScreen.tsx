@@ -27,6 +27,7 @@ import Reanimated, {
   withTiming,
 } from "react-native-reanimated";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { emptySceneDayFromIso } from "../../../shared/components/empty-scene/day-scene";
 import { Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
 import { PageWash } from "../../../shared/components/PageWash";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
@@ -1586,6 +1587,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             fillScreen
             body={emptyStateBody}
             scene="team-day-empty"
+            sceneDay={emptySceneDayFromIso(selectedDate)}
             title={emptyStateTitle}
           />
         ) : (
