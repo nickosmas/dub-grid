@@ -1,9 +1,10 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { Screen } from "../../../shared/components/Screen";
+import { Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
+import { useScrollToTopOnChange } from "../../../shared/hooks/useScrollToTopOnChange";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
@@ -69,6 +70,8 @@ export function AdminHomeScreen() {
   const hasOwnView = !managementOnly && (mine.isOn || bootstrapQuery.isLoading);
   const [chosenView, setChosenView] = useState<HomeView>(lastHomeView);
   const view: HomeView = hasOwnView ? chosenView : "team";
+  const scrollViewRef = useRef<ScreenScrollHandle | null>(null);
+  useScrollToTopOnChange(scrollViewRef, `${view}:${range.startDate}`);
   const chooseView = (next: HomeView) => {
     lastHomeView = next;
     setChosenView(next);
@@ -138,6 +141,7 @@ export function AdminHomeScreen() {
     return (
       <Screen
         bottomPaddingMode="tabbed"
+        scrollViewRef={scrollViewRef}
         // A skeleton stands in for content; it must not scroll.
         scrollEnabled={false}
         stickyHeader={header}
@@ -151,6 +155,7 @@ export function AdminHomeScreen() {
     return (
       <Screen
         bottomPaddingMode="tabbed"
+        scrollViewRef={scrollViewRef}
         refreshing={manualRefresh.isRefreshing}
         onRefresh={manualRefresh.refresh}
       >
@@ -175,6 +180,7 @@ export function AdminHomeScreen() {
     return (
       <Screen
         bottomPaddingMode="tabbed"
+        scrollViewRef={scrollViewRef}
         refreshing={manualRefresh.isRefreshing}
         onRefresh={manualRefresh.refresh}
       >
@@ -253,6 +259,7 @@ export function AdminHomeScreen() {
   return (
     <Screen
       bottomPaddingMode="tabbed"
+      scrollViewRef={scrollViewRef}
       pageBackground={wash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}

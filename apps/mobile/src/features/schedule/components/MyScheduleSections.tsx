@@ -1099,7 +1099,12 @@ export function UpcomingShiftsSection({
                     })}
                     {group.items.map((item, itemIndex) => {
                       const typeChip = getScheduleItemTypeChip(mobileColors, isDark, item);
-                      const change = getScheduleEntrySegmentChange(item.entry, item.segment);
+                      // A past day's shifts are done, so whether they were new
+                      // or edited no longer matters.
+                      const change =
+                        group.date < todayDate
+                          ? null
+                          : getScheduleEntrySegmentChange(item.entry, item.segment);
                       const shiftName = getScheduleItemShiftName(item);
                       const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
                       const focusAreaName = getScheduleItemFocusArea(item);
