@@ -2218,11 +2218,11 @@ describe("PersonDetailScreen", () => {
     it("puts Edit in the navigation bar, and clears it while editing", () => {
       renderAsManager({});
 
-      const bar = within(screen.getByTestId("navigation-bar"));
-      expect(bar.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+      const edit = screen.getByRole("button", { name: "Edit" });
+      expect(edit.closest('[data-testid="navigation-bar"]')).not.toBeNull();
       expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
 
-      fireEvent.click(bar.getByRole("button", { name: "Edit" }));
+      fireEvent.click(edit);
 
       // Editing, the bar holds Cancel and Save in Edit's place.
       expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();

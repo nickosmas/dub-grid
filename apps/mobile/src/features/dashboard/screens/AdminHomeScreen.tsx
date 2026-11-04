@@ -7,7 +7,6 @@ import { Screen, type ScreenScrollHandle } from "../../../shared/components/Scre
 import { useScrollToTopOnChange } from "../../../shared/hooks/useScrollToTopOnChange";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
-import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
@@ -252,9 +251,8 @@ export function AdminHomeScreen() {
         ]
       : teamSections;
 
-  const wash = IS_NATIVE_LIST ? undefined : (
-    <CoverageWash height={windowHeight} pct={data.metrics.coveragePct} />
-  );
+  // Home keeps its coverage wash on every platform (owner, 2026-11-04).
+  const wash = <CoverageWash height={windowHeight} pct={data.metrics.coveragePct} />;
 
   return (
     <Screen

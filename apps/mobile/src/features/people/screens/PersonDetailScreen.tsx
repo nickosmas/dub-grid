@@ -66,7 +66,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import { createHeaderTextAction } from "../../../shared/navigation/HeaderTextAction";
+import { HeaderTextBarAction } from "../../../shared/navigation/HeaderTextAction";
 import { DISCARD_CONFIRM, EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
@@ -1606,20 +1606,22 @@ export default function PersonDetailScreen() {
             color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
             fontFamily: mobileTypography.fontFamily.bold,
           },
-          // Edit lives in the bar, where iOS puts it, not in the action row:
-          // it is the one action about the page rather than about the person.
-          // While editing, the phones put Save and Cancel in the bar too; the
-          // web build keeps them in the footer.
-          ...createHeaderTextAction(
-            canEdit && !editing
-              ? {
-                  label: "Edit",
-                  accessibilityHint: "Opens the staff details editor",
-                  onPress: () => startEditing(),
-                }
-              : null,
-          ),
         }}
+      />
+      {/* Edit lives in the bar, where iOS puts it, not in the action row: it
+          is the one action about the page rather than about the person.
+          While editing, the phones put Save and Cancel in the bar too; the web
+          build keeps them in the footer. */}
+      <HeaderTextBarAction
+        action={
+          canEdit && !editing
+            ? {
+                label: "Edit",
+                accessibilityHint: "Opens the staff details editor",
+                onPress: () => startEditing(),
+              }
+            : null
+        }
       />
       {editing && IS_NATIVE_LIST ? (
         <EditBarActions

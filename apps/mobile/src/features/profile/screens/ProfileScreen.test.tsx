@@ -48,6 +48,27 @@ vi.mock("expo-router", () => ({
       stackScreenOptions.push(props.options ?? {});
       return <div data-testid="navigation-bar">{props.options?.headerRight?.() ?? null}</div>;
     },
+    // On iOS the bar's actions are native toolbar items.
+    Toolbar: Object.assign(
+      ({ children }: { children?: ReactNode }) => (
+        <div data-testid="navigation-bar-items">{children}</div>
+      ),
+      {
+        Button: ({
+          children,
+          accessibilityLabel,
+          onPress,
+        }: {
+          children?: ReactNode;
+          accessibilityLabel?: string;
+          onPress?: () => void;
+        }) => (
+          <button aria-label={accessibilityLabel} onClick={onPress} type="button">
+            {children}
+          </button>
+        ),
+      },
+    ),
   }),
 }));
 
@@ -611,7 +632,7 @@ describe("ProfileScreen", () => {
   it("puts Edit in the navigation bar and opens Profile details from it", () => {
     render(<ProfileScreen />);
 
-    const bar = within(screen.getByTestId("navigation-bar"));
+    const bar = within(screen.getByTestId("navigation-bar-items"));
     fireEvent.click(bar.getByRole("button", { name: "Edit" }));
 
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/work");
