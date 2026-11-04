@@ -27,7 +27,7 @@ import {
 } from "react-native-keyboard-controller";
 import { Pressable } from "./Pressable";
 import { SectionHeading } from "./SectionHeading";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaListener, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNativeTabBarPresence } from "../navigation/NativeTabBarPresence";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
@@ -44,8 +44,6 @@ import {
  * Breathing room left between a focused field and the top of the keyboard.
  */
 const KEYBOARD_BOTTOM_OFFSET = 24;
-/** When a page that hasn't been touched settles under its header again. */
-const SETTLE_RETRY_DELAYS_MS = [150, 500];
 
 /** Card header icon frame. Also the min height of the title and accessory
  * columns beside it, so a one-line title centres against the icon. */
@@ -150,10 +148,8 @@ export function Screen<T = never>({
   stickyHeaderTopPadding?: number;
   /**
    * Painted inside the sticky header's clipped shell, behind its content.
-   * Pair it with `pageBackground`: the shell goes transparent so the page's
-   * wash shows through the header region, and this node is what keeps
-   * content from showing through as it scrolls under. Render the same wash
-   * at the same height and the header paints exactly the slice behind it.
+   * Pair it with `pageBackground`: render the same wash at the same height
+   * and the header paints exactly the slice of it behind the header.
    */
   stickyHeaderBackground?: ReactNode;
   /**
@@ -200,7 +196,7 @@ export function Screen<T = never>({
    * life of the screen (Alerts, every time). The pull-to-refresh control used
    * to come and go with this flag, which remounted the page's children each
    * time loading toggled (see `refreshControl` below). Now only scrolling,
-   * bouncing and the pull switch off; the sticky header floats exactly as it
+   * bouncing and the pull switch off; the sticky header sits exactly as it
    * does once loaded, so nothing shifts when the content resolves.
    */
   scrollEnabled?: boolean;
@@ -222,50 +218,27 @@ export function Screen<T = never>({
   );
   const internalScrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
   const internalListRef = useRef<FlatList<T>>(null);
-  // Mirrors stickyHeaderHeight so the translating scroll handle below can
-  // always read the *current* height at call time, not whatever it was
-  // when the handle was created.
-  const stickyHeaderHeightRef = useRef(0);
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
-  const settleUnderHeaderRef = useRef(false);
-  const scrollYRef = useRef(0);
-  // Until the person touches the page, it belongs under the header. On a slow
-  // first load the system can still move it after the settle below has run
-  // (a loading state swapped for a short empty state resets the offset), and
-  // the page opened with its top tucked under the header.
-  const untouchedRef = useRef(true);
-  const resettleFrameRef = useRef<number | null>(null);
-  // A content size change can move the offset without reporting a scroll, so
-  // it re-pins whatever the last reported offset was.
-  const keepUnderHeader = (y: number | null) => {
-    const height = stickyHeaderHeightRef.current;
-    if (Platform.OS !== "ios" || !stickyHeader || height === 0) return;
-    if (!untouchedRef.current || settleUnderHeaderRef.current) return;
-    if ((y !== null && y <= -height + 1) || resettleFrameRef.current !== null) return;
-    resettleFrameRef.current = requestAnimationFrame(() => {
-      resettleFrameRef.current = null;
-      if (!untouchedRef.current) return;
-      scrollYRef.current = -height;
-      internalListRef.current?.scrollToOffset({ offset: -height, animated: false });
-      internalScrollViewRef.current?.scrollTo({ x: 0, y: -height, animated: false });
-    });
-  };
-  const keepUnderHeaderRef = useRef(keepUnderHeader);
-  keepUnderHeaderRef.current = keepUnderHeader;
-  const handleScroll: ScreenScrollViewProps["onScroll"] = (event) => {
-    scrollYRef.current = event.nativeEvent?.contentOffset?.y ?? scrollYRef.current;
-    keepUnderHeader(scrollYRef.current);
-    onScroll?.(event);
-  };
-  const handleTouchStart = () => {
-    untouchedRef.current = false;
-  };
-  useEffect(
-    () => () => {
-      if (resettleFrameRef.current !== null) cancelAnimationFrame(resettleFrameRef.current);
-    },
-    [],
-  );
+  const usesIosNativeInsets = Platform.OS === "ios" && !stickyHeader;
+  // The height left between the native header and tab bar. Content only fills
+  // that much, so a page that fits springs back when dragged, as a short page
+  // does in any iOS app. Filling the whole scroll view left the header and tab
+  // bar insets UIKit adds on top as room to scroll, and the page stayed where
+  // it was let go. The header's tallest height is the one that counts: the
+  // safe area shrinks as a large title folds away.
+  const [visibleHeight, setVisibleHeight] = useState<number | null>(null);
+  const tallestHeaderRef = useRef(0);
+  const insetListener = usesIosNativeInsets ? (
+    <SafeAreaListener
+      pointerEvents="none"
+      style={StyleSheet.absoluteFill}
+      onChange={({ insets: viewInsets, frame }) => {
+        tallestHeaderRef.current = Math.max(tallestHeaderRef.current, viewInsets.top);
+        const next = Math.max(frame.height - tallestHeaderRef.current - viewInsets.bottom, 0);
+        setVisibleHeight((current) => (current === next ? current : next));
+      }}
+    />
+  ) : null;
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
   const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay && !footer;
@@ -278,82 +251,25 @@ export function Screen<T = never>({
   const shouldRenderFooterAsSibling = !stickyHeader && !renderOverlay && Boolean(footer);
   // A sticky header only exists on a route that hides the native header (the
   // dashboard and the schedule), so nothing above it clears the status bar on
-  // its behalf: the shell pads itself by the safe-area inset whether it floats
-  // over the scroll view or sits in normal flow above a skeleton. The two
-  // branches used to disagree, with the non-scrolling one padding by 8pt on the
-  // assumption that it was "already below the system bars", and every skeleton
-  // drew under the Dynamic Island and then jumped down when its content landed.
+  // its behalf: the shell pads itself by the safe-area inset.
   const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? Math.max(insets.top, 8);
-  // Android's RefreshControl has progressViewOffset to push the pull-to-
-  // refresh spinner below the floating sticky header; iOS has no such prop.
-  // A JS-level paddingTop doesn't move the ScrollView's own frame origin
-  // (what the native pull reveal is anchored to), so without this the
-  // spinner renders directly behind the header instead of below it. Using a
-  // native contentInset/contentOffset moves that origin for real.
-  const isIosStickyHeader = Platform.OS === "ios" && Boolean(stickyHeader);
-  const iosContentInset = useMemo(
-    () =>
-      isIosStickyHeader ? { top: stickyHeaderHeight, left: 0, bottom: 0, right: 0 } : undefined,
-    [isIosStickyHeader, stickyHeaderHeight],
-  );
-  // `scrollViewRef` hands callers a *logical* content coordinate space —
-  // y: 0 always means "the true top of my content" — rather than the raw
-  // native ScrollView's contentOffset space. On iOS the floating sticky
-  // header is implemented via contentInset (not padding), so native y: 0
-  // actually sits behind the header, not below it; on Android the header's
-  // height is already baked into contentContainerStyle's paddingTop, so
-  // native y: 0 is already correct there. Without this translation, any
-  // caller scrolling "to the top" (e.g. ScheduleScreen resetting scroll
-  // position when the visible date range changes) would land content under
-  // the header on iOS specifically.
   const scrollHandle = useMemo<ScreenScrollHandle>(
     () =>
       ({
         scrollTo: (options?: { x?: number; y?: number; animated?: boolean } | number) => {
           const target = typeof options === "number" ? { y: options } : (options ?? {});
-          const y =
-            isIosStickyHeader && typeof target.y === "number"
-              ? target.y - stickyHeaderHeightRef.current
-              : target.y;
           if (internalListRef.current) {
             internalListRef.current.scrollToOffset({
-              offset: y ?? 0,
+              offset: target.y ?? 0,
               animated: target.animated ?? true,
             });
             return;
           }
-          internalScrollViewRef.current?.scrollTo({ ...target, y });
+          internalScrollViewRef.current?.scrollTo(target);
         },
       }) as unknown as ScreenScrollHandle,
-    [isIosStickyHeader],
+    [],
   );
-  // The first header measurement scrolls the content to sit just under it. It
-  // waits for the render that applies the new contentInset: React Native 0.86
-  // clamps a programmatic scroll to the current inset, so scrolling to
-  // -height before the inset lands is clamped to 0 and the page opens with
-  // its top hidden under the header.
-  useEffect(() => {
-    if (!settleUnderHeaderRef.current || stickyHeaderHeight === 0) return;
-    // Cleared only once the scroll runs: a second measurement before then
-    // cancels this frame, and must still find the settle pending.
-    const frame = requestAnimationFrame(() => {
-      settleUnderHeaderRef.current = false;
-      // A programmatic scroll reports no onScroll, so record where it lands.
-      scrollYRef.current = -stickyHeaderHeight;
-      internalListRef.current?.scrollToOffset({ offset: -stickyHeaderHeight, animated: false });
-      internalScrollViewRef.current?.scrollTo({ x: 0, y: -stickyHeaderHeight, animated: false });
-    });
-    // On a slow first load the inset can land later still, clamping that
-    // scroll to 0 without reporting it; settling again costs nothing when the
-    // page is already in place.
-    const retries = SETTLE_RETRY_DELAYS_MS.map((delay) =>
-      setTimeout(() => keepUnderHeaderRef.current(null), delay),
-    );
-    return () => {
-      cancelAnimationFrame(frame);
-      retries.forEach(clearTimeout);
-    };
-  }, [stickyHeaderHeight]);
 
   useEffect(() => {
     if (scrollViewRef) {
@@ -376,9 +292,10 @@ export function Screen<T = never>({
   // opens. A screen whose only field is a search bar at the top never needed
   // lifting, so it turns this off and simply does not move on focus.
   const contentContainerStyle = {
-    paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
     paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding,
-    flexGrow: 1,
+    ...(usesIosNativeInsets && visibleHeight !== null
+      ? { minHeight: visibleHeight }
+      : { flexGrow: 1 }),
   };
   // Mounted for the life of the screen once it can refresh, never only while
   // `scrollEnabled`: on iOS the control is the scroll view's first child, so
@@ -390,7 +307,6 @@ export function Screen<T = never>({
       enabled={scrollEnabled}
       refreshing={refreshing}
       onRefresh={onRefresh}
-      progressViewOffset={stickyHeader ? stickyHeaderHeight : 0}
       tintColor={mobileColors.brand}
       colors={[mobileColors.brand]}
     />
@@ -423,7 +339,6 @@ export function Screen<T = never>({
       automaticallyAdjustContentInsets={useNativeContentInsets}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={contentContainerStyle}
-      contentInset={iosContentInset}
       contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
       scrollEnabled={scrollEnabled}
       bounces={scrollEnabled}
@@ -431,10 +346,8 @@ export function Screen<T = never>({
       directionalLockEnabled={Platform.OS === "ios"}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
-      onContentSizeChange={() => keepUnderHeader(null)}
-      onScroll={handleScroll}
+      onScroll={onScroll}
       onScrollBeginDrag={onScrollBeginDrag}
-      onTouchStart={handleTouchStart}
       refreshControl={refreshControl}
       scrollEventThrottle={scrollEventThrottle}
       showsVerticalScrollIndicator={false}
@@ -458,7 +371,6 @@ export function Screen<T = never>({
       // full-page state only worked by swapping the ScrollView for a View,
       // which lost the iOS large-title collapse and pull-to-refresh.
       contentContainerStyle={contentContainerStyle}
-      contentInset={iosContentInset}
       contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
       scrollEnabled={scrollEnabled}
       bounces={scrollEnabled}
@@ -469,10 +381,8 @@ export function Screen<T = never>({
       directionalLockEnabled={Platform.OS === "ios"}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
-      onContentSizeChange={() => keepUnderHeader(null)}
-      onScroll={handleScroll}
+      onScroll={onScroll}
       onScrollBeginDrag={onScrollBeginDrag}
-      onTouchStart={handleTouchStart}
       // Mounted for the life of the screen once it can refresh, never only
       // while `scrollEnabled`. On iOS the control is the scroll view's first
       // child, so adding or removing it moves the content container to a
@@ -504,13 +414,19 @@ export function Screen<T = never>({
   ) : null;
 
   if (shouldExposeNativeScrollRoot) {
-    return scrollView;
+    return (
+      <>
+        {scrollView}
+        {insetListener}
+      </>
+    );
   }
 
   if (shouldRenderFooterAsSibling) {
     return (
       <>
         {scrollView}
+        {insetListener}
         {footerBar}
       </>
     );
@@ -528,36 +444,7 @@ export function Screen<T = never>({
         // this was invisible on iOS but fine on Android before the split.
         <View
           style={styles.stickyHeaderShadow}
-          onLayout={(event) => {
-            const nextHeight = event.nativeEvent.layout.height;
-
-            if (nextHeight !== stickyHeaderHeight) {
-              // The header's height is unknown (0) until this very first
-              // measurement lands. If a caller scrolled "to the top" via
-              // scrollViewRef before this fires (e.g. on a warm cache, where
-              // data — and so that scroll — can resolve in the same tick as
-              // mount, ahead of this native layout callback), the translation
-              // above had nothing to subtract yet and was a no-op, leaving
-              // content sitting under the header with no visible correction.
-              // Self-correct once the real height is known and applied (the
-              // effect above), regardless of what any caller already tried.
-              // A header that grows later, as a native control inside it
-              // reports its size, settles the page again while it is still at
-              // the top.
-              // A settle still pending counts as the top: the header can
-              // measure again (a native control inside it reporting its
-              // size) before the first scroll runs, and the page would
-              // otherwise rest pulled down by the difference, its refresh
-              // spinner half drawn under the header.
-              const isAtTop =
-                settleUnderHeaderRef.current || scrollYRef.current <= -stickyHeaderHeight + 1;
-              if (isIosStickyHeader && (stickyHeaderHeight === 0 || isAtTop)) {
-                settleUnderHeaderRef.current = true;
-              }
-              stickyHeaderHeightRef.current = nextHeight;
-              setStickyHeaderHeight(nextHeight);
-            }
-          }}
+          onLayout={(event) => setStickyHeaderHeight(event.nativeEvent.layout.height)}
         >
           <View
             style={[
@@ -572,6 +459,7 @@ export function Screen<T = never>({
         </View>
       ) : null}
       {scrollView}
+      {insetListener}
       {footerBar}
       {overlay == null ? null : overlayLayer}
     </View>
@@ -657,24 +545,22 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
       paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.md,
     },
-    // Carries only the shadow, positioning, and stacking — see the JSX for
-    // why this can't share a view with `stickyHeaderShell`'s `overflow:
-    // "hidden"` on iOS.
+    // Carries only the shadow and stacking; see the JSX for why this can't
+    // share a view with `stickyHeaderShell`'s `overflow: "hidden"` on iOS.
     // No shadow over a page background: the wash runs through the header,
     // and a shadow band under the shell read as a hard seam in it. None on
     // iOS either, whose bars sit flush with the grouped page at rest.
+    // It sits in the page's flow above the scroll view rather than floating
+    // over it, so the page's top is right under the header from the first
+    // frame. Floating needed a content inset that only landed once the header
+    // had measured, and the page drew under the header until then.
     stickyHeaderShadow: {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
       zIndex: 10,
       ...(hasPageBackground || Platform.OS === "ios" ? null : mobileElevation("header", isDark)),
     },
     stickyHeaderShell: {
-      // The fill has to stay opaque: content scrolls under this shell and must
-      // not show through. `overflow: hidden` clips whatever the header draws to
-      // the shell's own bounds.
+      // `overflow: hidden` clips whatever the header draws to the shell's own
+      // bounds.
       overflow: "hidden",
       // Match native-stack headers and the page ground. This shell is visible
       // behind an interactive back swipe from a child route; using `surface`
@@ -692,7 +578,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
       // replaced, which only ever had to stop a bordered bar looking pasted
       // on. Its `elevation` also clears the `card`-level tiles beneath it on
       // Android, where that number doubles as draw order and this shell is
-      // the earlier sibling, so it loses ties. The floating case gets its
+      // the earlier sibling, so it loses ties. The shell gets its
       // shadow from the `stickyHeaderShadow` wrapper instead; putting it here
       // too would just be clipped by this view's own `overflow: "hidden"`.
     },

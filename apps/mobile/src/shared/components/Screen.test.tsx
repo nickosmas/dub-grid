@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { NativeTabBarPresenceProvider } from "../navigation/NativeTabBarPresence";
 import { mobileSpacing } from "../theme/tokens";
@@ -240,6 +240,17 @@ vi.mock("react-native-safe-area-context", async () => {
   return {
     SafeAreaProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement("div", {}, children),
+    // Reports what UIKit gives a page under a large title and above the tab
+    // bar on an iPhone 17 Pro.
+    SafeAreaListener: ({ onChange }: { onChange: (data: unknown) => void }) => {
+      React.useEffect(() => {
+        onChange({
+          insets: { top: 168, right: 0, bottom: 83, left: 0 },
+          frame: { x: 0, y: 0, width: 402, height: 874 },
+        });
+      }, [onChange]);
+      return null;
+    },
     useSafeAreaInsets: () => ({ ...safeAreaInsets }),
   };
 });
@@ -402,7 +413,7 @@ describe("Screen", () => {
     expect(screen.queryByTestId("screen-scroll-view")).toBeNull();
     expect(list.getAttribute("data-content-inset-adjustment-behavior")).toBe("automatic");
     expect(JSON.parse(list.getAttribute("data-content-container-style") ?? "{}")).toMatchObject({
-      flexGrow: 1,
+      minHeight: 874 - 168 - 83,
     });
     // Header, rows in order with separators between them, footer last.
     const text = list.textContent ?? "";
@@ -512,14 +523,13 @@ describe("Screen", () => {
     );
 
     expect(screen.getByText("Page wash")).toBeInTheDocument();
-    // The header's wash lives inside the header's shell, next to its content,
-    // so content scrolling under the header never shows through.
+    // The header's wash lives inside the header's shell, next to its content.
     expect(screen.getByText("Header wash").parentElement).toBe(
       screen.getByText("Header").parentElement,
     );
   });
 
-  it("pads a non-scrolling sticky header by the top safe-area inset, the same as the floating one", () => {
+  it("pads a non-scrolling sticky header by the top safe-area inset, the same as a scrolling one", () => {
     safeAreaInsets.top = 59;
 
     const { unmount } = render(
@@ -565,7 +575,7 @@ describe("Screen", () => {
     expect(screen.getByText("Overlay 100")).toBeInTheDocument();
   });
 
-  it("uses a native content inset instead of padding to clear the sticky header on iOS, so pull-to-refresh isn't hidden behind it", () => {
+  it("puts the sticky header above the scroll view in the page's flow, so the page starts right under it", () => {
     render(
       <Screen refreshing={false} onRefresh={() => undefined} stickyHeader={<span>Header</span>}>
         <div>Body</div>
@@ -573,28 +583,23 @@ describe("Screen", () => {
     );
 
     const scrollView = screen.getByTestId("screen-scroll-view");
+    const header = screen.getByText("Header");
     const contentStyle = JSON.parse(
       scrollView.getAttribute("data-content-container-style") ?? "{}",
     );
 
-    // The mocked header's onLayout reports height: 100 (see the View mock
-    // above) — that value should drive a native inset, not a JS
-    // paddingTop, since paddingTop doesn't move the ScrollView's own frame
-    // origin that the RefreshControl's pull reveal is anchored to.
-    expect(JSON.parse(scrollView.getAttribute("data-content-inset") ?? "null")).toEqual({
-      top: 100,
-      left: 0,
-      bottom: 0,
-      right: 0,
-    });
-    // No contentOffset prop: applied before the inset, it reads to UIKit as a
-    // pull past the refresh threshold, and the page opened refreshing. The
-    // settle effect scrolls the content under the header instead.
-    expect(JSON.parse(scrollView.getAttribute("data-content-offset") ?? "null")).toBeNull();
-    expect(contentStyle.paddingTop).toBe(0);
+    // A floating header needed an inset that only landed once it had
+    // measured, and the page drew under the header for a frame first.
+    expect(header.compareDocumentPosition(scrollView) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(scrollView.contains(header)).toBe(false);
+    expect(JSON.parse(scrollView.getAttribute("data-content-inset") ?? "null")).toBeNull();
+    expect(contentStyle.paddingTop).toBeUndefined();
+    expect(nativeScrollTo).not.toHaveBeenCalled();
   });
 
-  it("translates an imperative scrollTo(y: 0) via scrollViewRef to sit below the sticky header on iOS", () => {
+  it("scrolls a caller's scrollTo(y: 0) to the true top of the page", () => {
     const scrollViewRef: {
       current: { scrollTo: (opts: { y?: number; animated?: boolean }) => void } | null;
     } = { current: null };
@@ -605,37 +610,28 @@ describe("Screen", () => {
       </Screen>,
     );
 
-    // A caller scrolling "to the top" (y: 0) — e.g. ScheduleScreen resetting
-    // position when the visible date range changes — must not land content
-    // behind the floating header: on iOS the header is implemented via
-    // contentInset, so the true top of content is native y: -headerHeight,
-    // not y: 0. The mocked header's onLayout reports height: 100.
-    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
 
-    expect(nativeScrollTo).toHaveBeenCalledWith({ y: -100, animated: true });
+    expect(nativeScrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
   });
+});
 
-  it("self-corrects position once the sticky header's first height is applied, with no caller involved", async () => {
-    // Regression for a race where a caller's scrollTo(y: 0) fires before the
-    // header's onLayout has reported a height (e.g. on a warm cache, where
-    // data — and so a caller's own "scroll to top" effect — can resolve in
-    // the same tick as mount, ahead of this native layout callback). At that
-    // moment there's nothing yet to subtract, so the translated call is a
-    // no-op, leaving content under the header with no visible correction.
-    // Screen itself must self-correct once the real height becomes known,
-    // regardless of whether any caller already (ineffectively) tried. It
-    // waits a frame for the contentInset that height produces: React Native
-    // 0.86 clamps a scroll above the current inset, so scrolling first lands
-    // at 0.
+describe("Screen under a native header on iOS", () => {
+  it("fills only the height between the header and the tab bar, so a page that fits springs back", () => {
     render(
-      <Screen stickyHeader={<span>Header</span>}>
-        <div>Body</div>
+      <Screen>
+        <div>Nothing here yet</div>
       </Screen>,
     );
 
-    await waitFor(() =>
-      expect(nativeScrollTo).toHaveBeenCalledWith({ x: 0, y: -100, animated: false }),
+    const contentStyle = JSON.parse(
+      screen.getByTestId("screen-scroll-view").getAttribute("data-content-container-style") ?? "{}",
     );
+
+    // Filling the whole scroll view left the header and tab bar insets UIKit
+    // adds as room to scroll, and the page stayed wherever it was let go.
+    expect(contentStyle.minHeight).toBe(874 - 168 - 83);
+    expect(contentStyle.flexGrow).toBeUndefined();
   });
 });
 

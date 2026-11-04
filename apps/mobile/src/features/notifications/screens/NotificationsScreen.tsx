@@ -402,7 +402,11 @@ export default function NotificationsScreen() {
         )}
         {/* Collapsed beside Mark all read, the bar title starts at the
             leading edge, as Mail names a mailbox; alone it stays centered. */}
-        <HeaderLeadingTitle title="Alerts" shown={unreadCount > 0 && largeTitle.collapsed} />
+        <HeaderLeadingTitle
+          collapsed={largeTitle.collapsed}
+          enabled={unreadCount > 0}
+          title="Alerts"
+        />
         {/* Mark all read is a bar action, as in Mail; how many are unread is
             already on the Unread filter. */}
         {unreadCount > 0 ? (
