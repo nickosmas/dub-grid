@@ -623,7 +623,7 @@ export default function ProfileScreen() {
                 <Button
                   label="Switch organization"
                   onPress={() => setIsSwitchModalVisible(true)}
-                  tone="secondary"
+                  tone="neutral"
                 />
               ) : null}
               <Button

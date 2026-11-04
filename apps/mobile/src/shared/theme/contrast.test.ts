@@ -166,8 +166,6 @@ describe("dark mode control contrast", () => {
  */
 describe("solid button tone contrast", () => {
   const SOLID_TONES = [
-    // `buttonPrimaryBg` no longer fills a button (`primary` takes the soft
-    // secondary pair) but still carries the white number on a `brand` badge.
     ["buttonPrimaryBg", "textInverse"],
     ["buttonDangerBg", "textInverse"],
     ["buttonSuccessBg", "textInverse"],
