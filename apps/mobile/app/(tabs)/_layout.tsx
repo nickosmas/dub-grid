@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ParamListBase } from "expo-router/react-navigation";
 import type { NativeStackNavigationProp } from "expo-router/native-stack";
 import { useNavigation, type ErrorBoundaryProps } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 
-const { Icon, Label, VectorIcon } = NativeTabs.Trigger;
+const { Icon, Label } = NativeTabs.Trigger;
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
 import { RouteErrorScreen } from "../../src/shared/components/RouteErrorScreen";
 import { NativeTabBarPresenceProvider } from "../../src/shared/navigation/NativeTabBarPresence";
@@ -60,12 +59,10 @@ export default function TabsLayout() {
       ? [
           <NativeTabs.Trigger key="home" name="home">
             <Label>Home</Label>
-            <Icon
-              src={{
-                default: <VectorIcon family={Ionicons} name="home-outline" />,
-                selected: <VectorIcon family={Ionicons} name="home" />,
-              }}
-            />
+            {/* An SF Symbol like the other tabs: a vector glyph loads its two
+                images separately, and when the selected one lands first
+                react-native-screens throws and the whole tab tree fails. */}
+            <Icon sf={{ default: "house", selected: "house.fill" }} />
           </NativeTabs.Trigger>,
         ]
       : []),
