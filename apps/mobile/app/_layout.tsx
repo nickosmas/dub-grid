@@ -12,6 +12,7 @@ import {
 import { DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -43,6 +44,16 @@ import {
   createDetailStackOptions,
 } from "../src/shared/navigation/top-level-stack";
 import { mobileTypography } from "../src/shared/theme/tokens";
+
+// Android draws Material's docked search bar in the content (ScreenSearch).
+const ALERTS_SEARCH_BAR =
+  Platform.OS === "ios"
+    ? ({
+        placement: "stacked",
+        hideWhenScrolling: false,
+        placeholder: "Search title or message",
+      } as const)
+    : undefined;
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 markMobileAuthRuntimeStarted();
@@ -141,10 +152,15 @@ function RootLayoutContent({
                                   gets the same native back as every drill-in. */}
                                 <Stack.Screen
                                   name="alerts/index"
-                                  // Not a large title: iOS 26 drew the stacked search field
-                                  // over it on a cold push. The screen sets its title on the
-                                  // leading edge instead (HeaderLeadingTitle).
-                                  options={createDetailStackOptions(mobileColors, "Alerts")}
+                                  options={{
+                                    ...createDetailStackOptions(mobileColors, "Alerts", {
+                                      largeTitle: true,
+                                    }),
+                                    // The search field belongs to the route, not only the
+                                    // screen: added after the push had laid out the large
+                                    // title, iOS 26 drew it over the title.
+                                    headerSearchBarOptions: ALERTS_SEARCH_BAR,
+                                  }}
                                 />
                                 <Stack.Screen
                                   name="alerts/[id]"
