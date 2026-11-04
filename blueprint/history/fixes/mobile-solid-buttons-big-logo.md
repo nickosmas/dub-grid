@@ -15,7 +15,9 @@
 
 - `primary` buttons are solid blue-600 (`buttonPrimaryBg`) with a white
   label, across the app. `secondary` keeps the soft blue as the step down
-  beside it; the other tones are unchanged.
+  beside it; the other tones are unchanged. Profile's Switch organization
+  moves from `secondary` to `neutral`: it is a quiet account action, not a
+  step down beside a main one (owner, 2026-11-04).
 - Sign-in, forgot and reset password, and onboarding show the lockup at
   30pt, left-aligned with the wordmark to the right of the symbol (owner,
   2026-11-04, after a centered stacked lockup was tried).
