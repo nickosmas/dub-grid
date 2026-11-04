@@ -3,6 +3,8 @@ import {
   ORG_ROLE_PRIVILEGE_ORDER,
   getEffectiveOrgRole,
   getOrgRoleInsignia,
+  getOwnOrgRoleChange,
+  getOwnOrgRoleChangedMessage,
   getOrgRolePrivilegeRank,
   type OrgRole,
 } from "./org-roles";
@@ -58,5 +60,50 @@ describe("getOrgRolePrivilegeRank", () => {
         getOrgRolePrivilegeRank(left) - getOrgRolePrivilegeRank(right),
     );
     expect(ranked).toEqual(ORG_ROLE_PRIVILEGE_ORDER);
+  });
+});
+
+describe("getOwnOrgRoleChange", () => {
+  const ORG = "org-1";
+
+  it("names the new role when the earlier reading of the same org differs", () => {
+    expect(
+      getOwnOrgRoleChange({ orgId: ORG, role: "admin" }, { orgId: ORG, role: "super_admin" }),
+    ).toBe("admin");
+    expect(getOwnOrgRoleChange({ orgId: ORG, role: "admin" }, { orgId: ORG, role: "user" })).toBe(
+      "admin",
+    );
+  });
+
+  it("finds nothing when the role is the same", () => {
+    expect(getOwnOrgRoleChange({ orgId: ORG, role: "user" }, { orgId: ORG, role: "user" })).toBe(
+      null,
+    );
+  });
+
+  it("never treats a different organization as a role change", () => {
+    expect(
+      getOwnOrgRoleChange({ orgId: "sandbox", role: "super_admin" }, { orgId: ORG, role: "user" }),
+    ).toBe(null);
+    expect(getOwnOrgRoleChange({ orgId: null, role: "user" }, { orgId: null, role: "admin" })).toBe(
+      null,
+    );
+  });
+
+  it("ignores a platform role or a missing one", () => {
+    expect(
+      getOwnOrgRoleChange({ orgId: ORG, role: "gridmaster" }, { orgId: ORG, role: "admin" }),
+    ).toBe(null);
+    expect(getOwnOrgRoleChange({ orgId: ORG, role: "admin" }, { orgId: ORG, role: null })).toBe(
+      null,
+    );
+  });
+});
+
+describe("getOwnOrgRoleChangedMessage", () => {
+  it("names the new role", () => {
+    expect(getOwnOrgRoleChangedMessage("super_admin")).toBe(
+      "Your role changed to Super Admin, so what you can see has updated.",
+    );
   });
 });

@@ -146,13 +146,16 @@ export async function findLiveStripeSubscription(customerId: string): Promise<st
 }
 
 /**
- * Create a Stripe Checkout Session for a new subscription.
+ * Create a Stripe Checkout Session for a new subscription. `trialEnd` (Unix
+ * seconds, from `checkoutTrialEnd`) keeps the rest of the in-app trial, so the
+ * first charge lands when it ends; null charges at once.
  */
 export async function createCheckoutSession(
   customerId: string,
   orgId: string,
   seats: number,
   returnUrl: string,
+  trialEnd: number | null = null,
 ) {
   const s = getStripe();
   if (!s) throw new Error("Stripe not configured");
@@ -164,9 +167,9 @@ export async function createCheckoutSession(
     mode: "subscription",
     line_items: [{ price: priceId, quantity: seats }],
     subscription_data: {
-      // No trial_period_days: the in-app 14-day trial (started on the first
-      // super_admin sign-in) is the only trial. Subscribing goes straight to
-      // active so we don't grant a second free period on top of it.
+      // Never trial_period_days: the in-app trial is the only trial, and
+      // Stripe's ends exactly when it does rather than adding a second one.
+      ...(trialEnd !== null ? { trial_end: trialEnd } : {}),
       metadata: { org_id: orgId },
     },
     success_url: withCheckoutSessionPlaceholder(returnUrl),
@@ -370,15 +373,19 @@ export async function upsertStripeSubscriptionToDb(
   );
   if (subError) throw subError;
 
+  // The trial clock is DubGrid's: a trialing subscription that names no end,
+  // or the same end to the second, leaves the organization's own date alone.
+  const keepOrgTrialEnd = sub.trial_end
+    ? await orgTrialEndsWithin(serviceClient, orgId, sub.trial_end)
+    : sub.status === "trialing";
+
   const { error: orgError } = await serviceClient
     .from("organizations")
     .update({
       stripe_customer_id: customerId,
       subscription_status: sub.status,
       subscription_seats: item?.quantity ?? null,
-      // The trial clock is DubGrid's: a trialing subscription that names no end
-      // leaves the organization's own end date where it is.
-      ...(trialEnd !== null || sub.status !== "trialing" ? { trial_ends_at: trialEnd } : {}),
+      ...(keepOrgTrialEnd ? {} : { trial_ends_at: trialEnd }),
       ...(needsPaymentAttention(sub.status) ? {} : { payment_grace_started_at: null }),
     })
     .eq("id", orgId);
@@ -544,6 +551,32 @@ export async function syncSubscriptionToDb(orgId: string): Promise<void> {
       audit: { source: "gridmaster_sync" },
     },
   );
+}
+
+/**
+ * Whether the organization's trial already ends within a second of Stripe's.
+ * Stripe keeps whole seconds, so writing its value back would move the in-app
+ * end by a fraction of one. A failed read writes Stripe's value, as before.
+ */
+async function orgTrialEndsWithin(
+  serviceClient: BillingSyncClient,
+  orgId: string,
+  stripeTrialEnd: number,
+): Promise<boolean> {
+  try {
+    const { data, error } = await serviceClient
+      .from("organizations")
+      .select("trial_ends_at")
+      .eq("id", orgId)
+      .maybeSingle();
+    if (error) return false;
+    const stored = (data as { trial_ends_at?: string | null } | null)?.trial_ends_at;
+    const storedMs = stored ? Date.parse(stored) : Number.NaN;
+    return Number.isFinite(storedMs) && Math.abs(storedMs - stripeTrialEnd * 1000) < 1000;
+  } catch (error) {
+    logger.warn({ error, orgId }, "Could not read the organization's trial end");
+    return false;
+  }
 }
 
 async function loadPreviousSubscriptionForAudit(

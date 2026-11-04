@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { describeShiftRequestSubmitted } from "@dubgrid/domain";
+import { describeShiftRequestDeclined, describeShiftRequestSubmitted } from "@dubgrid/domain";
 import { getIsoDateInTimeZone, resolveActiveShiftRequests } from "@dubgrid/schedule-core";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -389,11 +389,15 @@ export function useShiftRequests(
     async (requestId: string, empId: string, accept: boolean): Promise<boolean> => {
       if (!orgId) return false;
       try {
+        const requestType = requests.find((request) => request.id === requestId)?.type;
+        const answeredType =
+          requestType === "swap" || requestType === "pickup" ? requestType : null;
         const { autoApproved } = await respondToShiftRequest(requestId, empId, accept, orgId);
         if (accept) {
-          showSubmitted({ action: "accepted", type: "swap" }, autoApproved);
+          showSubmitted({ action: "accepted", type: answeredType }, autoApproved);
         } else {
-          toast.success("Swap declined");
+          const copy = describeShiftRequestDeclined(answeredType);
+          toast.success(copy.title, { description: copy.message });
         }
         await refetchAfterMutation();
         return true;
@@ -402,7 +406,7 @@ export function useShiftRequests(
         return false;
       }
     },
-    [orgId, refetchAfterMutation, showSubmitted],
+    [orgId, refetchAfterMutation, requests, showSubmitted],
   );
 
   const resolve = useCallback(

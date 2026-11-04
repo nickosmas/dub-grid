@@ -48,6 +48,8 @@ interface StaffDetailPanelProps {
   departmentLabel?: string;
   canManageEmployees: boolean;
   orgId?: string;
+  /** The organization's timezone, whose today the status dialogs use. */
+  timeZone?: string | null;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   /** Whether they can sign in, and if not where their invitation stands, for the invite card. */
   accountState?: PersonAccountState | null;
@@ -114,6 +116,7 @@ export function StaffDetailPanel({
   departmentLabel,
   canManageEmployees,
   orgId,
+  timeZone = null,
   pendingInviteByEmployeeId,
   accountState = null,
   onSave,
@@ -245,6 +248,7 @@ export function StaffDetailPanel({
       onSetPlannedChange={onSetPlannedChange}
       onRemove={onRemove}
       stepUpOpen={statusStepUpOpen}
+      timeZone={timeZone}
       variant="card"
       label={label}
       focus="plan"
@@ -266,6 +270,7 @@ export function StaffDetailPanel({
       onSetPlannedChange={onSetPlannedChange}
       onRemove={onRemove}
       stepUpOpen={statusStepUpOpen}
+      timeZone={timeZone}
     />
   );
 

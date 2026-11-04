@@ -168,6 +168,7 @@ import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
 import { buildSchedulableOn } from "./_lib/schedulable-on";
 import {
   CORRECTION_ADMIN_WINDOW_DAYS,
+  describeClaimApproval,
   singularLabelNoun,
   DEFAULT_ORGANIZATION_LABELS,
   orderFocusAreasByDepartment,
@@ -542,6 +543,7 @@ function SchedulerContent({
     canViewDashboardAnalytics,
     isSuperAdmin,
     isGridmaster,
+    isImpersonating,
     isLoading: permsLoading,
     orgId,
   } = usePermissions();
@@ -1816,6 +1818,7 @@ function SchedulerContent({
     org,
     spanWeeks,
     weekStart,
+    todayKey,
     employeeNameById,
     refetchScheduleData,
     startScheduleOperation,
@@ -5260,7 +5263,7 @@ function SchedulerContent({
           // just that one cell — this used to refetch the entire loaded window
           // to read a single number.
           const echoCell = { employeeId: panel.empId, date: formatDateKey(panel.date) };
-          const range = seriesScopeRange(seriesScope, echoCell.date);
+          const range = seriesScopeRange(seriesScope, echoCell.date, todayKeyRef.current);
           const seriesEcho = {
             isScheduler: canEditShiftsRef.current,
             assignmentLabelMap: assignmentLabelMapRef.current,
@@ -9445,11 +9448,12 @@ function SchedulerContent({
                 icon={CalendarPlus}
                 confirmLabel="Claim"
                 isLoading={isCoverageGapVolunteerPending}
-                message={
-                  canApproveShiftRequests
-                    ? "As an admin, it goes on the schedule right away."
-                    : "It's sent to your admin for approval."
-                }
+                // The volunteer posts a coverage gap's request themselves.
+                message={describeClaimApproval({
+                  viewerCanApprove: canApproveShiftRequests,
+                  posterApprovalCounts: false,
+                  impersonating: isImpersonating,
+                })}
                 title={`Claim ${pendingCoverageGapVolunteer.assignmentLabel} on ${pendingCoverageGapVolunteer.date}?`}
                 variant="info"
                 onCancel={() => {
@@ -9487,11 +9491,15 @@ function SchedulerContent({
                   spellOutAssignment(pendingClaimShift.assignmentIds[0]) ??
                   pendingClaimShift.assignmentLabel
                 } on ${pendingClaimShift.date}?`}
-                message={`${pendingClaimShift.calledOffBy ? "This shift was called off. " : ""}${
-                  canApproveShiftRequests
-                    ? "As an admin, it goes on the schedule right away."
-                    : "It's sent to your admin for approval."
-                }`}
+                // Grid open shifts are call-off vacancies and coverage gaps,
+                // where only the claimer's approval counts.
+                message={`${pendingClaimShift.calledOffBy ? "This shift was called off. " : ""}${describeClaimApproval(
+                  {
+                    viewerCanApprove: canApproveShiftRequests,
+                    posterApprovalCounts: false,
+                    impersonating: isImpersonating,
+                  },
+                )}`}
                 confirmLabel="Claim"
                 variant="info"
                 isLoading={isClaimShiftPending}
@@ -9644,6 +9652,7 @@ function SchedulerContent({
               pastDayNotice={pastDayNotice}
               correctedLabel={editPanelCorrectedLabel}
               correctedChange={editPanelCorrection ?? null}
+              todayKey={todayKey}
               allowShiftEdits={canEditShifts && (!editPanelIsPast || canCorrectPanelDay)}
               canEditScheduleIndicators={canEditNotes && !editPanelIsPast}
               getActiveIndicatorIds={panelActiveIndicatorIds}
@@ -9863,6 +9872,7 @@ function SchedulerContent({
               loading={shiftRequests.loading}
               currentEmpId={currentEmpId}
               canApprove={canApproveShiftRequests}
+              isImpersonating={isImpersonating}
               onClaim={(id) => {
                 if (!currentEmpId) return;
                 return shiftRequests.claim(id, currentEmpId);
@@ -10121,8 +10131,10 @@ function SchedulerContent({
                 importPreview.breakdown.imported === 1 ? "" : "s"
               } from ${importPreview.sourceRange}?`}
               message={(() => {
-                const { breakdown, targetRange, outcomes } = importPreview;
-                const copyLine = `They're copied into ${targetRange}.`;
+                const { breakdown, targetRange, outcomes, skipsPastDays } = importPreview;
+                const copyLine = skipsPastDays
+                  ? `They're copied into ${targetRange}. Days before today stay as they are.`
+                  : `They're copied into ${targetRange}.`;
                 if (breakdown.totalSkipped === 0) return copyLine;
                 const description = formatImportPreviousSkipDescription(
                   outcomes,

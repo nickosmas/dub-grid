@@ -13,7 +13,7 @@ import Modal from "@/components/Modal";
 
 import { Button } from "@/components/Button";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
-import { addDays, formatDateKey } from "@/lib/utils";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import type { BulkStatusOutcome } from "@/features/employees/client";
 
 /** Someone a bulk change leaves alone or couldn't change, and why. */
@@ -33,6 +33,9 @@ export interface BulkStatusDialogPerson {
   archivedAt?: string | null;
   plannedStatus?: "away" | "removed" | "suspended" | "active" | null;
   plannedFrom?: string | null;
+  plannedAbsenceTypeId?: number | null;
+  awayUntil?: string | null;
+  awayAbsenceTypeId?: number | null;
 }
 
 export interface BulkStatusDialogState {
@@ -124,6 +127,8 @@ interface BulkStatusDialogProps {
   onClose: () => void;
   /** The change is running; kept outside so it survives a step-up prompt. */
   running: boolean;
+  /** The organization's timezone: a return date is after its today, as the server checks. */
+  timeZone?: string | null;
 }
 
 /**
@@ -136,6 +141,7 @@ export function BulkStatusDialog({
   onConfirm,
   onClose,
   running,
+  timeZone = null,
 }: BulkStatusDialogProps) {
   const { action, eligible, skipped, note, returnDate, result } = state;
 
@@ -171,7 +177,7 @@ export function BulkStatusDialog({
   const copy = describeBulkStatusAction(action, eligible, {
     returnDate: action === "markAway" ? returnDate || null : null,
   });
-  const returnMinDate = formatDateKey(addDays(new Date(), 1));
+  const returnMinDate = addDaysToIsoDate(getIsoDateInTimeZone(new Date(), timeZone), 1);
 
   return (
     <ConfirmDialog

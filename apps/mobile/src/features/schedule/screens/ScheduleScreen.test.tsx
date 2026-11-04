@@ -2058,6 +2058,7 @@ describe("ScheduleScreen", () => {
           action: "claim",
           claimerEmpId: "emp-1",
         },
+        requestType: "pickup",
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );
@@ -2423,6 +2424,7 @@ describe("ScheduleScreen", () => {
           focusAreaId: 2,
           state: openShifts[0].state,
         },
+        requestType: null,
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );
@@ -2521,6 +2523,7 @@ describe("ScheduleScreen", () => {
           empId: "emp-1",
           accept: true,
         },
+        requestType: "swap",
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );
@@ -2542,6 +2545,7 @@ describe("ScheduleScreen", () => {
           empId: "emp-1",
           accept: false,
         },
+        requestType: "swap",
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );

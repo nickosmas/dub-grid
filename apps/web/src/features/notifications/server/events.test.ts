@@ -638,10 +638,57 @@ describe("dispatchNotificationEvent", () => {
       "org-1",
       "shift_request_expired",
       "Pickup request expired",
-      expect.stringContaining("expired"),
+      "Your pickup request expired before anyone decided on it. Submit a new one if you still need it.",
       expect.objectContaining({ requestId: "req-1", requestType: "pickup" }),
     );
   });
+
+  it.each([
+    [null, "Nobody picked up the shift you called off before it closed."],
+    [
+      { user_id: null, first_name: "Ana", last_name: "Diaz" },
+      "The shift you called off closed before Ana Diaz's pickup was approved.",
+    ],
+  ])(
+    "tells the absent person when the shift they called off closes (claimer %j)",
+    async (target, message) => {
+      fromMock.mockImplementation((table: string) => {
+        if (table === "shift_requests") {
+          return makeShiftRequestBuilder({
+            status: "expired",
+            type: "pickup",
+            parent_request_id: "calloff-1",
+            requester: { user_id: "requester-user", first_name: "Sam", last_name: "Lee" },
+            target,
+          });
+        }
+        if (table === "notifications") {
+          const builder: Record<string, unknown> = {};
+          builder.select = vi.fn(() => builder);
+          builder.eq = vi.fn(() => builder);
+          builder.limit = vi.fn(() => ({ data: [] }));
+          return builder;
+        }
+        return makeSingleRowBuilder(null);
+      });
+
+      await dispatchNotificationEvent("expire-requests-cron", {
+        action: "shift_request_expired",
+        orgId: "org-1",
+        requestId: "req-1",
+        requestType: "pickup",
+      });
+
+      expect(sendNotification).toHaveBeenCalledWith(
+        "requester-user",
+        "org-1",
+        "shift_request_expired",
+        "Pickup request expired",
+        message,
+        expect.objectContaining({ requestId: "req-1" }),
+      );
+    },
+  );
 
   it("fans out invitation_expired to super_admins + inviter", async () => {
     fromMock.mockImplementation((table: string) => {
@@ -1131,6 +1178,40 @@ describe("dispatchNotificationEvent", () => {
         "shift_request_approved",
         "Swap request approved",
         "Sam Lee accepted your swap request. It's approved and on the schedule.",
+        expect.objectContaining({ requestId: "request-1", approved: true }),
+      );
+    });
+
+    it("tells the absent person who picked up the shift they called off", async () => {
+      fromMock.mockImplementation((table: string) => {
+        if (table === "shift_requests") {
+          return makeShiftRequestBuilder({
+            status: "approved",
+            type: "pickup",
+            parent_request_id: "calloff-1",
+            requester: { user_id: "absent-user", first_name: "Jane", last_name: "Doe" },
+            target: { user_id: "claimant-user", first_name: "Sam", last_name: "Lee" },
+          });
+        }
+        return makeMembershipBuilder({ superAdmins: [{ user_id: "super-admin-user" }] });
+      });
+
+      await dispatchNotificationEvent("claimant-user", {
+        action: "shift_request_resolved",
+        orgId: "org-1",
+        requestId: "request-1",
+        requestType: "pickup",
+        approved: true,
+        adminNote: "Auto-approved: Sam Lee can approve shift requests",
+        autoApproved: true,
+      });
+
+      expect(sendNotification).toHaveBeenCalledWith(
+        "absent-user",
+        "org-1",
+        "shift_request_approved",
+        "Pickup request approved",
+        "Sam Lee picked up the shift you called off.",
         expect.objectContaining({ requestId: "request-1", approved: true }),
       );
     });

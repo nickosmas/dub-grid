@@ -15,7 +15,11 @@ import {
   type SeriesStateLike,
 } from "@/lib/series-summary";
 import { scheduleCellStateSchema, type ScheduleCellState } from "@dubgrid/contracts";
-import { canSeeDraftScheduleNotes, scheduleNotesForViewer } from "@dubgrid/schedule-core";
+import {
+  canSeeDraftScheduleNotes,
+  isPastDateKey,
+  scheduleNotesForViewer,
+} from "@dubgrid/schedule-core";
 import {
   fetchHiddenStaffIds,
   requireOrgPermissions,
@@ -37,6 +41,7 @@ import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cell
 import { formatDateKey, iterateDateRange } from "@/lib/utils";
 import { RECURRING_SHIFT_COLS, fetchAllRows } from "@/lib/db/shared";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { fetchOrgToday } from "@/features/employees/server/org-today";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import logger from "@/lib/logger";
 import type {
@@ -2281,7 +2286,7 @@ export async function POST(req: NextRequest) {
             .order("id", { ascending: true })
             .range(from, to);
 
-        const [{ data: recurringRows, error: recurringError }, cells] = await Promise.all([
+        const [recurringResult, cells, todayKey] = await Promise.all([
           auth.serviceClient
             .from("recurring_shifts")
             .select(
@@ -2295,7 +2300,9 @@ export async function POST(req: NextRequest) {
           // max_rows cap, causing already-scheduled cells to be treated as
           // empty and overwritten by the recurring fill below.
           fetchAllRows<DbScheduleCell>(buildExistingCellsPage),
+          fetchOrgToday(auth.serviceClient, data.orgId),
         ]);
+        const { data: recurringRows, error: recurringError } = recurringResult;
         if (recurringError) {
           throw recurringError;
         }
@@ -2402,6 +2409,11 @@ export async function POST(req: NextRequest) {
           new Date(`${data.startDate}T00:00:00`),
           new Date(`${data.endDate}T00:00:00`),
         )) {
+          // The database refuses a draft before the organization's today, and
+          // writes go in batches, so one past day would part-apply the fill.
+          if (isPastDateKey(dateKey, todayKey)) {
+            continue;
+          }
           for (const template of templatesByEmpAndDay.values()) {
             if (template.day_of_week !== dayOfWeek) {
               continue;

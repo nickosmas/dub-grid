@@ -42,7 +42,8 @@ function isStillActive(input: ScheduleCellInput, fill: RecurringFillInput): bool
 
 /**
  * The cells recurring schedules fill, by the server's own rule: only empty
- * cells of someone schedulable that day, on the schedule's weekday, within its
+ * cells of someone schedulable that day (a day the draft removed is not empty:
+ * the manager cleared it), on the schedule's weekday, within its
  * effective dates with the latest start winning, and never from an archived
  * shift, job or absence.
  */
@@ -56,7 +57,8 @@ export function planRecurringFills(fill: RecurringFillInput): RecurringFill[] {
   for (const { dateKey, dayOfWeek } of iterateDateRange(fill.startDate, fill.endDate)) {
     for (const [employeeId, schedules] of byEmployee) {
       if (fill.schedulableOn && !fill.schedulableOn(employeeId, dateKey)) continue;
-      if (hasVisibleGridShiftEntry(fill.shifts[`${employeeId}_${dateKey}`])) continue;
+      const entry = fill.shifts[`${employeeId}_${dateKey}`];
+      if (entry?.isDelete || hasVisibleGridShiftEntry(entry)) continue;
       const match = schedules
         .filter((schedule) => schedule.dayOfWeek === dayOfWeek)
         .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))

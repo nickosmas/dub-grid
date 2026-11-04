@@ -122,17 +122,6 @@ async function handleGET(req: NextRequest, timer: Timer) {
       });
     }
 
-    if (effectiveRole === "super_admin") {
-      const [inactive, employmentFlags] = await Promise.all([
-        orgId ? isCallerInactive(serviceClient, auth.user.id, orgId) : Promise.resolve(false),
-        getSelfEmploymentFlags(serviceClient, auth.user.id, orgId),
-      ]);
-      return NextResponse.json({
-        permissions: buildPerms(effectiveRole, orgId, false, null, false, inactive),
-        ...employmentFlags,
-      });
-    }
-
     const [inactive, employmentFlags, membershipResult] = await Promise.all([
       orgId ? isCallerInactive(serviceClient, auth.user.id, orgId) : Promise.resolve(false),
       getSelfEmploymentFlags(serviceClient, auth.user.id, orgId),
@@ -142,17 +131,19 @@ async function handleGET(req: NextRequest, timer: Timer) {
             .select("org_role, admin_permissions")
             .eq("user_id", auth.user.id)
             .eq("org_id", orgId)
+            .is("archived_at", null)
             .maybeSingle()
         : Promise.resolve(null),
     ]);
 
-    // The org_role claim trails the database after a promotion: the membership
-    // row is written immediately, but an access token that is already issued
-    // cannot be re-minted, so the claim can still say "user" for up to a
-    // refresh interval after someone is made an admin. Resolve the role from
-    // the membership row for the effective org rather than trusting the claim,
-    // or the client renders the wrong tier, including the wrong onboarding
-    // flow, then the right one the moment the token catches up.
+    // The org_role claim trails the database after any role change, Super
+    // Admin included: the membership row is written immediately, but an access
+    // token that is already issued cannot be re-minted, so the claim can name
+    // the old role for up to a refresh interval. Resolve the role from the
+    // membership row for the effective org rather than trusting the claim, or
+    // the client renders the wrong tier, including the wrong onboarding flow,
+    // then the right one the moment the token catches up. A sandbox owner's
+    // row in the sandbox org is a Super Admin one, so this holds there too.
     //
     // A missing row fails closed to "user": the JWT hook only issues an org
     // claim while the membership is valid, so no row here means it was archived

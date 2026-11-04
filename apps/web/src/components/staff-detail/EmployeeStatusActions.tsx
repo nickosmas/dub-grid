@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import type { AbsenceType, Employee } from "@/types";
 import { Button } from "@/components/Button";
-import { addDays, formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
+import { getEmployeeDisplayName } from "@/lib/utils";
+import { addDaysToIsoDate, getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import ConfirmDialog, { ConfirmSummaryBox } from "@/components/ConfirmDialog";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
@@ -21,6 +22,7 @@ import {
   availableStatusChoices,
   statusChoices,
   suggestedStatusChoice,
+  UNNAMED_ABSENCE,
   type StatusAction,
 } from "@dubgrid/domain";
 import { STATUS_KIND_ICONS, StatusSymbol } from "./StatusMarkIcon";
@@ -93,6 +95,11 @@ export interface EmployeeStatusActionsProps {
   fillWidth?: boolean;
   /** Hides the confirmation while a step-up prompt asks for fresh proof. */
   stepUpOpen?: boolean;
+  /**
+   * The organization's timezone. Its today decides whether a start date plans
+   * a change or starts it now, as the server decides it.
+   */
+  timeZone?: string | null;
 }
 
 const RETURN_DATE_HINT = "Leave it empty to mark them active yourself.";
@@ -135,10 +142,13 @@ function ReturnDateField({
 /** The first day away; empty means today, and a later day plans it (51g1). */
 function StartDateField({
   value,
+  today,
   onChange,
   hint,
 }: {
   value: string;
+  /** The organization's today (YYYY-MM-DD). */
+  today: string;
   onChange: (value: string) => void;
   hint?: string;
 }) {
@@ -158,8 +168,8 @@ function StartDateField({
         onChange={onChange}
         label="Starts"
         placeholder="Today"
-        minDate={formatDateKey(new Date())}
-        maxDate={formatDateKey(addDays(new Date(), PLANNED_START_MAX_DAYS))}
+        minDate={today}
+        maxDate={addDaysToIsoDate(today, PLANNED_START_MAX_DAYS)}
         allowClear
       />
       {hint ? (
@@ -174,10 +184,13 @@ function StartDateField({
 /** Their last day; empty offboards them now, a day plans it for the day after (51g2). */
 function LastDayField({
   value,
+  today,
   onChange,
   hint,
 }: {
   value: string;
+  /** The organization's today (YYYY-MM-DD). */
+  today: string;
   onChange: (value: string) => void;
   hint: string;
 }) {
@@ -197,8 +210,8 @@ function LastDayField({
         onChange={onChange}
         label="Last day"
         placeholder="Offboard now"
-        minDate={formatDateKey(new Date())}
-        maxDate={formatDateKey(addDays(new Date(), PLANNED_START_MAX_DAYS))}
+        minDate={today}
+        maxDate={addDaysToIsoDate(today, PLANNED_START_MAX_DAYS)}
         allowClear
       />
       <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
@@ -364,6 +377,7 @@ export function EmployeeStatusActions({
   onClosed,
   fillWidth = false,
   stepUpOpen = false,
+  timeZone = null,
 }: EmployeeStatusActionsProps) {
   const hasPlan =
     employee.status === "active" && employee.plannedStatus === "away" && !!employee.plannedFrom;
@@ -414,12 +428,11 @@ export function EmployeeStatusActions({
     suspend: onSuspend,
     reinstate: onReinstate,
   };
-  const todayKey = formatDateKey(new Date());
+  // The organization's today, as the server reads it (fetchOrgToday), not the browser's.
+  const todayKey = getIsoDateInTimeZone(new Date(), timeZone);
   // A start after today plans the Away rather than starting it.
   const laterStart = startDate && startDate > todayKey ? startDate : null;
-  const returnMinDate = formatDateKey(
-    addDays(laterStart ? new Date(`${laterStart}T00:00:00`) : new Date(), 1),
-  );
+  const returnMinDate = addDaysToIsoDate(laterStart ?? todayKey, 1);
   const suspensionEndChanged =
     isSuspended && !choice && (until || null) !== (employee.suspendedUntil ?? null);
   const suspensionPlanChanged =
@@ -467,6 +480,17 @@ export function EmployeeStatusActions({
   const plannedAbsenceName =
     absenceTypes.find((absenceType) => absenceType.id === employee.plannedAbsenceTypeId)?.name ??
     null;
+  // The absence a planned Away fills its days with, which ending or shortening it takes off.
+  const planAbsenceName =
+    hasPlan && employee.plannedAbsenceTypeId != null
+      ? (plannedAbsenceName ?? UNNAMED_ABSENCE)
+      : null;
+  // The absence an Away person's days hold now, which Mark active or an earlier date takes off.
+  const awayAbsenceName =
+    isAway && employee.awayUntil && employee.awayAbsenceTypeId != null
+      ? (absenceTypes.find((absenceType) => absenceType.id === employee.awayAbsenceTypeId)?.name ??
+        UNNAMED_ABSENCE)
+      : null;
   // A last day can be set only for someone Active and not suspended, as a plan needs.
   const canPlanLastDay =
     employee.status === "active" && !employee.archivedAt && !employee.suspendedAt;
@@ -606,6 +630,8 @@ export function EmployeeStatusActions({
             ? employee.plannedFrom
             : null,
         plannedStatus: employee.plannedStatus ?? null,
+        currentAbsenceName:
+          choice === "markActive" ? awayAbsenceName : hasPlan ? planAbsenceName : null,
       })
     : restoresNow
       ? describeStatusAction("restore", displayName)
@@ -663,12 +689,16 @@ export function EmployeeStatusActions({
                                   startDate: laterStart,
                                   returnDate: returnDate || null,
                                   absenceName: chosenAbsenceName,
+                                  plannedFrom: employee.plannedFrom ?? null,
+                                  currentReturnDate: employee.plannedUntil ?? null,
+                                  currentAbsenceName: planAbsenceName,
                                 })
                               : awayDetailsChanged
                                 ? describeStatusAction("setReturnDate", displayName, {
                                     returnDate: returnDate || null,
                                     currentReturnDate: employee.awayUntil ?? null,
                                     absenceName: chosenAbsenceName,
+                                    currentAbsenceName: awayAbsenceName,
                                   })
                                 : null;
   const notePlaceholder = choice ? NOTE_PLACEHOLDERS[choice] : undefined;
@@ -685,6 +715,7 @@ export function EmployeeStatusActions({
           {cancellingPlan ? null : (
             <>
               <StartDateField
+                today={todayKey}
                 value={startDate}
                 onChange={setStartDate}
                 hint="Clear it to suspend them today."
@@ -704,6 +735,7 @@ export function EmployeeStatusActions({
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {cancellingPlan ? null : (
             <StartDateField
+              today={todayKey}
               value={startDate}
               onChange={setStartDate}
               hint="Clear it to restore them today."
@@ -721,6 +753,7 @@ export function EmployeeStatusActions({
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {cancellingPlan ? null : (
             <LastDayField
+              today={todayKey}
               value={lastDay}
               onChange={setLastDay}
               hint="Clear it to offboard them today."
@@ -739,6 +772,7 @@ export function EmployeeStatusActions({
           {cancellingPlan ? null : (
             <>
               <StartDateField
+                today={todayKey}
                 value={startDate}
                 onChange={setStartDate}
                 hint="Clear it to start their time away today."
@@ -855,27 +889,33 @@ export function EmployeeStatusActions({
             ) : null}
             {choice === "markAway" ? (
               <>
-                <StartDateField value={startDate} onChange={setStartDate} />
+                <StartDateField today={todayKey} value={startDate} onChange={setStartDate} />
                 {datedFields}
               </>
             ) : null}
             {choice === "suspend" ? (
               <>
                 {onSetPlannedChange ? (
-                  <StartDateField value={startDate} onChange={setStartDate} />
+                  <StartDateField today={todayKey} value={startDate} onChange={setStartDate} />
                 ) : null}
                 <SuspensionEndField value={until} minDate={untilMinDate} onChange={setUntil} />
               </>
             ) : null}
             {choice === "restore" && onSetPlannedChange ? (
               <StartDateField
+                today={todayKey}
                 value={startDate}
                 onChange={setStartDate}
                 hint="Leave it empty to restore them today."
               />
             ) : null}
             {choice === "archive" && canPlanLastDay && onSetPlannedChange ? (
-              <LastDayField value={lastDay} onChange={setLastDay} hint={LAST_DAY_HINT} />
+              <LastDayField
+                today={todayKey}
+                value={lastDay}
+                onChange={setLastDay}
+                hint={LAST_DAY_HINT}
+              />
             ) : null}
             {copy?.message ? <span>{copy.message}</span> : null}
             {copy && copy.points.length > 0 ? (

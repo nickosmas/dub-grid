@@ -232,7 +232,7 @@ export function ManagementUserActionsSheet({
         presentation="inline"
         body={
           invitationConfirmAction === "resend"
-            ? "The current invitation will be canceled."
+            ? "A new invitation link is sent, and the current one stops working."
             : "The invite link stops working."
         }
         confirmLabel={invitationConfirmAction === "resend" ? "Resend" : "Revoke"}

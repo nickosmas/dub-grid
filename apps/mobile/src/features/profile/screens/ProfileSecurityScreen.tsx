@@ -41,7 +41,8 @@ const APP_LOCK_DESCRIPTION = Platform.select({
   default: "Ask for your fingerprint, face, or screen lock whenever you come back to the app.",
 });
 
-const PENDING_ACCOUNT_DELETION_MESSAGE = "An account deletion request is pending admin review.";
+const PENDING_ACCOUNT_DELETION_MESSAGE =
+  "An account deletion request is pending Super Admin review.";
 
 /**
  * The security hub: a list of places, not a page of editors.
@@ -244,7 +245,7 @@ export default function ProfileSecurityScreen() {
         </>
       ) : null}
       <ConfirmationModal
-        body="An Admin reviews the request before your account is deleted."
+        body="A Super Admin reviews the request before your account is deleted."
         confirmLabel="Request"
         confirmTone="danger"
         loading={deletionRequestMutation.isPending}

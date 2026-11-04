@@ -117,6 +117,12 @@ vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: vi.fn(),
 }));
 
+// Before every date the recurring-fill tests use, unless a test moves it.
+const fetchOrgToday = vi.fn(async (..._args: unknown[]) => "2026-08-01");
+vi.mock("@/features/employees/server/org-today", () => ({
+  fetchOrgToday: (...args: unknown[]) => fetchOrgToday(...args),
+}));
+
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { POST } from "./route";
 
@@ -1354,6 +1360,52 @@ describe("POST /api/schedule/manage", () => {
           p_from_recurring: true,
         }),
       );
+    });
+
+    it("fills only from the organization's today, since past days are corrected", async () => {
+      mockTables([]);
+      fetchOrgToday.mockResolvedValueOnce("2026-08-05");
+
+      const response = await POST(
+        makeRequest({
+          action: "applyRecurringSchedules",
+          orgId,
+          startDate: dateKey,
+          endDate: "2026-08-10",
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(fetchOrgToday).toHaveBeenCalledWith(expect.anything(), orgId);
+      const body = await response.json();
+      expect(body.generated).toEqual([
+        { empId, date: "2026-08-10", label: "Vacation", absenceTypeId: 9 },
+      ]);
+      expect(userRpc).toHaveBeenCalledTimes(1);
+      expect(userRpc).toHaveBeenCalledWith(
+        "write_schedule_cell_snapshot",
+        expect.objectContaining({ p_date: "2026-08-10" }),
+      );
+    });
+
+    it("fills today itself", async () => {
+      mockTables([]);
+      fetchOrgToday.mockResolvedValueOnce(dateKey);
+
+      const response = await POST(
+        makeRequest({
+          action: "applyRecurringSchedules",
+          orgId,
+          startDate: dateKey,
+          endDate: dateKey,
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.generated).toEqual([
+        { empId, date: dateKey, label: "Vacation", absenceTypeId: 9 },
+      ]);
     });
   });
 });
