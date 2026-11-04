@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  fetchMobileFocusAreaRowsInDepartmentOrder,
   fetchMobileManagementRosterRows,
   fetchMobileNotificationsPage,
   fetchMobilePeopleRows,
@@ -644,5 +645,45 @@ describe("fetchPublishedMobileScheduleRows", () => {
       absenceEndTime: "15:00",
       segments: [{ shiftId: 1, jobId: 10, position: 0 }],
     });
+  });
+});
+
+describe("fetchMobileFocusAreaRowsInDepartmentOrder", () => {
+  it("lists focus areas in their departments' order, as Settings does", async () => {
+    // Nursing's wings and Visiting Nursing's own area each start at 0, so
+    // ordering by the focus area's sort order alone put Visiting Nursing first.
+    const tables: Record<string, unknown[]> = {
+      focus_areas: [
+        { id: 4, name: "Visiting Nursing", department_id: 20, sort_order: 0 },
+        { id: 1, name: "Skilled Nursing", department_id: 10, sort_order: 0 },
+        { id: 3, name: "Sheltered Care", department_id: 10, sort_order: 2 },
+        { id: 2, name: "Night Nursing", department_id: 10, sort_order: 1 },
+      ],
+      departments: [
+        { id: 20, type: "scheduled", sort_order: 1 },
+        { id: 10, type: "scheduled", sort_order: 0 },
+      ],
+    };
+    const client = {
+      from: (table: string) => {
+        const result = { data: tables[table], error: null };
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          is: () => Promise.resolve(result),
+        };
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+
+    const rows = await fetchMobileFocusAreaRowsInDepartmentOrder(client, "org-1");
+
+    expect(rows.map((row) => row.name)).toEqual([
+      "Skilled Nursing",
+      "Night Nursing",
+      "Sheltered Care",
+      "Visiting Nursing",
+    ]);
+    expect(rows[0]).toEqual({ id: 1, name: "Skilled Nursing", department_id: 10 });
   });
 });
