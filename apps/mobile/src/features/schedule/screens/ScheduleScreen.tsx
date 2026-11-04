@@ -22,6 +22,7 @@ import Reanimated, {
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { emptySceneDayFromIso } from "../../../shared/components/empty-scene/day-scene";
 import { Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
+import { useScrollToTopOnChange } from "../../../shared/hooks/useScrollToTopOnChange";
 import { PageWash } from "../../../shared/components/PageWash";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
@@ -44,7 +45,6 @@ import {
   IconControlButton,
   WeekNavigatorHeader,
 } from "../components/WeekNavigatorHeader";
-import { ShiftChangeBadge, getShiftChangeLabel } from "../components/ShiftChangeBadge";
 import { SplitShiftBadge } from "../components/SplitShift";
 import { getMySchedule, getOrgSchedule, getShiftRequests } from "../../../shared/lib/api";
 import { getAvatarTone } from "@dubgrid/design-tokens";
@@ -118,7 +118,6 @@ import {
   buildJobChip,
   getMeHeroShiftmates,
   buildRestOfDayAbsenceChip,
-  getScheduleEntrySegmentChange,
   getSegmentJobChip,
   hasMentoredSegments,
   isGeneralShiftSegment,
@@ -428,8 +427,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<string | null>(null);
   const calendarExpandProgress = useSharedValue(0);
   const calendarDragStartProgress = useSharedValue(0);
-  const meScrollViewRef = useRef<ScreenScrollHandle | null>(null);
-  const pendingMeScrollKeyRef = useRef<string | null>(null);
+  const scrollViewRef = useRef<ScreenScrollHandle | null>(null);
   const swipeStartXRef = useRef<number | null>(null);
   const swipeStartTimestampRef = useRef<number | null>(null);
   const selectedDateRef = useRef<string | null>(null);
@@ -814,30 +812,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       ? `${activeTeamFocusAreaTab.label} shifts show here once they're published.`
       : "Shifts show here once they're published.";
 
-  useEffect(() => {
-    if (isTeamScope) {
-      return;
-    }
-
-    pendingMeScrollKeyRef.current = `${range.startDate}:${selectedDate}`;
-  }, [isTeamScope, range.startDate, selectedDate]);
-
-  useEffect(() => {
-    if (isTeamScope || contentState.kind === "loading" || !linkedEmployee) {
-      return;
-    }
-
-    const scrollRequestKey = `${range.startDate}:${selectedDate}`;
-    if (pendingMeScrollKeyRef.current !== scrollRequestKey) {
-      return;
-    }
-
-    meScrollViewRef.current?.scrollTo({
-      y: 0,
-      animated: true,
-    });
-    pendingMeScrollKeyRef.current = null;
-  }, [contentState.kind, isTeamScope, linkedEmployee, range.startDate, selectedDate]);
+  useScrollToTopOnChange(scrollViewRef, `${range.startDate}:${selectedDate}`);
 
   function closeCalendarExpansion() {
     if (!isCalendarOpen) {
@@ -1413,7 +1388,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       // Everything else scrolls — `Screen`'s `flexGrow: 1` gives a `fillScreen`
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
-      scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
+      scrollViewRef={scrollViewRef}
       stickyHeader={stickyHeader}
       stickyHeaderShellStyle={isTeamScope ? styles.teamHeaderCard : undefined}
     >
@@ -1744,15 +1719,9 @@ function TeamShiftMemberRow({
   const memberTimeRange = getTeamShiftRowTimeRange(row, groupTimeRange);
   const alternateShiftLabel = formatAlternateShiftTitles(row.alternateShiftTitles);
   const roleChip = getTeamMemberRoleChip(mobileColors, isDark, entry, segment);
-  const change = segment ? getScheduleEntrySegmentChange(entry, segment) : entry.change;
-  // One chip, not two: as on Home's Your Week rows, a split shift folds the
-  // change word into its own label ("Also Day Shift · New") instead of
-  // stacking a second chip under the name.
-  const changeLabel = getShiftChangeLabel(change);
-  const splitChipLabel =
-    alternateShiftLabel && changeLabel
-      ? `${alternateShiftLabel} · ${changeLabel}`
-      : alternateShiftLabel;
+  // No New or Edited beside a name: the team's day reads as it stands, and
+  // what changed belongs to the shift's own page.
+  const splitChipLabel = alternateShiftLabel;
   const isMentored = segment
     ? segment.isMentored === true
     : hasMentoredSegments(getScheduleEntrySegments(entry));
@@ -1803,7 +1772,6 @@ function TeamShiftMemberRow({
           <View style={styles.teamMemberHeaderRow}>
             <View style={styles.teamMemberNameRow}>
               <Text style={styles.teamMemberName}>{memberName}</Text>
-              <ShiftChangeBadge change={splitChipLabel ? null : change} />
             </View>
             {stackRolePill ? null : rolePill}
           </View>

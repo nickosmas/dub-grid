@@ -555,6 +555,7 @@ export function createSafeAreaContextModule(React: ReactModule) {
     React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
 
   return {
+    SafeAreaListener: () => null,
     SafeAreaProvider,
     SafeAreaView,
     useSafeAreaInsets: () => ({

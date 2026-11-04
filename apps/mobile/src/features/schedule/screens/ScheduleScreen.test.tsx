@@ -1357,10 +1357,10 @@ describe("ScheduleScreen", () => {
     personal.unmount();
     render(<TeamScheduleScreen />);
 
-    // The team row folds the change word into its split chip, as Home does,
-    // so the edited Evening row carries one chip and the Day row stays clean.
-    expect(screen.getByLabelText("Also Day Shift · Edited")).toBeInTheDocument();
+    // The team rows name no change: what changed belongs to the shift's page.
+    expect(screen.getByLabelText("Also Day Shift")).toBeInTheDocument();
     expect(screen.getByLabelText("Also Evening Shift")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Edited/)).toBeNull();
     expect(screen.queryByLabelText("Shift edited")).toBeNull();
   });
 
@@ -1422,11 +1422,33 @@ describe("ScheduleScreen", () => {
     personal.unmount();
     render(<TeamScheduleScreen />);
 
-    expect(screen.getByLabelText("Also Day Shift · New")).toBeInTheDocument();
+    expect(screen.getByLabelText("Also Day Shift")).toBeInTheDocument();
     expect(screen.getByLabelText("Also Evening Shift")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/New/)).toBeNull();
     expect(screen.queryByLabelText("Shift new")).toBeNull();
     expect(screen.queryByLabelText(/Edited/)).toBeNull();
     expect(screen.queryByText(/^Was /)).toBeNull();
+  });
+
+  it("marks a new shift only on today and later, not on a day that has passed", () => {
+    const change = { kind: "new", isNewAddition: true };
+    meScheduleEntries = [
+      createScheduleEntry({ date: "2026-04-14", change }),
+      createScheduleEntry({ date: "2026-04-15" }),
+      createScheduleEntry({ date: "2026-04-17", change }),
+    ];
+    teamScheduleEntries = [];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<HomeScheduleScreen />);
+
+    // Thursday the 16th is today: Tuesday's shift is done, Friday's is ahead
+    // (on its row and as the next shift in the hero).
+    expect(screen.getAllByLabelText("Shift new")).toHaveLength(2);
+    expect(
+      within(screen.getByTestId("me-hero-card")).getByLabelText("Shift new"),
+    ).toBeInTheDocument();
   });
 
   it("keeps the team schedule free of Was lines", () => {
