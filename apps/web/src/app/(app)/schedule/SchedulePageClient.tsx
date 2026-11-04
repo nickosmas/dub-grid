@@ -1818,6 +1818,7 @@ function SchedulerContent({
     org,
     spanWeeks,
     weekStart,
+    todayKey,
     employeeNameById,
     refetchScheduleData,
     startScheduleOperation,
@@ -5262,7 +5263,7 @@ function SchedulerContent({
           // just that one cell — this used to refetch the entire loaded window
           // to read a single number.
           const echoCell = { employeeId: panel.empId, date: formatDateKey(panel.date) };
-          const range = seriesScopeRange(seriesScope, echoCell.date);
+          const range = seriesScopeRange(seriesScope, echoCell.date, todayKeyRef.current);
           const seriesEcho = {
             isScheduler: canEditShiftsRef.current,
             assignmentLabelMap: assignmentLabelMapRef.current,
@@ -9651,6 +9652,7 @@ function SchedulerContent({
               pastDayNotice={pastDayNotice}
               correctedLabel={editPanelCorrectedLabel}
               correctedChange={editPanelCorrection ?? null}
+              todayKey={todayKey}
               allowShiftEdits={canEditShifts && (!editPanelIsPast || canCorrectPanelDay)}
               canEditScheduleIndicators={canEditNotes && !editPanelIsPast}
               getActiveIndicatorIds={panelActiveIndicatorIds}
@@ -10129,8 +10131,10 @@ function SchedulerContent({
                 importPreview.breakdown.imported === 1 ? "" : "s"
               } from ${importPreview.sourceRange}?`}
               message={(() => {
-                const { breakdown, targetRange, outcomes } = importPreview;
-                const copyLine = `They're copied into ${targetRange}.`;
+                const { breakdown, targetRange, outcomes, skipsPastDays } = importPreview;
+                const copyLine = skipsPastDays
+                  ? `They're copied into ${targetRange}. Days before today stay as they are.`
+                  : `They're copied into ${targetRange}.`;
                 if (breakdown.totalSkipped === 0) return copyLine;
                 const description = formatImportPreviousSkipDescription(
                   outcomes,

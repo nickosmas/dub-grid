@@ -323,9 +323,7 @@ describe("ShiftRequestBoard", () => {
       expect(fetchShiftRequestDraftCells).toHaveBeenCalledWith("approve-2", "org-1");
       const note = screen.getByRole("note");
       expect(note).toHaveTextContent("Alice Smith has unpublished changes on Thu, Apr 16.");
-      expect(note).toHaveTextContent(
-        "Approving publishes this request now and replaces those changes.",
-      );
+      expect(note).toHaveTextContent("Approving publishes this request now and replaces them.");
       expect(onResolve).not.toHaveBeenCalled();
 
       await confirmDialogAction(user, "Approve");
@@ -337,7 +335,7 @@ describe("ShiftRequestBoard", () => {
       await openApprove();
 
       expect(screen.getByRole("note")).toHaveTextContent(
-        "These days couldn't be checked for unpublished changes.",
+        "These days couldn't be checked for unpublished changes or notes.",
       );
     });
 

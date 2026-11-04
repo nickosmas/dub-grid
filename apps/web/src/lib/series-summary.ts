@@ -232,12 +232,21 @@ function longDay(date: string): string {
   return `${WEEKDAYS[weekdayIndex(date)]}, ${monthDay(date)}`;
 }
 
-/** The four ways an edit or removal can reach a repeating item's days. */
+/** Whether a repeating item has days before `today`, which its edits and removals leave alone. */
+export function seriesHasPastDays(occurrenceDates: string[] | null, today: string): boolean {
+  return !!occurrenceDates?.some((day) => day < today);
+}
+
+/**
+ * The four ways an edit or removal can reach a repeating item's days. Each
+ * counts only today and later, since days before today stay as they are.
+ */
 export function seriesScopeOptions(
   occurrenceDates: string[] | null,
   date: string,
+  today: string,
 ): SeriesScopeOption[] {
-  const sorted = occurrenceDates ? [...occurrenceDates].sort() : null;
+  const sorted = occurrenceDates ? occurrenceDates.filter((day) => day >= today).sort() : null;
   const reach = (dates: string[] | null) => ({
     detail: dates ? formatSeriesSpan(dates) : null,
     count: dates ? dates.length : null,

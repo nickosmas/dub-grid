@@ -104,7 +104,7 @@ describe("getMobileRequestActionFeedback", () => {
 
       expect(feedback.warning).toEqual([
         "Jane Morgan has unpublished changes on Wed, Oct 28.",
-        "Approving publishes this request now and replaces those changes.",
+        "Approving publishes this request now and replaces them.",
       ]);
     });
 
@@ -116,7 +116,7 @@ describe("getMobileRequestActionFeedback", () => {
       });
 
       expect(feedback.warning?.[0]).toBe(
-        "These days couldn't be checked for unpublished changes. Approving publishes this request now and replaces any there are.",
+        "These days couldn't be checked for unpublished changes or notes. Approving publishes this request now and replaces any there are.",
       );
     });
 

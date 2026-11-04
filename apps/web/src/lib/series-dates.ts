@@ -40,14 +40,16 @@ export function generateSeriesDates(
 
 /**
  * The inclusive date range a series-wide scope reaches from the occurrence on
- * `date`; an omitted bound is open. "this" is a single-cell write, not a
- * series write, so it has no range.
+ * `date`; an omitted end is open. "this" is a single-cell write, not a series
+ * write, so it has no range. Days before `today` are corrected, not drafted,
+ * so no range starts before it; the server keeps the same bound (118).
  */
 export function seriesScopeRange(
   scope: Exclude<SeriesScope, "this">,
   date: string,
-): { fromDate?: string; toDate?: string } {
-  if (scope === "previous") return { toDate: date };
-  if (scope === "following") return { fromDate: date };
-  return {};
+  today: string,
+): { fromDate: string; toDate?: string } {
+  if (scope === "previous") return { fromDate: today, toDate: date };
+  if (scope === "following") return { fromDate: date > today ? date : today };
+  return { fromDate: today };
 }

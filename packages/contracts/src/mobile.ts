@@ -717,7 +717,15 @@ export const mobileShiftRequestSchema = z.object({
    * failed, which must still warn.
    */
   draftCells: z
-    .array(z.object({ empId: z.string().uuid(), date: z.string().date() }))
+    .array(
+      z.object({
+        empId: z.string().uuid(),
+        date: z.string().date(),
+        // Which kind of unpublished change the day holds (119); absent from older servers.
+        hasShiftChanges: z.boolean().optional(),
+        hasNoteChanges: z.boolean().optional(),
+      }),
+    )
     .nullable()
     .optional(),
 });
