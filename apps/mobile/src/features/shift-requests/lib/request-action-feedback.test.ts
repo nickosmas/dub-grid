@@ -7,9 +7,22 @@ import {
 describe("getMobileRequestActionFeedback", () => {
   it("promises a queue to a member and the schedule to an approver", () => {
     const body = { action: "claim" };
-    expect(getMobileRequestActionFeedback({ requestId: "r1", body }).message).toBe(
-      "It's sent to your admin for approval.",
-    );
+    const calloffPickup = {
+      type: "pickup" as const,
+      status: "open" as const,
+      targetEmpId: null,
+      targetName: null,
+      parentRequestId: "calloff-1",
+    };
+    expect(
+      getMobileRequestActionFeedback({ requestId: "r1", body, request: calloffPickup }).message,
+    ).toBe("It's sent for approval.");
+    expect(
+      getMobileRequestActionFeedback({
+        requestId: "r1",
+        body: { action: "volunteer_open_shift" },
+      }).message,
+    ).toBe("It's sent for approval.");
     expect(
       getMobileRequestActionFeedback({ requestId: "r1", body, viewerCanApprove: true }).message,
     ).toBe("You can approve requests, so it goes on the schedule right away.");
@@ -20,6 +33,38 @@ describe("getMobileRequestActionFeedback", () => {
         viewerCanApprove: true,
       }).message,
     ).toBe("You can approve requests, so it goes on the schedule right away.");
+  });
+
+  it("allows for a poster who can approve an ordinary pickup", () => {
+    const ordinaryPickup = {
+      type: "pickup" as const,
+      status: "open" as const,
+      targetEmpId: null,
+      targetName: null,
+      parentRequestId: null,
+    };
+    const expected =
+      "It goes on the schedule once it's approved, right away if whoever posted it can approve requests.";
+    expect(
+      getMobileRequestActionFeedback({
+        requestId: "r1",
+        body: { action: "claim" },
+        request: ordinaryPickup,
+      }).message,
+    ).toBe(expected);
+    // Without the request in hand, the hedged sentence is the one that is always true.
+    expect(
+      getMobileRequestActionFeedback({ requestId: "r1", body: { action: "claim" } }).message,
+    ).toBe(expected);
+  });
+
+  it("says a decline closes the request", () => {
+    expect(
+      getMobileRequestActionFeedback({
+        requestId: "r1",
+        body: { action: "respond", accept: false },
+      }).message,
+    ).toBe("The request closes and the requester keeps their shift.");
   });
 
   it("cautions that the other person hasn't answered when a cancel goes over their head", () => {
@@ -104,15 +149,30 @@ describe("getMobileRequestActionSuccessToast", () => {
     expect(getMobileRequestActionSuccessToast({ action: "claim" }, { autoApproved: true })).toEqual(
       { title: "Shift is yours", message: "The claim was approved and is on the schedule." },
     );
-    expect(
-      getMobileRequestActionSuccessToast(
-        { action: "respond", accept: true },
-        { autoApproved: true },
-      ),
-    ).toEqual({ title: "Swap approved", message: "Both schedules are updated." });
-    expect(getMobileRequestActionSuccessToast({ action: "respond", accept: false })).toEqual({
-      title: "Request declined",
+  });
+
+  it("names the answered request's real type", () => {
+    const accept = { action: "respond", accept: true };
+    const decline = { action: "respond", accept: false };
+    expect(getMobileRequestActionSuccessToast(accept, { autoApproved: true }, "swap")).toEqual({
+      title: "Swap approved",
+      message: "Both schedules are updated.",
+    });
+    expect(getMobileRequestActionSuccessToast(accept, { autoApproved: true }, "pickup")).toEqual({
+      title: "Pickup approved",
+      message: "The shift is on your schedule.",
+    });
+    expect(getMobileRequestActionSuccessToast(accept, { autoApproved: true })).toEqual({
+      title: "Request approved",
+      message: "The schedule is updated.",
+    });
+    expect(getMobileRequestActionSuccessToast(decline, undefined, "pickup")).toEqual({
+      title: "Pickup declined",
       message: "They'll see your answer.",
     });
+    expect(getMobileRequestActionSuccessToast(decline, undefined, "swap").title).toBe(
+      "Swap declined",
+    );
+    expect(getMobileRequestActionSuccessToast(decline).title).toBe("Request declined");
   });
 });

@@ -168,6 +168,7 @@ import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
 import { buildSchedulableOn } from "./_lib/schedulable-on";
 import {
   CORRECTION_ADMIN_WINDOW_DAYS,
+  describeClaimApproval,
   singularLabelNoun,
   DEFAULT_ORGANIZATION_LABELS,
   orderFocusAreasByDepartment,
@@ -542,6 +543,7 @@ function SchedulerContent({
     canViewDashboardAnalytics,
     isSuperAdmin,
     isGridmaster,
+    isImpersonating,
     isLoading: permsLoading,
     orgId,
   } = usePermissions();
@@ -9445,11 +9447,12 @@ function SchedulerContent({
                 icon={CalendarPlus}
                 confirmLabel="Claim"
                 isLoading={isCoverageGapVolunteerPending}
-                message={
-                  canApproveShiftRequests
-                    ? "As an admin, it goes on the schedule right away."
-                    : "It's sent to your admin for approval."
-                }
+                // The volunteer posts a coverage gap's request themselves.
+                message={describeClaimApproval({
+                  viewerCanApprove: canApproveShiftRequests,
+                  posterApprovalCounts: false,
+                  impersonating: isImpersonating,
+                })}
                 title={`Claim ${pendingCoverageGapVolunteer.assignmentLabel} on ${pendingCoverageGapVolunteer.date}?`}
                 variant="info"
                 onCancel={() => {
@@ -9487,11 +9490,15 @@ function SchedulerContent({
                   spellOutAssignment(pendingClaimShift.assignmentIds[0]) ??
                   pendingClaimShift.assignmentLabel
                 } on ${pendingClaimShift.date}?`}
-                message={`${pendingClaimShift.calledOffBy ? "This shift was called off. " : ""}${
-                  canApproveShiftRequests
-                    ? "As an admin, it goes on the schedule right away."
-                    : "It's sent to your admin for approval."
-                }`}
+                // Grid open shifts are call-off vacancies and coverage gaps,
+                // where only the claimer's approval counts.
+                message={`${pendingClaimShift.calledOffBy ? "This shift was called off. " : ""}${describeClaimApproval(
+                  {
+                    viewerCanApprove: canApproveShiftRequests,
+                    posterApprovalCounts: false,
+                    impersonating: isImpersonating,
+                  },
+                )}`}
                 confirmLabel="Claim"
                 variant="info"
                 isLoading={isClaimShiftPending}
@@ -9863,6 +9870,7 @@ function SchedulerContent({
               loading={shiftRequests.loading}
               currentEmpId={currentEmpId}
               canApprove={canApproveShiftRequests}
+              isImpersonating={isImpersonating}
               onClaim={(id) => {
                 if (!currentEmpId) return;
                 return shiftRequests.claim(id, currentEmpId);

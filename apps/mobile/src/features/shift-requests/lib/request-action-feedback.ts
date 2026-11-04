@@ -1,7 +1,10 @@
 import {
   describeApprovalDraftWarning,
+  describeClaimApproval,
+  describeShiftRequestDeclined,
   describeShiftRequestSubmitted,
   isAwaitingRecipient,
+  SHIFT_REQUEST_DECLINE_MESSAGE,
   type ShiftRequestDraftCell,
 } from "@dubgrid/domain";
 
@@ -19,6 +22,8 @@ export type MobileRequestActionSubject = {
   targetName: string | null;
   requesterEmpId?: string;
   requesterName?: string;
+  /** Set on the open pickup a call-off leaves behind. */
+  parentRequestId?: string | null;
   /** Absent when not checked; null when the check failed. */
   draftCells?: ShiftRequestDraftCell[] | null;
 };
@@ -84,23 +89,24 @@ export function getMobileRequestActionFeedback({
   viewerCanApprove?: boolean;
 }): MobileRequestActionFeedback {
   const key = getMobileRequestActionKey(requestId, body);
-  const claimMessage = viewerCanApprove
-    ? "You can approve requests, so it goes on the schedule right away."
-    : "It's sent to your admin for approval.";
 
   switch (getActionVariant(body)) {
     case "volunteer_open_shift":
       return {
         confirmLabel: "Claim",
         key,
-        message: claimMessage,
+        // The volunteer posts a coverage gap's request themselves.
+        message: describeClaimApproval({ viewerCanApprove, posterApprovalCounts: false }),
         title: "Claim this shift?",
       };
     case "claim":
       return {
         confirmLabel: "Claim",
         key,
-        message: claimMessage,
+        message: describeClaimApproval({
+          viewerCanApprove,
+          posterApprovalCounts: request?.parentRequestId == null,
+        }),
         title: "Claim this shift?",
       };
     case "accept":
@@ -115,7 +121,7 @@ export function getMobileRequestActionFeedback({
         confirmLabel: "Decline",
         confirmStyle: "destructive",
         key,
-        message: "The requester keeps their current shift unless someone else responds.",
+        message: SHIFT_REQUEST_DECLINE_MESSAGE,
         title: "Decline request?",
       };
     case "approve":
@@ -156,22 +162,25 @@ export function getMobileRequestActionFeedback({
   }
 }
 
+/** `requestType` is the answered request's type, when the caller knows it. */
 export function getMobileRequestActionSuccessToast(
   body: MobileRequestActionBody,
   result?: { autoApproved?: boolean },
+  requestType?: MobileRequestActionSubject["type"] | null,
 ): MobileRequestActionSuccessToast {
   const autoApproved = result?.autoApproved === true;
+  const answeredType = requestType === "swap" || requestType === "pickup" ? requestType : null;
   switch (getActionVariant(body)) {
     case "volunteer_open_shift":
     case "claim":
       return describeShiftRequestSubmitted({ action: "claimed" }, { autoApproved });
     case "accept":
-      return describeShiftRequestSubmitted({ action: "accepted", type: "swap" }, { autoApproved });
+      return describeShiftRequestSubmitted(
+        { action: "accepted", type: answeredType },
+        { autoApproved },
+      );
     case "decline":
-      return {
-        title: "Request declined",
-        message: "They'll see your answer.",
-      };
+      return describeShiftRequestDeclined(answeredType);
     case "approve":
       return {
         title: "Request approved",
