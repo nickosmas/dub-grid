@@ -25,3 +25,20 @@ export function subscribeToNetworkState(listener: NetworkStateListener): () => v
     listeners.delete(listener);
   };
 }
+
+const reachedListeners = new Set<() => void>();
+
+/**
+ * Called whenever the server answers, whatever the status: an answer is proof
+ * the connection works, whatever the platform's network reading last said.
+ */
+export function reportServerReached(): void {
+  for (const listener of reachedListeners) listener();
+}
+
+export function subscribeToServerReached(listener: () => void): () => void {
+  reachedListeners.add(listener);
+  return () => {
+    reachedListeners.delete(listener);
+  };
+}

@@ -1,6 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
 import { ApiResponseError } from "@dubgrid/api-client";
-import { isNetworkConnectionError } from "./errors";
 
 /**
  * `NetworkStateProvider` wires react-query's `focusManager` to AppState, so
@@ -13,16 +12,15 @@ const FOREGROUND_STALE_TIME_MS = 30_000;
 
 /**
  * A retry re-runs the same request, so a refused, forbidden or missing answer
- * comes back again and only delays the error. Network failures wait for
- * `refetchOnReconnect`.
+ * comes back again and only delays the error. A dropped connection is retried
+ * like a server failure: iOS often drops the first request after a wake or a
+ * network handover while the connection works, and leaving it to
+ * `refetchOnReconnect` showed an error page that never cleared, since the app
+ * never went offline to come back. React Query pauses retries while offline.
  */
 const TERMINAL_STATUSES = new Set([401, 403, 404]);
 
 export function shouldRetryMobileQuery(failureCount: number, error: unknown): boolean {
-  if (isNetworkConnectionError(error)) {
-    return false;
-  }
-
   if (error instanceof ApiResponseError && TERMINAL_STATUSES.has(error.status)) {
     return false;
   }

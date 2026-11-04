@@ -372,6 +372,79 @@ describe("NetworkStateProvider", () => {
     expect(setFocused.mock.calls).toEqual([[false], [false]]);
   });
 
+  it("rides out a brief offline reading while requests still work", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      networkListener?.({ isConnected: false, isInternetReachable: false });
+      vi.advanceTimersByTime(2_999);
+    });
+    expect(screen.getByTestId("online")).toHaveTextContent("true");
+
+    act(() => {
+      networkListener?.({ isConnected: true, isInternetReachable: true });
+      vi.advanceTimersByTime(5_000);
+    });
+
+    expect(screen.getByTestId("online")).toHaveTextContent("true");
+    expect(setOnline).not.toHaveBeenCalledWith(false);
+  });
+
+  it("goes offline once an offline reading lasts", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      networkListener?.({ isConnected: false, isInternetReachable: false });
+      vi.advanceTimersByTime(3_000);
+    });
+
+    expect(screen.getByTestId("offline")).toHaveTextContent("true");
+    expect(setOnline).toHaveBeenLastCalledWith(false);
+  });
+
+  it("comes back online at once when the server answers", async () => {
+    getNetworkStateAsync.mockResolvedValue({ isConnected: false, isInternetReachable: false });
+    const { reportServerReached } = await import("../lib/network-state-source");
+
+    render(
+      <NetworkStateProvider>
+        <NetworkProbe />
+      </NetworkStateProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("offline")).toHaveTextContent("true");
+
+    act(() => {
+      reportServerReached();
+    });
+
+    expect(screen.getByTestId("online")).toHaveTextContent("true");
+    expect(setOnline).toHaveBeenLastCalledWith(true);
+  });
+
   it("cancels a reconnect transition when connectivity drops again", async () => {
     getNetworkStateAsync.mockResolvedValue({
       isConnected: false,
@@ -443,6 +516,7 @@ describe("NetworkStateProvider", () => {
 
     act(() => {
       networkListener?.({ isConnected: false, isInternetReachable: false });
+      vi.advanceTimersByTime(3_000);
     });
     expect(screen.getByTestId("offline")).toHaveTextContent("true");
   });
