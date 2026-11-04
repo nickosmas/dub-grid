@@ -10,10 +10,15 @@ import {
 import { AppState, Platform, type AppStateStatus } from "react-native";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import * as Network from "expo-network";
-import { subscribeToNetworkState } from "../lib/network-state-source";
+import { subscribeToNetworkState, subscribeToServerReached } from "../lib/network-state-source";
 import { getSupabaseClient } from "../lib/supabase";
 
 const NETWORK_RECONNECT_STABILITY_MS = 1_500;
+// iOS reports the network path as unavailable for a moment during a handover
+// (Wi-Fi to cellular, between cells, waking from sleep) while requests still
+// go through. Going offline on that blip showed "Network connection issue"
+// and paused every page's loading, so an offline reading must last this long.
+const NETWORK_OFFLINE_CONFIRM_MS = 3_000;
 // This provider renders nothing until the first probe resolves, and it sits
 // above the screen that hides the native splash — so a probe that never settles
 // would strand the app on the splash forever. Assume online after this budget.
@@ -39,6 +44,7 @@ function toOnlineValue(
 
 export function NetworkStateProvider({ children }: PropsWithChildren) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOnlineRef = useRef<boolean | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const recheckOfflineRef = useRef<() => void>(() => {});
@@ -56,6 +62,29 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
       }
     }
 
+    function clearOfflineTimer() {
+      if (offlineTimerRef.current != null) {
+        clearTimeout(offlineTimerRef.current);
+        offlineTimerRef.current = null;
+      }
+    }
+
+    function goOffline() {
+      clearReconnectTimer();
+      clearOfflineTimer();
+      setIsOnline(false);
+      isOnlineRef.current = false;
+      onlineManager.setOnline(false);
+    }
+
+    function goOnline() {
+      clearReconnectTimer();
+      clearOfflineTimer();
+      setIsOnline(true);
+      isOnlineRef.current = true;
+      onlineManager.setOnline(true);
+    }
+
     function applyOnlineState(nextOnline: boolean) {
       if (cancelled) {
         return;
@@ -64,17 +93,26 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
       setHasResolvedState(true);
 
       if (!nextOnline) {
+        // Already offline, or the first reading: nothing to confirm.
+        if (isOnlineRef.current !== true) {
+          goOffline();
+          return;
+        }
         clearReconnectTimer();
-        setIsOnline(false);
-        isOnlineRef.current = false;
-        onlineManager.setOnline(false);
+        if (offlineTimerRef.current == null) {
+          offlineTimerRef.current = setTimeout(() => {
+            offlineTimerRef.current = null;
+            if (!cancelled) goOffline();
+          }, NETWORK_OFFLINE_CONFIRM_MS);
+        }
         return;
       }
 
+      // Back before the offline reading was confirmed: it was a blip.
+      clearOfflineTimer();
+
       if (isOnlineRef.current === null) {
-        setIsOnline(true);
-        isOnlineRef.current = true;
-        onlineManager.setOnline(true);
+        goOnline();
         return;
       }
 
@@ -87,9 +125,7 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
         if (cancelled) {
           return;
         }
-        setIsOnline(true);
-        isOnlineRef.current = true;
-        onlineManager.setOnline(true);
+        goOnline();
       }, NETWORK_RECONNECT_STABILITY_MS);
     }
 
@@ -125,6 +161,17 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
       receivedLiveEvent = true;
       applyOnlineState(toOnlineValue(networkState));
     });
+    // The server answering settles it: online now, with no stability wait,
+    // and any pending offline reading dropped.
+    const unsubscribeServerReached = subscribeToServerReached(() => {
+      if (cancelled) return;
+      if (isOnlineRef.current === true && onlineManager.isOnline()) {
+        clearOfflineTimer();
+        return;
+      }
+      setHasResolvedState(true);
+      goOnline();
+    });
 
     // Events alone cannot undo a wrong offline flag: one that is missed leaves
     // it offline while requests still work, pausing every query. Only an online
@@ -147,8 +194,10 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
       cancelled = true;
       clearTimeout(probeTimeout);
       clearReconnectTimer();
+      clearOfflineTimer();
       recheckOfflineRef.current = () => {};
       unsubscribe();
+      unsubscribeServerReached();
     };
   }, []);
 
