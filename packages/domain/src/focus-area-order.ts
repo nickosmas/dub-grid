@@ -1,16 +1,24 @@
-import type { Department, FocusArea } from "@/types";
+interface OrderableFocusArea {
+  departmentId: number | null;
+  sortOrder: number;
+}
+
+interface OrderingDepartment {
+  id: number;
+  type: string;
+  sortOrder: number;
+}
 
 /**
  * Focus areas in the order the schedule shows them: grouped by their
  * scheduled department's order, then by their own order within it. A focus
  * area's `sortOrder` alone is only meaningful inside its department, so
- * ordering by it across departments interleaves them.
+ * ordering by it across departments interleaves them. Web and the mobile API
+ * both use this, so the app lists them in the order Settings shows.
  */
-export function orderFocusAreasByDepartment<
-  T extends Pick<FocusArea, "departmentId" | "sortOrder">,
->(
+export function orderFocusAreasByDepartment<T extends OrderableFocusArea>(
   focusAreas: readonly T[],
-  departments: readonly Pick<Department, "id" | "type" | "sortOrder">[],
+  departments: readonly OrderingDepartment[],
 ): T[] {
   const departmentRank = new Map(
     departments

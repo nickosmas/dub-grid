@@ -26,6 +26,7 @@ export * from "./auth-codes";
 export * from "./invitation-lifetime";
 export * from "./service-status";
 export * from "./focus-area-shifts";
+export * from "./focus-area-order";
 export * from "./schedule-corrections";
 export * from "./conflict-copy";
 export * from "./terminology-copy";

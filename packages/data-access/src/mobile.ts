@@ -1,4 +1,4 @@
-import { INVITATION_LIFETIME_MS } from "@dubgrid/domain";
+import { INVITATION_LIFETIME_MS, orderFocusAreasByDepartment } from "@dubgrid/domain";
 import type {
   MobileNotification,
   MobileNotificationPriority,
@@ -833,16 +833,36 @@ export async function fetchMobileFocusAreaRows(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileFocusAreaRow[]> {
-  const { data, error } = await serviceClient
-    .from("focus_areas")
-    .select("id, name, department_id")
-    .eq("org_id", orgId)
-    .is("archived_at", null)
-    .order("sort_order", { ascending: true });
+  const [focusAreaResult, departmentResult] = await Promise.all([
+    serviceClient
+      .from("focus_areas")
+      .select("id, name, department_id, sort_order")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    serviceClient
+      .from("departments")
+      .select("id, type, sort_order")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+  ]);
 
-  if (error) throw error;
+  if (focusAreaResult.error) throw focusAreaResult.error;
+  if (departmentResult.error) throw departmentResult.error;
 
-  return (data ?? []) as MobileFocusAreaRow[];
+  // A focus area's sort order only counts within its department, so the list
+  // follows the departments' order first, as Settings and the web grid do.
+  const rows = (focusAreaResult.data ?? []) as (MobileFocusAreaRow & { sort_order: number })[];
+  const departments = (
+    (departmentResult.data ?? []) as { id: number; type: string; sort_order: number }[]
+  ).map((department) => ({
+    id: department.id,
+    type: department.type,
+    sortOrder: department.sort_order,
+  }));
+  return orderFocusAreasByDepartment(
+    rows.map((row) => ({ row, departmentId: row.department_id, sortOrder: row.sort_order })),
+    departments,
+  ).map(({ row }) => ({ id: row.id, name: row.name, department_id: row.department_id }));
 }
 
 export async function fetchMobileRoleRows(

@@ -170,6 +170,7 @@ import {
   CORRECTION_ADMIN_WINDOW_DAYS,
   singularLabelNoun,
   DEFAULT_ORGANIZATION_LABELS,
+  orderFocusAreasByDepartment,
 } from "@dubgrid/domain";
 import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
@@ -383,7 +384,6 @@ import {
   type PublicationRangeLoadState,
 } from "./_lib/publication-range-state";
 import { markOwnPublicationAsAdditions } from "./_lib/own-publication";
-import { orderFocusAreasByDepartment } from "@/lib/focus-area-order";
 import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {

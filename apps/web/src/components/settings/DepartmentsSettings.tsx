@@ -7,6 +7,7 @@ import {
   singularLabelNoun,
   DEFAULT_ORGANIZATION_LABELS,
   ADMINISTRATIVE_TEAM_LABELS,
+  orderFocusAreasByDepartment,
 } from "@dubgrid/domain";
 import { Department, FocusArea } from "@/types";
 import { Button } from "@/components/Button";
@@ -33,7 +34,6 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 import { useSmoothReorder } from "@/hooks/useSmoothReorder";
-import { orderFocusAreasByDepartment } from "@/lib/focus-area-order";
 import type { DependencyInfo } from "@/features/settings/client";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
