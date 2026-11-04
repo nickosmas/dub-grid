@@ -39,3 +39,18 @@ The owner asked for two things on 2026-11-04:
 - Not fixed: the person page, whose editor opens in place, still shows one
   frame of a wider empty capsule before its checkmark. Not checked on Android
   or a physical phone.
+
+## Also in this fix (owner, same day)
+
+- **App lock:** the locked page keeps its message in the middle and puts
+  Unlock (solid blue) and Sign out (neutral gray) as full-width buttons at the
+  foot, in thumb reach, instead of a compact button over a text link. Seen in
+  light and dark on the simulator, drawn on its own; the real lock already
+  covers the whole app, tab bar included.
+- **No logo animation on the way in:** the app's splash (launch, the wait for
+  startup, and the app lock's cover while Face ID runs) is the native launch
+  image held still: the same mark at the same size on the same background. The
+  breathing mark, the wash and the wordmark fade are gone, and so is the
+  900 ms minimum; the splash lifts when the first screen is ready, with the
+  short fade it had. A cold launch on the simulator shows one still frame from
+  the launch image to Home.
