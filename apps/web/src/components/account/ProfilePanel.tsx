@@ -511,8 +511,8 @@ export function ProfilePanel({
       toast.success(
         hasEmailChanges
           ? profileSaved
-            ? "Profile updated. Confirmation sent to your new email address."
-            : "Confirmation sent to your new email address."
+            ? "Profile updated. We emailed a link to your current address and your new one. Your email changes once you confirm both."
+            : "We emailed a link to your current address and your new one. Your email changes once you confirm both."
           : "Profile updated.",
       );
       setPendingConfirm(null);
@@ -647,7 +647,8 @@ export function ProfilePanel({
         : pendingConfirm === "account-deletion"
           ? {
               title: "Request account deletion?",
-              message: "An admin reviews and approves the request before your account is removed.",
+              message:
+                "A Super Admin reviews and approves the request before your account is removed.",
               confirmLabel: "Request deletion",
               variant: "danger" as const,
               loading: requestingDeletion,
@@ -1054,7 +1055,7 @@ export function ProfilePanel({
                 Delete account
               </div>
               <p className="dg-card-description">
-                Request that an admin delete your account. This is irreversible.
+                Request that a Super Admin delete your account. This is irreversible.
               </p>
             </div>
             {pendingDeletion ? (
@@ -1074,7 +1075,7 @@ export function ProfilePanel({
                   </Button>
                 }
               >
-                Account deletion request pending admin review.
+                Account deletion request pending Super Admin review.
               </Banner>
             ) : (
               <Button

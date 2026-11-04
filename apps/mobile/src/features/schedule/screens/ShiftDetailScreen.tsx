@@ -949,11 +949,9 @@ export default function ShiftDetailScreen() {
 
     setPendingConfirmation({
       title: "Submit this call-off?",
-      body: `You'll be marked ${absenceTypeLabel} for your ${shiftLabel} shift on ${shiftDateLabel}.${
-        canApproveShiftRequests
-          ? " You can approve requests, so it goes on the schedule right away."
-          : ""
-      }`,
+      body: canApproveShiftRequests
+        ? `You'll be marked ${absenceTypeLabel} for your ${shiftLabel} shift on ${shiftDateLabel}. You can approve requests, so it goes on the schedule right away.`
+        : `If it's approved, you'll be marked ${absenceTypeLabel} for your ${shiftLabel} shift on ${shiftDateLabel}.`,
       confirmLabel: "Call off",
       confirmTone: "danger",
       onConfirm: () =>

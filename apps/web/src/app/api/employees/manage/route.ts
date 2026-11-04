@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import {
+  AWAY_WHILE_SUSPENDED_CODE,
+  AWAY_WHILE_SUSPENDED_MESSAGE,
   changedElsewhereMessage,
   canMarkInactive,
   FIRST_DAY_INVALID_CODE,
@@ -825,6 +827,18 @@ export async function POST(req: NextRequest) {
         ) {
           return NextResponse.json(
             { error: NOT_ON_SCHEDULE_MESSAGE, code: NOT_ON_SCHEDULE_CODE },
+            { status: 400 },
+          );
+        }
+
+        // Leaving Active ends a suspension in the database (109), as on the status route.
+        if (
+          nextEmployee.status === "inactive" &&
+          previousRow?.status === "active" &&
+          previousRow.suspendedAt
+        ) {
+          return NextResponse.json(
+            { error: AWAY_WHILE_SUSPENDED_MESSAGE, code: AWAY_WHILE_SUSPENDED_CODE },
             { status: 400 },
           );
         }

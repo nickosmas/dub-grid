@@ -2861,7 +2861,9 @@ describe("ShiftDetailScreen", () => {
 
     expect(mutate).not.toHaveBeenCalled();
     expect(screen.getByText("Submit this call-off?")).toBeInTheDocument();
-    expect(screen.getByText(/You'll be marked Sick for your/)).toBeInTheDocument();
+    expect(screen.getByText(/You'll be marked Sick for your/)).toHaveTextContent(
+      /You can approve requests, so it goes on the schedule right away\.$/,
+    );
 
     confirmDialog("Call off");
 
@@ -2873,6 +2875,37 @@ describe("ShiftDetailScreen", () => {
       targetShiftDate: undefined,
       absenceTypeId: 1,
     });
+  });
+
+  it("says a call-off waits for approval when the requester can't approve", () => {
+    const defaults = useBootstrap() as unknown as {
+      data: { permissions: Record<string, boolean> };
+    };
+    useBootstrap.mockReturnValue({
+      ...defaults,
+      data: {
+        ...defaults.data,
+        permissions: { ...defaults.data.permissions, canApproveShiftRequests: false },
+      },
+    } as never);
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+      reset: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Drop shift"));
+    fireEvent.click(screen.getByText("Call off"));
+    fireEvent.click(screen.getByText("Sick"));
+    fireEvent.click(screen.getByText("Submit"));
+
+    expect(
+      screen.getByText(/^If it's approved, you'll be marked Sick for your/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/right away/)).not.toBeInTheDocument();
   });
 
   it("spells out absence reasons when the absence type has a full name", () => {

@@ -197,7 +197,7 @@ export function groupManagerQueue<T extends ShiftRequestQueueInput>(
 export type ShiftRequestSubmission =
   | { action: "created"; type: ShiftRequestType; targeted: boolean }
   | { action: "claimed" }
-  | { action: "accepted"; type: "swap" | "pickup" };
+  | { action: "accepted"; type: "swap" | "pickup" | null };
 
 export type ShiftRequestSubmittedCopy = {
   title: string;
@@ -251,8 +251,47 @@ function describeAutoApproved(submission: ShiftRequestSubmission): ShiftRequestS
     case "claimed":
       return { title: "Shift is yours", message: "The claim was approved and is on the schedule." };
     case "accepted":
-      return submission.type === "swap"
-        ? { title: "Swap approved", message: "Both schedules are updated." }
-        : { title: "Pickup approved", message: "The shift is on your schedule." };
+      if (submission.type === "swap") {
+        return { title: "Swap approved", message: "Both schedules are updated." };
+      }
+      if (submission.type === "pickup") {
+        return { title: "Pickup approved", message: "The shift is on your schedule." };
+      }
+      return { title: "Request approved", message: "The schedule is updated." };
   }
+}
+
+/** The toast after the recipient declines; `null` when the type is not known. */
+export function describeShiftRequestDeclined(
+  type: "swap" | "pickup" | null,
+): ShiftRequestSubmittedCopy {
+  const kind = type === "swap" ? "Swap" : type === "pickup" ? "Pickup" : "Request";
+  return { title: `${kind} declined`, message: "They'll see your answer." };
+}
+
+/** What declining does, said before the recipient confirms. */
+export const SHIFT_REQUEST_DECLINE_MESSAGE =
+  "The request closes and the requester keeps their shift.";
+
+/**
+ * What a claim confirmation says happens next. A claim is approved on the
+ * spot when the claimer can approve requests, or, for an ordinary pickup,
+ * when whoever posted it can. The open shift a call-off leaves and a
+ * coverage gap count only the claimer, and nothing is approved on the spot
+ * while a Gridmaster impersonates.
+ */
+export function describeClaimApproval(input: {
+  viewerCanApprove: boolean;
+  /** True for an ordinary pickup, whose poster's approval also counts. */
+  posterApprovalCounts: boolean;
+  impersonating?: boolean;
+}): string {
+  if (input.impersonating) return "It's sent for approval.";
+  if (input.viewerCanApprove) {
+    return "You can approve requests, so it goes on the schedule right away.";
+  }
+  if (input.posterApprovalCounts) {
+    return "It goes on the schedule once it's approved, right away if whoever posted it can approve requests.";
+  }
+  return "It's sent for approval.";
 }

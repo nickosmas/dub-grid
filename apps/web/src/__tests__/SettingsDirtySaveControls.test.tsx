@@ -364,7 +364,9 @@ describe("settings dirty save controls", () => {
     );
 
     const title = screen.getByText("Block overlapping shifts");
-    const description = screen.getByText("Nobody can be given two shifts that overlap.");
+    const description = screen.getByText(
+      "Two shifts on the same day can't overlap. The shift editor also checks the day before and after.",
+    );
     const rows = container.querySelectorAll("[data-schedule-rule-row]");
 
     expect(title).toHaveStyle({

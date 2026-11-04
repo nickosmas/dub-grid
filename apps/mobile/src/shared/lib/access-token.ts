@@ -85,6 +85,11 @@ export function getOrgIdFromAccessToken(accessToken: string | null): string | nu
   return readStringClaim(accessToken, "org_id");
 }
 
+/** The `org_role` claim: the role this token was issued with, which trails a role change. */
+export function getOrgRoleFromAccessToken(accessToken: string | null): string | null {
+  return readStringClaim(accessToken, "org_role");
+}
+
 /**
  * Stable client identity for session transitions and authenticated cache keys.
  *

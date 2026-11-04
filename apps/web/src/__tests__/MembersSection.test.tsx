@@ -1322,7 +1322,8 @@ describe("MembersSection - bulk status changes (51h)", () => {
   it("offers each change that reaches someone, with how many", async () => {
     await selectAll({});
     expect(screen.getByRole("button", { name: "Reinstate (1)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mark away (3)" })).toBeInTheDocument();
+    // Pat is suspended, so Mark away waits for a Reinstate.
+    expect(screen.getByRole("button", { name: "Mark away (2)" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Suspend (1)" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Offboard (3)" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Mark active/ })).toBeNull();
@@ -1364,23 +1365,25 @@ describe("MembersSection - bulk status changes (51h)", () => {
     const onBulkStatusChange = vi.fn().mockResolvedValue([
       { empId: "emp-1", ok: true },
       { empId: "emp-2", ok: true },
-      { empId: "emp-3", ok: true },
     ]);
     const { user } = await selectAll({ onBulkStatusChange });
 
-    await user.click(screen.getByRole("button", { name: "Mark away (3)" }));
-    const dialog = await screen.findByRole("alertdialog", { name: "Mark 3 people away?" });
+    await user.click(screen.getByRole("button", { name: "Mark away (2)" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Mark 2 people away?" });
+    expect(within(dialog).getByRole("region", { name: "Skipped" })).toHaveTextContent(
+      "Reinstate them first, then mark them away.",
+    );
     expect(within(dialog).getByText("Return date")).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Reason (optional)"), " Unit closed ");
     await user.click(within(dialog).getByRole("button", { name: "Mark away" }));
 
     await waitFor(() =>
-      expect(onBulkStatusChange).toHaveBeenCalledWith("markAway", ["emp-1", "emp-2", "emp-3"], {
+      expect(onBulkStatusChange).toHaveBeenCalledWith("markAway", ["emp-1", "emp-2"], {
         note: "Unit closed",
       }),
     );
     await waitFor(() =>
-      expect(vi.mocked(toast.success)).toHaveBeenCalledWith("3 people marked away"),
+      expect(vi.mocked(toast.success)).toHaveBeenCalledWith("2 people marked away"),
     );
   });
 

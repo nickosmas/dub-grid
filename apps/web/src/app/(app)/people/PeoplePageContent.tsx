@@ -286,6 +286,7 @@ function PeopleContent() {
             onBulkStatusChange={runBulkStatusChange}
             onAdd={() => setShowAddModal(true)}
             orgId={org?.id ?? ""}
+            timeZone={org?.timezone ?? null}
             assignments={assignments}
             shiftCategories={shiftCategories}
             jobs={jobs}

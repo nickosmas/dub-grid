@@ -555,7 +555,7 @@ export function OverviewTab({
             </div>
             <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
               {organization.archivedAt
-                ? "Restoring will make this organization active again."
+                ? "Restoring reopens the organization. If its billing was canceled, it stays locked until billing is set up again."
                 : "Archiving hides the organization from active listings. Data is preserved."}
             </div>
           </div>

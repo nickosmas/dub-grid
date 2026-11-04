@@ -9,6 +9,7 @@ const subscriptionsRetrieve = vi.fn();
 const subscriptionsUpdate = vi.fn();
 const serviceFrom = vi.fn();
 const organizationSingle = vi.fn();
+const organizationTrialMaybeSingle = vi.fn();
 const organizationEq = vi.fn();
 const organizationUpdate = vi.fn();
 const subscriptionEq = vi.fn();
@@ -77,6 +78,7 @@ describe("syncSubscriptionToDb", () => {
       data: { stripe_customer_id: "cus_123" },
       error: null,
     });
+    organizationTrialMaybeSingle.mockResolvedValue({ data: null, error: null });
     organizationEq.mockResolvedValue({ error: null });
     organizationUpdate.mockReturnValue({ eq: organizationEq });
     subscriptionEq.mockResolvedValue({ error: null });
@@ -90,6 +92,7 @@ describe("syncSubscriptionToDb", () => {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               single: organizationSingle,
+              maybeSingle: organizationTrialMaybeSingle,
             })),
           })),
           update: organizationUpdate,
@@ -208,6 +211,89 @@ describe("syncSubscriptionToDb", () => {
           "http://localhost:3000/settings?section=org-billing&billing=success&stripe_checkout_session_id={CHECKOUT_SESSION_ID}",
         cancel_url: "http://localhost:3000/settings?section=org-billing&billing=canceled",
       }),
+    );
+    const [params] = checkoutSessionsCreate.mock.calls[0] as [Record<string, unknown>];
+    expect(params.subscription_data).toEqual({ metadata: { org_id: ORG_ID } });
+  });
+
+  it("ends Stripe's trial when the in-app trial ends, never adding one", async () => {
+    process.env.STRIPE_PRICE_ID_MONTHLY = "price_123";
+    checkoutSessionsCreate.mockResolvedValue({ id: "cs_test_123" });
+    const { createCheckoutSession } = await import("./stripe");
+
+    await createCheckoutSession(
+      "cus_123",
+      ORG_ID,
+      9,
+      "http://localhost:3000/settings?section=org-billing",
+      1_780_000_000,
+    );
+
+    const [params] = checkoutSessionsCreate.mock.calls[0] as [Record<string, unknown>];
+    expect(params.subscription_data).toEqual({
+      trial_end: 1_780_000_000,
+      metadata: { org_id: ORG_ID },
+    });
+  });
+
+  it("keeps the organization's own trial end when Stripe's matches it to the second", async () => {
+    organizationTrialMaybeSingle.mockResolvedValue({
+      data: { trial_ends_at: "2026-05-02T23:59:59.400Z" },
+      error: null,
+    });
+    subscriptionsList.mockResolvedValue({
+      data: [
+        {
+          id: "sub_123",
+          customer: "cus_123",
+          status: "trialing",
+          items: { data: [{ price: { id: "price_123" }, quantity: 3 }] },
+          cancel_at: null,
+          canceled_at: null,
+          trial_end: 1_777_766_400,
+        },
+      ],
+    });
+    const { syncSubscriptionToDb } = await import("./stripe");
+
+    await syncSubscriptionToDb(ORG_ID);
+
+    expect(organizationUpdate).toHaveBeenCalledWith({
+      stripe_customer_id: "cus_123",
+      subscription_status: "trialing",
+      subscription_seats: 3,
+      payment_grace_started_at: null,
+    });
+    expect(subscriptionUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "trialing", trial_end: "2026-05-03T00:00:00.000Z" }),
+      { onConflict: "org_id" },
+    );
+  });
+
+  it("takes Stripe's trial end when it differs from the organization's", async () => {
+    organizationTrialMaybeSingle.mockResolvedValue({
+      data: { trial_ends_at: "2026-04-30T00:00:00.000Z" },
+      error: null,
+    });
+    subscriptionsList.mockResolvedValue({
+      data: [
+        {
+          id: "sub_123",
+          customer: "cus_123",
+          status: "trialing",
+          items: { data: [{ price: { id: "price_123" }, quantity: 3 }] },
+          cancel_at: null,
+          canceled_at: null,
+          trial_end: 1_777_766_400,
+        },
+      ],
+    });
+    const { syncSubscriptionToDb } = await import("./stripe");
+
+    await syncSubscriptionToDb(ORG_ID);
+
+    expect(organizationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ trial_ends_at: "2026-05-03T00:00:00.000Z" }),
     );
   });
 

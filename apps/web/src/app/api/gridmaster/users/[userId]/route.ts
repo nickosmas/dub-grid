@@ -148,6 +148,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ userI
       orgId: await loadPrimaryOrgId(serviceClient, target.userId),
       actorId: assurance.user.id,
       actorSessionId: assurance.sessionId,
+      byPlatform: true,
     });
     await writeGridmasterAuditLogAfterCommit({
       serviceClient,

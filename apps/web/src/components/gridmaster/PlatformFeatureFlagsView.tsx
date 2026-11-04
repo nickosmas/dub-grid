@@ -64,7 +64,7 @@ const FLAG_INFO: Record<string, { label: string; description: string }> = {
   cron_trial_expiry: {
     label: "Trial Expiry Reminders",
     description:
-      "A daily background job that emails organizations about expiring trials. Turning this off pauses those reminders; nothing breaks for users.",
+      "A daily background job that alerts organizations about ending trials and billing locks. Turning this off stops trial reminders, trial-ended alerts and lock alerts. Access is unchanged.",
   },
   cron_expire_requests: {
     label: "Shift Request Auto-Expiry",
@@ -74,7 +74,7 @@ const FLAG_INFO: Record<string, { label: string; description: string }> = {
   cron_return_from_away: {
     label: "Return From Away",
     description:
-      "A daily background job that sets people back to Active on their return date. Turning this off leaves them Away until someone marks them active; they can still be scheduled from that date.",
+      "A daily background job that applies dated status changes: returns from Away, planned Away starts, offboarding after a last day, suspensions starting and ending, and planned restores. Turning this off leaves everyone in their current status until someone changes it by hand.",
   },
   cron_sandbox_cleanup: {
     label: "Sandbox Cleanup",

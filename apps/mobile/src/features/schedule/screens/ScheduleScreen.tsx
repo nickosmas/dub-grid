@@ -528,6 +528,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const { pendingAction, runRequestAction, confirmationModal } = useShiftRequestActionFlow({
     accessToken,
     viewerCanApprove: Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests),
+    requests: requestsQuery.data?.requests,
     onSucceeded: refetchScreenContent,
   });
 

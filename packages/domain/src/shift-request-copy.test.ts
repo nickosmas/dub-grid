@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   describeAwaitingRecipient,
+  describeClaimApproval,
+  describeShiftRequestDeclined,
   describeCancelAwaitingRecipientCaution,
   groupManagerQueue,
   isAwaitingRecipient,
@@ -214,6 +216,9 @@ describe("describeShiftRequestSubmitted", () => {
       describeShiftRequestSubmitted({ action: "accepted", type: "pickup" }, { autoApproved: true })
         .title,
     ).toBe("Pickup approved");
+    expect(
+      describeShiftRequestSubmitted({ action: "accepted", type: null }, { autoApproved: true }),
+    ).toEqual({ title: "Request approved", message: "The schedule is updated." });
   });
 
   it("tells an approver the decision waits only on the recipient", () => {
@@ -232,5 +237,43 @@ describe("describeShiftRequestSubmitted", () => {
       title: "Shift posted for pickup",
       message: "A claim on it is approved right away.",
     });
+  });
+});
+
+describe("describeShiftRequestDeclined", () => {
+  it("names the kind of request that was declined", () => {
+    expect(describeShiftRequestDeclined("swap").title).toBe("Swap declined");
+    expect(describeShiftRequestDeclined("pickup").title).toBe("Pickup declined");
+    expect(describeShiftRequestDeclined(null)).toEqual({
+      title: "Request declined",
+      message: "They'll see your answer.",
+    });
+  });
+});
+
+describe("describeClaimApproval", () => {
+  it("promises right away only when the claimer can approve", () => {
+    expect(describeClaimApproval({ viewerCanApprove: true, posterApprovalCounts: false })).toBe(
+      "You can approve requests, so it goes on the schedule right away.",
+    );
+    expect(describeClaimApproval({ viewerCanApprove: false, posterApprovalCounts: false })).toBe(
+      "It's sent for approval.",
+    );
+  });
+
+  it("allows for a poster who can approve an ordinary pickup", () => {
+    expect(describeClaimApproval({ viewerCanApprove: false, posterApprovalCounts: true })).toBe(
+      "It goes on the schedule once it's approved, right away if whoever posted it can approve requests.",
+    );
+  });
+
+  it("never promises right away while impersonating", () => {
+    expect(
+      describeClaimApproval({
+        viewerCanApprove: true,
+        posterApprovalCounts: true,
+        impersonating: true,
+      }),
+    ).toBe("It's sent for approval.");
   });
 });

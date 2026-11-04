@@ -439,7 +439,7 @@ export default function ProfileWorkScreen() {
       const message = result.requestedNameChange
         ? "Your changes were saved and a name change request was sent."
         : result.emailChanged
-          ? "Check your email to confirm the new address."
+          ? "We emailed a link to your current address and your new one. Your email changes once you confirm both."
           : "Your profile was updated.";
       pushToast({
         tone: "success",
@@ -471,7 +471,7 @@ export default function ProfileWorkScreen() {
         ...(isNameRequest && hasOtherChanges ? ["Other edits you made are saved."] : []),
         "Your email changes for every organization you belong to.",
         "You'll confirm it's you first.",
-        "We'll email the new address a link to finish the change.",
+        "We'll email a link to your current address and your new one. Your email changes once you confirm both.",
       ]
     : [];
   const guard = useUnsavedChangesGuard({
@@ -810,7 +810,7 @@ function EditPanel({
     <>
       {!canEditProfileDirectly ? (
         <StatusBanner
-          body="An Admin reviews name changes. A new phone number saves right away, and a new email needs confirming from your inbox."
+          body="An Admin reviews name changes. A new phone number saves right away, and a new email needs confirming from both your current and new inboxes."
           title="Editing your profile"
           tone="info"
         />

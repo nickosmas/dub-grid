@@ -15,10 +15,11 @@ import { countBillableAppUsers, resolveBillingReturnUrl } from "@/features/billi
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
-import { isLiveSubscriptionStatus } from "@dubgrid/domain";
+import { checkoutTrialEnd, isLiveSubscriptionStatus } from "@dubgrid/domain";
 
 const ALREADY_SUBSCRIBED =
   "Your organization already has a subscription. Use Manage billing to change it.";
+const BILLING_PAUSED = "Billing is paused. You can start a subscription once it resumes.";
 
 const bodySchema = z.object({
   orgId: z.string().uuid(),
@@ -93,12 +94,19 @@ export async function POST(req: NextRequest) {
 
     const { data: org, error: orgError } = await supabase
       .from("organizations")
-      .select("id, name, stripe_customer_id")
+      .select("id, name, stripe_customer_id, subscription_status, trial_ends_at, billing_paused_at")
       .eq("id", orgId)
       .single();
 
     if (orgError || !org) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+    }
+
+    // A paused trial isn't counting down, so there is no end for Stripe's
+    // trial to match, and a subscription started now would bill during the
+    // hold. The billing page offers no checkout while paused either.
+    if (org.billing_paused_at) {
+      return NextResponse.json({ error: BILLING_PAUSED }, { status: 409 });
     }
 
     // A second checkout would start a second subscription billed alongside the
@@ -159,8 +167,19 @@ export async function POST(req: NextRequest) {
 
     const seats = Math.max(await countBillableAppUsers(supabase, orgId), 1);
 
-    // Create checkout session
-    const checkoutSession = await createCheckoutSession(customerId, orgId, seats, returnUrl);
+    // Subscribing during the trial keeps the days left: Stripe first charges
+    // at the same trial end that access decisions use.
+    const trialEnd = checkoutTrialEnd({
+      status: org.subscription_status,
+      trialEndsAt: org.trial_ends_at,
+    });
+    const checkoutSession = await createCheckoutSession(
+      customerId,
+      orgId,
+      seats,
+      returnUrl,
+      trialEnd,
+    );
 
     return NextResponse.json({ url: checkoutSession.url });
   } catch (err) {

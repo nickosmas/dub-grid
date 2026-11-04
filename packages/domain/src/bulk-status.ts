@@ -4,6 +4,7 @@ import {
   EMPLOYMENT_STATUS_LABELS,
   statusChoices,
   SUSPENDED_LABEL,
+  UNNAMED_ABSENCE,
   type CurrentStatusState,
   type StatusAction,
   type StatusActionCopy,
@@ -152,11 +153,17 @@ export function describeBulkStatusAction(
   const withReturnDate = action === "markAway" ? { returnDate } : {};
   const [only] = people;
   if (people.length === 1 && only) {
+    // The bar has no absence names, so the person's absence is named generically.
+    const absence =
+      action === "markActive"
+        ? holdsAwayAbsence(only)
+        : only.plannedStatus === "away" && only.plannedAbsenceTypeId != null;
     return describeStatusAction(statusAction, only.name, {
       ...withReturnDate,
       hasAccount: !("userId" in only) || Boolean(only.userId),
       plannedFrom: only.plannedFrom ?? null,
       plannedStatus: only.plannedStatus ?? null,
+      currentAbsenceName: absence ? UNNAMED_ABSENCE : null,
     });
   }
   const groupCopy = describeStatusAction(statusAction, countPeople(people.length), {
@@ -164,18 +171,75 @@ export function describeBulkStatusAction(
     group: true,
     hasAccount: people.some((person) => !("userId" in person) || Boolean(person.userId)),
   });
-  const copy = { ...groupCopy, done: bulkStatusDone(action, people.length) };
-  const planned = REPLACES_PLAN.has(action)
-    ? people.filter((person) => person.plannedStatus && person.plannedFrom).length
-    : 0;
-  if (planned === 0) return copy;
+  const copy = {
+    ...groupCopy,
+    ...(action === "markActive" ? { message: markActiveGroupMessage(people) } : {}),
+    done: bulkStatusDone(action, people.length),
+  };
+  const plans = REPLACES_PLAN.has(action)
+    ? people.filter((person) => person.plannedStatus && person.plannedFrom)
+    : [];
+  if (plans.length === 0) return copy;
+  const left = groupPlanLeftovers(action, plans, returnDate);
   return {
     ...copy,
     points: [
       ...copy.points,
-      planned === 1
+      plans.length === 1
         ? "The change planned for 1 of them is canceled."
-        : `Changes planned for ${planned} of them are canceled.`,
+        : `Changes planned for ${plans.length} of them are canceled.`,
+      ...left.points,
+    ],
+    unchanged: [...copy.unchanged, ...left.unchanged],
+  };
+}
+
+/** An Away person whose days ahead hold an absence until their return date (51f). */
+function holdsAwayAbsence(person: CurrentStatusState): boolean {
+  return person.awayAbsenceTypeId != null && Boolean(person.awayUntil);
+}
+
+/** Mark active for several: their away absence comes off the days ahead, nothing else comes back. */
+function markActiveGroupMessage(people: readonly BulkStatusPerson[]): string {
+  const withAbsence = people.filter(holdsAwayAbsence).length;
+  if (withAbsence === 0) return "Shifts taken off while they were away stay off.";
+  if (withAbsence === people.length) {
+    return `Days left in their time away go back to what was published, without ${UNNAMED_ABSENCE}.`;
+  }
+  return "Days an away absence held go back to what was published. Other shifts taken off while they were away stay off.";
+}
+
+/**
+ * What the replaced plans leave behind, as `describeStatusAction` says it for
+ * one person: an absence comes off the days it filled, and nothing else they
+ * cleared comes back. Taking them off the schedule now clears it all anyway.
+ */
+function groupPlanLeftovers(
+  action: BulkStatusAction,
+  plans: readonly BulkStatusPerson[],
+  returnDate: string | null,
+): { points: string[]; unchanged: string[] } {
+  if (action === "archive" || (action === "markAway" && !returnDate)) {
+    return { points: [], unchanged: [] };
+  }
+  const clearing = plans.filter(
+    (person) => person.plannedStatus === "away" || person.plannedStatus === "removed",
+  );
+  if (clearing.length === 0) return { points: [], unchanged: [] };
+  const withAbsence = clearing.some(
+    (person) => person.plannedStatus === "away" && person.plannedAbsenceTypeId != null,
+  );
+  const withoutAbsence = clearing.some(
+    (person) => !(person.plannedStatus === "away" && person.plannedAbsenceTypeId != null),
+  );
+  return {
+    points: withAbsence
+      ? ["Days a canceled plan filled with an absence go back to what was published."]
+      : [],
+    unchanged: [
+      ...(withoutAbsence ? ["Shifts their plans already took off stay off."] : []),
+      // Suspending closes every open request anyway.
+      ...(action === "suspend" ? [] : ["Requests their plans closed stay closed."]),
     ],
   };
 }

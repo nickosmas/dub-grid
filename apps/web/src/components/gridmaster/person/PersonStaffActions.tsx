@@ -5,6 +5,7 @@ import {
   canMarkInactive,
   describeStatusAction,
   statusUndoAction,
+  UNNAMED_ABSENCE,
 } from "@dubgrid/domain";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -160,8 +161,12 @@ export function PersonStaffActions({
     (option) =>
       !(option === "remove" && employee.status === "removed") &&
       // Away only takes someone off the schedule, so it skips management-only people,
-      // and someone with an away planned already has one (51g1).
-      !(option === "deactivate" && (!canMarkInactive(employee.focusAreaIds) || plannedFrom)),
+      // someone with an away planned already has one (51g1), and a suspended person
+      // is reinstated first, since Away would end the suspension.
+      !(
+        option === "deactivate" &&
+        (!canMarkInactive(employee.focusAreaIds) || plannedFrom || employee.suspendedAt)
+      ),
   );
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const copyFor = (change: StatusChange) =>
@@ -176,6 +181,9 @@ export function PersonStaffActions({
         hasAccount: linked,
         plannedFrom: plannedLastDayFrom ?? (change === "remove" ? plannedFrom : null),
         plannedStatus: employee.plannedStatus ?? null,
+        // Mark active takes their away absence off the days ahead.
+        currentAbsenceName:
+          employee.awayUntil && employee.awayAbsenceTypeId != null ? UNNAMED_ABSENCE : null,
       },
     );
 

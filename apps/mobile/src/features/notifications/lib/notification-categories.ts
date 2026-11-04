@@ -15,7 +15,7 @@ export const NOTIFICATION_CATEGORIES = [
     key: "schedule",
     icon: "calendar-outline",
     title: "Schedule updates",
-    detail: "A schedule is published, or one of your shifts is added, moved, or removed.",
+    detail: "One of your shifts is added, changed, or removed when a schedule is published.",
   },
   {
     key: "shift_requests",

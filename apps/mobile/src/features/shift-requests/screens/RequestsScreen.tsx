@@ -141,6 +141,7 @@ type RequestActionConfirmation = {
   feedback: MobileRequestActionFeedback;
   /** A decision with an optional note to both people: a sheet, not a confirmation. */
   takesNote: boolean;
+  requestType: MobileShiftRequest["type"] | null;
 } | null;
 
 type ShiftPillColors = {
@@ -465,8 +466,11 @@ export default function RequestsScreen() {
     onChange: refreshRequests,
   });
   const requestActionMutation = useOptimisticMutation({
-    mutationFn: async (input: { requestId: string; body: RequestActionBody }) =>
-      updateShiftRequest(accessToken!, input.requestId, input.body),
+    mutationFn: async (input: {
+      requestId: string;
+      body: RequestActionBody;
+      requestType: MobileShiftRequest["type"] | null;
+    }) => updateShiftRequest(accessToken!, input.requestId, input.body),
     patches: (input) => {
       const status = getOptimisticRequestStatus(input.body);
 
@@ -489,14 +493,14 @@ export default function RequestsScreen() {
     },
     successToast: (data, variables) => ({
       tone: "success",
-      ...getMobileRequestActionSuccessToast(variables.body, data),
+      ...getMobileRequestActionSuccessToast(variables.body, data, variables.requestType),
     }),
     errorToast: {
       title: "Couldn't update request",
       fallbackMessage: "We couldn't update that shift request.",
     },
     announceOnSuccess: (data, variables) =>
-      getMobileRequestActionSuccessToast(variables.body, data).title ?? null,
+      getMobileRequestActionSuccessToast(variables.body, data, variables.requestType).title ?? null,
     onSuccess: async () => {
       // The user's own availability view is derived from schedule cells the
       // server rewrites on approval, so it has to come from the server.
@@ -535,7 +539,13 @@ export default function RequestsScreen() {
           isAwaitingRecipient(request) &&
           request.requesterEmpId !== linkedEmployeeId);
       setResolveNote("");
-      setRequestActionConfirmation({ requestId, body, feedback, takesNote });
+      setRequestActionConfirmation({
+        requestId,
+        body,
+        feedback,
+        takesNote,
+        requestType: request?.type ?? null,
+      });
     },
     [
       canApprove,
@@ -549,7 +559,7 @@ export default function RequestsScreen() {
   const confirmRequestAction = useCallback(() => {
     if (!requestActionConfirmation) return;
 
-    const { requestId, feedback } = requestActionConfirmation;
+    const { requestId, feedback, requestType } = requestActionConfirmation;
     const note = resolveNote.trim();
     const body: RequestActionBody =
       requestActionConfirmation.takesNote &&
@@ -566,7 +576,7 @@ export default function RequestsScreen() {
     // rather than rejects: the mutation's own `onError` already toasts.
     return new Promise<void>((resolve) => {
       requestActionMutation.mutate(
-        { requestId, body },
+        { requestId, body, requestType },
         {
           onSettled: () => {
             setPendingAction(null);
@@ -950,7 +960,7 @@ export default function RequestsScreen() {
           {myRequests.length === 0 ? (
             <EmptyStateCard
               fillScreen
-              body="Requests you make stay here until they're resolved or canceled."
+              body="Requests you make show here until they're decided, canceled or expire, or the shift starts."
               scene="mine-none"
               title="You haven't made any requests"
             />

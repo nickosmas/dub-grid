@@ -339,6 +339,21 @@ describe("updateMobilePersonStatus suspending", () => {
     expect(deps.updateEmployeeSuspension).not.toHaveBeenCalled();
   });
 
+  // Leaving Active would end the suspension in the database (109).
+  it("refuses to mark a suspended person away until they're reinstated", async () => {
+    const { deps, result } = run(employee({ suspendedAt: "2026-10-26T00:00:00Z" }), {
+      action: "deactivate",
+    });
+
+    await expect(result).resolves.toMatchObject({
+      kind: "invalid_status_change",
+      error: "Reinstate them first, then mark them away.",
+      code: "AWAY_WHILE_SUSPENDED",
+      status: 400,
+    });
+    expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
+  });
+
   it("refuses to suspend someone with no account, since there's no sign-in to stop", async () => {
     const { deps, result } = run(employee({ userId: null }), { action: "suspend" });
 
@@ -441,7 +456,7 @@ describe("updateMobilePersonStatus with a planned away (51g1)", () => {
         action: "deactivate",
         startDate: "2026-11-10",
       }).result,
-    ).toMatchObject({ code: "NOT_PLANNABLE" });
+    ).toMatchObject({ code: "AWAY_WHILE_SUSPENDED" });
     expect(await run(employee(), { action: "cancelPlannedChange" }).result).toMatchObject({
       code: "NO_PLANNED_CHANGE",
     });

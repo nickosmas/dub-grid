@@ -74,6 +74,32 @@ const APP_AUTH_EMAILS: AppAuthEmail[] = [
     notice: false,
   },
   {
+    name: "sign-in email changed by themselves (previous address)",
+    Component: LoginEmailChangedEmail as ComponentType<never>,
+    props: {
+      orgName: "Calm Haven",
+      recipient: "previous",
+      newEmail: "new@example.com",
+      logoUrl,
+      changedBy: "self",
+      signOut: "other-devices",
+    },
+    notice: true,
+  },
+  {
+    name: "sign-in email changed by support, sign-out unconfirmed (previous address)",
+    Component: LoginEmailChangedEmail as ComponentType<never>,
+    props: {
+      orgName: "your organization",
+      recipient: "previous",
+      newEmail: "new@example.com",
+      logoUrl,
+      changedBy: "support",
+      signOut: "not-confirmed",
+    },
+    notice: true,
+  },
+  {
     name: "account deleted",
     Component: AccountDeletedEmail as ComponentType<never>,
     props: { logoUrl },

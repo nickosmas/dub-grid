@@ -7,6 +7,7 @@ import type { ShiftRequest } from "@/types";
 
 const mockFetchShiftRequests = vi.fn();
 const mockClaimShiftRequest = vi.fn();
+const mockRespondToShiftRequest = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 const mockQueueNotification = vi.fn();
@@ -18,7 +19,7 @@ vi.mock("@/features/schedule/client", () => ({
   createShiftRequest: vi.fn(),
   fetchShiftRequests: (...args: unknown[]) => mockFetchShiftRequests(...args),
   resolveShiftRequest: vi.fn(),
-  respondToShiftRequest: vi.fn(),
+  respondToShiftRequest: (...args: unknown[]) => mockRespondToShiftRequest(...args),
   volunteerForOpenShift: vi.fn(),
 }));
 
@@ -238,6 +239,41 @@ describe("useShiftRequests", () => {
 
     expect(mockToastSuccess).toHaveBeenCalledWith("Shift is yours", {
       description: "The claim was approved and is on the schedule.",
+    });
+  });
+
+  it("names a targeted pickup, not a swap, when the recipient answers", async () => {
+    mockFetchShiftRequests.mockResolvedValue([
+      buildRequest({ id: "offer", targetEmpId: "claimer-1", targetName: "Sam Lee" }),
+      buildRequest({ id: "swap", type: "swap", targetEmpId: "claimer-1", targetName: "Sam Lee" }),
+    ]);
+    mockRespondToShiftRequest.mockResolvedValue({ autoApproved: true });
+
+    const { result } = renderHook(
+      () => useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
+      { wrapper },
+    );
+    await flush();
+
+    await act(async () => {
+      await result.current.respond("offer", "claimer-1", true);
+    });
+    expect(mockToastSuccess).toHaveBeenLastCalledWith("Pickup approved", {
+      description: "The shift is on your schedule.",
+    });
+
+    await act(async () => {
+      await result.current.respond("offer", "claimer-1", false);
+    });
+    expect(mockToastSuccess).toHaveBeenLastCalledWith("Pickup declined", {
+      description: "They'll see your answer.",
+    });
+
+    await act(async () => {
+      await result.current.respond("swap", "claimer-1", false);
+    });
+    expect(mockToastSuccess).toHaveBeenLastCalledWith("Swap declined", {
+      description: "They'll see your answer.",
     });
   });
 

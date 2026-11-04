@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbShiftRequest } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
+import { toShiftRequestDraftCell, type ShiftRequestDraftCellRow } from "@dubgrid/domain";
 import {
   settleShiftRequestAfterTransition,
   type ShiftRequestSettlement,
@@ -637,8 +638,8 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        const draftCells = ((rows ?? []) as { emp_id: string; shift_date: string }[]).map(
-          (row) => ({ empId: row.emp_id, date: row.shift_date }),
+        const draftCells = ((rows ?? []) as ShiftRequestDraftCellRow[]).map(
+          toShiftRequestDraftCell,
         );
         return NextResponse.json({ success: true, draftCells });
       }
