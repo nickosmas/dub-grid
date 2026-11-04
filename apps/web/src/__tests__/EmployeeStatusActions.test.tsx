@@ -14,6 +14,9 @@ const DAY_LABEL = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
+// The helpers below pick days in the test machine's zone, so the organization shares it.
+const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 /** A local day `offset` days from today; tomorrow is the earliest return date offered. */
 function dayFromToday(offset: number): { key: string; label: string } {
   const date = new Date();
@@ -95,6 +98,7 @@ function renderActions(
       canOffboard={canOffboard}
       variant="page"
       absenceTypes={absenceTypes}
+      timeZone={LOCAL_TIME_ZONE}
       {...handlers}
     />,
   );
@@ -360,11 +364,15 @@ describe("EmployeeStatusActions", () => {
 
     const dialog = await openDialog(user);
     expect(choices(dialog)).toEqual([
-      "ActiveBack on the schedule from today.",
+      "ActiveCan be scheduled again from today.",
       "SuspendedOnly someone who is active can be suspended.",
       "OffboardedNo longer on staff. Can't sign in or be scheduled.",
     ]);
     await user.click(within(dialog).getByRole("radio", { name: /^Active/ }));
+    // Marking them active puts back nothing that was taken off while away.
+    expect(
+      within(dialog).getByText("Shifts taken off while they were away stay off."),
+    ).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Mark active" }));
 
     expect(onActivate).toHaveBeenCalledWith("emp-1");
@@ -557,6 +565,35 @@ describe("EmployeeStatusActions", () => {
     expect(within(dialog).getByText(/^They stay Active until /)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Schedule away" }));
     expect(onDeactivate).toHaveBeenCalledWith("emp-1", undefined, back.key, null, start.key);
+  });
+
+  it("decides now or later from the organization's today, not the browser's", async () => {
+    // 01:00 UTC on Oct 27 is still Oct 26 in Los Angeles.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-27T01:00:00.000Z"));
+    try {
+      const user = userEvent.setup();
+      render(
+        <EmployeeStatusActions
+          employee={makeEmployee()}
+          canEdit
+          variant="page"
+          timeZone="America/Los_Angeles"
+          onDeactivate={vi.fn()}
+          onActivate={vi.fn()}
+          onRemove={vi.fn()}
+          onSetPlannedChange={vi.fn()}
+        />,
+      );
+      const dialog = await openDialog(user);
+      await user.click(within(dialog).getByRole("radio", { name: /^Away/ }));
+      await user.click(within(dialog).getByRole("button", { name: "Starts" }));
+      // Oct 27 is already today in UTC, but tomorrow for the organization.
+      await user.click(screen.getByRole("button", { name: "Choose Tuesday, October 27, 2026" }));
+      expect(within(dialog).getByRole("button", { name: "Schedule away" })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   const planned = {
@@ -818,10 +855,8 @@ describe("EmployeeStatusActions", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "More status changes" }));
-    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
-      "Mark away",
-      "Offboard",
-    ]);
+    // A suspended person is reinstated before Away, so the menu leaves it out.
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Offboard"]);
     await user.click(screen.getByRole("menuitem", { name: "Offboard" }));
     const dialog = screen.getByRole("alertdialog", { name: "Offboard Alice Smith?" });
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
@@ -847,7 +882,6 @@ describe("EmployeeStatusActions", () => {
     await user.click(screen.getByRole("button", { name: "More status changes" }));
     expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
       "Set end date",
-      "Mark away",
       "Offboard",
     ]);
     await user.click(screen.getByRole("menuitem", { name: "Set end date" }));

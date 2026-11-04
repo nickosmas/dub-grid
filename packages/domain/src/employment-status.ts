@@ -61,6 +61,14 @@ export const NOT_SUSPENDED_CODE = "NOT_SUSPENDED";
 
 export const NOT_SUSPENDED_MESSAGE = "They aren't suspended.";
 
+export const AWAY_WHILE_SUSPENDED_CODE = "AWAY_WHILE_SUSPENDED";
+
+/**
+ * Leaving Active ends a suspension in the database (109), which would give
+ * them sign-in back, so a suspended person is reinstated before Away (owner).
+ */
+export const AWAY_WHILE_SUSPENDED_MESSAGE = "Reinstate them first, then mark them away.";
+
 export const AWAY_ABSENCE_INVALID_CODE = "AWAY_ABSENCE_INVALID";
 
 export const AWAY_ABSENCE_NEEDS_DATE_MESSAGE =
@@ -213,6 +221,8 @@ export interface PlannedChangeState {
   plannedStatus?: PlannedStatus | null;
   plannedFrom?: string | null;
   plannedUntil?: string | null;
+  /** The absence a planned Away fills its days with (51g1). */
+  plannedAbsenceTypeId?: number | null;
 }
 
 /** Someone's first day (51g4), which no earlier day can be scheduled before. */
@@ -413,6 +423,12 @@ export interface StatusActionOptions {
   lastDay?: string | null;
   /** False for someone with no account: nothing is said about their sign-in. */
   hasAccount?: boolean;
+  /**
+   * The absence their days hold now, by name: an Away person's (Mark active,
+   * Edit time away), or the planned Away's (Save changes, and any change that
+   * cancels it).
+   */
+  currentAbsenceName?: string | null;
 }
 
 /** The absence filling the away days, as one full sentence. */
@@ -436,6 +452,7 @@ function describeSetReturnDate(
   returnDate: string | null,
   currentReturnDate: string | null,
   absenceName: string | null,
+  currentAbsenceName: string | null,
 ): StatusActionCopy {
   const changing = currentReturnDate !== null;
   // The dialog edits the absence as well as the date, so it's named for the whole time away.
@@ -448,6 +465,7 @@ function describeSetReturnDate(
         ? [
             "Any upcoming shifts come off the published schedule now.",
             "Recurring schedules set up for them are removed.",
+            "Open requests they're part of are closed.",
           ]
         : [],
       unchanged: [],
@@ -455,14 +473,30 @@ function describeSetReturnDate(
     };
   }
   const day = formatReturnDate(returnDate, { weekday: true });
+  const shortDay = formatReturnDate(returnDate);
+  // A later date clears the days it adds (099); an earlier one puts back only
+  // the days their absence held (100) and leaves the rest as they are.
+  const later = changing && returnDate > (currentReturnDate as string);
+  const earlier = changing && returnDate < (currentReturnDate as string);
   // Someone away with no date already has nothing scheduled and no recurring
   // schedule left, so the date only decides when they're back.
   return changing
     ? {
         ...base,
         message: `They're back to Active on ${day}.`,
-        points: returnDatePoints(returnDate, absenceName),
-        unchanged: [],
+        points: [
+          ...returnDatePoints(returnDate, absenceName),
+          ...(later ? [`Open requests for days before ${shortDay} are closed.`] : []),
+          ...(earlier && currentAbsenceName
+            ? [
+                `Days from ${shortDay} go back to what was published, without ${currentAbsenceName}.`,
+              ]
+            : []),
+        ],
+        unchanged:
+          earlier && !currentAbsenceName
+            ? [`Shifts already taken off from ${shortDay} on stay off.`]
+            : [],
         done: "Time away updated",
       }
     : {
@@ -506,6 +540,63 @@ function plannedAwaySentence(startDate: string, returnDate: string | null): stri
   return returnDate
     ? `Away from ${from}, back ${formatReturnDate(returnDate, { weekday: true })}.`
     : `Away from ${from}.`;
+}
+
+const PLAN_REQUESTS_STAY_CLOSED = "Requests the plan closed stay closed.";
+
+/** Names an absence in `currentAbsenceName` where only its id is known. */
+export const UNNAMED_ABSENCE = "their absence";
+
+/**
+ * What a planned Away or last day leaves behind once another change replaces
+ * it (104): days its absence held go back to what was published, and nothing
+ * else it cleared comes back. `through` is the last day of a new last day,
+ * after which the days come off anyway.
+ */
+function replacedPlanLeftovers(
+  plannedStatus: PlannedStatus | null,
+  absenceName: string | null,
+  { requests = true, through = null }: { requests?: boolean; through?: string | null } = {},
+): { points: string[]; unchanged: string[] } {
+  if (plannedStatus !== "away" && plannedStatus !== "removed") return { points: [], unchanged: [] };
+  const stayClosed = requests ? [PLAN_REQUESTS_STAY_CLOSED] : [];
+  if (plannedStatus === "away" && absenceName) {
+    return {
+      points: [
+        through
+          ? `Days through ${formatReturnDate(through)} it filled with ${absenceName} go back to what was published.`
+          : `Days it filled with ${absenceName} go back to what was published.`,
+      ],
+      unchanged: stayClosed,
+    };
+  }
+  return { points: [], unchanged: ["Shifts the plan already took off stay off.", ...stayClosed] };
+}
+
+/**
+ * Days a planned Away no longer covers once its dates change: its absence
+ * comes off them, but a shift it took off stays off (104).
+ */
+function shrunkPlanLeftovers(
+  from: { start: string; until: string | null },
+  to: { start: string; until: string | null },
+  absenceName: string | null,
+): { points: string[]; unchanged: string[] } {
+  const shrinks =
+    to.start > from.start || (to.until !== null && (from.until === null || to.until < from.until));
+  if (!shrinks) return { points: [], unchanged: [] };
+  return absenceName
+    ? {
+        points: [`Days it no longer covers go back to what was published, without ${absenceName}.`],
+        unchanged: [PLAN_REQUESTS_STAY_CLOSED],
+      }
+    : {
+        points: [],
+        unchanged: [
+          "Shifts already taken off days it no longer covers stay off.",
+          PLAN_REQUESTS_STAY_CLOSED,
+        ],
+      };
 }
 
 /** "They stay Active through Sat, Nov 8, their last day." */
@@ -608,6 +699,7 @@ export function describeStatusAction(
     plannedStatus = null,
     lastDay = null,
     hasAccount: account = true,
+    currentAbsenceName = null,
   }: StatusActionOptions = {},
 ): StatusActionCopy {
   // Any other change replaces the change they have planned.
@@ -620,6 +712,10 @@ export function describeStatusAction(
       : plannedStatus === "suspended"
         ? [`The suspension planned from ${formatReturnDate(plannedFrom)} is canceled.`]
         : [`The time away planned from ${formatReturnDate(plannedFrom)} is canceled.`];
+  const leftByCancelledPlan = (options?: { requests?: boolean; through?: string | null }) =>
+    plannedFrom
+      ? replacedPlanLeftovers(plannedStatus ?? "away", currentAbsenceName, options)
+      : { points: [], unchanged: [] };
   // Leaving the grid publishes the removals at once (114).
   const leavingSchedule = [
     "Any upcoming shifts come off the published schedule now.",
@@ -636,16 +732,22 @@ export function describeStatusAction(
   switch (action) {
     case "markAway":
       if (startDate) {
+        const left = leftByCancelledPlan();
         return {
           label: "Schedule away",
           title: `Mark ${name} away?`,
           message: `They stay Active until ${formatReturnDate(startDate, { weekday: true })}.`,
-          points: [...plannedAwayPoints(startDate, returnDate, absenceName), ...cancelsPlan],
-          unchanged: [],
+          points: [
+            ...plannedAwayPoints(startDate, returnDate, absenceName),
+            ...cancelsPlan,
+            ...left.points,
+          ],
+          unchanged: left.unchanged,
           done: "Away scheduled",
         };
       }
       if (returnDate) {
+        const left = leftByCancelledPlan();
         return {
           label: "Mark away",
           title: `Mark ${name} away?`,
@@ -654,8 +756,9 @@ export function describeStatusAction(
             ...returnDatePoints(returnDate, absenceName),
             `Open requests for days before ${formatReturnDate(returnDate)} are closed.`,
             ...cancelsPlan,
+            ...left.points,
           ],
-          unchanged: keepsAccess,
+          unchanged: [...keepsAccess, ...left.unchanged],
           done: "Marked away",
         };
       }
@@ -698,14 +801,26 @@ export function describeStatusAction(
           done: "Last day changed",
         };
       }
-      return {
-        label: "Save changes",
-        title: `Change ${name}'s planned time away?`,
-        message: startDate ? plannedAwaySentence(startDate, returnDate) : "",
-        points: startDate ? plannedAwayPoints(startDate, returnDate, absenceName) : [],
-        unchanged: [],
-        done: "Planned time away changed",
-      };
+      {
+        const left =
+          startDate && plannedFrom
+            ? shrunkPlanLeftovers(
+                { start: plannedFrom, until: currentReturnDate },
+                { start: startDate, until: returnDate },
+                currentAbsenceName,
+              )
+            : { points: [], unchanged: [] };
+        return {
+          label: "Save changes",
+          title: `Change ${name}'s planned time away?`,
+          message: startDate ? plannedAwaySentence(startDate, returnDate) : "",
+          points: startDate
+            ? [...plannedAwayPoints(startDate, returnDate, absenceName), ...left.points]
+            : [],
+          unchanged: left.unchanged,
+          done: "Planned time away changed",
+        };
+      }
     case "cancelPlannedChange":
       if (plannedStatus === "active") {
         return {
@@ -733,7 +848,11 @@ export function describeStatusAction(
           title: `Cancel ${name}'s last day?`,
           message: "They stay Active and can be scheduled after that day again.",
           points: [],
-          unchanged: [],
+          // A last day holds no absence, so nothing it cleared comes back (104).
+          unchanged: [
+            "Shifts already taken off after that day stay off.",
+            PLAN_REQUESTS_STAY_CLOSED,
+          ],
           done: "Last day canceled",
         };
       }
@@ -760,17 +879,24 @@ export function describeStatusAction(
         done: "Planned time away canceled",
       };
     case "setReturnDate":
-      return describeSetReturnDate(name, returnDate, currentReturnDate, absenceName);
+      return describeSetReturnDate(
+        name,
+        returnDate,
+        currentReturnDate,
+        absenceName,
+        currentAbsenceName,
+      );
     case "setSuspendedUntil":
       return describeSetSuspendedUntil(name, returnDate, currentReturnDate);
     case "archive":
       if (lastDay) {
+        const left = leftByCancelledPlan({ through: lastDay });
         return {
           label: "Set last day",
           title: `Offboard ${name}?`,
           message: lastDayMessage(lastDay),
-          points: [...lastDayPoints(lastDay, account), ...cancelsPlan],
-          unchanged: [],
+          points: [...lastDayPoints(lastDay, account), ...cancelsPlan, ...left.points],
+          unchanged: left.unchanged,
           done: "Last day set",
         };
       }
@@ -788,15 +914,25 @@ export function describeStatusAction(
         done: "Offboarded",
       };
     case "markActive":
+      // The choice already says they can be scheduled again from today. Their
+      // away absence comes off the days ahead (100); nothing else comes back.
       return {
         label: "Mark active",
         title: `Mark ${name} active?`,
-        message: "",
+        message: currentAbsenceName
+          ? `Days left in their time away go back to what was published, without ${currentAbsenceName}.`
+          : "Shifts taken off while they were away stay off.",
         points: [],
         unchanged: [],
         done: "Marked active",
       };
-    case "suspend":
+    case "suspend": {
+      // Suspending now closes every open request, so the plan's need no word.
+      const left = leftByCancelledPlan({ requests: !!startDate });
+      const shiftsStay =
+        left.unchanged.length > 0
+          ? "Their other shifts stay, and you can keep scheduling them."
+          : "Their shifts stay, and you can keep scheduling them.";
       return {
         label: startDate ? "Schedule suspension" : "Suspend",
         title: `Suspend ${name}?`,
@@ -805,10 +941,11 @@ export function describeStatusAction(
           : returnDate
             ? accessBackSentence(returnDate)
             : "",
-        points: [...suspensionPoints(startDate, returnDate), ...cancelsPlan],
-        unchanged: ["Their shifts stay, and you can keep scheduling them."],
+        points: [...suspensionPoints(startDate, returnDate), ...cancelsPlan, ...left.points],
+        unchanged: [shiftsStay, ...left.unchanged],
         done: startDate ? "Suspension scheduled" : "Suspended",
       };
+    }
     case "reinstate":
       return {
         label: "Reinstate",
@@ -863,6 +1000,8 @@ export interface StatusState extends PlannedChangeState, FirstDayState {
   /** Their linked account; null for someone who can't sign in at all. Left out, they have one. */
   userId?: string | null;
   awayUntil?: string | null;
+  /** The absence an Away person's days hold until their return date (51f). */
+  awayAbsenceTypeId?: number | null;
   suspendedAt?: string | null;
   /** A suspended person's first day with access again (51g3). */
   suspendedUntil?: string | null;
@@ -939,9 +1078,11 @@ export function statusChoices(
       ? "Only someone on staff can be marked away."
       : !canMarkInactive(state.focusAreaIds)
         ? NOT_ON_SCHEDULE_MESSAGE
-        : plannedAwayFrom
-          ? `Planned from ${formatReturnDate(plannedAwayFrom, { weekday: true })}. ${EDIT_PLAN_HINT}`
-          : null;
+        : kind === "suspended"
+          ? AWAY_WHILE_SUSPENDED_MESSAGE
+          : plannedAwayFrom
+            ? `Planned from ${formatReturnDate(plannedAwayFrom, { weekday: true })}. ${EDIT_PLAN_HINT}`
+            : null;
   const away = choice(
     {
       kind: "away",
@@ -1010,8 +1151,8 @@ export function statusChoices(
           kind: "active",
           action: "markActive",
           label: EMPLOYMENT_STATUS_LABELS.active,
-          detail: "Back on the schedule from today.",
-          outcome: "They'll be Active again and back on the schedule from today.",
+          detail: "Can be scheduled again from today.",
+          outcome: "They'll be Active again and can be scheduled from today.",
         }),
         suspended,
         archived,

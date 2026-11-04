@@ -10,6 +10,7 @@ import {
   formatFirstDay,
   canOffboardAtTier,
   statusChoices,
+  UNNAMED_ABSENCE,
   type StatusAction,
   type StatusActionCopy,
   DEFAULT_ORGANIZATION_LABELS,
@@ -1442,6 +1443,23 @@ export default function PersonDetailScreen() {
           : null,
     absenceName: plannedAbsence ? (plannedAbsence.name ?? plannedAbsence.label) : null,
   });
+  // The absence a planned Away fills its days with, which ending or shortening it takes off.
+  const planAbsenceName =
+    hasPlan && person.plannedAbsenceTypeId != null
+      ? plannedAbsence
+        ? (plannedAbsence.name ?? plannedAbsence.label)
+        : UNNAMED_ABSENCE
+      : null;
+  // The absence an Away person's days hold now, which Mark active or an earlier date takes off.
+  const currentAwayAbsence = absenceTypes.find(
+    (absenceType) => absenceType.id === person.awayAbsenceTypeId,
+  );
+  const awayAbsenceName =
+    isAway && person.awayUntil && person.awayAbsenceTypeId != null
+      ? currentAwayAbsence
+        ? (currentAwayAbsence.name ?? currentAwayAbsence.label)
+        : UNNAMED_ABSENCE
+      : null;
   const statusCopy = statusChoice
     ? describeStatusAction(statusChoice, getFullName(person), {
         hasAccount: Boolean(person.userId),
@@ -1465,6 +1483,8 @@ export default function PersonDetailScreen() {
             ? person.plannedFrom
             : null,
         plannedStatus: person.plannedStatus ?? null,
+        currentAbsenceName:
+          statusChoice === "markActive" ? awayAbsenceName : hasPlan ? planAbsenceName : null,
       })
     : restoresNow
       ? describeStatusAction("restore", getFullName(person))
@@ -1508,12 +1528,16 @@ export default function PersonDetailScreen() {
                           startDate: laterStart,
                           returnDate,
                           absenceName: chosenAbsenceName,
+                          plannedFrom: person.plannedFrom ?? null,
+                          currentReturnDate: person.plannedUntil ?? null,
+                          currentAbsenceName: planAbsenceName,
                         })
                       : awayDetailsChanged
                         ? describeStatusAction("setReturnDate", getFullName(person), {
                             returnDate,
                             currentReturnDate: person.awayUntil,
                             absenceName: chosenAbsenceName,
+                            currentAbsenceName: awayAbsenceName,
                           })
                         : null;
   const invitationConfirmationTitle =

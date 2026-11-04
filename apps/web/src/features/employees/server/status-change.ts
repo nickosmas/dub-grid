@@ -15,6 +15,8 @@ import {
   AWAY_ABSENCE_INVALID_CODE,
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   AWAY_ABSENCE_UNKNOWN_MESSAGE,
+  AWAY_WHILE_SUSPENDED_CODE,
+  AWAY_WHILE_SUSPENDED_MESSAGE,
   bulkStatusSkipReason,
   canMarkInactive,
   canOffboardAtTier,
@@ -303,6 +305,20 @@ export async function applyStatusChange(
 
   if ((action === "deactivate" || editingAway) && !canMarkInactive(currentEmployee.focusAreaIds)) {
     return respond({ error: NOT_ON_SCHEDULE_MESSAGE, code: NOT_ON_SCHEDULE_CODE }, { status: 400 });
+  }
+
+  // Leaving Active ends a suspension in the database (109), giving sign-in
+  // back, so Away, now or planned, waits for a Reinstate.
+  if (
+    action === "deactivate" &&
+    currentEmployee.status === "active" &&
+    !currentEmployee.archivedAt &&
+    currentEmployee.suspendedAt
+  ) {
+    return respond(
+      { error: AWAY_WHILE_SUSPENDED_MESSAGE, code: AWAY_WHILE_SUSPENDED_CODE },
+      { status: 400 },
+    );
   }
 
   if (

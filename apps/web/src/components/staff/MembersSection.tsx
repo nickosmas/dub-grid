@@ -196,6 +196,8 @@ export interface MembersSectionProps {
   certificationLabel: string;
   roleLabel: string;
   orgId?: string;
+  /** The organization's timezone, whose today the status dialogs use. */
+  timeZone?: string | null;
   isSuperAdmin?: boolean;
   isGridmaster?: boolean;
   // Self signal: the viewer's own employees row has management department
@@ -236,6 +238,7 @@ export function MembersSection({
   certificationLabel,
   roleLabel,
   orgId,
+  timeZone = null,
   isSuperAdmin,
   isGridmaster,
   isManagementUser,
@@ -2239,6 +2242,7 @@ export function MembersSection({
       {selectedEmployee && canManageEmployees && (
         <StaffDetailPanel
           employee={selectedEmployee}
+          timeZone={timeZone}
           focusAreas={focusAreas}
           certifications={certifications}
           roles={roles}
@@ -2594,6 +2598,7 @@ export function MembersSection({
       {bulkStatus && !statusStepUpOpen ? (
         <BulkStatusDialog
           state={bulkStatus}
+          timeZone={timeZone}
           onChange={setBulkStatus}
           onConfirm={handleConfirmBulkStatus}
           running={bulkStatusRunning}

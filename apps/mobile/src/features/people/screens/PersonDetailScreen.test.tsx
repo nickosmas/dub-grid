@@ -1419,7 +1419,7 @@ describe("PersonDetailScreen", () => {
       renderWithStatusMutation({ status: "inactive", awayUntil: day(3) });
       openStatus();
       expect(radioNames()).toEqual([
-        "Active. Back on the schedule from today.",
+        "Active. Can be scheduled again from today.",
         `Edit time away. Back ${formatReturnDate(day(3), { weekday: true })}.`,
         "Suspended. Only someone who is active can be suspended.",
         "Offboarded. No longer on staff. Can't sign in or be scheduled.",
@@ -1428,9 +1428,10 @@ describe("PersonDetailScreen", () => {
 
       renderWithStatusMutation({ suspendedAt: "2026-10-26T12:00:00Z" });
       openStatus();
-      expect(radioNames().slice(0, 2)).toEqual([
+      expect(radioNames().slice(0, 3)).toEqual([
         "Active. Can sign in again.",
         "Set end date. No end date.",
+        "Away. Reinstate them first, then mark them away.",
       ]);
     });
 
@@ -2030,6 +2031,9 @@ describe("PersonDetailScreen", () => {
       openStatus();
       pick(/^Active/);
       expect(screen.getByText("Mark Mina Diaz active?")).toBeInTheDocument();
+      expect(
+        screen.getByText("Shifts taken off while they were away stay off."),
+      ).toBeInTheDocument();
       confirm("Mark active");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
