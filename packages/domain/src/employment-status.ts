@@ -743,11 +743,20 @@ export function describeStatusAction(
         message: "",
         points: [
           "They stay Active and can be scheduled on those days again.",
+          // The plan wrote its absence into the draft only; cancelling drops
+          // that draft, so a day whose absence was published since is left
+          // empty until the next publish (unfill_away_absence, 100).
           ...(absenceName
-            ? [`Those days go back to what was published, without ${absenceName}.`]
+            ? [
+                `Days with ${absenceName} only in the draft go back to what was published.`,
+                `Days where ${absenceName} is already published are cleared in the draft, and staff see it until you publish.`,
+              ]
             : []),
         ],
-        unchanged: absenceName ? [] : ["Shifts already taken off those days stay off."],
+        unchanged: [
+          ...(absenceName ? [] : ["Shifts already taken off those days stay off."]),
+          "Requests the plan closed stay closed.",
+        ],
         done: "Planned time away canceled",
       };
     case "setReturnDate":

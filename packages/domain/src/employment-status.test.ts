@@ -166,7 +166,10 @@ describe("describeStatusAction", () => {
     expect(suspend.unchanged).toEqual(["Their shifts stay, and you can keep scheduling them."]);
     expect(describeStatusAction("cancelPlannedChange", "Ana")).toMatchObject({
       points: ["They stay Active and can be scheduled on those days again."],
-      unchanged: ["Shifts already taken off those days stay off."],
+      unchanged: [
+        "Shifts already taken off those days stay off.",
+        "Requests the plan closed stay closed.",
+      ],
     });
   });
 
@@ -629,6 +632,12 @@ describe("planned away (51g1)", () => {
       absenceName: "Vacation",
     });
     expect(cancel.label).toBe("Cancel planned time away");
+    expect(cancel.points).toEqual([
+      "They stay Active and can be scheduled on those days again.",
+      "Days with Vacation only in the draft go back to what was published.",
+      "Days where Vacation is already published are cleared in the draft, and staff see it until you publish.",
+    ]);
+    expect(cancel.unchanged).toEqual(["Requests the plan closed stay closed."]);
     for (const copy of [edit, cancel]) {
       expect(copy.points.length).toBeGreaterThanOrEqual(2);
       for (const point of copy.points) expect(point).toMatch(/^[A-Z].*\.$/);

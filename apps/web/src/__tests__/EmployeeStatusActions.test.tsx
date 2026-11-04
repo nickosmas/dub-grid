@@ -590,8 +590,11 @@ describe("EmployeeStatusActions", () => {
     const dialog = await openDialog(user);
     await user.click(within(dialog).getByRole("button", { name: "Cancel planned time away" }));
     expect(
-      within(dialog).getByText("Those days go back to what was published, without Vacation."),
+      within(dialog).getByText(
+        "Days where Vacation is already published are cleared in the draft, and staff see it until you publish.",
+      ),
     ).toBeInTheDocument();
+    expect(within(dialog).getByText("Requests the plan closed stay closed.")).toBeInTheDocument();
     await user.click(
       within(dialog)
         .getAllByRole("button", { name: "Cancel planned time away" })
