@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { Stack } from "expo-router";
 import { HeaderLeadingTitle } from "../../../shared/navigation/HeaderLeadingTitle";
+import { useLargeTitleCollapse } from "../../../shared/navigation/useLargeTitleCollapse";
 import { useToolbarIcon } from "../../../shared/navigation/useToolbarIcon";
 import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/contracts";
@@ -160,6 +161,7 @@ export default function NotificationsScreen() {
   );
 
   const unreadCount = notificationsQuery.data?.pages[0]?.unreadCount ?? 0;
+  const largeTitle = useLargeTitleCollapse();
 
   // One open swipe at a time across the list; see `OpenSwipeRegistry`.
   const openSwipe = useRef<OpenSwipeRegistry["current"]>(null);
@@ -345,10 +347,14 @@ export default function NotificationsScreen() {
       // Same as People: the search field sits at the top, so the keyboard
       // inset buys nothing and costs a jump when the large title recalculates.
       adjustsForKeyboard={false}
+      onScroll={largeTitle.onScroll}
+      onScrollBeginDrag={largeTitle.onScrollBeginDrag}
       bottomPaddingMode="stack"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={contentState.kind !== "loading"}
+      // Live while loading too: a locked scroll view on a cold push left the
+      // stacked search field drawn over the large title until first touched.
+      scrollEnabled
       list={{
         data: listItems,
         keyExtractor: (notification) => notification.id,
@@ -394,9 +400,11 @@ export default function NotificationsScreen() {
             tabs={filterTabs}
           />
         )}
+        {/* Collapsed beside Mark all read, the bar title starts at the
+            leading edge, as Mail names a mailbox; alone it stays centered. */}
+        <HeaderLeadingTitle title="Alerts" shown={unreadCount > 0 && largeTitle.collapsed} />
         {/* Mark all read is a bar action, as in Mail; how many are unread is
             already on the Unread filter. */}
-        <HeaderLeadingTitle title="Alerts" />
         {unreadCount > 0 ? (
           <MarkAllReadBarAction disabled={busy} onPress={() => setConfirmingMarkAllRead(true)} />
         ) : null}

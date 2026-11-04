@@ -132,6 +132,7 @@ export function Screen<T = never>({
   refreshing = false,
   onRefresh,
   onScroll,
+  onScrollBeginDrag,
   scrollEventThrottle,
   adjustsForKeyboard = true,
   bottomPaddingMode = DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
@@ -173,6 +174,7 @@ export function Screen<T = never>({
   refreshing?: boolean;
   onRefresh?: () => void;
   onScroll?: ScreenScrollViewProps["onScroll"];
+  onScrollBeginDrag?: ScreenScrollViewProps["onScrollBeginDrag"];
   scrollEventThrottle?: number;
   /**
    * Set false on a screen whose only input sits at the *top* — a search field
@@ -431,6 +433,7 @@ export function Screen<T = never>({
       keyboardShouldPersistTaps="handled"
       onContentSizeChange={() => keepUnderHeader(null)}
       onScroll={handleScroll}
+      onScrollBeginDrag={onScrollBeginDrag}
       onTouchStart={handleTouchStart}
       refreshControl={refreshControl}
       scrollEventThrottle={scrollEventThrottle}
@@ -468,6 +471,7 @@ export function Screen<T = never>({
       keyboardShouldPersistTaps="handled"
       onContentSizeChange={() => keepUnderHeader(null)}
       onScroll={handleScroll}
+      onScrollBeginDrag={onScrollBeginDrag}
       onTouchStart={handleTouchStart}
       // Mounted for the life of the screen once it can refresh, never only
       // while `scrollEnabled`. On iOS the control is the scroll view's first
