@@ -5,6 +5,7 @@ import {
   getScheduleEntryFocusAreaId,
   getScheduleEntrySegmentFocusAreaName,
   getScheduleEntrySegments,
+  isDeletedScheduleHistory,
   type ScheduleEntryLike,
 } from "@dubgrid/schedule-core";
 
@@ -195,6 +196,8 @@ export function formatCalendarMonthTitle(monthStart: string, todayDate: string):
 export function getScheduledDates(entries: ReadonlyArray<MobileScheduleEntry>): Set<string> {
   const dates = new Set<string>();
   for (const entry of entries) {
+    // A shift a publish removed still comes back as history; it isn't work.
+    if (isDeletedScheduleHistory(entry)) continue;
     if (entry.state.kind === "worked" && entry.state.segments.length > 0) dates.add(entry.date);
   }
   return dates;

@@ -1429,6 +1429,68 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText(/^Was /)).toBeNull();
   });
 
+  it("keeps the team schedule free of Was lines", () => {
+    const changed = createScheduleEntry({
+      shiftIds: [2],
+      shiftLabel: "E",
+      assignmentLabel: "E",
+      shiftName: "Evening Shift",
+      startTime: "15:00:00",
+      endTime: "23:00:00",
+      change: {
+        kind: "modified",
+        previousSegment: {
+          shiftId: 1,
+          jobId: 10,
+          shiftName: "Day Shift",
+          jobName: "Mentor",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          displayFocusAreaName: "Skilled Nursing",
+        },
+        previousPresentation: {
+          label: "D",
+          shiftName: "Day Shift",
+          focusAreaId: 2,
+          focusAreaName: "Skilled Nursing",
+          displayFocusAreaName: "Skilled Nursing",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          segments: [
+            {
+              shiftId: 1,
+              jobId: 10,
+              shiftName: "Day Shift",
+              jobName: "Mentor",
+              startTime: "07:00:00",
+              endTime: "15:00:00",
+              displayFocusAreaName: "Skilled Nursing",
+            },
+          ],
+        },
+      },
+      segments: [
+        {
+          shiftId: 2,
+          jobId: 20,
+          shiftName: "Evening Shift",
+          jobName: "Supervisor",
+          startTime: "15:00:00",
+          endTime: "23:00:00",
+          displayFocusAreaName: "Skilled Nursing",
+        },
+      ],
+    });
+    meScheduleEntries = [];
+    teamScheduleEntries = [{ ...changed, employeeId: "emp-2", employeeName: "Bri Shaw" }];
+    openShifts = [];
+    shiftRequests = [];
+
+    render(<TeamScheduleScreen />);
+    expect(screen.getByText("Bri Shaw")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Previous shift:/)).toBeNull();
+  });
+
   it("shows deleted general shifts in Your Week rows", () => {
     const change = {
       kind: "deleted",

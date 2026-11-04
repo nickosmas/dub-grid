@@ -25,6 +25,14 @@ describe("getScheduledDates", () => {
     ]);
     expect([...dates]).toEqual(["2026-11-02"]);
   });
+
+  it("leaves out a shift a publish removed", () => {
+    const removed = {
+      ...entry("2026-11-05", { segments: [{} as never] }),
+      change: { kind: "deleted" },
+    } as unknown as MobileScheduleEntry;
+    expect([...getScheduledDates([removed])]).toEqual([]);
+  });
 });
 
 describe("getCalendarDotRanges", () => {
