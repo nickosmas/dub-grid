@@ -240,6 +240,7 @@ describe("PATCH /api/gridmaster/users/[userId]", () => {
       orgId: ORG,
       actorId: "gm",
       actorSessionId: "gm-session",
+      byPlatform: true,
     });
     expect(writeGridmasterAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({

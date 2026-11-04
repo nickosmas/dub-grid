@@ -86,7 +86,11 @@ export function InlineRoleSelect({
               ? `Change the invitation for ${pendingInvitationEmail} to ${ORG_ROLE_LABELS[pending]}?`
               : `Change their access role to ${ORG_ROLE_LABELS[pending]}?`
           }
-          message={pendingInvitationEmail ? undefined : "Their access updates immediately."}
+          message={
+            pendingInvitationEmail
+              ? undefined
+              : "Their access changes now. If they have the app open, it updates and tells them."
+          }
           summary={
             pendingInvitationEmail
               ? {

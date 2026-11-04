@@ -70,6 +70,8 @@ describe("followUpLinkedLoginEmailChange", () => {
     expect(sentTo("old@example.com")?.html).toContain("new@example.com");
     expect(sentTo("old@example.com")?.html).toContain("Calm Haven");
     expect(sentTo("new@example.com")?.html).toContain("Calm Haven");
+    expect(sentTo("old@example.com")?.html).toContain("An administrator at");
+    expect(sentTo("old@example.com")?.html).toContain("signed you out on your devices");
   });
 
   // The new address was typed by an administrator and may be a stranger's.
@@ -87,6 +89,17 @@ describe("followUpLinkedLoginEmailChange", () => {
     expect(endUserSessions).toHaveBeenCalledWith("manager-1", {
       keepSessionId: "manager-session",
     });
+    const html = sentTo("old@example.com")?.html ?? "";
+    expect(html).toContain("signed you out on your other devices");
+    expect(html).not.toContain("An administrator");
+    expect(sentTo("new@example.com")?.html).not.toContain("An administrator");
+  });
+
+  it("names DubGrid support when a Gridmaster made the change", async () => {
+    await change({ actorId: "gridmaster-1", byPlatform: true });
+
+    expect(sentTo("old@example.com")?.html).toContain("DubGrid support changed");
+    expect(sentTo("old@example.com")?.html).not.toContain("An administrator");
   });
 
   it("still sends both notices when revocation fails, and reports it", async () => {
@@ -95,6 +108,9 @@ describe("followUpLinkedLoginEmailChange", () => {
     await expect(change()).resolves.toBeUndefined();
 
     expect(sendResendEmail).toHaveBeenCalledTimes(2);
+    const html = sentTo("old@example.com")?.html ?? "";
+    expect(html).not.toContain("signed you out");
+    expect(html).toContain("Sign out of any device you don&#x27;t recognize.");
     expect(captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({ extra: expect.objectContaining({ step: "revoke-sessions" }) }),

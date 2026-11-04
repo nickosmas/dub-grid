@@ -746,7 +746,7 @@ export default function PersonDetailScreen() {
         message:
           result.result === "invitation_replaced"
             ? "A replacement invitation is on its way."
-            : "Their access updates immediately.",
+            : "Their access changes now. If they have the app open, it updates and tells them.",
       });
     },
   });
@@ -1526,7 +1526,7 @@ export default function PersonDetailScreen() {
     invitationConfirmAction === "create"
       ? undefined
       : invitationConfirmAction === "resend"
-        ? "The current invitation will be canceled."
+        ? "A new invitation link is sent, and the current one stops working."
         : "The invite link stops working.";
   const invitationConfirmationLabel =
     invitationConfirmAction === "create"

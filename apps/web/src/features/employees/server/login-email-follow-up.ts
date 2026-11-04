@@ -3,7 +3,11 @@ import "server-only";
 import { createElement } from "react";
 import { render } from "@react-email/components";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { LoginEmailChangedEmail } from "@/emails/LoginEmailChangedEmail";
+import {
+  LoginEmailChangedEmail,
+  type LoginEmailChangedBy,
+  type LoginEmailSignOut,
+} from "@/emails/LoginEmailChangedEmail";
 import { endUserSessions } from "@/lib/auth/revocation";
 import { emailBaseUrl, sanitizeHeaderValue } from "@/lib/email";
 import { getInvitationEmailConfig } from "@/features/mobile/server/invitation-email";
@@ -20,11 +24,14 @@ export interface LoginEmailChangeFollowUp {
   orgId: string | null;
   actorId: string;
   actorSessionId: string | null;
+  /** True when a Gridmaster made the change, so the notices name DubGrid support. */
+  byPlatform?: boolean;
 }
 
 /**
- * After an administrator changes someone's email address, sessions opened
- * under the old identity stop working and both addresses are told why.
+ * After someone's sign-in email is changed from their staff record, sessions
+ * opened under the old identity stop working and both addresses are told why,
+ * claiming a sign-out only when it happened.
  *
  * The change itself has already committed, and a retry of the save would find
  * no change to follow up on, so failing the request here would only hide the
@@ -34,26 +41,32 @@ export interface LoginEmailChangeFollowUp {
 export async function followUpLinkedLoginEmailChange(
   input: LoginEmailChangeFollowUp,
 ): Promise<void> {
+  const keepSessionId = input.userId === input.actorId ? input.actorSessionId : null;
+  let signOut: LoginEmailSignOut = "not-confirmed";
   try {
     // Ended at the provider too, or a refresh would restore access within the
     // hour. Changing your own staff record keeps the session doing it.
-    await endUserSessions(input.userId, {
-      keepSessionId: input.userId === input.actorId ? input.actorSessionId : null,
-    });
+    await endUserSessions(input.userId, { keepSessionId });
+    signOut = keepSessionId ? "other-devices" : "everywhere";
   } catch (error) {
     report(error, input, "revoke-sessions");
   }
 
   try {
-    await sendNotices(input);
+    await sendNotices(input, signOut);
   } catch (error) {
     report(error, input, "notify");
   }
 }
 
-async function sendNotices(input: LoginEmailChangeFollowUp): Promise<void> {
+async function sendNotices(
+  input: LoginEmailChangeFollowUp,
+  signOut: LoginEmailSignOut,
+): Promise<void> {
   const config = getInvitationEmailConfig();
   if (!config) return;
+  const changedBy: LoginEmailChangedBy =
+    input.userId === input.actorId ? "self" : input.byPlatform ? "support" : "administrator";
 
   const { data: organization } = input.orgId
     ? await input.serviceClient
@@ -94,6 +107,8 @@ async function sendNotices(input: LoginEmailChangeFollowUp): Promise<void> {
             recipient: notice.recipient,
             newEmail: input.newEmail,
             logoUrl,
+            changedBy,
+            signOut,
           }),
         ),
       }),

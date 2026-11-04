@@ -511,7 +511,7 @@ export default function ProfilePasswordScreen() {
               onFocus={() => setFocusedPasswordField("confirmPassword")}
             />
             <Text style={styles.signOutNotice}>
-              Changing your password signs you out everywhere else.
+              Changing your password signs you out on every device, including this one.
             </Text>
           </ProfilePanel>
         </ProfileSection>

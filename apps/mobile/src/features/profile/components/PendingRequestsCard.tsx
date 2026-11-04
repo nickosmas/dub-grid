@@ -21,7 +21,7 @@ const TYPE_LABELS: Record<MobileProfileChangeRequest["type"], string> = {
 
 const TYPE_DESCRIPTIONS: Record<MobileProfileChangeRequest["type"], string> = {
   profile_update: "An Admin reviews it before your name changes.",
-  account_deletion: "An Admin reviews it before your account is deleted.",
+  account_deletion: "A Super Admin reviews it before your account is deleted.",
 };
 
 function formatSubmittedAt(value: string): string {
