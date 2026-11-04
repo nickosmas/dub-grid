@@ -438,3 +438,35 @@ export function resumedTrialEndsAt(input: ResumeTrialInput): string | null {
   const held = Math.max(0, now.getTime() - heldFrom.getTime());
   return new Date(trialEndsAt.getTime() + held).toISOString();
 }
+
+/** Stripe Checkout refuses a trial that ends less than 48 hours ahead. */
+export const CHECKOUT_TRIAL_MIN_MS = 48 * 3_600_000;
+// A checkout started right at the limit would be refused on clock skew alone.
+const CHECKOUT_TRIAL_MARGIN_MS = 10 * 60_000;
+
+export interface CheckoutTrialInput {
+  status: string | null | undefined;
+  trialEndsAt: string | null | undefined;
+  billingPausedAt?: string | null;
+  now?: Date;
+}
+
+/**
+ * The Unix time a subscription started now first charges, as Stripe's
+ * `trial_end`: the organization's own trial end, so subscribing keeps the
+ * days left. Null charges at once: no trial is running, it is paused, or less
+ * of it is left than Stripe Checkout accepts.
+ */
+export function checkoutTrialEnd(input: CheckoutTrialInput): number | null {
+  const status = input.status ?? null;
+  if (status !== null && status !== "trialing") return null;
+  if (input.billingPausedAt) return null;
+  const endsAt = parseDate(input.trialEndsAt);
+  if (!endsAt) return null;
+  const now = input.now ?? new Date();
+  if (endsAt.getTime() - now.getTime() < CHECKOUT_TRIAL_MIN_MS + CHECKOUT_TRIAL_MARGIN_MS) {
+    return null;
+  }
+  // Rounded up so Stripe's trial never ends before DubGrid's.
+  return Math.ceil(endsAt.getTime() / 1000);
+}

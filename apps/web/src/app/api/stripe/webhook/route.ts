@@ -153,6 +153,9 @@ export async function POST(req: NextRequest) {
       }
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
+        // Subscribing during the trial opens with an invoice for nothing; it
+        // isn't a payment, so it stays out of the billing feed and history.
+        if (invoice.amount_paid === 0) break;
         await writeStripePaymentSucceededAuditLog(getServiceClient(), invoice, {
           stripeEventId: event.id,
           stripeEventType: event.type,
