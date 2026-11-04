@@ -96,6 +96,7 @@ vi.mock("../../../shared/lib/query-client", () => ({
   queryClient: {
     cancelQueries: queryClientCancel,
     clear: queryClientClear,
+    fetchQuery: vi.fn(() => Promise.reject(new Error("offline"))),
     invalidateQueries: vi.fn(),
   },
 }));

@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { subscribeOrgScopedRealtime } from "@dubgrid/realtime-core";
 import {
-  invalidateMobileRealtimeQueries,
   invalidateMobileRealtimeQueriesForTables,
   type MobileRealtimeTable,
 } from "../lib/mobile-realtime-invalidation";
@@ -79,9 +78,9 @@ export function useMobileRealtimeInvalidation({
       onFlush: (tables) => {
         const token = accessTokenRef.current;
         if (!token) return;
-        for (const table of tables) {
-          invalidateMobileRealtimeQueries(queryClient, token, table);
-        }
+        // Several tables feed the same families (a cell save touches three),
+        // so each family is invalidated once, keeping a fetch in flight.
+        invalidateMobileRealtimeQueriesForTables(queryClient, token, tables);
       },
       // Events missed while the channel was down could be on any table it
       // watches, so the catch-up refreshes every family those tables feed

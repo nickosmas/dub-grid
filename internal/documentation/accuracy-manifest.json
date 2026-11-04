@@ -1321,7 +1321,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:af9047d919a8e8dc610cab92a2cb94db647f1b2974817f8c4ac3ed8377dd0fb0"
+      "evidenceFingerprint": "sha256:e46271ae96255c2300d14b38b7669a5c65594e9013336feb856f3cb114ded674"
     },
     {
       "id": "alerts",
@@ -1514,7 +1514,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d503995438d2eca14480e416091025b1ef814f4596ad75154c8cc478e03ac37c"
+      "evidenceFingerprint": "sha256:f58a2cfb04aec6e2ff18034bb9cf2c076d8d99ae521e753ab9d37ceeb81e1cb2"
     },
     {
       "id": "security-sessions",
@@ -2090,7 +2090,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:04f412a120a9c15566f863ea867263cf7dbbf297e1c15484be3a3f40a6bb228e"
+      "evidenceFingerprint": "sha256:0b4d59c615dde4440ded5a4ac0355259177cfd287f787ad50d55ad543de347b7"
     },
     {
       "id": "integrations-exports",

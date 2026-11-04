@@ -52,7 +52,8 @@ import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeMo
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { queryClient } from "../../../shared/lib/query-client";
 import { clearQueryCache } from "../../../shared/lib/query-persistence";
-import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { createBootstrapQueryOptions, useBootstrap } from "../../auth/hooks/useBootstrap";
+import { prefetchHomeQueries } from "../../auth/lib/prefetch-home";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { getDepartmentNames, getScheduledDepartmentNames } from "../../../shared/lib/departments";
 import {
@@ -189,8 +190,8 @@ export default function ProfileScreen() {
     setIsSigningOut(true);
 
     try {
-      await disablePushForCurrentDevice();
-      await revokeCurrentMobileSession();
+      // Both read the same live token and neither depends on the other.
+      await Promise.all([disablePushForCurrentDevice(), revokeCurrentMobileSession()]);
 
       const { error } = await getSupabaseClient().auth.signOut({
         scope: "local",
@@ -303,6 +304,13 @@ export default function ProfileScreen() {
         return;
       }
       router.replace("/(tabs)/home");
+      // Home's data starts now rather than after the new bootstrap renders;
+      // a warm-up that fails leaves Home to load on its own.
+      const switchedToken = refreshResult.data.session.access_token;
+      void Promise.resolve()
+        .then(() => queryClient.fetchQuery(createBootstrapQueryOptions(switchedToken)))
+        .then((bootstrap) => prefetchHomeQueries(switchedToken, bootstrap))
+        .catch(() => undefined);
 
       // Last, and deliberately not awaited into the critical path: remembering
       // the org for the next launch is a convenience, and it must never be able
