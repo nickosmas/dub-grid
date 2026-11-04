@@ -118,7 +118,7 @@ export const RESTORE_OUT_OF_REACH_MESSAGE = "Only a Super Admin can restore a Su
 
 /** Gridmaster's Remove from organization confirmation: it offboards their staff record too (51k). */
 export const REMOVE_FROM_ORGANIZATION_MESSAGE =
-  "They're offboarded there: they lose access now, and their upcoming shifts come off the published schedule. Their staff record stays, and the organization can restore them.";
+  "They're offboarded there: they lose access now, and their shifts from today on come off the published schedule, except a day that has already started. Their staff record stays, and the organization can restore them.";
 
 /**
  * Whether this manager may offboard or restore someone with `targetOrgRole`
@@ -463,7 +463,7 @@ function describeSetReturnDate(
       message: "They stay away until someone marks them active.",
       points: changing
         ? [
-            "Any upcoming shifts come off the published schedule now.",
+            "Their shifts from today on come off the published schedule now, except a day that has already started.",
             "Recurring schedules set up for them are removed.",
             "Open requests they're part of are closed.",
           ]
@@ -718,7 +718,7 @@ export function describeStatusAction(
       : { points: [], unchanged: [] };
   // Leaving the grid publishes the removals at once (114).
   const leavingSchedule = [
-    "Any upcoming shifts come off the published schedule now.",
+    "Their shifts from today on come off the published schedule now, except a day that has already started.",
     "Recurring schedules set up for them are removed.",
     "Open requests they're part of are closed.",
   ];

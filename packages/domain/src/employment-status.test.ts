@@ -300,7 +300,7 @@ describe("describeStatusAction with a return date", () => {
 
     expect(copy.message).toBe("They stay away until someone marks them active.");
     expect(copy.points).toEqual([
-      "Any upcoming shifts come off the published schedule now.",
+      "Their shifts from today on come off the published schedule now, except a day that has already started.",
       "Recurring schedules set up for them are removed.",
       "Open requests they're part of are closed.",
     ]);
