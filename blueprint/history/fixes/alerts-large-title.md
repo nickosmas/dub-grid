@@ -17,11 +17,18 @@ on a cold push iOS 26 drew the stacked search field over a large title.
 - The route declares the search field (iOS only), so it exists while the
   push lays out the title, and the list stays scrollable while it loads.
   Each alone still left the field over the title on a cold push.
-- `HeaderLeadingTitle` has no users left.
-- Collapsed, the title is centered, as iOS draws every collapsed large
-  title.
+- Collapsed, the title sits beside the back button while Mark all read is
+  in the bar, as Mail names a mailbox, and centered when it isn't (owner,
+  2026-11-03). iOS centers a collapsed title on its own, so while Mark all
+  read shows, `HeaderLeadingTitle` blanks the centered title and adds the
+  leading one once the page has scrolled the large title away
+  (`useLargeTitleCollapse`).
 
 ## Checks
+
+- iOS 26.5 Simulator: with an unread alert, expanded shows only the large
+  title, and collapsed shows "Alerts" beside the back button; with none
+  unread, collapsed shows it centered.
 
 - Mobile type-check, lint, and the notifications and entry tests (131).
 - iPhone 17 Pro Max, production build: the first open after a launch
