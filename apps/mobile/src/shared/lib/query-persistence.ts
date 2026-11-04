@@ -34,7 +34,8 @@ export function shouldPersistQuery(query: Pick<Query, "queryKey" | "state">): bo
     case "dashboard":
       return true;
     case "schedule":
-      return scope === "mine";
+      // Admin Home's My schedule shows the team's week beside the person's own.
+      return scope === "mine" || scope === "team";
     case "requests":
       // The identity key follows directly; history and availability name themselves first.
       return Array.isArray(scope);

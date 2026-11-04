@@ -304,9 +304,11 @@ const TONE_STYLE = {
 
 function resolveLabelColor(tone: ButtonTone, mobileColors: MobileColors): string {
   switch (tone) {
-    // The main action is a soft blue fill rather than a solid one; `secondary`
-    // shares it, and a pair that needs a step down beside it takes `neutral`.
+    // The main action is a solid blue fill with a white label (owner,
+    // 2026-11-04: the soft fill read too light). `secondary` keeps the soft
+    // blue as the step down beside it, and `neutral` a step further.
     case "primary":
+      return mobileColors.textInverse;
     case "secondary":
       // Paired with the darker secondary fill; the standard brand blue on that
       // fill measures 4.03:1 and fails AA.
@@ -337,7 +339,7 @@ function resolveLabelColor(tone: ButtonTone, mobileColors: MobileColors): string
 }
 
 function resolveRippleColor(tone: ButtonTone, mobileColors: MobileColors): string {
-  if (tone === "danger" || tone === "success" || tone === "warning") {
+  if (tone === "primary" || tone === "danger" || tone === "success" || tone === "warning") {
     return mobileColors.ripplePrimary;
   }
   return mobileColors.rippleNeutral;
@@ -372,7 +374,7 @@ const createStyles = (mobileColors: MobileColors) =>
       opacity: 0.4,
     },
     tonePrimary: {
-      backgroundColor: mobileColors.controlSecondaryBg,
+      backgroundColor: mobileColors.buttonPrimaryBg,
     },
     toneSecondary: {
       backgroundColor: mobileColors.controlSecondaryBg,

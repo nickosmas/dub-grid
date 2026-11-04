@@ -26,15 +26,15 @@ describe("shouldPersistQuery", () => {
     expect(shouldPersistQuery(succeeded(["mobile", "schedule", "mine", "id", "a", "b"]))).toBe(
       true,
     );
+    expect(shouldPersistQuery(succeeded(["mobile", "schedule", "team", "id", "a", "b"]))).toBe(
+      true,
+    );
     expect(
       shouldPersistQuery(succeeded(["mobile", "requests", ["authenticated", "u", "o"], "a", "b"])),
     ).toBe(true);
   });
 
   it("leaves everything else, and anything that has not answered, in memory only", () => {
-    expect(shouldPersistQuery(succeeded(["mobile", "schedule", "team", "id", "a", "b"]))).toBe(
-      false,
-    );
     expect(shouldPersistQuery(succeeded(["mobile", "requests", "history", "id", 20]))).toBe(false);
     expect(shouldPersistQuery(succeeded(["mobile", "people", "id"]))).toBe(false);
     expect(shouldPersistQuery(succeeded(["mobile", "profile", "id"]))).toBe(false);

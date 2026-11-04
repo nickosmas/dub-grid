@@ -1,14 +1,7 @@
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { scheduleNotesForRow } from "../lib/scheduleNotes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AppState,
-  Animated,
-  View,
-  useWindowDimensions,
-  type AppStateStatus,
-  type GestureResponderEvent,
-} from "react-native";
+import { Animated, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
 import { PressableRow } from "../../../shared/components/PressableRow";
@@ -820,22 +813,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     isTeamScope && activeTeamFocusAreaTab
       ? `${activeTeamFocusAreaTab.label} shifts show here once they're published.`
       : "Shifts show here once they're published.";
-
-  useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
-
-    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      if (nextState === "active") {
-        void refetchScreenContent();
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [accessToken, refetchScreenContent]);
 
   useEffect(() => {
     if (isTeamScope) {
