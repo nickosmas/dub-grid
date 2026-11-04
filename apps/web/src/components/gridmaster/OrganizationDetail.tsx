@@ -56,7 +56,6 @@ import {
 } from "@/features/organization/client";
 import { fetchEmployees } from "@/features/employees/client";
 import { fetchOrganizationUsers } from "@/features/organization/client";
-import { queueNotification } from "@/lib/notify";
 import type { TenantStats } from "@/features/gridmaster/client";
 import { queryKeys } from "@/lib/query-keys";
 import type {

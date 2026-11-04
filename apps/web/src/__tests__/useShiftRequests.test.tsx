@@ -9,7 +9,6 @@ const mockFetchShiftRequests = vi.fn();
 const mockClaimShiftRequest = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
-const mockQueueNotification = vi.fn();
 const mockCaptureException = vi.fn();
 
 vi.mock("@/features/schedule/client", () => ({
@@ -52,10 +51,6 @@ vi.mock("sonner", () => ({
     success: (...args: unknown[]) => mockToastSuccess(...args),
     error: (...args: unknown[]) => mockToastError(...args),
   },
-}));
-
-vi.mock("@/lib/notify", () => ({
-  queueNotification: (...args: unknown[]) => mockQueueNotification(...args),
 }));
 
 vi.mock("@/lib/sentry", () => ({

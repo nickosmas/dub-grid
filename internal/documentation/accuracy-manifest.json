@@ -413,7 +413,7 @@
             "drafts visible to editors only; draft cell states; drafts saved server-side",
             "banner counts for the period and other-period banner",
             "publish dialog: per-author breakdown, on-schedule and coverage warnings; publishes the visible period",
-            "Schedule updated alert to scheduled people except the publisher; Recently published bar; Highlight Changes",
+            "one alert to each person whose shifts changed, except the publisher; Recently published bar; Highlight Changes",
             "who can publish; Admin default",
             "discard dialog: my drafts, keep, Super Admin all; period-scoped",
             "approved requests change the published schedule directly"
@@ -425,7 +425,7 @@
             "apps/web/src/app/(app)/schedule/SchedulePageClient.tsx",
             "apps/web/src/app/api/shifts/publish/route.ts",
             "apps/web/src/app/api/shifts/discard/route.ts",
-            "apps/web/src/features/notifications/server/events.ts",
+            "apps/web/src/features/notifications/server/publish-alerts.ts",
             "apps/web/src/lib/schedule-cells.ts",
             "apps/web/src/components/ScheduleGrid.tsx",
             "packages/authz/src/index.ts",
@@ -437,6 +437,7 @@
             "apps/web/src/app/(app)/schedule/_components/PublishChangeSummary.test.tsx",
             "apps/web/src/app/api/shifts/publish/route.test.ts",
             "apps/web/src/app/api/shifts/discard/route.test.ts",
+            "apps/web/src/features/notifications/server/publish-alerts.test.ts",
             "apps/web/src/__tests__/discard-schedule-drafts.integration.test.ts",
             "apps/web/src/__tests__/draft-state-editor-only.integration.test.ts"
           ],
@@ -444,7 +445,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:15991bd51e84db9fbede158cce8a996fd8aa4e3055e5b2682badd21d525e0dc2"
+      "evidenceFingerprint": "sha256:d9fb7d327357885abf2812514a01fd569b4795d662c1293d27c6cea5f24056b5"
     },
     {
       "id": "recurring-shifts",
@@ -1593,7 +1594,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:34ba9b3f272d8c755519d11da635a2d7db1d99559fb05bd46e65bc1f5ac12df8"
+      "evidenceFingerprint": "sha256:18e17204e2fc1c16d452a1fd5f37c955d58fe63bacebdba1a8ecd6bd4fe26144"
     },
     {
       "id": "privacy-controls",

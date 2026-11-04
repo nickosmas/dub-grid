@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:ae6c408fb8bdea2698a555f7f24524e457610af925c231046e0ae79b118c570e",
+  "sourceDigest": "sha256:a8ddc37e4323a234ddb410e5cb78fc4eb1037ec132c17474933de7b735617c6d",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2986,15 +2986,6 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/schedule/requests/route.ts"
-      }
-    },
-    {
-      "id": "http:POST:/api/send-notification",
-      "method": "POST",
-      "path": "/api/send-notification",
-      "scope": "api",
-      "source": {
-        "path": "apps/web/src/app/api/send-notification/route.ts"
       }
     },
     {

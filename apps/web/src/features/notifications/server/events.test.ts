@@ -10,10 +10,6 @@ vi.mock("@/lib/supabase-service", () => ({
   }),
 }));
 
-vi.mock("@/lib/published-shifts", () => ({
-  fetchPublishedShiftRows: vi.fn(),
-}));
-
 vi.mock("@/lib/logger", () => ({
   default: {
     error: vi.fn(),
