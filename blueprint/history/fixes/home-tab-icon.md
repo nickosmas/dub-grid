@@ -20,7 +20,7 @@ tab bar was handed a selected icon with no normal one.
 
 ## Checks
 
-- Mobile type-check and lint.
+- Mobile type-check, lint, and the tabs layout test, which now expects an SF Symbol on every tab.
 - iOS 26.5 Simulator, Debug build: the error showed on launch before the
   fix and the tabs open after it.
 - Android is unchanged; its tab bar never used the vector icon.

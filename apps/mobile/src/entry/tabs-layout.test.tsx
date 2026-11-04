@@ -17,12 +17,6 @@ vi.mock("react-native", async () =>
   createReactNativeModule(await import("react"), { platformOS: "ios" }),
 );
 
-vi.mock("@expo/vector-icons/Ionicons", () => ({
-  default: {
-    getImageSource: vi.fn(),
-  },
-}));
-
 vi.mock("expo-router", async () => {
   const React = await import("react");
   const Stack = Object.assign(
@@ -72,9 +66,7 @@ vi.mock("expo-router/unstable-native-tabs", async () => {
     return React.createElement("div");
   };
 
-  const VectorIcon = (props: Record<string, unknown>) => React.createElement("div", props);
-
-  NativeTabs.Trigger = Object.assign(Trigger, { Icon, Label, VectorIcon });
+  NativeTabs.Trigger = Object.assign(Trigger, { Icon, Label });
 
   return { NativeTabs };
 });
@@ -225,17 +217,14 @@ describe("TabsLayout", () => {
     expect(nativeTabsLabelStyles.at(-1)).toEqual(nativeTabsLabelStyles.at(-2));
   });
 
-  it("uses SF symbols for the native tabs, with Home drawn from its own icon", () => {
+  // A vector icon loads its normal and selected images separately; when the
+  // selected one lands first react-native-screens throws and every tab fails.
+  it("uses SF symbols for every native tab, never a loaded icon", () => {
     render(<TabsLayout />);
 
     expect(triggerIconMock).toHaveBeenCalledTimes(5);
 
-    const [homeProps, ...restProps] = triggerIconMock.mock.calls.map(([props]) => props);
-
-    expect(homeProps).toMatchObject({ src: expect.any(Object) });
-    expect(homeProps).not.toHaveProperty("sf");
-
-    for (const props of restProps) {
+    for (const [props] of triggerIconMock.mock.calls) {
       expect(props).toMatchObject({ sf: expect.any(Object) });
       expect(props).not.toHaveProperty("src");
     }
