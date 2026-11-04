@@ -19,9 +19,10 @@ web already orders by the department first (`orderFocusAreasByDepartment`).
 
 - `orderFocusAreasByDepartment` moves from the web app to `@dubgrid/domain`,
   unchanged, so web and the mobile API share one rule.
-- `fetchMobileFocusAreaRows` (bootstrap's focus areas, which the Schedule
-  tab's area tabs follow) loads the departments alongside and orders by them
-  first.
+- `fetchMobileFocusAreaRowsInDepartmentOrder` loads the departments alongside
+  the focus areas and orders by them first. Bootstrap's and the profile's
+  focus area lists use it (the Schedule tab's area tabs follow bootstrap's).
+  Lookups that only need names keep the plain query.
 
 ## Evidence
 

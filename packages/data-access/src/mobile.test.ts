@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  fetchMobileFocusAreaRows,
+  fetchMobileFocusAreaRowsInDepartmentOrder,
   fetchMobileManagementRosterRows,
   fetchMobileNotificationsPage,
   fetchMobilePeopleRows,
@@ -648,7 +648,7 @@ describe("fetchPublishedMobileScheduleRows", () => {
   });
 });
 
-describe("fetchMobileFocusAreaRows", () => {
+describe("fetchMobileFocusAreaRowsInDepartmentOrder", () => {
   it("lists focus areas in their departments' order, as Settings does", async () => {
     // Nursing's wings and Visiting Nursing's own area each start at 0, so
     // ordering by the focus area's sort order alone put Visiting Nursing first.
@@ -676,7 +676,7 @@ describe("fetchMobileFocusAreaRows", () => {
       },
     } as unknown as SupabaseClient;
 
-    const rows = await fetchMobileFocusAreaRows(client, "org-1");
+    const rows = await fetchMobileFocusAreaRowsInDepartmentOrder(client, "org-1");
 
     expect(rows.map((row) => row.name)).toEqual([
       "Skilled Nursing",

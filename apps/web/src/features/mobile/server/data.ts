@@ -25,6 +25,7 @@ import {
   fetchMobileEffectiveScheduleRows,
   fetchMobileEmployeeRowsByIds,
   fetchMobileFocusAreaRows as fetchMobileFocusAreaRowsData,
+  fetchMobileFocusAreaRowsInDepartmentOrder,
   fetchMobileJobNameRows,
   fetchMobileManagementMembershipRowsByUserIds,
   fetchMobileNotificationFacets as fetchMobileNotificationFacetsData,
@@ -394,7 +395,7 @@ export async function fetchMobileFocusAreas(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileFocusArea[]> {
-  const rows = await fetchMobileFocusAreaRowsData(serviceClient, orgId);
+  const rows = await fetchMobileFocusAreaRowsInDepartmentOrder(serviceClient, orgId);
   return rows.map((row) => ({
     id: row.id,
     name: row.name,

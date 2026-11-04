@@ -833,6 +833,27 @@ export async function fetchMobileFocusAreaRows(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileFocusAreaRow[]> {
+  const { data, error } = await serviceClient
+    .from("focus_areas")
+    .select("id, name, department_id")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileFocusAreaRow[];
+}
+
+/**
+ * The focus areas in the order Settings lists them. A focus area's sort order
+ * only counts within its department, so this follows the departments' order
+ * first; by sort order alone, areas from different departments tie.
+ */
+export async function fetchMobileFocusAreaRowsInDepartmentOrder(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileFocusAreaRow[]> {
   const [focusAreaResult, departmentResult] = await Promise.all([
     serviceClient
       .from("focus_areas")
@@ -849,8 +870,6 @@ export async function fetchMobileFocusAreaRows(
   if (focusAreaResult.error) throw focusAreaResult.error;
   if (departmentResult.error) throw departmentResult.error;
 
-  // A focus area's sort order only counts within its department, so the list
-  // follows the departments' order first, as Settings and the web grid do.
   const rows = (focusAreaResult.data ?? []) as (MobileFocusAreaRow & { sort_order: number })[];
   const departments = (
     (departmentResult.data ?? []) as { id: number; type: string; sort_order: number }[]
