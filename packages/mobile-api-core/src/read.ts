@@ -525,11 +525,15 @@ export async function loadMobileOrgSchedulePayload(
     deps.fetchMobileScheduleEntries(auth.serviceClient, scope),
     deps.fetchMobileScheduleNotes(auth.serviceClient, scope),
   ]);
+  // Nobody schedules in the app, so a removed shift on someone's team row is
+  // only history; they read as not scheduled that day. The person's own week
+  // (`/me/schedule`) keeps it, since that's how they learn not to come in.
+  const scheduled = entries.filter((entry) => entry.change?.kind !== "deleted");
 
   return {
     range,
     entries: withScheduleVisibility(
-      withScheduleIndicators(entries, notes, auth.permissions),
+      withScheduleIndicators(scheduled, notes, auth.permissions),
       auth.permissions,
       auth.currentOrg,
     ),
