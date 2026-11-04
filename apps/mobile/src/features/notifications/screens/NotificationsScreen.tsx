@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { Stack } from "expo-router";
-import { HeaderLeadingTitle } from "../../../shared/navigation/HeaderLeadingTitle";
 import { useToolbarIcon } from "../../../shared/navigation/useToolbarIcon";
 import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/contracts";
@@ -348,7 +347,9 @@ export default function NotificationsScreen() {
       bottomPaddingMode="stack"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      scrollEnabled={contentState.kind !== "loading"}
+      // Live while loading too: a locked scroll view on a cold push left the
+      // stacked search field drawn over the large title until first touched.
+      scrollEnabled
       list={{
         data: listItems,
         keyExtractor: (notification) => notification.id,
@@ -396,7 +397,6 @@ export default function NotificationsScreen() {
         )}
         {/* Mark all read is a bar action, as in Mail; how many are unread is
             already on the Unread filter. */}
-        <HeaderLeadingTitle title="Alerts" />
         {unreadCount > 0 ? (
           <MarkAllReadBarAction disabled={busy} onPress={() => setConfirmingMarkAllRead(true)} />
         ) : null}
