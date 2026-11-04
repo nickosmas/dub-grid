@@ -314,6 +314,32 @@ describe("schedule payloads and what staff may see (46f)", () => {
     expect(payload.entries[0]!.change?.kind).toBe("modified");
   });
 
+  it("leaves removed shifts off the team schedule for everyone, and keeps them in the person's own week", async () => {
+    const removed = {
+      ...(entry(null) as object),
+      change: { kind: "deleted", previousPresentation },
+    } as never;
+    const editorPermissions = {
+      canViewSchedule: true,
+      canEditShifts: true,
+      canApproveShiftRequests: false,
+      canManageEmployees: false,
+      canPublishSchedule: true,
+      level: 3,
+    };
+    fetchMobileScheduleEntries.mockResolvedValueOnce([entry(null), removed]);
+    const team = await loadMobileOrgSchedulePayload(
+      { currentOrg: { id: ORG_ID }, serviceClient: {}, permissions: editorPermissions } as never,
+      range,
+      { fetchMobileScheduleEntries, fetchMobileScheduleNotes } as never,
+    );
+    expect(team.entries.map((item) => item.change?.kind)).toEqual(["modified"]);
+
+    fetchMobileScheduleEntries.mockResolvedValueOnce([entry(null), removed]);
+    const own = await loadForStaff({});
+    expect(own.entries.map((item) => item.change?.kind)).toEqual(["modified", "deleted"]);
+  });
+
   it("keeps both for an editor and for a super admin whatever the organization chose", async () => {
     const hidden = { id: ORG_ID, staffSeePublisher: false, staffSeeShiftChanges: false };
     const editor = await loadMobileOrgSchedulePayload(
