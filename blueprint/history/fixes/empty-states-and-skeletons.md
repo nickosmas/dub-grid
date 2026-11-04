@@ -83,3 +83,11 @@ Buttons stay text-only. Staff copy says "the app", never DubGrid.
 - `npm run type-check`, `npm run test:mobile`, `npm run test:web` and `npm run lint` pass.
 - **iOS Simulator:** each mobile empty state in light and dark.
 - **Web:** a throttled load of People, Profile and the staff page in both themes, plus Alerts with a filter that matches nothing.
+
+## Later fix
+
+- The team Schedule's empty day drew the canvas's sample tile ("MON 2")
+  whatever day was open, contradicting the title under it. The tile now names
+  the selected day (`day-scene.ts`, from the ISO date), and the static scene
+  carries no date at all (owner, 2026-11-03, fix/empty-day-scene-date).
+  Checked on the iOS Simulator on Tue 3 and Fri 6.

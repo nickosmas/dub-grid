@@ -302,8 +302,6 @@ export const EMPTY_SCENES: Record<EmptySceneKind, readonly EmptySceneShape[]> = 
   ],
   "team-day-empty": [
     { shape: "rect", x: 10, y: 18, width: 72, height: 104, rx: 18, fill: "ink" },
-    { shape: "text", x: 46, y: 48, fill: "ground", size: 15, text: "MON" },
-    { shape: "text", x: 46, y: 100, fill: "ground", size: 46, text: "2" },
     {
       shape: "rect",
       x: 96,
