@@ -31,10 +31,12 @@ function bootstrapFor(
     focusAreaIds: ["fa-1"],
     departmentIds: [],
   },
+  canViewSchedule = false,
 ) {
   return {
     effectiveRole,
     linkedEmployee,
+    permissions: { canViewSchedule },
     currentOrg: { timezone: "America/New_York", payPeriodStartDate: null },
   } as unknown as MobileBootstrapResponse;
 }
@@ -53,6 +55,18 @@ describe("prefetchHomeQueries", () => {
     const range = getScheduleRangeForDate(getIsoDateInTimeZone(new Date(), "America/New_York"));
     expect(prefetchedKeys()).toEqual([
       JSON.stringify(getAdminDashboardQueryKey(TOKEN, range)),
+      JSON.stringify(mobileQueryKeys.dashboardSchedule(TOKEN, range)),
+      JSON.stringify(mobileQueryKeys.shiftRequests(TOKEN, range)),
+    ]);
+  });
+
+  it("warms the team's week too for an admin who can see the schedule", () => {
+    prefetchHomeQueries(TOKEN, bootstrapFor("admin", undefined, true));
+
+    const range = getScheduleRangeForDate(getIsoDateInTimeZone(new Date(), "America/New_York"));
+    expect(prefetchedKeys()).toEqual([
+      JSON.stringify(getAdminDashboardQueryKey(TOKEN, range)),
+      JSON.stringify(mobileQueryKeys.schedule(TOKEN, "team", range)),
       JSON.stringify(mobileQueryKeys.dashboardSchedule(TOKEN, range)),
       JSON.stringify(mobileQueryKeys.shiftRequests(TOKEN, range)),
     ]);

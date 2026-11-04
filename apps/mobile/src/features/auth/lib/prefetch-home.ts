@@ -1,6 +1,11 @@
 import type { MobileBootstrapResponse } from "@dubgrid/contracts";
 import { getIsoDateInTimeZone, getScheduleRangeForDate } from "@dubgrid/schedule-core";
-import { getDashboard, getMySchedule, getShiftRequests } from "../../../shared/lib/api";
+import {
+  getDashboard,
+  getMySchedule,
+  getOrgSchedule,
+  getShiftRequests,
+} from "../../../shared/lib/api";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getAdminDashboardQueryKey } from "../../dashboard/hooks/useAdminDashboard";
@@ -36,6 +41,13 @@ export function prefetchHomeQueries(
       queryFn: ({ signal }) => getDashboard(accessToken, range, signal),
     });
     if (!managementOnly) {
+      // My schedule's day cards wait on the team's week too.
+      if (bootstrap.permissions.canViewSchedule) {
+        void queryClient.prefetchQuery({
+          queryKey: mobileQueryKeys.schedule(accessToken, "team", range),
+          queryFn: ({ signal }) => getOrgSchedule(accessToken, range, signal),
+        });
+      }
       void queryClient.prefetchQuery({
         queryKey: mobileQueryKeys.dashboardSchedule(accessToken, range),
         queryFn: ({ signal }) => getMySchedule(accessToken, range, signal),

@@ -32,6 +32,8 @@ vi.mock("expo-router", async () => {
   return {
     Redirect: ({ href }: { href: string }) => React.createElement("div", {}, `redirect:${href}`),
     Stack,
+    // A focused tab mounts at once; the deferred mount has its own test.
+    useIsFocused: () => true,
     useNavigation: () => ({
       addListener: (name: string, listener: (event: { data: { closing: boolean } }) => void) => {
         navigationListeners.set(name, listener);
