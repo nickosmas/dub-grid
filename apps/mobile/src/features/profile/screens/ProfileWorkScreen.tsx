@@ -35,6 +35,7 @@ import {
   useFocusAreaShiftsQuestion,
 } from "../../../shared/hooks/useFocusAreaShiftsQuestion";
 import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
+import { usePushSettled } from "../../../shared/navigation/usePushSettled";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
   createProfileChangeRequest,
@@ -481,6 +482,7 @@ export default function ProfileWorkScreen() {
   // Header back, Android hardware back and the iOS back swipe ask too, through
   // this same confirmation rather than a second one of their own.
   useNavigationDiscardGuard(guard);
+  const pushSettled = usePushSettled();
 
   const editFieldErrors =
     draft && profile
@@ -547,14 +549,17 @@ export default function ProfileWorkScreen() {
     ) : null;
 
   // On the phones the editor's actions sit in the navigation bar; the web build
-  // and the tests keep them along the bottom.
+  // and the tests keep them along the bottom. They join the bar once the push
+  // has finished: during it, iOS morphed Profile's Edit into a long pill on
+  // the way to this checkmark.
   const barActions =
-    IS_NATIVE_LIST && draft && profile ? (
+    IS_NATIVE_LIST && pushSettled ? (
       <EditBarActions
         save={{
           label: isNameRequest ? "Send" : "Save",
           accessibilityLabel: isNameRequest ? "Send request" : "Save changes",
-          disabled: saveMutation.isPending || !hasChanges || hasValidationErrors,
+          disabled:
+            !draft || !profile || saveMutation.isPending || !hasChanges || hasValidationErrors,
           loading: saveMutation.isPending,
           onPress: handleSave,
         }}

@@ -1,6 +1,7 @@
+import { Stack } from "expo-router";
 import type { NativeStackNavigationOptions } from "expo-router/native-stack";
 import { useMemo } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { Platform, Pressable, StyleSheet } from "react-native";
 import Animated from "react-native-reanimated";
 import { Text } from "../components/Text";
 import { useAsyncAction } from "../hooks/useAsyncAction";
@@ -27,6 +28,38 @@ export type HeaderTextAction = {
 type HeaderTextActionOptions = Pick<NativeStackNavigationOptions, "headerRight">;
 
 /**
+ * A text action at the trailing end of the navigation bar, as the system's own
+ * bar item on iOS. iOS 26 morphs bar items from one screen to the next, so an
+ * Edit that opens an editor turns smoothly into the editor's checkmark; the
+ * custom view below stretched into a long pill on the way. Android keeps its
+ * Material text action, since its toolbar draws only icons.
+ *
+ * Render it beside the screen's `Stack.Screen`; `null` renders nothing, which
+ * clears the slot (for an editor's own bar actions, say).
+ */
+export function HeaderTextBarAction({ action }: { action: HeaderTextAction | null }) {
+  if (Platform.OS !== "ios") {
+    return <Stack.Screen options={createHeaderTextAction(action)} />;
+  }
+
+  if (!action) {
+    return null;
+  }
+
+  return (
+    <Stack.Toolbar placement="right">
+      <Stack.Toolbar.Button
+        accessibilityHint={action.accessibilityHint}
+        accessibilityLabel={action.accessibilityLabel ?? action.label}
+        onPress={action.onPress}
+      >
+        {action.label}
+      </Stack.Toolbar.Button>
+    </Stack.Toolbar>
+  );
+}
+
+/**
  * A text action at the trailing end of the native navigation bar.
  *
  * It goes through `headerRight`, which react-native-screens wraps in a
@@ -36,11 +69,8 @@ type HeaderTextActionOptions = Pick<NativeStackNavigationOptions, "headerRight">
  * app drawing any; earlier iOS shows the plain tinted label, and Android its
  * Material text action.
  *
- * Not native-stack's `unstable_headerRightItems`, though a real bar item would
- * be the textbook way to get the glass: native-stack 7.18 hands those to
- * react-native-screens as `title`/`titleStyle`, and the 4.17 pinned here
- * (for the iOS 26 back button) reads `label`/`labelStyle`, so the item came
- * up as an empty capsule on 2026-09-20. Revisit once screens is on 4.26+.
+ * On iOS `HeaderTextBarAction` uses a real bar item instead; this stays for
+ * Android, where the toolbar draws only icons.
  *
  * Spread the result into the screen's `options`. Pass `null` to clear the
  * slot, e.g. while an inline editor owns the page's actions; the explicit

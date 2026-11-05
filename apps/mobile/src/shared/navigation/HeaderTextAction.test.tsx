@@ -4,10 +4,55 @@ import { createReactNativeModule } from "../../test/native";
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
+vi.mock("expo-router", async () => {
+  const React = await import("react");
+  return {
+    Stack: {
+      Screen: () => null,
+      Toolbar: Object.assign(
+        ({ children }: { children?: React.ReactNode }) =>
+          React.createElement("div", { "data-testid": "bar-items" }, children),
+        {
+          Button: (props: {
+            children?: React.ReactNode;
+            accessibilityLabel?: string;
+            onPress?: () => void;
+          }) =>
+            React.createElement(
+              "button",
+              { "aria-label": props.accessibilityLabel, onClick: props.onPress, type: "button" },
+              props.children,
+            ),
+        },
+      ),
+    },
+  };
+});
+
 let createHeaderTextAction: (typeof import("./HeaderTextAction"))["createHeaderTextAction"];
+let HeaderTextBarAction: (typeof import("./HeaderTextAction"))["HeaderTextBarAction"];
 
 beforeAll(async () => {
-  ({ createHeaderTextAction } = await import("./HeaderTextAction"));
+  ({ createHeaderTextAction, HeaderTextBarAction } = await import("./HeaderTextAction"));
+});
+
+describe("HeaderTextBarAction", () => {
+  // A system bar item, so iOS can morph it into the next screen's items.
+  it("puts the action in the bar as a native item that presses through", () => {
+    const onPress = vi.fn();
+    render(<HeaderTextBarAction action={{ label: "Edit", onPress }} />);
+
+    const item = screen.getByRole("button", { name: "Edit" });
+    expect(screen.getByTestId("bar-items")).toContainElement(item);
+    fireEvent.click(item);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the bar empty without an action", () => {
+    render(<HeaderTextBarAction action={null} />);
+
+    expect(screen.queryByTestId("bar-items")).toBeNull();
+  });
 });
 
 describe("createHeaderTextAction", () => {

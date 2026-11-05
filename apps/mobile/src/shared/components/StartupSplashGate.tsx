@@ -4,18 +4,12 @@ import * as SplashScreen from "expo-splash-screen";
 import { useBootstrap } from "../../features/auth/hooks/useBootstrap";
 import { authEntryRecorder } from "../../features/auth/lib/auth-entry-measurement";
 import { prefetchHomeQueries } from "../../features/auth/lib/prefetch-home";
-import { getStartupBeganAt } from "../../features/auth/lib/warm-startup";
 import { useHasSeenOnboarding } from "../../features/auth/hooks/useHasSeenOnboarding";
 import { useSessionState } from "../providers/AuthSessionProvider";
 import { useAppLockState } from "../providers/AppLockProvider";
 import { appLockUnsupported } from "../lib/app-lock";
 import { AppSplashScreen } from "./AppSplashScreen";
 
-/**
- * Long enough for the logo to read as a deliberate brand moment rather than a
- * flicker, short enough that it is usually over before startup resolves.
- */
-const MIN_SPLASH_MS = 900;
 const MAX_BOOTSTRAP_SPLASH_MS = 15_000;
 
 /**
@@ -38,7 +32,6 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
   const bootstrapQuery = useBootstrap(accessToken);
   const onboardingQuery = useHasSeenOnboarding();
   const lockState = useAppLockState();
-  const [minimumElapsed, setMinimumElapsed] = useState(false);
   const [bootstrapBudgetElapsed, setBootstrapBudgetElapsed] = useState(false);
 
   // Owned here, not by a route: the native splash has to come down on every
@@ -65,22 +58,6 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
     };
   }, []);
 
-  useEffect(() => {
-    // Counted from launch: fonts and the theme read already spent part of it.
-    const beganAt = getStartupBeganAt();
-    const remaining = beganAt === null ? MIN_SPLASH_MS : MIN_SPLASH_MS - (Date.now() - beganAt);
-    const timeout = setTimeout(
-      () => {
-        setMinimumElapsed(true);
-      },
-      Math.max(0, remaining),
-    );
-
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, []);
-
   // Home's first queries start as soon as bootstrap names the role, beside
   // the splash rather than after the tab tree mounts.
   const hasPrefetchedHomeRef = useRef(false);
@@ -99,8 +76,9 @@ export function StartupSplashGate({ children }: PropsWithChildren) {
   // `isLoading` is false while the query is disabled (signed out) and false
   // again the moment it settles either way, so a bootstrap failure still lifts
   // the splash and lets the tab gate show its locked state.
+  // No minimum time: the splash is the launch image held still, so it lifts
+  // the moment the first screen is ready (owner, 2026-11-04).
   const isStartupResolved =
-    minimumElapsed &&
     !isSessionLoading &&
     !onboardingQuery.isLoading &&
     // The app lock's setting must be known before a signed-in app shows.

@@ -37,6 +37,10 @@ export function useToolbarIcon(
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
+// Drawn once per icon and colour for the life of the app, so a bar that comes
+// back (every editor's checkmark) has its image on the first frame.
+const iosImageCache = new Map<string, ImageSourcePropType>();
+
 /**
  * An iOS header icon drawn to an image in a set colour, for a prominent bar
  * item: iOS draws a symbol on the filled brand capsule in a pale tint of it,
@@ -47,18 +51,28 @@ export function useIosToolbarImage(
   ionicon: IoniconName,
   color: string,
 ): ImageSourcePropType | undefined {
-  const [source, setSource] = useState<ImageSourcePropType | undefined>();
+  const key = `${ionicon}:${color}`;
+  const [source, setSource] = useState<ImageSourcePropType | undefined>(() =>
+    iosImageCache.get(key),
+  );
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
+    const cached = iosImageCache.get(key);
+    if (cached) {
+      setSource(cached);
+      return;
+    }
     let cancelled = false;
     void Ionicons.getImageSource(ionicon, 24, color).then((image) => {
-      if (!cancelled && image) setSource(image);
+      if (!image) return;
+      iosImageCache.set(key, image);
+      if (!cancelled) setSource(image);
     });
     return () => {
       cancelled = true;
     };
-  }, [ionicon, color]);
+  }, [ionicon, color, key]);
 
   return source;
 }

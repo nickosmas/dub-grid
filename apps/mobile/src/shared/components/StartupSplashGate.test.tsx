@@ -118,13 +118,11 @@ describe("StartupSplashGate", () => {
     expect(screen.getByText("router")).toBeInTheDocument();
   });
 
-  it("lifts the splash once the session, bootstrap and first-run flag have landed", async () => {
+  it("lifts the splash as soon as the session, bootstrap and first-run flag have landed", () => {
     renderGate();
 
-    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
-
-    await elapseMinimumSplash();
-
+    // No minimum time: the splash is the launch image held still, not a
+    // brand moment to sit through.
     expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
   });
 

@@ -1369,13 +1369,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
-  // On the web build the staff home sits on the brand aurora, the login
-  // page's wash. On device every page is the plain grouped gray, the team
-  // schedule always so.
-  const homeWash =
-    isTeamScope || IS_NATIVE_LIST ? undefined : (
-      <PageWash colors={mobileSoftGradientStops("aurora", isDark)} height={viewportHeight} />
-    );
+  // The staff home sits on the brand aurora, the login page's wash, on every
+  // platform (owner, 2026-11-04); the team schedule stays plain.
+  const homeWash = isTeamScope ? undefined : (
+    <PageWash colors={mobileSoftGradientStops("aurora", isDark)} height={viewportHeight} />
+  );
 
   return (
     <Screen
