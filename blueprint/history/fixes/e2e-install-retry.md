@@ -21,9 +21,12 @@ that hit the limit, since a rerun replaces a job's first attempt in the API.
 - **System dependencies get their own step**, with `timeout` running as root. As
   the runner user it could not kill the `apt-get` that sudo starts, which would
   hold the lock against the retry.
-- **Each attempt gets 5 minutes, up to 3 times.** Between attempts dpkg is repaired
-  and the Azure mirror is dropped, so the retry takes a different route. apt keeps
-  what it finished downloading.
+- **Each attempt gets 5 minutes, up to 3 times.** Between attempts the Azure mirror
+  is dropped, so the retry takes a different route. A download killed part way
+  starts again, so the retry relies on the better route, not on resuming.
+- **The dpkg repair repeats until it succeeds.** dpkg outlives the kill and holds
+  its lock for a while, so a single repair could fail and leave the next attempt
+  to stop at "dpkg was interrupted". A forced timeout on real runners showed this.
 - **The step has a 20-minute limit and the browser download 15**, so a stall fails
   plainly in minutes rather than as a cancelled job an hour later.
 
