@@ -65,8 +65,26 @@ jobs:
       # allowlisted rebuild now that install scripts are off by default.
       - run: npm run deps:rebuild
 
+      # The Ubuntu mirror can serve one runner at 65 kB/s while others in the same
+      # minute get 8 MB/s, which ran a shard into the job limit before any test.
+      # A slow attempt is abandoned and retried away from the Azure mirror; apt
+      # keeps what it finished downloading. `timeout` runs as root because it
+      # could not otherwise kill the apt-get that sudo starts, and that would
+      # hold the lock against the retry.
+      - name: Install Playwright system dependencies
+        timeout-minutes: 20
+        run: |
+          for attempt in 1 2 3; do
+            sudo env "PATH=$PATH" timeout 300 node_modules/.bin/playwright install-deps ${{ matrix.browser }} && exit 0
+            echo "playwright install-deps failed or stalled (attempt $attempt of 3)" >&2
+            sudo dpkg --configure -a || true
+            sudo sed -i '/azure/d' /etc/apt/apt-mirrors.txt || true
+          done
+          exit 1
+
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+        timeout-minutes: 15
+        run: npx playwright install ${{ matrix.browser }}
 
       # Every shard pulls the same images at once, and ghcr.io answers that burst
       # with "error from registry: retry-after" before any test runs. A failed
