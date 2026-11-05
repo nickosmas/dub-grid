@@ -20,7 +20,7 @@ export function PasswordStrengthHints({ password }: { password: string }) {
   const level = getPasswordStrengthLevel(password);
   const hasStartedTyping = password.length > 0;
 
-  const levelTone = level === 3 ? "success" : level === 0 ? "danger" : "warning";
+  const levelTone = level === 2 ? "success" : level === 0 ? "danger" : "warning";
 
   return (
     <View accessibilityLabel="Password strength hints" style={styles.root}>

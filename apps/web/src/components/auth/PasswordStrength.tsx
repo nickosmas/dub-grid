@@ -25,9 +25,9 @@ export function PasswordStrength({ password }: { password: string }) {
           aria-label="Password strength"
           aria-valuenow={level}
           aria-valuemin={0}
-          aria-valuemax={3}
+          aria-valuemax={2}
         >
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2].map((i) => (
             <div key={i} className={`dg-password-strength__bar${i <= level ? " is-active" : ""}`} />
           ))}
         </div>
