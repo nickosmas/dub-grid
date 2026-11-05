@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import { MaybeHint } from "@/components/ui/hint";
+import { Skeleton } from "@/components/ui/skeleton";
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { AccessInsignia } from "./AccessInsignia";
 import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
@@ -106,6 +107,8 @@ interface StaffRowSharedProps {
   onRoleChange?: (newRole: OrganizationRole, accessToken?: string) => Promise<void>;
   /** Whether the pending-invitation lookup has settled for this organization. */
   invitationStateReady?: boolean;
+  /** The Access column waits on the directory; a placeholder holds its place. */
+  directoryLoading?: boolean;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onToggleSelect: (empId: string) => void;
   onRowClick: (empId: string) => void;
@@ -162,6 +165,7 @@ function StaffRowCells({
   orgRole,
   onRoleChange,
   invitationStateReady = true,
+  directoryLoading = false,
   pendingInviteByEmployeeId,
   onToggleSelect,
   onRowClick,
@@ -411,7 +415,9 @@ function StaffRowCells({
           gridClassName="dg-staff-directory-cell flex py-4"
         >
           {(() => {
-            if (!invitationStateReady && !emp.userId && emp.email) return null;
+            if (!invitationStateReady && !emp.userId && emp.email) {
+              return <Skeleton className="h-5 w-[84px] rounded-full" />;
+            }
 
             const account: {
               label: string;
@@ -447,7 +453,9 @@ function StaffRowCells({
           tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
           gridClassName="dg-staff-directory-cell flex py-4"
         >
-          {!invitationStateReady && !emp.userId ? null : (
+          {directoryLoading || (!invitationStateReady && !emp.userId) ? (
+            <Skeleton className="h-8 w-[132px]" />
+          ) : (
             <InlineRoleSelect
               orgRole={orgRole}
               onChange={onRoleChange}

@@ -12,6 +12,7 @@ const record = (date: string, overrides: Partial<ShiftRecord> = {}): ShiftRecord
   draftKind: null,
   was: null,
   correctionReason: null,
+  correctedFrom: null,
   absenceName: null,
   noteCount: 0,
   ...overrides,
@@ -63,6 +64,7 @@ describe("buildScheduleWeeks", () => {
         record("2026-10-27", {
           state: "corrected",
           was: "Day Shift",
+          correctedFrom: "Was Evening Shift",
           correctionReason: "Left early",
           absenceName: "Sick",
           noteCount: 2,
@@ -78,7 +80,8 @@ describe("buildScheduleWeeks", () => {
     });
     expect(week.rows[1].pill).toEqual({ label: "Draft: new", tone: "neutral" });
     expect(week.rows[2]).toMatchObject({
-      detail: "7:00 AM - 3:30 PM · then Sick · was Day Shift · Left early · 2 schedule notes",
+      detail:
+        "7:00 AM - 3:30 PM · then Sick · was Day Shift · Was Evening Shift · Left early · 2 schedule notes",
       pill: { label: "Corrected", tone: "info" },
     });
   });

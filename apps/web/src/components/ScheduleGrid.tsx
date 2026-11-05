@@ -968,6 +968,16 @@ function ShiftDetailHoverCard({
                       data-correction-change
                       style={{ display: "flex", flexDirection: "column", gap: 6 }}
                     >
+                      <div
+                        data-correction-title
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: "var(--dg-color-text-primary)",
+                        }}
+                      >
+                        Corrected day
+                      </div>
                       {shownCorrection ? <HoverChangeView view={shownCorrection} /> : null}
                       {shownCorrectionNotes.map((note) => (
                         <div

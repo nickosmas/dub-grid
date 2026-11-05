@@ -27,47 +27,123 @@ const card: React.CSSProperties = {
   borderRadius: "var(--dg-radius-lg)",
 };
 
-function StatusCard({ status }: { status: NonNullable<PanelViewStatus> }) {
+function StatusHeading({
+  title,
+  detail,
+  dotColor,
+}: {
+  title: string;
+  detail?: ReactNode;
+  dotColor: string;
+}) {
   return (
-    <div
-      style={{ ...card, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span
-          aria-hidden="true"
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+      <span
+        aria-hidden="true"
+        style={{
+          width: 8,
+          height: 8,
+          marginTop: 6,
+          borderRadius: 4,
+          background: dotColor,
+          flexShrink: 0,
+        }}
+      />
+      <div style={{ minWidth: 0 }}>
+        <div
           style={{
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            background: "var(--dg-color-warning-text)",
-            flexShrink: 0,
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            color: "var(--dg-color-text-primary)",
           }}
-        />
-        <div style={{ minWidth: 0 }}>
+        >
+          {title}
+        </div>
+        {detail ? (
           <div
             style={{
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 600,
-              color: "var(--dg-color-text-primary)",
+              fontSize: "var(--dg-fs-caption)",
+              color: "var(--dg-color-text-muted)",
+              marginTop: 2,
             }}
           >
-            {status.kind === "unpublished" ? "Not published yet" : "Changed since it was published"}
+            {detail}
           </div>
-          {status.kind === "unpublished" ? (
-            <div
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                marginTop: 2,
-              }}
-            >
-              {status.personName} sees this once you publish.
-            </div>
-          ) : null}
-        </div>
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+const statusCard: React.CSSProperties = {
+  ...card,
+  padding: "14px 16px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+};
+
+function StatusCard({ status }: { status: NonNullable<PanelViewStatus> }) {
+  return (
+    <div style={statusCard}>
+      <StatusHeading
+        title={
+          status.kind === "unpublished" ? "Not published yet" : "Changed since it was published"
+        }
+        detail={
+          status.kind === "unpublished"
+            ? `${status.personName} sees this once you publish.`
+            : undefined
+        }
+        dotColor="var(--dg-color-warning-text)"
+      />
       {status.kind === "changed" ? (
         <ShiftChangeCard change={status.change} layout="stacked" />
+      ) : null}
+    </div>
+  );
+}
+
+/** A corrected past day: what it was, what it is now, and who corrected it. */
+export function CorrectedDayCard({
+  change,
+  notes,
+  detail,
+}: {
+  change: ShiftChange | null;
+  /** What the correction changed that the change model leaves out, such as mentoring. */
+  notes: string[];
+  /** When, by whom, and the reason on its own line. */
+  detail: string;
+}) {
+  const shownChange = change && change.kind !== "none" ? change : null;
+  return (
+    <div data-corrected-day style={{ ...statusCard, marginBottom: 16 }}>
+      <StatusHeading
+        title="Corrected day"
+        detail={
+          <span data-correction-notice style={{ whiteSpace: "pre-line" }}>
+            {detail}
+          </span>
+        }
+        dotColor="var(--dg-color-text-muted)"
+      />
+      {shownChange || notes.length > 0 ? (
+        <div data-correction-change style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {shownChange ? <ShiftChangeCard change={shownChange} layout="stacked" /> : null}
+          {notes.map((note) => (
+            <p
+              key={note}
+              style={{
+                margin: 0,
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--dg-color-text-secondary)",
+              }}
+            >
+              {note}
+            </p>
+          ))}
+        </div>
       ) : null}
     </div>
   );
