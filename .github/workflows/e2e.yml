@@ -75,7 +75,8 @@ jobs:
         timeout-minutes: 20
         run: |
           for attempt in 1 2 3; do
-            sudo env "PATH=$PATH" timeout 300 node_modules/.bin/playwright install-deps ${{ matrix.browser }} && exit 0
+            limit=300; [ "$attempt" = 1 ] && limit=20 # TEST ONLY: force the retry path
+            sudo env "PATH=$PATH" timeout "$limit" node_modules/.bin/playwright install-deps ${{ matrix.browser }} && exit 0
             echo "playwright install-deps failed or stalled (attempt $attempt of 3)" >&2
             sudo dpkg --configure -a || true
             sudo sed -i '/azure/d' /etc/apt/apt-mirrors.txt || true
