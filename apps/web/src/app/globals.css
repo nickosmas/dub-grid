@@ -364,25 +364,30 @@
   --dg-color-info-bg: #eff6ff;
   --dg-color-info-text: #1d4ed8;
   --dg-color-info-border: #bfdbfe;
-  /* Banners and notices (components/ui/Banner.tsx): a soft fill, and dark text
-     and icon of that hue. Text clears 5.3:1 on every fill. */
+  /* Banners and notices (components/ui/Banner.tsx): a soft fill, neutral text
+     and a tone icon, at least 3:1 on its fill. Tone text remains for titles
+     that carry the tone, such as a legal notice's. */
   --dg-color-banner-warning-bg: #fdeed2;
   --dg-color-banner-warning-border: #e9bc69;
   --dg-color-banner-warning-text: #92400e;
+  --dg-color-banner-warning-icon: #b45309;
   --dg-color-banner-danger-bg: #fce5e2;
   --dg-color-banner-danger-border: #eba59e;
   --dg-color-banner-danger-text: #b91c1c;
+  --dg-color-banner-danger-icon: #dc2626;
   --dg-color-banner-info-bg: #e3eefc;
   --dg-color-banner-info-border: #9dc0ee;
   --dg-color-banner-info-text: #1d4ed8;
+  --dg-color-banner-info-icon: #2563eb;
   --dg-color-banner-success-bg: #e2f4e7;
   --dg-color-banner-success-border: #93cca0;
   --dg-color-banner-success-text: #166534;
+  --dg-color-banner-success-icon: #15803d;
   /* A legal document's callout (components/ui/LegalNotice.tsx). */
   --dg-color-legal-notice-bg: #fef6e7;
   --dg-color-legal-notice-rule: #d97706;
   /* Toasts sit on a neutral card, so their icons take bright fills in both
-     themes; a banner's icon takes its text colour. */
+     themes. */
   /* A status card's amber status and icon: a step lighter than warning text,
      5:1 on white. */
   --dg-color-status-warning-text: #b45309;
@@ -535,20 +540,23 @@
   --dg-color-info-bg: #152238;
   --dg-color-info-text: #93c5fd;
   --dg-color-info-border: #1e3a5f;
-  /* The same banners inverted: a deep fill of the hue and pale text of the
-     hue, all over zinc surfaces. */
+  /* The same banners inverted: a deep fill of the hue over zinc surfaces. */
   --dg-color-banner-warning-bg: #3a2a12;
   --dg-color-banner-warning-border: #6e4f1c;
   --dg-color-banner-warning-text: #fbd99b;
+  --dg-color-banner-warning-icon: #fbbf24;
   --dg-color-banner-danger-bg: #3b1a18;
   --dg-color-banner-danger-border: #763029;
   --dg-color-banner-danger-text: #fdcbc5;
+  --dg-color-banner-danger-icon: #f87171;
   --dg-color-banner-info-bg: #142843;
   --dg-color-banner-info-border: #284b7c;
   --dg-color-banner-info-text: #c7dcfb;
+  --dg-color-banner-info-icon: #60a5fa;
   --dg-color-banner-success-bg: #12301f;
   --dg-color-banner-success-border: #245e3a;
   --dg-color-banner-success-text: #bfe9cc;
+  --dg-color-banner-success-icon: #4ade80;
   --dg-color-legal-notice-bg: #2e2414;
   --dg-color-legal-notice-rule: #f59e0b;
   --dg-color-status-warning-text: #fbbf24;

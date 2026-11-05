@@ -17,7 +17,7 @@ describe("SectionNotice", () => {
     expect(callout.querySelector("svg")).toBeInTheDocument();
     expect(callout).toHaveClass(
       "bg-[var(--dg-color-banner-danger-bg)]",
-      "text-[var(--dg-color-banner-danger-text)]",
+      "text-[var(--dg-color-text-primary)]",
     );
   });
 
@@ -28,7 +28,7 @@ describe("SectionNotice", () => {
 
     expect(screen.getByRole("note")).toHaveClass(
       "bg-[var(--dg-color-banner-warning-bg)]",
-      "text-[var(--dg-color-banner-warning-text)]",
+      "text-[var(--dg-color-text-primary)]",
     );
   });
 

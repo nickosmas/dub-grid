@@ -1,4 +1,4 @@
-# Fix: Lighter banners, icon on the first line, regular text
+# Fix: Lighter banners with neutral text, icon on the first line
 
 **Type:** Fix
 **Status:** verified
@@ -12,13 +12,19 @@ semibold throughout, so nothing in it stood out (owner, 2026-11-04).
 
 ## The fix
 
-Owner decisions, 2026-11-04: option A of the "Banner refinements" canvas, and
-bold only for what should stand out.
+Owner decisions, 2026-11-04: option A of the "Banner refinements" canvas, then
+pattern 1 of its "In-app banner patterns" board, and bold only for what should
+stand out. The real banners of Atlassian, Polaris, Carbon, Primer and Material
+were compared first.
 
 - **Lighter fills.** Every banner fill is lighter in light mode and softer in
-  dark mode. Text stays at least 5.3:1 in light mode and 10:1 in dark.
-- **Icon on the first line.** A boxed banner keeps its 25px icon and centers
-  it on the first line or the title. Full-width bars stay centered.
+  dark mode.
+- **Neutral text, tone icon.** Banner and Schedule bar text is neutral and only
+  the icon carries the tone, replacing the one shared colour of
+  `icon-matches-text`. Text clears 12:1 and icons 4:1 on every fill.
+- **Icon on the first line.** A boxed banner's icon is 20px and sits on the
+  first line or the title. Full-width bars keep 25px and stay centered, with
+  their text and icon in one colour.
 - **Buttons.** A button no longer makes a one-line box taller than its icon,
   so the icon, text and button share a centerline.
 - **Regular text.** Banner and Schedule bar text is regular weight. Titles and

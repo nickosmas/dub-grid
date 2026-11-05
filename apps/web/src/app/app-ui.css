@@ -3195,15 +3195,13 @@ button.dg-cc-sg-main {
   border-radius: 10px;
   font-size: 13px;
   font-weight: 400;
-  color: var(--dg-color-banner-warning-text);
+  color: var(--dg-color-text-primary);
 }
 .dg-draft-banner--danger {
   background: var(--dg-color-banner-danger-bg);
-  color: var(--dg-color-banner-danger-text);
 }
 .dg-draft-banner--info {
   background: var(--dg-color-banner-info-bg);
-  color: var(--dg-color-banner-info-text);
 }
 .dg-draft-banner-actions {
   margin-left: auto;
