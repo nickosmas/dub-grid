@@ -4,13 +4,14 @@ import { StatusIcon } from "./StatusIcon";
 
 export type BannerTone = "info" | "success" | "warning" | "danger";
 
-const BANNER_ICON_SIZE = 25;
+const BOX_ICON_SIZE = 20;
+const BAR_ICON_SIZE = 25;
 
 const TONE_CLASSES: Record<BannerTone, string> = {
-  info: "bg-[var(--dg-color-banner-info-bg)] text-[var(--dg-color-banner-info-text)]",
-  success: "bg-[var(--dg-color-banner-success-bg)] text-[var(--dg-color-banner-success-text)]",
-  warning: "bg-[var(--dg-color-banner-warning-bg)] text-[var(--dg-color-banner-warning-text)]",
-  danger: "bg-[var(--dg-color-banner-danger-bg)] text-[var(--dg-color-banner-danger-text)]",
+  info: "bg-[var(--dg-color-banner-info-bg)]",
+  success: "bg-[var(--dg-color-banner-success-bg)]",
+  warning: "bg-[var(--dg-color-banner-warning-bg)]",
+  danger: "bg-[var(--dg-color-banner-danger-bg)]",
 };
 
 const BAR_TONE_CLASSES: Record<BannerTone, string> = {
@@ -23,13 +24,13 @@ const BAR_TONE_CLASSES: Record<BannerTone, string> = {
     "bg-[var(--dg-color-banner-danger-vivid-bg)] text-[var(--dg-color-banner-danger-vivid-text)]",
 };
 
-// The icon takes the text's colour, so the two never sit in near-matching
-// shades. Whole class names, so Tailwind sees them.
+// Only the icon carries the tone; the text stays neutral. Whole class names,
+// so Tailwind sees them.
 const ICON_CLASSES: Record<BannerTone, string> = {
-  info: "text-[var(--dg-color-banner-info-text)]",
-  success: "text-[var(--dg-color-banner-success-text)]",
-  warning: "text-[var(--dg-color-banner-warning-text)]",
-  danger: "text-[var(--dg-color-banner-danger-text)]",
+  info: "text-[var(--dg-color-banner-info-icon)]",
+  success: "text-[var(--dg-color-banner-success-icon)]",
+  warning: "text-[var(--dg-color-banner-warning-icon)]",
+  danger: "text-[var(--dg-color-banner-danger-icon)]",
 };
 
 // A bar's icon takes the bar's text colour too.
@@ -60,7 +61,7 @@ export interface BannerProps {
   className?: string;
 }
 
-/** Every banner and notice in the app: a tinted fill with text and icon in one colour, no border. */
+/** Every banner and notice in the app: a tinted fill, a tone icon and neutral text, no border. */
 export function Banner({
   tone,
   icon,
@@ -75,20 +76,19 @@ export function Banner({
   const shape =
     layout === "bar"
       ? "items-center justify-center px-4 py-2"
-      : "items-center rounded-[10px] px-3.5 py-3";
+      : "items-start rounded-[10px] px-3.5 py-3";
 
   return (
     <div
       role={role}
       aria-label={ariaLabel}
-      className={`flex gap-2.5 text-[13px] font-medium leading-[1.5] ${shape} ${layout === "bar" ? BAR_TONE_CLASSES[tone] : TONE_CLASSES[tone]} ${className ?? ""}`}
+      className={`flex gap-2.5 text-[13px] font-normal leading-[1.5] ${shape} ${layout === "bar" ? BAR_TONE_CLASSES[tone] : `${TONE_CLASSES[tone]} text-[var(--dg-color-text-primary)]`} ${className ?? ""}`}
     >
-      {/* Centered on the text, however many lines it runs. */}
       <span className="flex shrink-0">
         <StatusIcon
           tone={tone}
           icon={icon}
-          size={BANNER_ICON_SIZE}
+          size={layout === "bar" ? BAR_ICON_SIZE : BOX_ICON_SIZE}
           className={layout === "bar" ? BAR_ICON_CLASSES[tone] : ICON_CLASSES[tone]}
         />
       </span>
@@ -96,7 +96,14 @@ export function Banner({
         {title ? <span className="font-semibold">{title}</span> : null}
         {children}
       </div>
-      {action ? <div className="flex shrink-0 items-center self-center">{action}</div> : null}
+      {/* The negative margin keeps a button from growing a one-line box past the icon. */}
+      {action ? (
+        <div
+          className={`flex shrink-0 items-center self-center ${layout === "bar" ? "" : "-my-1"}`}
+        >
+          {action}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -107,7 +114,7 @@ export function BannerIcon({ tone, icon }: { tone: BannerTone; icon?: LucideIcon
     <StatusIcon
       tone={tone}
       icon={icon}
-      size={BANNER_ICON_SIZE}
+      size={BOX_ICON_SIZE}
       className={`shrink-0 ${ICON_CLASSES[tone]}`}
     />
   );

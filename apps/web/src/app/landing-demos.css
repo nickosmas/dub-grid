@@ -353,7 +353,7 @@
   padding: 8px 14px;
   border-radius: 10px;
   background: var(--dg-color-banner-warning-bg);
-  color: var(--dg-color-banner-warning-text);
+  color: var(--dg-color-text-primary);
   font-size: 14px;
   white-space: nowrap;
   font-weight: 600;
@@ -362,6 +362,9 @@
   transition:
     opacity 300ms ease,
     transform 300ms ease;
+}
+.landing-draft-banner > svg {
+  color: var(--dg-color-banner-warning-icon);
 }
 .landing-draft-banner[data-shown] {
   opacity: 1;
