@@ -533,13 +533,17 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             {/* ── Details section ── */}
             <div
               className={sectioned ? "dg-card" : undefined}
-              style={sectioned ? undefined : { paddingTop: 20, paddingBottom: 20 }}
+              style={
+                sectioned
+                  ? undefined
+                  : { paddingTop: hideIdentityFields ? 0 : 20, paddingBottom: 20 }
+              }
             >
               {sectioned ? (
                 <div className="dg-card-header">
                   <div className="dg-card-title">Details</div>
                 </div>
-              ) : (
+              ) : hideIdentityFields ? null : (
                 <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
                   Details
                 </div>
@@ -847,7 +851,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   <div className="dg-card-header">
                     <div className="dg-card-title">Work</div>
                   </div>
-                ) : (
+                ) : hideIdentityFields ? null : (
                   <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
                     Assignments
                   </div>

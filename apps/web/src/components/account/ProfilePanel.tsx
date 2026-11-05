@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   getOptionalUsPhoneError,
   getRequiredStaffEmailError,
@@ -12,17 +13,16 @@ import {
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
 import { toast } from "sonner";
-import { Check, Clock, Trash2, X } from "lucide-react";
+import { Clock } from "lucide-react";
 
-import { SectionCard } from "@/components/settings/shared";
-import DeleteAccountCard from "@/components/account/DeleteAccountCard";
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Modal from "@/components/Modal";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { formatClientLabel } from "@/lib/client-facing";
-import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { UnsavedChangesBar } from "@/components/ui/UnsavedChangesBar";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import {
@@ -43,7 +43,6 @@ import {
 } from "@/features/organization/client";
 import { EmployeeProfileConflictError, updateEmployee } from "@/features/employees/client";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
-import { PersonProfileHeader } from "@/components/staff/PersonProfileHeader";
 import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
 import { EmployeeManagementAccessEditor } from "@/components/staff/EmployeeManagementAccessModal";
 import EditEmployeePanel, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
@@ -76,8 +75,6 @@ interface ProfilePanelProps {
   orgId: string | null;
   canEditProfileDirectly: boolean;
   isGridmaster: boolean;
-  /** Super admins delete their own account directly; everyone else requests it. */
-  canDeleteAccountDirectly: boolean;
   /** Effective permission role (e.g. "user" / "admin" / "super_admin" / "gridmaster"). */
   role: string;
   departments: Department[];
@@ -99,6 +96,8 @@ interface ProfilePanelProps {
   /** Refreshes the whole self-profile query after the management-access modal
    *  saves - the shared editor doesn't hand back the new department list. */
   refetchProfile: () => Promise<unknown>;
+  /** Where the Unsaved changes bar goes, so it can stay in view over the whole tab. */
+  saveBarSlot?: HTMLElement | null;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -108,7 +107,27 @@ const ROLE_LABELS: Record<string, string> = {
   user: "User",
 };
 
-type PendingConfirm = "account-details" | "name-change-request" | "account-deletion" | null;
+type PendingConfirm = "account-details" | "name-change-request" | null;
+
+function AccountCard({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="dg-card">
+      <div className="dg-card-header">
+        <h2 className="dg-card-title">{title}</h2>
+        {action}
+      </div>
+      <div className="dg-card-body">{children}</div>
+    </section>
+  );
+}
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -137,7 +156,6 @@ export function ProfilePanel({
   orgId,
   canEditProfileDirectly,
   isGridmaster,
-  canDeleteAccountDirectly,
   role,
   departments,
   isOnSchedule,
@@ -152,6 +170,7 @@ export function ProfilePanel({
   setProfile,
   setEmployee,
   refetchProfile,
+  saveBarSlot,
 }: ProfilePanelProps) {
   const stepUp = useStepUpAction();
   const firstName = profile?.first_name?.trim() || null;
@@ -176,12 +195,11 @@ export function ProfilePanel({
   const accountDraftTouchedRef = useRef(false);
 
   const [changeRequests, setChangeRequests] = useState<ProfileChangeRequest[]>([]);
-  const [loadingChangeRequests, setLoadingChangeRequests] = useState(false);
   const [requestFirstName, setRequestFirstName] = useState("");
   const [requestLastName, setRequestLastName] = useState("");
   const [requestNote, setRequestNote] = useState("");
   const [submittingRequest, setSubmittingRequest] = useState(false);
-  const [requestingDeletion, setRequestingDeletion] = useState(false);
+  const [requestingNameChange, setRequestingNameChange] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const savedFirstName = firstName ?? "";
@@ -231,10 +249,6 @@ export function ProfilePanel({
   const requestLastNameError =
     requestLastName.trim().length > 0 ? getStaffNameError(requestLastName, "Last name") : null;
   const requestNoteError = getStaffNotesError(requestNote);
-
-  // Deletion is a super admin's decision: managers below that tier request
-  // it like any member, and a super admin gets the direct card instead.
-  const showDeletion = !isGridmaster && !canDeleteAccountDirectly;
 
   const allManagementDepartments = departments.filter((d) => d.type === "management");
   const managementDepartments = allManagementDepartments.filter((d) =>
@@ -391,35 +405,28 @@ export function ProfilePanel({
   }
 
   useEffect(() => {
-    // Both the name-change request UI and the account-deletion section need
-    // to read change_requests. Fetch once for both.
     // Change requests are org-scoped and the route refuses a non-member, so
     // there is nothing to ask for without a membership.
-    const needsRequests = isOrgMember && (!canEditProfileDirectly || showDeletion);
+    const needsRequests = isOrgMember && !canEditProfileDirectly;
     if (!orgId || !needsRequests) {
       setChangeRequests([]);
       return;
     }
     let cancelled = false;
-    setLoadingChangeRequests(true);
     fetchOwnProfileChangeRequests(orgId)
       .then((result) => {
         if (!cancelled) setChangeRequests(result.requests);
       })
       .catch(() => {
         if (!cancelled) setChangeRequests([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingChangeRequests(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [canEditProfileDirectly, isOrgMember, orgId, showDeletion]);
+  }, [canEditProfileDirectly, isOrgMember, orgId]);
 
   const pendingRequests = changeRequests.filter((r) => r.status === "pending");
   const pendingNameRequest = pendingRequests.find((r) => r.type === "profile_update");
-  const pendingDeletion = pendingRequests.find((r) => r.type === "account_deletion");
 
   function cancelEditing() {
     accountDraftTouchedRef.current = false;
@@ -571,29 +578,12 @@ export function ProfilePanel({
       setRequestFirstName("");
       setRequestLastName("");
       setRequestNote("");
+      setRequestingNameChange(false);
       toast.success("Name change request sent.");
     } catch (err) {
       toast.error(extractErrorMessage(err, "We couldn't send name change request. Try again."));
     } finally {
       setSubmittingRequest(false);
-    }
-  }
-
-  async function sendDeletionRequest() {
-    if (!orgId) return;
-    setRequestingDeletion(true);
-    try {
-      const result = await createOwnProfileChangeRequest({
-        orgId,
-        type: "account_deletion",
-        requestNote: "Account deletion requested from self profile.",
-      });
-      setChangeRequests((cur) => [result.request, ...cur]);
-      toast.success("Account deletion request sent.");
-    } catch (err) {
-      toast.error(extractErrorMessage(err, "We couldn't request account deletion. Try again."));
-    } finally {
-      setRequestingDeletion(false);
     }
   }
 
@@ -603,11 +593,7 @@ export function ProfilePanel({
     try {
       const result = await cancelOwnProfileChangeRequest(request.id);
       setChangeRequests((cur) => cur.map((r) => (r.id === result.request.id ? result.request : r)));
-      toast.success(
-        request.type === "account_deletion"
-          ? "Account deletion request canceled."
-          : "Name change request canceled.",
-      );
+      toast.success("Name change request canceled.");
     } catch (err) {
       toast.error(extractErrorMessage(err, "We couldn't cancel that request. Try again."));
     } finally {
@@ -624,7 +610,6 @@ export function ProfilePanel({
     }
     setPendingConfirm(null);
     if (action === "name-change-request") void sendNameChangeRequest();
-    if (action === "account-deletion") void sendDeletionRequest();
   }
 
   const confirmation =
@@ -644,77 +629,100 @@ export function ProfilePanel({
             variant: "info" as const,
             loading: submittingRequest,
           }
-        : pendingConfirm === "account-deletion"
-          ? {
-              title: "Request account deletion?",
-              message:
-                "A Super Admin reviews and approves the request before your account is removed.",
-              confirmLabel: "Request deletion",
-              variant: "danger" as const,
-              loading: requestingDeletion,
-            }
-          : null;
+        : null;
+
+  const saveBarNode = hasAnyChanges ? (
+    <UnsavedChangesBar
+      saveDisabled={hasInvalidDraft}
+      saving={saving}
+      onDiscard={cancelEditing}
+      onSave={requestSave}
+    />
+  ) : null;
+  const saveBar = saveBarSlot && saveBarNode ? createPortal(saveBarNode, saveBarSlot) : saveBarNode;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <PersonProfileHeader
-        avatarSeed={user?.id ?? employee?.id ?? ""}
-        name={displayName}
-        orgRole={selfOrgRole}
-        email={user?.email ?? employee?.email}
-        phone={employee?.phone}
-        employmentType={employee?.focusAreaIds.length ? employee.employmentType : undefined}
-        employeeNumber={employee?.employeeNumber}
-      />
-
-      <SectionCard>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="dg-card-title">Profile details</div>
-              <div className="dg-card-description">
-                Account and contact information. Changes stay editable on this page.
+    <>
+      <AccountCard title="Your details">
+        <Form
+          onSubmit={(e) => {
+            e.preventDefault();
+            requestSave();
+          }}
+          className="flex flex-col gap-4"
+        >
+          {canEditProfileDirectly ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="dg-label">First name</label>
+                <input
+                  aria-label="First name"
+                  value={editFirstName}
+                  onChange={(e) => {
+                    accountDraftTouchedRef.current = true;
+                    setEditFirstName(e.target.value);
+                  }}
+                  className="dg-input"
+                />
+                {firstNameError && <p className="dg-form-error">{firstNameError}</p>}
+              </div>
+              <div>
+                <label className="dg-label">Last name</label>
+                <input
+                  aria-label="Last name"
+                  value={editLastName}
+                  onChange={(e) => {
+                    accountDraftTouchedRef.current = true;
+                    setEditLastName(e.target.value);
+                  }}
+                  className="dg-input"
+                />
+                {lastNameError && <p className="dg-form-error">{lastNameError}</p>}
               </div>
             </div>
-          </div>
-
-          <Form
-            onSubmit={(e) => {
-              e.preventDefault();
-              requestSave();
-            }}
-            className="flex flex-col gap-5"
-          >
-            {canEditProfileDirectly && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="dg-label">First name</label>
-                  <input
-                    aria-label="First name"
-                    value={editFirstName}
-                    onChange={(e) => {
-                      accountDraftTouchedRef.current = true;
-                      setEditFirstName(e.target.value);
-                    }}
-                    className="dg-input"
-                  />
-                  {firstNameError && <p className="dg-form-error">{firstNameError}</p>}
-                </div>
-                <div>
-                  <label className="dg-label">Last name</label>
-                  <input
-                    aria-label="Last name"
-                    value={editLastName}
-                    onChange={(e) => {
-                      accountDraftTouchedRef.current = true;
-                      setEditLastName(e.target.value);
-                    }}
-                    className="dg-input"
-                  />
-                  {lastNameError && <p className="dg-form-error">{lastNameError}</p>}
-                </div>
+          ) : (
+            <div>
+              <span className="dg-label">Name</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[14px] text-[var(--dg-color-text-primary)]">
+                  {displayName}
+                </span>
+                {pendingNameRequest ? null : (
+                  <Button
+                    type="button"
+                    onClick={() => setRequestingNameChange(true)}
+                    disabled={!orgId}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                  >
+                    Request a name change
+                  </Button>
+                )}
               </div>
-            )}
+              {pendingNameRequest ? (
+                <div className="mt-2">
+                  <Banner
+                    tone="warning"
+                    icon={Clock}
+                    action={
+                      <Button
+                        type="button"
+                        onClick={() => cancelRequest(pendingNameRequest)}
+                        disabled={cancellingId === pendingNameRequest.id}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
+                      >
+                        <ButtonLoading loading={cancellingId === pendingNameRequest.id}>
+                          Cancel request
+                        </ButtonLoading>
+                      </Button>
+                    }
+                  >
+                    Your name change is waiting for an admin.
+                  </Banner>
+                </div>
+              ) : null}
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="dg-label">Email</label>
               <input
@@ -748,126 +756,75 @@ export function ProfilePanel({
                 {phoneError && <p className="dg-form-error">{phoneError}</p>}
               </div>
             )}
-          </Form>
-        </div>
-      </SectionCard>
+          </div>
+        </Form>
+      </AccountCard>
 
       {canEditProfileDirectly && employee && (
-        <SectionCard>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="dg-card-title">Work details</div>
-                <div className="dg-card-description">
-                  Employment type, {(focusAreaLabel ?? "schedule areas").toLowerCase()},{" "}
-                  {(certificationLabel ?? "certification").toLowerCase()}, and{" "}
-                  {(roleLabel ?? "roles").toLowerCase()} for this account.
-                </div>
-              </div>
-            </div>
-            <EditEmployeePanel
-              flushHorizontal
-              ref={workEditorRef}
-              employee={employee}
-              focusAreas={focusAreas}
-              certifications={certifications}
-              certificationLabel={certificationLabel}
-              roles={roles}
-              roleLabel={roleLabel}
-              focusAreaLabel={focusAreaLabel}
-              isManagementUser={showManagementAccess}
-              hideIdentityFields
-              hideActions
-              persistent
-              onDirtyChange={setWorkHasChanges}
-              onSaveBlockedChange={setWorkSaveBlocked}
-              onSave={async (updatedEmployee) => {
-                await saveWorkDetails(updatedEmployee);
-              }}
-              onCancel={() => undefined}
-            />
-          </div>
-        </SectionCard>
+        <AccountCard title="Work">
+          <EditEmployeePanel
+            flushHorizontal
+            ref={workEditorRef}
+            employee={employee}
+            focusAreas={focusAreas}
+            certifications={certifications}
+            certificationLabel={certificationLabel}
+            roles={roles}
+            roleLabel={roleLabel}
+            focusAreaLabel={focusAreaLabel}
+            isManagementUser={showManagementAccess}
+            hideIdentityFields
+            hideActions
+            persistent
+            onDirtyChange={setWorkHasChanges}
+            onSaveBlockedChange={setWorkSaveBlocked}
+            onSave={async (updatedEmployee) => {
+              await saveWorkDetails(updatedEmployee);
+            }}
+            onCancel={() => undefined}
+          />
+        </AccountCard>
       )}
 
-      <SectionCard>
-        <div className="flex flex-wrap justify-end gap-2">
-          {hasAnyChanges && (
-            <Button
-              type="button"
-              onClick={cancelEditing}
-              disabled={saving}
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-            >
-              <X size={14} />
-              {EDITOR_ACTION_LABELS.discard}
-            </Button>
-          )}
-          <Button
-            type="button"
-            onClick={requestSave}
-            disabled={saving || !hasAnyChanges || hasInvalidDraft}
-            className="dg-btn dg-btn-primary dg-btn-sm"
-          >
-            <ButtonLoading loading={saving} spinnerSize={14} icon={<Check size={14} />}>
-              Save changes
-            </ButtonLoading>
-          </Button>
-        </div>
-      </SectionCard>
-
-      <SectionCard>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div>
-            <div className="dg-card-title">Access</div>
-            <div className="dg-card-description">
-              {isGridmaster
-                ? "Your platform role. Gridmasters administer every organization and hold no organization role of their own."
-                : "Your organization role and the permissions it carries."}
-            </div>
-          </div>
-          {isGridmaster ? (
-            <Field label="Platform role" value="Gridmaster" />
-          ) : canManageManagementAccess && selfOrgRole ? (
-            <MemberAccessControls
-              orgRole={selfOrgRole}
-              adminPermissions={selfMembership?.adminPermissions}
-              onRoleChange={handleRoleChange}
-              onPermissionsChange={handlePermissionsChange}
-              isSelf
-              labels={{ focusAreaLabel, certificationLabel, roleLabel }}
-            />
-          ) : (
-            <Field label="Role" value={ROLE_LABELS[role] ?? role} />
-          )}
-        </div>
-      </SectionCard>
+      <AccountCard title="Access">
+        {isGridmaster ? (
+          <Field label="Platform role" value="Gridmaster" />
+        ) : canManageManagementAccess && selfOrgRole ? (
+          <MemberAccessControls
+            orgRole={selfOrgRole}
+            adminPermissions={selfMembership?.adminPermissions}
+            onRoleChange={handleRoleChange}
+            onPermissionsChange={handlePermissionsChange}
+            isSelf
+            labels={{ focusAreaLabel, certificationLabel, roleLabel }}
+          />
+        ) : (
+          <Field label="Access role" value={ROLE_LABELS[role] ?? role} />
+        )}
+      </AccountCard>
 
       {/* Department assignment only applies to management involvement, so a
        *  self-viewer with neither existing departments nor the permission to
        *  start (canManageManagementAccess) never sees this card at all - the
        *  same "not part of management" story the People panels tell. */}
       {!isGridmaster && (canManageManagementAccess || showManagementAccess) && (
-        <SectionCard>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="dg-card-title">{ADMINISTRATIVE_TEAM_LABELS.plural}</div>
-                <div className="dg-card-description">Teams you're on outside the schedule.</div>
-              </div>
-              {canManageManagementAccess && employee && (
-                <Button
-                  type="button"
-                  onClick={() => setIsEditingManagementAccess(true)}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                >
-                  {showManagementAccess
-                    ? "Edit administrative teams"
-                    : "Add to an administrative team"}
-                </Button>
-              )}
-            </div>
-
+        <AccountCard
+          title={ADMINISTRATIVE_TEAM_LABELS.plural}
+          action={
+            canManageManagementAccess && employee ? (
+              <Button
+                type="button"
+                onClick={() => setIsEditingManagementAccess(true)}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+              >
+                {showManagementAccess
+                  ? "Edit administrative teams"
+                  : "Add to an administrative team"}
+              </Button>
+            ) : undefined
+          }
+        >
+          <div className="flex flex-col gap-4">
             <Field
               label="Departments"
               value={
@@ -887,7 +844,7 @@ export function ProfilePanel({
               </Button>
             )}
           </div>
-        </SectionCard>
+        </AccountCard>
       )}
 
       {isEditingManagementAccess && orgId && employee && (
@@ -939,165 +896,83 @@ export function ProfilePanel({
         />
       )}
 
-      {!canEditProfileDirectly && (
-        <SectionCard>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div>
-              <div className="dg-card-title">Name change requests</div>
-              <div className="dg-card-description">
-                Ask an admin to update your name. Email and phone are managed in Account details.
-              </div>
-            </div>
-
-            {pendingNameRequest && (
-              <Banner
-                tone="warning"
-                icon={Clock}
-                action={
-                  <Button
-                    type="button"
-                    onClick={() => cancelRequest(pendingNameRequest)}
-                    disabled={cancellingId === pendingNameRequest.id}
-                    className="dg-btn dg-btn-secondary dg-btn-sm"
-                  >
-                    <ButtonLoading loading={cancellingId === pendingNameRequest.id}>
-                      Cancel request
-                    </ButtonLoading>
-                  </Button>
-                }
+      {requestingNameChange && !pendingNameRequest ? (
+        <Modal
+          title="Request a name change"
+          onClose={() => setRequestingNameChange(false)}
+          className="dg-modal--tight-header"
+          style={{ maxWidth: 480, width: "100%" }}
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                onClick={() => setRequestingNameChange(false)}
+                className="dg-btn dg-btn-secondary"
               >
-                A name change request is pending admin review.
-              </Banner>
-            )}
-
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={
+                  submittingRequest ||
+                  !orgId ||
+                  Boolean(requestFirstNameError) ||
+                  Boolean(requestLastNameError) ||
+                  Boolean(requestNoteError)
+                }
+                onClick={requestNameChange}
+                className="dg-btn dg-btn-primary"
+              >
+                <ButtonLoading loading={submittingRequest}>Send request</ButtonLoading>
+              </Button>
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
+                <label className="dg-label" htmlFor="profile-requested-first-name">
+                  First name
+                </label>
                 <input
-                  aria-label="Requested first name"
+                  id="profile-requested-first-name"
                   className="dg-input"
-                  disabled={!!pendingNameRequest}
-                  placeholder="Requested first name"
                   value={requestFirstName}
                   onChange={(e) => setRequestFirstName(e.target.value)}
                 />
                 {requestFirstNameError && <p className="dg-form-error">{requestFirstNameError}</p>}
               </div>
               <div>
+                <label className="dg-label" htmlFor="profile-requested-last-name">
+                  Last name
+                </label>
                 <input
-                  aria-label="Requested last name"
+                  id="profile-requested-last-name"
                   className="dg-input"
-                  disabled={!!pendingNameRequest}
-                  placeholder="Requested last name"
                   value={requestLastName}
                   onChange={(e) => setRequestLastName(e.target.value)}
                 />
                 {requestLastNameError && <p className="dg-form-error">{requestLastNameError}</p>}
               </div>
             </div>
-            <textarea
-              aria-label="Request note"
-              className="dg-input"
-              disabled={!!pendingNameRequest}
-              placeholder="Note for admins"
-              rows={3}
-              value={requestNote}
-              onChange={(e) => setRequestNote(e.target.value)}
-            />
-            {requestNoteError && <p className="dg-form-error">{requestNoteError}</p>}
-            <Button
-              type="button"
-              disabled={
-                submittingRequest ||
-                !!pendingNameRequest ||
-                !orgId ||
-                Boolean(requestFirstNameError) ||
-                Boolean(requestLastNameError) ||
-                Boolean(requestNoteError)
-              }
-              onClick={requestNameChange}
-              className="dg-btn dg-btn-secondary dg-btn-sm self-start"
-            >
-              <ButtonLoading loading={submittingRequest}>Request name change</ButtonLoading>
-            </Button>
-            {loadingChangeRequests ? (
-              <span
-                aria-hidden
-                className="dg-skeleton"
-                style={{
-                  display: "inline-block",
-                  width: 180,
-                  height: 12,
-                  borderRadius: "var(--dg-radius-xs)",
-                }}
-              />
-            ) : changeRequests.length > 0 ? (
-              <p className="m-0 text-[13px] text-[var(--dg-color-text-muted)]">
-                Latest request: {formatClientLabel(changeRequests[0].status)}
-              </p>
-            ) : null}
-          </div>
-        </SectionCard>
-      )}
-
-      {showDeletion && (
-        <SectionCard>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              borderTop: "1px solid var(--dg-color-danger-bg)",
-              paddingTop: 16,
-            }}
-          >
             <div>
-              <div className="dg-card-title" style={{ color: "var(--dg-color-danger)" }}>
-                Delete account
-              </div>
-              <p className="dg-card-description">
-                Request that a Super Admin delete your account. This is irreversible.
-              </p>
+              <label className="dg-label" htmlFor="profile-request-note">
+                Note for admins
+              </label>
+              <textarea
+                id="profile-request-note"
+                className="dg-input"
+                rows={3}
+                value={requestNote}
+                onChange={(e) => setRequestNote(e.target.value)}
+              />
+              {requestNoteError && <p className="dg-form-error">{requestNoteError}</p>}
             </div>
-            {pendingDeletion ? (
-              <Banner
-                tone="warning"
-                icon={Clock}
-                action={
-                  <Button
-                    type="button"
-                    onClick={() => cancelRequest(pendingDeletion)}
-                    disabled={cancellingId === pendingDeletion.id}
-                    className="dg-btn dg-btn-secondary dg-btn-sm"
-                  >
-                    <ButtonLoading loading={cancellingId === pendingDeletion.id}>
-                      Cancel request
-                    </ButtonLoading>
-                  </Button>
-                }
-              >
-                Account deletion request pending Super Admin review.
-              </Banner>
-            ) : (
-              <Button
-                type="button"
-                onClick={() => setPendingConfirm("account-deletion")}
-                disabled={requestingDeletion || !orgId}
-                className="dg-btn dg-btn-danger self-start"
-              >
-                <ButtonLoading
-                  loading={requestingDeletion}
-                  spinnerSize={14}
-                  icon={<Trash2 size={14} style={{ marginRight: 4 }} />}
-                >
-                  Request account deletion
-                </ButtonLoading>
-              </Button>
-            )}
           </div>
-        </SectionCard>
-      )}
+        </Modal>
+      ) : null}
 
-      {!isGridmaster && canDeleteAccountDirectly && <DeleteAccountCard />}
+      {saveBar}
 
       {confirmation && !stepUp.dialog && (
         <ConfirmDialog
@@ -1113,6 +988,6 @@ export function ProfilePanel({
         />
       )}
       {stepUp.dialog}
-    </div>
+    </>
   );
 }

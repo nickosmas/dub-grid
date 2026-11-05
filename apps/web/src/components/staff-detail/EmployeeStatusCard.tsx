@@ -19,6 +19,8 @@ interface EmployeeStatusCardProps {
    * as the staff page's invite card; the planned cards then sit below.
    */
   companion?: ReactNode;
+  /** On your own profile, being Active with nothing planned needs no card. */
+  hideWhenActive?: boolean;
 }
 
 const LATER_GRID = "grid grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] gap-3";
@@ -78,6 +80,7 @@ export function EmployeeStatusCard({
   action,
   planAction,
   companion,
+  hideWhenActive = false,
 }: EmployeeStatusCardProps) {
   const absenceId =
     employee.status === "inactive" ? employee.awayAbsenceTypeId : employee.plannedAbsenceTypeId;
@@ -87,6 +90,7 @@ export function EmployeeStatusCard({
     today: formatDateKey(new Date()),
   });
   const active = current.kind === "active";
+  if (hideWhenActive && active && !planned && !starts) return null;
   const colors = STATUS_TONE_COLORS[current.tone];
   const cardStyle = {
     display: "flex",

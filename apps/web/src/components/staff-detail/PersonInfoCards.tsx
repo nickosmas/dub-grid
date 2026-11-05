@@ -80,6 +80,8 @@ interface WorkCardProps {
   roleLabel?: string;
   /** Management-only people have no schedule fields to show. */
   showScheduleDetails: boolean;
+  /** Internal notes are written about someone, for the people who manage them. */
+  hideInternalNotes?: boolean;
 }
 
 export function WorkCard({
@@ -91,6 +93,7 @@ export function WorkCard({
   certificationLabel = "Certification",
   roleLabel = "Roles",
   showScheduleDetails,
+  hideInternalNotes = false,
 }: WorkCardProps) {
   const certification = certifications.find((item) => item.id === employee.certificationId);
   const list = (names: string[]) => (names.length > 0 ? names.join(", ") : <Missing>None</Missing>);
@@ -108,17 +111,19 @@ export function WorkCard({
           <InfoField label={roleLabel}>{list(namesOf(employee.roleIds, roles))}</InfoField>
         </dl>
       ) : null}
-      <dl
-        className={`m-0 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg-secondary)] px-3.5 py-3 ${showScheduleDetails ? "mt-4" : ""}`}
-      >
-        <InfoField label="Internal notes">
-          {employee.contactNotes ? (
-            <span className="whitespace-pre-wrap">{employee.contactNotes}</span>
-          ) : (
-            <Missing>None</Missing>
-          )}
-        </InfoField>
-      </dl>
+      {hideInternalNotes ? null : (
+        <dl
+          className={`m-0 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg-secondary)] px-3.5 py-3 ${showScheduleDetails ? "mt-4" : ""}`}
+        >
+          <InfoField label="Internal notes">
+            {employee.contactNotes ? (
+              <span className="whitespace-pre-wrap">{employee.contactNotes}</span>
+            ) : (
+              <Missing>None</Missing>
+            )}
+          </InfoField>
+        </dl>
+      )}
     </AboutCard>
   );
 }
