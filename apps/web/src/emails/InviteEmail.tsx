@@ -7,7 +7,7 @@ import { EmailButton } from "./components/EmailButton";
 import { styles, PREVIEW_LOGO_URL } from "./components/theme";
 import { formatInvitationExpiry } from "./invitation-expiry";
 
-export type InvitationEmailKind = "new" | "reissue";
+export type InvitationEmailKind = "new" | "reissue" | "moved";
 
 export type InviteEmailProps = {
   orgName: string;
@@ -67,6 +67,12 @@ export function InviteEmail({
         To get started, set your password and accept your invitation.
       </Text>
       <EmailButton href={acceptUrl}>Accept invitation</EmailButton>
+      {kind === "moved" ? (
+        <Text style={styles.paragraph}>
+          Already use DubGrid with another organization? Contact support@dubgrid.com and we&apos;ll
+          keep you on one sign-in.
+        </Text>
+      ) : null}
       <Text style={{ ...styles.fine, margin: "0 0 8px" }}>
         If the button doesn&apos;t work, copy and paste this link into your browser:
       </Text>

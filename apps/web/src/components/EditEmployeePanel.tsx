@@ -86,6 +86,8 @@ export interface EditEmployeePanelProps {
   onEmailConflictChange?: (hasConflict: boolean) => void;
   onInvite?: (emp: Employee) => void;
   pendingInvitation?: Invitation;
+  /** Offered beside a joined person's locked email, when this viewer may move them. */
+  onMoveToNewEmail?: () => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onResend?: (invitationId: string) => Promise<boolean> | boolean | void;
   /** Called instead of `onSave` when the admin confirms changing the email
@@ -166,6 +168,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onEmailConflictChange,
       onInvite,
       pendingInvitation,
+      onMoveToNewEmail,
       onRevoke,
       onResend,
       onSaveWithReinvite,
@@ -723,6 +726,18 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                           }}
                         >
                           Only they can change this, on their own profile.
+                          {onMoveToNewEmail ? (
+                            <>
+                              {" "}
+                              <button
+                                type="button"
+                                onClick={onMoveToNewEmail}
+                                className="cursor-pointer border-0 bg-transparent p-0 font-semibold text-[var(--dg-color-link)] hover:underline"
+                              >
+                                Move to a new email
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       )}
                       {fieldErrors.email && (

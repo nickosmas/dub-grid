@@ -33,7 +33,6 @@ One email per person stands.
 ## Not in this fix
 
 - Move to a new email, where an organization points its own record at a new address
-  with a new invite, is the planned follow-up. Until it ships, a manager can't fix the
-  email of someone who lost their mailbox, and it comes to support.
+  with a new invite, followed in fix/move-to-new-email.
 - `LoginEmailChangedEmail` keeps its "administrator" wording, which nothing reaches now.
   Remove it when Move settles what the notices say.
