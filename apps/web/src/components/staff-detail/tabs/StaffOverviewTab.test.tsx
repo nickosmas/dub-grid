@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { StaffOverviewTab } from "./StaffOverviewTab";
-import type { PersonRequestRow } from "@/lib/person-requests";
+import type { ReactNode } from "react";
 import type { AssignmentDefinition, Employee, ShiftCategory, ShiftMap } from "@/types";
 
 vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "light" }) }));
@@ -20,27 +20,14 @@ const assignment = {
 } as AssignmentDefinition;
 const worked = { assignmentIds: [1], isDelete: false } as ShiftMap[string];
 const NEXT_DAYS = Array.from({ length: 7 }, (_, index) => new Date(2026, 9, 29 + index));
-const WAITING: PersonRequestRow = {
-  key: "shift-r1",
-  type: "Swap",
-  details: "Sat, Nov 7 · Day Shift",
-  secondary: "with Margaret Sullivan",
-  sentDate: "2026-10-28",
-  state: "Awaiting approval",
-  tone: "warning",
-  decidedBy: null,
-  waiting: true,
-  reviewHref: "/schedule?requests=approval",
-};
-
 function renderTab({
   periodShifts = {} as ShiftMap,
   nextDays = { dates: NEXT_DAYS, shifts: {} as ShiftMap },
-  waitingRequests,
+  about = <p>About them</p>,
 }: {
   periodShifts?: ShiftMap | "loading";
   nextDays?: { dates: Date[]; shifts: ShiftMap } | null;
-  waitingRequests?: PersonRequestRow[];
+  about?: ReactNode;
 } = {}) {
   render(
     <StaffOverviewTab
@@ -54,8 +41,7 @@ function renderTab({
       absenceTypes={[]}
       focusAreas={[]}
       nextDays={nextDays}
-      waitingRequests={waitingRequests}
-      about={<p>About them</p>}
+      about={about}
     />,
   );
 }
@@ -96,19 +82,13 @@ describe("StaffOverviewTab", () => {
     expect(screen.queryByTestId("my-schedule-row")).toBeNull();
   });
 
-  it("lists what's waiting with a way to review it, only when something is", () => {
-    renderTab({ waitingRequests: [WAITING] });
-    const card = screen.getByRole("region", { name: "Needs attention" });
-    expect(within(card).getByText("Swap")).toBeInTheDocument();
-    expect(within(card).getByRole("link", { name: "Review" })).toHaveAttribute(
-      "href",
-      "/schedule?requests=approval",
-    );
+  it("leaves the section out when the page has nowhere else for it", () => {
+    renderTab({ about: null });
+    expect(screen.queryByText("About")).toBeNull();
   });
 
-  it("hides Needs attention when nothing waits", () => {
-    renderTab({ waitingRequests: [] });
-    expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
+  it("shows who they are when it's given", () => {
+    renderTab();
     expect(screen.getByText("About them")).toBeInTheDocument();
   });
 });

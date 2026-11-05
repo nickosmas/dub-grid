@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
 import MyScheduleRow from "@/components/dashboard/MyScheduleRow";
-import type { PersonRequestRow } from "@/lib/person-requests";
 import { computePeriodHours, computeWorkMix } from "@/lib/staff-detail-stats";
 import type {
   AbsenceType,
@@ -43,15 +41,13 @@ interface StaffOverviewTabProps {
   aboutTitle?: string;
   /** "What they work", or "What you work" on your own profile. */
   mixTitle?: string;
-  /** Requests about them still awaiting approval; undefined when this viewer can't review them. */
-  waitingRequests?: PersonRequestRow[];
-  /** Work, Access and the record line. */
-  about: ReactNode;
+  /** Work, Access and the record line, where the page has nowhere else for them. */
+  about?: ReactNode;
 }
 
 const sentence = (phrase: string) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
 
-/** The glance: the period's numbers, their next days, what's waiting, and who they are. */
+/** The glance: the period's numbers and their next days. */
 export function StaffOverviewTab({
   employee,
   periodShifts,
@@ -63,7 +59,6 @@ export function StaffOverviewTab({
   absenceTypes,
   focusAreas,
   nextDays,
-  waitingRequests,
   about,
   nextDaysCopy,
   aboutTitle = "About",
@@ -113,7 +108,6 @@ export function StaffOverviewTab({
     { label: "Shifts", value: summary ? String(summary.shiftCount) : "-" },
     { label: "Average per week", value: summary ? `${summary.averagePerWeek}h` : "-" },
   ];
-  const waiting = waitingRequests ?? [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -166,48 +160,14 @@ export function StaffOverviewTab({
         />
       ) : null}
 
-      {waiting.length > 0 ? (
-        <section className="dg-card" aria-label="Needs attention">
-          <div className="dg-card-header">
-            <div className="dg-card-title flex items-center gap-2">
-              Needs attention
-              <span className="dg-tabular-nums inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--dg-color-brand)] px-1.5 text-[12px] font-semibold text-white">
-                {waiting.length}
-              </span>
-            </div>
-          </div>
-          <div className="dg-card-body flex flex-col">
-            {waiting.slice(0, 4).map((row, index) => (
-              <div
-                key={row.key}
-                className={`flex items-center gap-3 py-2.5 ${index > 0 ? "border-t border-[var(--dg-color-border-light)]" : "pt-0"}`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
-                    {row.type}
-                  </div>
-                  <div className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-subtle)]">
-                    {[row.details, row.secondary].filter(Boolean).join(", ")}
-                  </div>
-                </div>
-                <Link href={row.reviewHref} className="dg-btn dg-btn-secondary dg-btn-sm">
-                  Review
-                </Link>
-              </div>
-            ))}
-            {waiting.length > 4 ? (
-              <span className="pt-2 text-[13px] text-[var(--dg-color-text-subtle)]">
-                and {waiting.length - 4} more in Activity
-              </span>
-            ) : null}
-          </div>
-        </section>
+      {about ? (
+        <>
+          <h2 className="dg-section-heading" style={{ marginTop: 24 }}>
+            {aboutTitle}
+          </h2>
+          {about}
+        </>
       ) : null}
-
-      <h2 className="dg-section-heading" style={{ marginTop: 24 }}>
-        {aboutTitle}
-      </h2>
-      {about}
     </div>
   );
 }

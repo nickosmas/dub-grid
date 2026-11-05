@@ -329,6 +329,48 @@ describe("EditEmployeePanel", () => {
       expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
     });
 
+    it("keeps a draft through a refetch of the same record, in persistent mode", async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <EditEmployeePanel
+          employee={employee}
+          focusAreas={focusAreas}
+          certifications={[...DESIGNATIONS]}
+          roles={[]}
+          persistent
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      await user.type(screen.getByDisplayValue("Alice"), "a");
+
+      rerender(
+        <EditEmployeePanel
+          employee={{ ...employee }}
+          focusAreas={focusAreas}
+          certifications={[...DESIGNATIONS]}
+          roles={[]}
+          persistent
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByDisplayValue("Alicea")).toBeInTheDocument();
+
+      rerender(
+        <EditEmployeePanel
+          employee={{ ...employee, version: employee.version + 1 }}
+          focusAreas={focusAreas}
+          certifications={[...DESIGNATIONS]}
+          roles={[]}
+          persistent
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
+    });
+
     it("Save becomes enabled after changing the first name field", async () => {
       const user = userEvent.setup();
       renderPanel();

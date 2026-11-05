@@ -128,6 +128,7 @@ export async function expectNoManageControls(
   for (const name of ["Save", "Edit details", "Mark away", "Archive", "Add"]) {
     await expect(scope.getByRole("button", { name, exact: true }), name).toHaveCount(0);
   }
+  await expect(scope.getByRole("textbox", { name: /First name/ })).toHaveCount(0);
 }
 
 /** A published, non-OFF cell in one employee's row, or in anyone else's. */
