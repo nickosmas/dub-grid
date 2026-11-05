@@ -8,6 +8,7 @@ import {
   useId,
   forwardRef,
   useImperativeHandle,
+  useRef,
 } from "react";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { Button } from "@/components/Button";
@@ -106,6 +107,8 @@ export interface EditEmployeePanelProps {
   hideActions?: boolean;
   /** Persistent page editors have no meaningful pristine Close action. */
   persistent?: boolean;
+  /** Draws Details and Work as the page's own cards, for editing in place. */
+  sectioned?: boolean;
   /** Drops the editor's own side padding so an embedding card owns the inner
    *  padding and the fields line up with that card's heading. */
   flushHorizontal?: boolean;
@@ -174,6 +177,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onSaveWithReinvite,
       hideActions,
       persistent = false,
+      sectioned = false,
       flushHorizontal = false,
     }: EditEmployeePanelProps,
     ref,
@@ -273,11 +277,18 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
     }, []);
 
+    // Editing in place outlives a background refetch, which hands back the same
+    // record as a new object: only a real change replaces what's being typed.
+    const loadedRecordRef = useRef({ id: employee.id, version: employee.version });
     useEffect(() => {
+      const loaded = loadedRecordRef.current;
+      const unchanged = loaded.id === employee.id && loaded.version === employee.version;
+      loadedRecordRef.current = { id: employee.id, version: employee.version };
+      if (persistent && unchanged) return;
       setForm(buildEditForm(employee));
       setTouched({});
       setAddingFirstDay(false);
-    }, [employee]);
+    }, [employee, persistent]);
 
     // A first day can still be given to someone Active who hasn't worked a shift yet.
     const mayStillStart = Boolean(orgId) && employee.status === "active" && !employee.firstDay;
@@ -516,14 +527,27 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             style={{
               display: "flex",
               flexDirection: "column",
+              gap: sectioned ? 16 : undefined,
             }}
           >
             {/* ── Details section ── */}
-            <div style={{ paddingTop: 20, paddingBottom: 20 }}>
-              <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
-                Details
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div
+              className={sectioned ? "dg-card" : undefined}
+              style={sectioned ? undefined : { paddingTop: 20, paddingBottom: 20 }}
+            >
+              {sectioned ? (
+                <div className="dg-card-header">
+                  <div className="dg-card-title">Details</div>
+                </div>
+              ) : (
+                <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
+                  Details
+                </div>
+              )}
+              <div
+                className={sectioned ? "dg-card-body" : undefined}
+                style={{ display: "flex", flexDirection: "column", gap: 14 }}
+              >
                 {!hideIdentityFields && (
                   <div
                     style={{
@@ -713,9 +737,14 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         onBlur={() => markTouched("email")}
                         placeholder="name@example.com"
                         readOnly={readOnly || Boolean(employee.userId)}
-                        style={
-                          fieldErrors.email ? { borderColor: "var(--dg-color-danger)" } : undefined
-                        }
+                        style={{
+                          ...(fieldErrors.email
+                            ? { borderColor: "var(--dg-color-danger)" }
+                            : undefined),
+                          ...(employee.userId
+                            ? { color: "var(--dg-color-text-muted)", cursor: "default" }
+                            : undefined),
+                        }}
                       />
                       {employee.userId && !fieldErrors.email && (
                         <div
@@ -803,16 +832,30 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
             {showScheduleAssignments && (
               <div
-                style={{
-                  borderTop: "1px solid var(--dg-color-border-light)",
-                  paddingTop: 20,
-                  paddingBottom: 20,
-                }}
+                className={sectioned ? "dg-card" : undefined}
+                style={
+                  sectioned
+                    ? undefined
+                    : {
+                        borderTop: "1px solid var(--dg-color-border-light)",
+                        paddingTop: 20,
+                        paddingBottom: 20,
+                      }
+                }
               >
-                <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
-                  Assignments
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {sectioned ? (
+                  <div className="dg-card-header">
+                    <div className="dg-card-title">Work</div>
+                  </div>
+                ) : (
+                  <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
+                    Assignments
+                  </div>
+                )}
+                <div
+                  className={sectioned ? "dg-card-body" : undefined}
+                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
+                >
                   <SectionNotice messages={assignmentNotices} />
                   <div>
                     <label style={fieldLabel}>{certificationLabel}</label>
