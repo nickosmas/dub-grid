@@ -163,7 +163,6 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 | GET    | `/api/notifications/facets` | Return inbox facet counts                              |
 | POST   | `/api/notifications/search` | Full-text search across notifications                  |
 | POST   | `/api/notifications/bulk`   | Bulk read/unread/archive/delete operations             |
-| POST   | `/api/send-notification`    | Dispatch an in-app or email notification               |
 
 ---
 
