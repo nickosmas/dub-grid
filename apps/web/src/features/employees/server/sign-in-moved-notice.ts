@@ -3,29 +3,29 @@ import "server-only";
 import { createElement } from "react";
 import { after } from "next/server";
 import { render } from "@react-email/components";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { SignInMovedEmail } from "@/emails/SignInMovedEmail";
 import { getInvitationEmailConfig } from "@/features/mobile/server/invitation-email";
 import { emailBaseUrl, sanitizeHeaderValue } from "@/lib/email";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
-import { getServiceClient } from "@/lib/supabase-service";
 
 /**
  * Tells the old address that a staff record left it. It never prints the new
  * address, and it runs past the response because the move has already happened.
  */
-export function scheduleSignInMovedNotice(input: {
-  email: string | null | undefined;
-  orgId: string;
-}): void {
+export function scheduleSignInMovedNotice(
+  serviceClient: SupabaseClient,
+  input: { email: string | null | undefined; orgId: string },
+): void {
   const { email, orgId } = input;
   if (!email) return;
   after(async () => {
     try {
       const config = getInvitationEmailConfig();
       if (!config) return;
-      const { data: organization } = await getServiceClient()
+      const { data: organization } = await serviceClient
         .from("organizations")
         .select("name")
         .eq("id", orgId)

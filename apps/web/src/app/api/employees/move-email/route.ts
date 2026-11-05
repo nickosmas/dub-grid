@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
       user_agent: requestContext.userAgent,
     });
     if (auditError) logger.error({ error: auditError, empId }, "move audit write failed");
-    scheduleSignInMovedNotice({ email: employee.email, orgId });
+    scheduleSignInMovedNotice(serviceClient, { email: employee.email, orgId });
 
     const invitationId = await inviteToNewAddress({
       serviceClient,

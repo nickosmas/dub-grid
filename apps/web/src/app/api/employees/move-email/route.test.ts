@@ -179,7 +179,7 @@ describe("POST /api/employees/move-email", () => {
     expect(sendPendingInvitationEmail).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "moved" }),
     );
-    expect(scheduleSignInMovedNotice).toHaveBeenCalledWith({
+    expect(scheduleSignInMovedNotice).toHaveBeenCalledWith(expect.anything(), {
       email: "old@dubgrid.test",
       orgId: ORG_ID,
     });
