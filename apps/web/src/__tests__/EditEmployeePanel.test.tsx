@@ -768,20 +768,13 @@ describe("EditEmployeePanel", () => {
       requireCredentialAssurance.mockClear();
     });
 
-    it("confirms the manager's identity before changing a linked account's email", async () => {
-      const user = userEvent.setup();
-      const onSave = vi.fn();
-      renderPanel({ onSave, employee: { ...employee, userId: "user-42" } });
+    it("shows a joined person's email as read-only", () => {
+      renderPanel({ employee: { ...employee, userId: "user-42" } });
 
-      await changeEmail(user);
-      await user.click(screen.getByRole("button", { name: "Save" }));
-
-      await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
-      expect(stepUpRun).toHaveBeenCalledOnce();
-      expect(requireCredentialAssurance).toHaveBeenCalledWith("access-token");
-      expect(requireCredentialAssurance.mock.invocationCallOrder[0]).toBeLessThan(
-        onSave.mock.invocationCallOrder[0]!,
-      );
+      expect(screen.getByLabelText("Email")).toHaveAttribute("readonly");
+      expect(
+        screen.getByText("Only they can change this, on their own profile."),
+      ).toBeInTheDocument();
     });
 
     it("does not ask for identity when a person without an account changes email", async () => {
@@ -794,19 +787,6 @@ describe("EditEmployeePanel", () => {
 
       expect(onSave).toHaveBeenCalledOnce();
       expect(stepUpRun).not.toHaveBeenCalled();
-    });
-
-    it("blocks clearing the email of a linked account", async () => {
-      const user = userEvent.setup();
-      const onSave = vi.fn();
-      renderPanel({ onSave, employee: { ...employee, userId: "user-42" } });
-
-      const emailInput = screen.getByDisplayValue("alice@example.com");
-      await user.clear(emailInput);
-      fireEvent.blur(emailInput);
-
-      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-      expect(screen.getByText("An account needs an email to sign in with.")).toBeInTheDocument();
     });
 
     it("does not gate the save when there is no pending invitation", async () => {

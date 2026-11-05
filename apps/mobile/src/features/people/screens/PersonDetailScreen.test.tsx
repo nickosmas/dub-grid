@@ -123,25 +123,11 @@ vi.mock("../../../shared/navigation/top-level-stack", () => ({
   createDetailStackOptions: () => ({}),
 }));
 
-const stepUpRun = vi.fn(async (action: (token: string) => Promise<unknown>) => {
-  await action("step-up-token");
-  return true;
-});
-const requireMobileCredentialAssurance = vi.fn(async (_accessToken: string) => ({
-  success: true,
-}));
-
-vi.mock("../../profile/hooks/useMobileStepUpAction", () => ({
-  useMobileStepUpAction: () => ({ run: stepUpRun, active: false, sheet: null }),
-}));
-
 const updateMobilePerson = vi.fn();
 
 vi.mock("../../../shared/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../shared/lib/api")>()),
   updateMobilePerson: (...args: unknown[]) => updateMobilePerson(...args),
-  requireMobileCredentialAssurance: (accessToken: string) =>
-    requireMobileCredentialAssurance(accessToken),
 }));
 
 vi.mock("../../auth/hooks/useAccessToken", () => ({
@@ -189,8 +175,6 @@ describe("PersonDetailScreen", () => {
     pushToast.mockReset();
     routerReplace.mockReset();
     routerPush.mockReset();
-    stepUpRun.mockClear();
-    requireMobileCredentialAssurance.mockClear();
     emptyStateTitles.length = 0;
     stackScreenOptions.length = 0;
 
@@ -2724,27 +2708,17 @@ describe("PersonDetailScreen", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("confirms the manager's identity before changing a linked account's email", async () => {
-      const mutationCalls = renderForSchedule({ userId: "user-2", email: "old@dubgrid.test" });
+    it("tells a manager only the person can change a joined person's email", () => {
+      renderForSchedule({ userId: "user-2", email: "old@dubgrid.test" });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@dubgrid.test" } });
-      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-      expect(screen.getByText("Change the staff email to new@dubgrid.test?")).toBeInTheDocument();
-      confirmDialog("Save");
-
-      await waitFor(() => expect(stepUpRun).toHaveBeenCalledTimes(1));
-      expect(requireMobileCredentialAssurance).toHaveBeenCalledWith("step-up-token");
-      const payloads = mutationCalls.flatMap((call) =>
-        call.mutateAsync.mock.calls.map(([payload]) => payload),
-      );
-      expect(payloads).toContainEqual(
-        expect.objectContaining({ email: "new@dubgrid.test", actionAccessToken: "step-up-token" }),
-      );
+      expect(
+        screen.getByText("Only they can change this, on their own profile."),
+      ).toBeInTheDocument();
     });
 
-    it("saves a new email for a person without an account without step-up", async () => {
+    it("saves a new email for a person without an account", async () => {
       const mutationCalls = renderForSchedule({ userId: null, email: "old@dubgrid.test" });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -2757,20 +2731,6 @@ describe("PersonDetailScreen", () => {
           mutationCalls.flatMap((call) => call.mutateAsync.mock.calls.map(([p]) => p)),
         ).toContainEqual(expect.objectContaining({ email: "new@dubgrid.test" })),
       );
-      expect(stepUpRun).not.toHaveBeenCalled();
-    });
-
-    it("blocks clearing the email of a linked account", () => {
-      renderForSchedule({ userId: "user-2", email: "old@dubgrid.test" });
-
-      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.change(screen.getByLabelText("Email"), { target: { value: "" } });
-      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-
-      expect(pushToast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "An account needs an email to sign in with." }),
-      );
-      expect(stepUpRun).not.toHaveBeenCalled();
     });
 
     it("offers Add to schedule to someone who isn't on it", () => {

@@ -15,7 +15,6 @@ import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE, useIsInSandbox } from "@/hooks";
 import { useStepUpAction, type StepUpRun } from "@/hooks/useStepUpAction";
 import { useLatestRef } from "@/hooks/useLatestRef";
-import { requireCredentialAssurance } from "@/features/account/client";
 import {
   validateEmail,
   validateNotes,
@@ -398,19 +397,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         return false;
       }
 
-      // The email is the login email: changing it for a linked account is a
-      // sensitive action, so confirm the manager's identity the way the
-      // profile's own email change does before the save goes out.
-      if (emailChanged && employee.userId) {
-        let saved = false;
-        const completed = await stepUpRef.current.run(async (accessToken) => {
-          await requireCredentialAssurance(accessToken);
-          saved = (await onSave(nextEmployee)) !== false;
-        });
-        if (completed && saved) onSaveCompleted?.();
-        return completed && saved;
-      }
-
       const saved = (await onSave(nextEmployee)) !== false;
       if (!saved) return false;
       onSaveCompleted?.();
@@ -723,11 +709,22 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                         onBlur={() => markTouched("email")}
                         placeholder="name@example.com"
-                        readOnly={readOnly}
+                        readOnly={readOnly || Boolean(employee.userId)}
                         style={
                           fieldErrors.email ? { borderColor: "var(--dg-color-danger)" } : undefined
                         }
                       />
+                      {employee.userId && !fieldErrors.email && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-text-subtle)",
+                            marginTop: 4,
+                          }}
+                        >
+                          Only they can change this, on their own profile.
+                        </div>
+                      )}
                       {fieldErrors.email && (
                         <div
                           style={{
