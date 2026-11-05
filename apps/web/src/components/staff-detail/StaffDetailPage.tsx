@@ -6,7 +6,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ProgressBar from "@/components/ProgressBar";
+import { getEmployeeDisplayName } from "@/lib/utils";
 import { PersonPageSkeleton } from "@/components/LoadingSkeletons";
+import { MoveEmailDialog } from "@/components/staff-detail/MoveEmailDialog";
 import { useSkeletonGate } from "@/hooks/useSkeletonGate";
 import { Button } from "@/components/Button";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
@@ -1051,6 +1053,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [absenceTypes, assignmentById, categoryById, focusAreas, jobs],
   );
 
+  const [movingToNewEmail, setMovingToNewEmail] = useState(false);
   const closeDetailsEditor = useCallback(() => {
     setDetailsDirty(false);
     setIsEditingDetails(false);
@@ -1060,6 +1063,16 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   // Matches the directory table's Access column: the membership's role, or the
   // role a pending invitation will grant once it is accepted.
   const effectiveOrgRole = directoryPerson?.orgRole ?? pendingInvite?.roleToAssign ?? null;
+  // The server applies the same limits: an Admin can't choose who holds another
+  // Admin's access, and a person changes their own email on their profile.
+  const canMoveToNewEmail =
+    Boolean(employee?.userId) &&
+    employee?.status !== "removed" &&
+    !isSelfAction(currentUser?.id, employee?.userId) &&
+    (effectiveOrgRole === "user" ||
+      effectiveOrgRole === null ||
+      Boolean(perms.isSuperAdmin) ||
+      Boolean(perms.isGridmaster));
   const hasPendingManagementInvite =
     !!directoryPerson &&
     directoryPerson.managementDepartmentIds.length > 0 &&
@@ -1585,6 +1598,21 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         </div>
       )}
 
+      {movingToNewEmail && employee && orgId ? (
+        <MoveEmailDialog
+          employee={employee}
+          orgId={orgId}
+          name={getEmployeeDisplayName(employee)}
+          onMoved={(moved) => {
+            syncEmployeeCaches(moved);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) });
+            void invitationsQuery.refetch();
+          }}
+          onClose={() => setMovingToNewEmail(false)}
+        />
+      ) : null}
+
       {isEditingDetails && employee && (
         <Modal
           title="Edit details"
@@ -1636,6 +1664,14 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             onSaveBlockedChange={setDetailsSaveBlocked}
             pendingInvitation={pendingInvite ?? undefined}
             onSaveWithReinvite={handleSaveEmployeeWithReinvite}
+            onMoveToNewEmail={
+              canMoveToNewEmail
+                ? () => {
+                    closeDetailsEditor();
+                    setMovingToNewEmail(true);
+                  }
+                : undefined
+            }
           />
         </Modal>
       )}

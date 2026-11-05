@@ -267,6 +267,14 @@ address. The two stores are kept equal in both directions:
   so `/api/employees/manage` and the mobile person `PATCH` refuse a changed or blank
   email on a linked row, whoever the editor is, and the web and mobile editors show it
   read-only. Before someone has a sign-in, their email stays editable.
+- **An organization moves its own record** (`/api/employees/move-email`, web only): for
+  someone who lost their mailbox. The record leaves the old sign-in for the new address,
+  the old sign-in loses this organization only (`endAccessInOrganization`, never an
+  everywhere sign-out, since they may not be able to reset a password), and an invite
+  carries the same role. It is not a sign-in change: other organizations keep the old
+  sign-in until they move too, or support changes it. Accepting on one sign-in joins them
+  up again. Only a Super Admin moves an Admin or Super Admin, because the invite gives
+  that access to whoever opens the mailbox.
 - **Support changes it** (`/api/gridmaster/users/[userId]`): the one path that calls
   `auth.admin.updateUserById(userId, { email, email_confirm: true })`
   (`features/employees/server/login-email.ts`), behind fresh sensitive-action auth. It

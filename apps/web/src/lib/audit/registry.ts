@@ -685,6 +685,11 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     headline: (d, ctx) => `Canceled ${who(d, ctx, "a team member")}'s planned suspension`,
     suppressKeys: ["plannedFrom", "plannedUntil"],
   },
+  "employee.moved_to_new_email": {
+    category: "people",
+    severity: "warning",
+    headline: (d, ctx) => `Moved ${who(d, ctx, "a staff member")} to a new email`,
+  },
   "employee.removed": {
     category: "people",
     severity: "delete",
