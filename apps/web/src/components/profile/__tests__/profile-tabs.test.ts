@@ -5,9 +5,8 @@ const ALL = availableProfileTabs({ hasStaffRecord: true, isOnSchedule: true });
 
 describe("availableProfileTabs", () => {
   it("offers Schedule only to someone on the schedule, and only Account without a staff record", () => {
-    expect(ALL).toEqual(["overview", "schedule", "account"]);
+    expect(ALL).toEqual(["account", "schedule"]);
     expect(availableProfileTabs({ hasStaffRecord: true, isOnSchedule: false })).toEqual([
-      "overview",
       "account",
     ]);
     expect(availableProfileTabs({ hasStaffRecord: false, isOnSchedule: false })).toEqual([
@@ -36,15 +35,16 @@ describe("resolveProfileLink", () => {
     });
   });
 
-  it("sends the old overview section to Overview", () => {
-    expect(resolveProfileLink({ tab: null, section: "overview" }, ALL).tab).toBe("overview");
-  });
+  it.each([[{ tab: null, section: "overview" }], [{ tab: "overview", section: null }]])(
+    "sends an old overview link to Schedule: %o",
+    (link) => {
+      expect(resolveProfileLink(link, ALL).tab).toBe("schedule");
+    },
+  );
 
   it("falls back to the first tab this viewer has", () => {
-    expect(
-      resolveProfileLink({ tab: "schedule", section: null }, ["overview", "account"]).tab,
-    ).toBe("overview");
+    expect(resolveProfileLink({ tab: "schedule", section: null }, ["account"]).tab).toBe("account");
     expect(resolveProfileLink({ tab: null, section: "overview" }, ["account"]).tab).toBe("account");
-    expect(resolveProfileLink({ tab: null, section: null }, ALL).tab).toBe("overview");
+    expect(resolveProfileLink({ tab: null, section: null }, ALL).tab).toBe("account");
   });
 });

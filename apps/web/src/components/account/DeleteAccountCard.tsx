@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { SectionCard } from "@/components/settings/shared";
 import { requireCredentialAssurance } from "@/features/account/client";
 import { useIsInSandbox, useLogout } from "@/hooks";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
@@ -73,37 +71,25 @@ export default function DeleteAccountCard() {
   }
 
   return (
-    <SectionCard>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          borderTop: "1px solid var(--dg-color-danger-bg)",
-          paddingTop: 16,
-        }}
-      >
-        <div>
-          <div className="dg-card-title" style={{ color: "var(--dg-color-danger)" }}>
-            Delete account
-          </div>
-          <p className="dg-card-description">
-            Permanently delete your account and leave every organization you belong to. If you're an
-            organization's only Super Admin, make someone else a Super Admin first.
-          </p>
-        </div>
+    <section id="profile-delete" aria-labelledby="profile-delete-title" className="dg-card">
+      <div className="dg-card-header">
+        <h2 id="profile-delete-title" className="dg-card-title">
+          Delete account
+        </h2>
+      </div>
+      <div className="dg-card-body flex flex-wrap items-center justify-between gap-3">
+        <p className="m-0 min-w-0 flex-1 basis-60 text-[14px] text-[var(--dg-color-text-secondary)]">
+          Permanently delete your account and leave every organization you belong to. If you&apos;re
+          an organization&apos;s only Super Admin, make someone else a Super Admin first.
+        </p>
         <Button
           type="button"
           onClick={() => setConfirmOpen(true)}
           disabled={isInSandbox}
           title={isInSandbox ? "Deleting your account isn't available in sandbox mode." : undefined}
-          className="dg-btn dg-btn-danger self-start"
+          className="dg-btn dg-btn-danger dg-btn-sm"
         >
-          <ButtonLoading
-            loading={isDeleting}
-            spinnerSize={14}
-            icon={<Trash2 size={14} style={{ marginRight: 4 }} />}
-          >
+          <ButtonLoading loading={isDeleting} spinnerSize={14}>
             Delete account
           </ButtonLoading>
         </Button>
@@ -111,7 +97,7 @@ export default function DeleteAccountCard() {
 
       {confirmOpen && !stepUp.dialog && (
         <ConfirmDialog
-          title="Delete your account"
+          title="Delete your account?"
           variant="danger"
           confirmLabel="Delete account"
           isLoading={isDeleting}
@@ -141,6 +127,6 @@ export default function DeleteAccountCard() {
         />
       )}
       {stepUp.dialog}
-    </SectionCard>
+    </section>
   );
 }
