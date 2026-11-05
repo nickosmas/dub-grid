@@ -188,6 +188,20 @@ export async function checkEmployeeEmailConflict(
   });
 }
 
+/** Points a joined person's staff record at a new address and invites it. */
+export function moveEmployeeToNewEmail(input: {
+  orgId: string;
+  empId: string;
+  email: string;
+  expectedVersion: number;
+}): Promise<{ employee: Employee; invited: boolean }> {
+  return requestEmployeesJson("/api/employees/move-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export interface EmployeePhoneConflictResult {
   conflict: boolean;
   conflictingEmployeeId: string | null;

@@ -77,6 +77,13 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
   // Both status routes check the caller, then ask a Gridmaster for fresh
   // proof before the shared change reads or writes anyone (F-96, 51c, 51g1,
   // 51h); the revocations themselves live in the shared change below.
+  // Ends the moved sign-in's access to this organization only, after fresh proof.
+  "apps/web/src/app/api/employees/move-email/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\bforbidIfSandboxCookie\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bcanManageEmployees\s*\([\s\S]*?\bendAccessInOrganization\s*\(/,
+    ],
+  },
   "apps/web/src/app/api/employees/status/route.ts": {
     policy: "authorized-target-revocation",
     assertions: [

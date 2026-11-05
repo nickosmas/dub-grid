@@ -9,6 +9,7 @@ import { ImpersonationNoticeEmail } from "./ImpersonationNoticeEmail";
 import { InviteEmail } from "./InviteEmail";
 import { LoginEmailChangedEmail } from "./LoginEmailChangedEmail";
 import { NotificationEmail } from "./NotificationEmail";
+import { SignInMovedEmail } from "./SignInMovedEmail";
 import { TwoFactorResetEmail } from "./TwoFactorResetEmail";
 import { SUPABASE_AUTH_TEMPLATES } from "./auth/supabase-templates";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
@@ -35,6 +36,12 @@ const logoUrl = "https://app.test";
  * (41c3). Add a new sign-in email here.
  */
 const APP_AUTH_EMAILS: AppAuthEmail[] = [
+  {
+    name: "sign-in moved",
+    Component: SignInMovedEmail as ComponentType<never>,
+    props: { orgName: "Acme Health", logoUrl },
+    notice: true,
+  },
   {
     name: "invitation",
     Component: InviteEmail as ComponentType<never>,
