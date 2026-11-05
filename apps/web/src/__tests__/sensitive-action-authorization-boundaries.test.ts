@@ -311,12 +311,6 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     policy: "sensitive",
     assertions: [/\brequireOrgPermissions\s*\(/, /\brequireSensitiveActionAuth\s*\(/],
   },
-  "apps/web/src/app/api/employees/manage/route.ts": {
-    policy: "conditional-sensitive",
-    assertions: [
-      /if \(loginEmailChange && linkedUserId\) \{[\s\S]*?\bforbidIfSandboxCookie\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\([\s\S]*?\bfollowUpLinkedLoginEmailChange\s*\(/,
-    ],
-  },
   "apps/web/src/app/api/people/change-requests/[id]/route.ts": {
     policy: "conditional-sensitive",
     assertions: [
@@ -341,9 +335,6 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
   // Gridmasters can't reach mobile, so no fresh-proof step is owed.
   "apps/web/src/features/mobile/server/routes/people-status.ts": [
     /endAccess: async \(serviceClient, \{ userId, orgId \}\) => \{\s*try \{\s*await endUserSessions\(userId\);/,
-  ],
-  "apps/web/src/features/mobile/server/routes/person.ts": [
-    /if \(loginEmailChange && currentPerson\.userId\) \{[\s\S]*?\brequireMobileSensitiveActionAuth\s*\([\s\S]*?\bsyncLinkedLoginEmail\s*\([\s\S]*?\bfollowUpLinkedLoginEmailChange\s*\(/,
   ],
   "apps/web/src/features/mobile/server/routes/auth-sign-out.ts": [
     /requireAssuredCaller[\s\S]*?\brequireMobileSensitiveActionAuth\s*\(/,

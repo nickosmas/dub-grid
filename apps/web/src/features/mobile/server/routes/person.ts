@@ -6,21 +6,18 @@ import {
   type MobilePerson,
 } from "@dubgrid/contracts";
 import { updateMobileEmployeeDetailsRow } from "@dubgrid/data-access";
-import { requireMobileAuth, requireMobileSensitiveActionAuth } from "@/features/mobile/server";
+import { requireMobileAuth } from "@/features/mobile/server";
 import {
   getLoginEmailChange,
+  LINKED_EMAIL_OWNER_ONLY_MESSAGE,
   LINKED_EMAIL_REQUIRED_MESSAGE,
-  LoginEmailConflictError,
-  syncLinkedLoginEmail,
 } from "@/features/employees/server/login-email";
-import { followUpLinkedLoginEmailChange } from "@/features/employees/server/login-email-follow-up";
 import {
   clearFocusAreaShiftsAfterSave,
   planFocusAreaShifts,
 } from "@/features/employees/server/focus-area-shifts";
 import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
-import { emailContactConflict, getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
-import { checkEmployeeEmailConflict } from "@/features/employees/server/contact-conflicts";
+import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import {
   buildStaffValidationErrorResponse,
   getStaffFieldErrorsFromZod,
@@ -292,55 +289,20 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return NextResponse.json(focusAreaShiftsPlan.refuse, { status: 409 });
   }
 
-  // The staff email is the login email. Changing it for a linked account is a
-  // sensitive action, and an account cannot be left without one.
+  // The staff email is the sign-in email, and whoever sets it can reset the
+  // password. So it changes only on the person's own profile, where both
+  // addresses confirm, or through support: never from a staff record.
   if (currentPerson.userId && !update.email) {
     return buildStaffValidationErrorResponse({ email: LINKED_EMAIL_REQUIRED_MESSAGE });
   }
-  const loginEmailChange = getLoginEmailChange({
-    userId: currentPerson.userId,
-    previousEmail: currentPerson.email,
-    nextEmail: update.email,
-  });
-  if (loginEmailChange && currentPerson.userId) {
-    // The sign-in changes before the row is written, so a contact email the
-    // row would refuse is refused here first (41b2). The version is checked
-    // above.
-    const emailConflict = await checkEmployeeEmailConflict(auth.serviceClient, {
-      orgId: auth.currentOrg.id,
-      email: loginEmailChange,
-      excludeEmployeeId: id,
-      currentUserId: currentPerson.userId,
-    });
-    if (emailConflict.conflict) {
-      return NextResponse.json(emailContactConflict(emailConflict.reason ?? "employee_duplicate"), {
-        status: 409,
-      });
-    }
-    const assurance = await requireMobileSensitiveActionAuth(req);
-    if ("response" in assurance) return assurance.response;
-    try {
-      await syncLinkedLoginEmail(auth.serviceClient, {
-        userId: currentPerson.userId,
-        email: loginEmailChange,
-      });
-    } catch (error) {
-      if (error instanceof LoginEmailConflictError) {
-        return NextResponse.json(error.conflict, { status: 409 });
-      }
-      throw error;
-    }
-    const actorSessionId = assurance.claims.session_id;
-    await followUpLinkedLoginEmailChange({
-      serviceClient: auth.serviceClient,
+  if (
+    getLoginEmailChange({
       userId: currentPerson.userId,
-      previousEmail: currentPerson.email ?? null,
-      newEmail: loginEmailChange,
-      orgId: auth.currentOrg.id,
-      actorId: assurance.user.id,
-      actorSessionId: typeof actorSessionId === "string" ? actorSessionId : null,
-    });
-    auditDetails.to.loginEmail = loginEmailChange;
+      previousEmail: currentPerson.email,
+      nextEmail: update.email,
+    })
+  ) {
+    return buildStaffValidationErrorResponse({ email: LINKED_EMAIL_OWNER_ONLY_MESSAGE });
   }
 
   let updatedRow;

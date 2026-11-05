@@ -477,85 +477,24 @@ describe("mobile person route", () => {
     describe("login email", () => {
       const params = { params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }) };
 
-      // The sign-in changes before the row, so an email the row would refuse
-      // is refused before the sign-in, sessions or notices change (41b2).
-      it("refuses an email another person uses before touching the sign-in", async () => {
+      // Whoever sets the sign-in email can reset the password, so a staff record
+      // can't change it, whatever the editor's level.
+      it("refuses to change a linked person's email", async () => {
         requireMobileAuth.mockResolvedValue(makeAuth());
-        checkEmployeeEmailConflict.mockResolvedValue({
-          conflict: true,
-          conflictingEmployeeId: "other-employee",
-          reason: "employee_duplicate",
-        });
 
         const { PATCH } = await import("./person");
-        const response = await PATCH(patchRequest({ email: "taken@dubgrid.com" }), params);
+        const response = await PATCH(patchRequest({ email: "new@dubgrid.com" }), params);
 
-        expect(response.status).toBe(409);
-        expect(await response.json()).toMatchObject({
-          code: "EMPLOYEE_CONTACT_CONFLICT",
-          field: "email",
-          message: "That email is already used by another person.",
-        });
-        expect(checkEmployeeEmailConflict).toHaveBeenCalledWith(
-          expect.anything(),
-          expect.objectContaining({
-            email: "taken@dubgrid.com",
-            excludeEmployeeId: "d660d308-4e0d-4daf-84fd-6753405e6740",
-            currentUserId: PERSON_USER_ID,
-          }),
+        expect(response.status).toBe(400);
+        expect((await response.json()).fieldErrors.email).toBe(
+          "Only they can change this, on their own profile.",
         );
-        expect(requireMobileSensitiveActionAuth).not.toHaveBeenCalled();
         expect(updateUserById).not.toHaveBeenCalled();
         expect(followUpLinkedLoginEmailChange).not.toHaveBeenCalled();
         expect(updateMobileEmployeeDetailsRow).not.toHaveBeenCalled();
       });
 
-      it("changes the login email behind step-up before writing the row", async () => {
-        requireMobileAuth.mockResolvedValue(makeAuth());
-        updateMobileEmployeeDetailsRow.mockResolvedValue({ id: "row-1" });
-
-        const { PATCH } = await import("./person");
-        const response = await PATCH(patchRequest({ email: "new@dubgrid.com" }), params);
-
-        expect(response.status).toBe(200);
-        expect(requireMobileSensitiveActionAuth).toHaveBeenCalledTimes(1);
-        expect(updateUserById).toHaveBeenCalledWith(PERSON_USER_ID, {
-          email: "new@dubgrid.com",
-          email_confirm: true,
-        });
-        expect(updateUserById.mock.invocationCallOrder[0]).toBeLessThan(
-          updateMobileEmployeeDetailsRow.mock.invocationCallOrder[0]!,
-        );
-        const input = updateMobileEmployeeDetailsRow.mock.calls[0]?.[1] as {
-          audit: { details?: { to: Record<string, unknown> } };
-        };
-        expect(input.audit.details?.to.loginEmail).toBe("new@dubgrid.com");
-        // Sessions under the old identity end, and both addresses hear why.
-        expect(followUpLinkedLoginEmailChange).toHaveBeenCalledWith(
-          expect.objectContaining({
-            userId: PERSON_USER_ID,
-            newEmail: "new@dubgrid.com",
-            actorId: VIEWER_USER_ID,
-            actorSessionId: "viewer-session",
-          }),
-        );
-      });
-
-      it("returns the step-up challenge without touching the account", async () => {
-        requireMobileAuth.mockResolvedValue(makeAuth());
-        requireMobileSensitiveActionAuth.mockResolvedValue({
-          response: Response.json({ error: "step up" }, { status: 403 }),
-        });
-
-        const { PATCH } = await import("./person");
-        const response = await PATCH(patchRequest({ email: "new@dubgrid.com" }), params);
-
-        expect(response.status).toBe(403);
-        expect(updateUserById).not.toHaveBeenCalled();
-        expect(updateMobileEmployeeDetailsRow).not.toHaveBeenCalled();
-      });
-
-      it("skips step-up for a person without an account", async () => {
+      it("saves a new email for a person without an account", async () => {
         requireMobileAuth.mockResolvedValue(makeAuth());
         rowToEmployee.mockReturnValue(makeEmployee({ userId: null }));
         mockManagementMemberships([]);
@@ -568,22 +507,7 @@ describe("mobile person route", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(requireMobileSensitiveActionAuth).not.toHaveBeenCalled();
         expect(updateUserById).not.toHaveBeenCalled();
-      });
-
-      it("reports a taken address as an email conflict", async () => {
-        requireMobileAuth.mockResolvedValue(makeAuth());
-        updateUserById.mockResolvedValue({
-          error: { status: 422, code: "email_exists", message: "already registered" },
-        });
-
-        const { PATCH } = await import("./person");
-        const response = await PATCH(patchRequest({ email: "taken@dubgrid.com" }), params);
-
-        expect(response.status).toBe(409);
-        expect(await response.json()).toMatchObject({ field: "email" });
-        expect(updateMobileEmployeeDetailsRow).not.toHaveBeenCalled();
       });
 
       it("rejects clearing the email of a linked account", async () => {
