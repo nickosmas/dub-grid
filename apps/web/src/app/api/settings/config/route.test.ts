@@ -120,6 +120,8 @@ describe("delete dependency checks", () => {
     chain.select = passthrough;
     chain.is = passthrough;
     chain.eq = passthrough;
+    chain.contains = passthrough;
+    chain.maybeSingle = async () => ({ data: null, error: null });
     chain.then = (resolve: (v: { data: unknown[]; count: number; error: null }) => unknown) =>
       resolve({ data: [], count: 0, error: null });
     const rpc = vi.fn(async () => ({ data: 3, error: null }));
@@ -205,6 +207,116 @@ describe("delete dependency checks", () => {
       summary: "Used by 2 employees",
       hasAnyReferences: true,
     });
+  });
+});
+
+describe("deleting only what nothing uses", () => {
+  /** Every reference check finds nothing, except rows in `usedTables`. */
+  function referenceClient(usedTables: string[], dayOffAbsenceTypeId: number | null = null) {
+    const writes: Array<{ table: string; op: string }> = [];
+    const contains: Array<{ table: string; column: string; values: unknown }> = [];
+    const client = {
+      from: (table: string) => {
+        const chain: Record<string, unknown> = {};
+        const passthrough = () => chain;
+        for (const method of ["select", "eq", "is", "in", "order", "limit", "not"]) {
+          chain[method] = passthrough;
+        }
+        chain.contains = (column: string, values: unknown) => {
+          contains.push({ table, column, values });
+          return chain;
+        };
+        chain.delete = () => {
+          writes.push({ table, op: "delete" });
+          return chain;
+        };
+        chain.update = () => {
+          writes.push({ table, op: "update" });
+          return chain;
+        };
+        chain.insert = passthrough;
+        chain.maybeSingle = async () => ({
+          data:
+            table === "organizations"
+              ? {
+                  coverage_rule_config: { mentoredCoverageCreditPercent: 100, dayOffAbsenceTypeId },
+                }
+              : null,
+          error: null,
+        });
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          resolve({ data: [], count: usedTables.includes(table) ? 1 : 0, error: null });
+        return chain;
+      },
+      rpc: async () => ({ data: 0, error: null }),
+    };
+    getServiceClient.mockReturnValue(client);
+    requireOrgPermissions.mockResolvedValue({
+      actor: { id: "actor-1", email: "a@example.com" },
+      serviceClient: client,
+      orgId: REAL_ORG,
+    });
+    return { writes, contains };
+  }
+
+  async function remove(action: string, itemId: number) {
+    const { POST } = await import("./route");
+    const res = await POST(
+      new NextRequest("https://app.test/api/settings/config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action, orgId: REAL_ORG, itemId, hard: true }),
+      }),
+    );
+    expect(res?.status).toBe(200);
+  }
+
+  it.each([
+    ["deleteShiftCategory", "shift_categories", "employee_shift_preferences", "shift_ids"],
+    ["deleteJobDefinition", "jobs", "employee_job_preferences", "job_ids"],
+  ])(
+    "%s archives an item someone's shift preferences name",
+    async (action, table, preferences, column) => {
+      const { writes, contains } = referenceClient([preferences]);
+
+      await remove(action, 5);
+
+      expect(contains).toContainEqual({ table: preferences, column, values: [5] });
+      expect(writes).toEqual([{ table, op: "update" }]);
+    },
+  );
+
+  it("archives the absence Schedule Rules saved as the day off absence", async () => {
+    const { writes } = referenceClient([], 9);
+
+    await remove("deleteAbsenceType", 9);
+
+    expect(writes).toEqual([{ table: "absence_types", op: "update" }]);
+  });
+
+  it.each([
+    ["deleteShiftCategory", "shift_categories"],
+    ["deleteJobDefinition", "jobs"],
+    ["deleteAbsenceType", "absence_types"],
+  ])("%s still deletes an item nothing uses", async (action, table) => {
+    const { writes } = referenceClient([], 3);
+
+    await remove(action, 5);
+
+    expect(writes).toEqual([{ table, op: "delete" }]);
+  });
+
+  it("reports the day off absence as in use, so the dialog offers Archive", async () => {
+    referenceClient([], 9);
+    const { GET } = await import("./route");
+
+    const res = await GET(
+      new NextRequest(
+        `https://app.test/api/settings/config?action=checkAbsenceTypeDependencies&orgId=${REAL_ORG}&itemId=9`,
+      ),
+    );
+
+    expect(await res?.json()).toMatchObject({ hasAnyReferences: true });
   });
 });
 

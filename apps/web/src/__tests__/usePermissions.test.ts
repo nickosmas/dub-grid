@@ -36,11 +36,18 @@ function createMockChannel() {
 }
 
 const mockCreateBrowserRealtimeChannel = vi.fn((_name: string) => createMockChannel());
+const mockRefreshBrowserSession = vi.fn();
+const mockToastInfo = vi.fn();
 
 vi.mock("@/features/account/client", () => ({
   createBrowserRealtimeChannel: (name: string) => mockCreateBrowserRealtimeChannel(name),
   fetchAccountPermissions: () => mockFetchAccountPermissions(),
+  refreshBrowserSession: () => mockRefreshBrowserSession(),
   removeBrowserRealtimeChannel: (channel: unknown) => mockRemoveBrowserRealtimeChannel(channel),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { info: (message: string) => mockToastInfo(message) },
 }));
 
 // ── Import after mocks ──────────────────────────────────────────────────────
@@ -357,6 +364,29 @@ describe("usePermissions hook", () => {
     expect(result.current.canEditShifts).toBe(true);
     expect(result.current.canEditNotes).toBe(true);
     expect(result.current.canPublishSchedule).toBe(false);
+  });
+
+  it("catches the token up after a role change and tells the person once", async () => {
+    signIn({ platform_role: "none", org_role: "user", org_id: "org-role-change" });
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("admin", "org-role-change", false, null),
+    });
+    mockRefreshBrowserSession.mockResolvedValue({
+      access_token: createAccessToken({
+        platform_role: "none",
+        org_role: "admin",
+        org_id: "org-role-change",
+      }),
+    });
+
+    const { result } = renderPermissions();
+    await waitFor(() => expect(result.current.role).toBe("admin"));
+    await waitFor(() =>
+      expect(mockToastInfo).toHaveBeenCalledWith(
+        "Your role changed to Admin, so what you can see has updated.",
+      ),
+    );
+    expect(mockRefreshBrowserSession).toHaveBeenCalledTimes(1);
   });
 
   it("clears perms when auth transitions to signed-out", async () => {

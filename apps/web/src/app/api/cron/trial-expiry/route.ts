@@ -2,6 +2,7 @@ import {
   BILLING_POLICY_LIMITS,
   PAYMENT_ATTENTION_STATUSES,
   billingPolicyOverridesFromRow,
+  isLiveSubscriptionStatus,
   resolveBillingPolicy,
 } from "@dubgrid/domain";
 import { BILLING_POLICY_OVERRIDE_SELECT, getPlatformBillingPolicy } from "@/lib/billing-policy";
@@ -23,6 +24,22 @@ const LOCK_ALERT_WINDOW_DAYS = 3;
 
 function lockedRecently(lockedAt: number, now: Date): boolean {
   return lockedAt <= now.getTime() && lockedAt > now.getTime() - LOCK_ALERT_WINDOW_DAYS * DAY_MS;
+}
+
+const SUBSCRIPTION_EMBED = "subscriptions(stripe_subscription_id, status)";
+
+// Subscribing during the trial keeps it, so a trialing organization can
+// already have a subscription that starts billing when the trial ends. Telling
+// it to subscribe, or that it locked, would be wrong.
+function hasLiveSubscription(org: Record<string, unknown>): boolean {
+  const embedded = org.subscriptions;
+  const rows = (Array.isArray(embedded) ? embedded : embedded ? [embedded] : []) as Array<{
+    stripe_subscription_id?: string | null;
+    status?: string | null;
+  }>;
+  return rows.some(
+    (row) => Boolean(row.stripe_subscription_id) && isLiveSubscriptionStatus(row.status),
+  );
 }
 
 // Runs daily via the vercel.json crons block. Three passes:
@@ -68,7 +85,7 @@ export async function GET(req: NextRequest) {
   // trial that could be in one and pick per organization.
   const { data: endingSoon, error: endingError } = await db
     .from("organizations")
-    .select(`id, trial_ends_at, ${BILLING_POLICY_OVERRIDE_SELECT}`)
+    .select(`id, trial_ends_at, ${SUBSCRIPTION_EMBED}, ${BILLING_POLICY_OVERRIDE_SELECT}`)
     .gte("trial_ends_at", startOfToday.toISOString())
     .lt("trial_ends_at", latestWindowEnd.toISOString())
     // An organization moved off its trial keeps the old end date; it is not
@@ -86,7 +103,7 @@ export async function GET(req: NextRequest) {
   let endingDispatched = 0;
   for (const org of (endingSoon ?? []) as Array<Record<string, unknown>>) {
     const trialEndsAt = org.trial_ends_at as string | null;
-    if (!trialEndsAt) continue;
+    if (!trialEndsAt || hasLiveSubscription(org)) continue;
     const { values } = resolveBillingPolicy(platformPolicy, billingPolicyOverridesFromRow(org));
     const windowStart = new Date(startOfToday);
     windowStart.setUTCDate(windowStart.getUTCDate() + values.trialReminderDays);
@@ -110,7 +127,9 @@ export async function GET(req: NextRequest) {
   // dedupes on trialEndsAt so the same expiry only alerts once.
   const { data: expired, error: expiredError } = await db
     .from("organizations")
-    .select(`id, trial_ends_at, subscription_status, ${BILLING_POLICY_OVERRIDE_SELECT}`)
+    .select(
+      `id, trial_ends_at, subscription_status, ${SUBSCRIPTION_EMBED}, ${BILLING_POLICY_OVERRIDE_SELECT}`,
+    )
     .lt("trial_ends_at", now.toISOString())
     .in("subscription_status", ["trialing", "trial_pending"])
     .is("archived_at", null)
@@ -124,7 +143,7 @@ export async function GET(req: NextRequest) {
   let lockedDispatched = 0;
   for (const org of (expired ?? []) as Array<Record<string, unknown>>) {
     const trialEndsAt = org.trial_ends_at as string | null;
-    if (!trialEndsAt) continue;
+    if (!trialEndsAt || hasLiveSubscription(org)) continue;
     await dispatchNotificationEvent("trial-expiry-cron", {
       action: "billing_trial_expired",
       orgId: org.id as string,

@@ -68,9 +68,28 @@ describe("planRecurringFills", () => {
     expect(fill()).toEqual([{ employeeId: "ana", dateKey: "2026-10-26", input: worked }]);
   });
 
-  it("never fills a cell that already has an entry, but fills a deleted one", () => {
+  it("never fills a cell that already has an entry", () => {
     expect(fill({ shifts: { "ana_2026-10-26": entry() } })).toEqual([]);
-    expect(fill({ shifts: { "ana_2026-10-26": entry({ isDelete: true }) } })).toHaveLength(1);
+    expect(
+      fill({
+        shifts: { "ana_2026-10-26": entry({ label: "", assignmentIds: [], absenceTypeId: 7 }) },
+      }),
+    ).toEqual([]);
+  });
+
+  it("leaves a day the draft removed alone, as the server does", () => {
+    const removed = entry({ isDraft: true, draftKind: "deleted", isDelete: true });
+    expect(fill({ shifts: { "ana_2026-10-26": removed } })).toEqual([]);
+    const twoMondays = { startDate: new Date(2026, 9, 25), endDate: new Date(2026, 10, 7) };
+    expect(
+      fill({ ...twoMondays, shifts: { "ana_2026-10-26": removed } }).map((f) => f.dateKey),
+    ).toEqual(["2026-11-02"]);
+  });
+
+  it("fills a cell whose entry holds nothing", () => {
+    expect(
+      fill({ shifts: { "ana_2026-10-26": entry({ label: "", assignmentIds: [] }) } }),
+    ).toHaveLength(1);
   });
 
   it("respects the effective dates, open ended or not", () => {

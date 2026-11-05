@@ -9,6 +9,7 @@ import type {
   MobileShiftRequestHistoryResponse,
   MobileUpdateShiftRequestBody,
 } from "@dubgrid/contracts";
+import { toShiftRequestDraftCell, type ShiftRequestDraftCellRow } from "@dubgrid/domain";
 import { hasShiftRequestStarted, timesOverlap, type TimeRange } from "@dubgrid/schedule-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -405,10 +406,7 @@ async function withApprovalDraftCells(
       });
       const draftCells = error
         ? null
-        : ((data ?? []) as { emp_id: string; shift_date: string }[]).map((row) => ({
-            empId: row.emp_id,
-            date: row.shift_date,
-          }));
+        : ((data ?? []) as ShiftRequestDraftCellRow[]).map(toShiftRequestDraftCell);
       return { ...request, draftCells };
     }),
   );

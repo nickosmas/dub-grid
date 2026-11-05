@@ -4,6 +4,8 @@ import {
   AWAY_ABSENCE_INVALID_CODE,
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
   AWAY_ABSENCE_UNKNOWN_MESSAGE,
+  AWAY_WHILE_SUSPENDED_CODE,
+  AWAY_WHILE_SUSPENDED_MESSAGE,
   canMarkInactive,
   canOffboardAtTier,
   isAwayAbsenceRefusal,
@@ -237,6 +239,7 @@ type PeopleStatusResult =
       error: string;
       code:
         | typeof NOT_SUSPENDABLE_CODE
+        | typeof AWAY_WHILE_SUSPENDED_CODE
         | typeof NO_ACCOUNT_CODE
         | typeof NOT_SUSPENDED_CODE
         | typeof NOT_PLANNABLE_CODE
@@ -342,6 +345,22 @@ export async function updateMobilePersonStatus(
     !canMarkInactive(currentEmployee.focusAreaIds)
   ) {
     return { kind: "not_on_schedule", error: NOT_ON_SCHEDULE_MESSAGE, status: 400 };
+  }
+
+  // Leaving Active ends a suspension in the database (109), giving sign-in
+  // back, so Away, now or planned, waits for a Reinstate, as on web.
+  if (
+    input.body.action === "deactivate" &&
+    currentEmployee.status === "active" &&
+    !currentEmployee.archivedAt &&
+    currentEmployee.suspendedAt
+  ) {
+    return {
+      kind: "invalid_status_change",
+      error: AWAY_WHILE_SUSPENDED_MESSAGE,
+      code: AWAY_WHILE_SUSPENDED_CODE,
+      status: 400,
+    };
   }
 
   const returnDate = input.body.returnDate ?? null;

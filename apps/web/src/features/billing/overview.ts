@@ -1,3 +1,4 @@
+import { checkoutTrialEnd } from "@dubgrid/domain";
 import type { OrganizationBillingSummary } from "@/types";
 import { calendarDaysUntil, describeBillingStatus, type BillingTone } from "./trial-status";
 
@@ -123,7 +124,7 @@ export function describeSeatGap(seatsInUse: number, paidSeats: number | null): s
   if (paidSeats == null) return null;
   const gap = seatsInUse - paidSeats;
   const sync =
-    "We update your paid seats to match the seats in use, and the change is prorated on your next invoice.";
+    "Paid seats don't change on their own. When we update them to match the seats in use, the change is prorated on your next invoice.";
   if (gap > 0) {
     return `${gap === 1 ? "1 seat in use isn't" : `${gap} seats in use aren't`} paid for yet. ${sync}`;
   }
@@ -177,6 +178,45 @@ function trialPending(summary: Summary, now: Date): Partial<BillingOverview> {
   };
 }
 
+function trialStartedStep(summary: Summary): BillingTimelineStep[] {
+  return summary.trialStartedAt
+    ? [
+        {
+          key: "started",
+          label: "Trial started",
+          when: formatShortDate(summary.trialStartedAt),
+          state: "done",
+        },
+      ]
+    : [];
+}
+
+/** A subscription started during the trial first charges when the trial ends. */
+function trialSubscribed(
+  summary: Summary,
+  now: Date,
+  visual: BillingVisual,
+): Partial<BillingOverview> {
+  const trialEndsAt = summary.trialEndsAt!;
+  return {
+    status: { label: "Subscribed", tone: "success" },
+    title: "Your subscription starts when the free trial ends.",
+    lead: "You won't be charged until then. After that, payments are collected automatically each month for your paid seats.",
+    visual,
+    timeline: [
+      ...trialStartedStep(summary),
+      todayStep(now),
+      {
+        key: "billing",
+        label: "Billing starts",
+        when: formatShortDate(trialEndsAt),
+        state: "upcoming",
+      },
+    ],
+    action: portalOrCheckout(summary, "Manage billing"),
+  };
+}
+
 function trialRunning(summary: Summary, now: Date): Partial<BillingOverview> {
   const trialEndsAt = summary.trialEndsAt!;
   const left = Math.max(0, calendarDaysUntil(new Date(trialEndsAt), now));
@@ -185,34 +225,33 @@ function trialRunning(summary: Summary, now: Date): Partial<BillingOverview> {
     ? daysBetween(summary.trialStartedAt, trialEndsAt)
     : Math.max(left, summary.billingPolicy?.trialDays ?? left);
   const ending = left <= ENDING_SOON_DAYS;
+  const ring = (tone: BillingTone): BillingVisual => ({
+    kind: "ring",
+    value: left,
+    total,
+    unit: left === 1 ? "day" : "days",
+    caption: "Left in your free trial",
+    tone,
+  });
+  if (summary.hasStripeSubscription) return trialSubscribed(summary, now, ring("info"));
+  // Stripe can't hold a trial this short, so checkout would charge at once.
+  const keepsTrial =
+    checkoutTrialEnd({ status: summary.status, trialEndsAt, billingPausedAt: null, now }) !== null;
+  const charged = keepsTrial
+    ? "You won't be charged until the trial ends."
+    : "Less than two days of the trial are left, so a subscription started now is charged right away.";
   return {
     title: ending
       ? "Start a subscription to keep your organization open."
       : "Your free trial is running.",
     lead: ending
-      ? `You won't be charged until the trial ends. Without a subscription, your organization locks ${
+      ? `${charged} Without a subscription, your organization locks ${
           graceDays > 0 ? "once the grace period ends" : "when it does"
         }.`
       : "You can start a subscription at any time, and you won't be charged until the trial ends.",
-    visual: {
-      kind: "ring",
-      value: left,
-      total,
-      unit: left === 1 ? "day" : "days",
-      caption: "Left in your free trial",
-      tone: ending ? "warning" : "info",
-    },
+    visual: ring(ending ? "warning" : "info"),
     timeline: [
-      ...(summary.trialStartedAt
-        ? [
-            {
-              key: "started",
-              label: "Trial started",
-              when: formatShortDate(summary.trialStartedAt),
-              state: "done" as const,
-            },
-          ]
-        : []),
+      ...trialStartedStep(summary),
       todayStep(now),
       { key: "ends", label: "Trial ends", when: formatShortDate(trialEndsAt), state: "upcoming" },
       ...(graceDays > 0

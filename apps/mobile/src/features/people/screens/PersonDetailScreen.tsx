@@ -10,6 +10,7 @@ import {
   formatFirstDay,
   canOffboardAtTier,
   statusChoices,
+  UNNAMED_ABSENCE,
   type StatusAction,
   type StatusActionCopy,
   DEFAULT_ORGANIZATION_LABELS,
@@ -66,7 +67,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import { createHeaderTextAction } from "../../../shared/navigation/HeaderTextAction";
+import { HeaderTextBarAction } from "../../../shared/navigation/HeaderTextAction";
 import { DISCARD_CONFIRM, EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
@@ -746,7 +747,7 @@ export default function PersonDetailScreen() {
         message:
           result.result === "invitation_replaced"
             ? "A replacement invitation is on its way."
-            : "Their access updates immediately.",
+            : "Their access changes now. If they have the app open, it updates and tells them.",
       });
     },
   });
@@ -1442,6 +1443,23 @@ export default function PersonDetailScreen() {
           : null,
     absenceName: plannedAbsence ? (plannedAbsence.name ?? plannedAbsence.label) : null,
   });
+  // The absence a planned Away fills its days with, which ending or shortening it takes off.
+  const planAbsenceName =
+    hasPlan && person.plannedAbsenceTypeId != null
+      ? plannedAbsence
+        ? (plannedAbsence.name ?? plannedAbsence.label)
+        : UNNAMED_ABSENCE
+      : null;
+  // The absence an Away person's days hold now, which Mark active or an earlier date takes off.
+  const currentAwayAbsence = absenceTypes.find(
+    (absenceType) => absenceType.id === person.awayAbsenceTypeId,
+  );
+  const awayAbsenceName =
+    isAway && person.awayUntil && person.awayAbsenceTypeId != null
+      ? currentAwayAbsence
+        ? (currentAwayAbsence.name ?? currentAwayAbsence.label)
+        : UNNAMED_ABSENCE
+      : null;
   const statusCopy = statusChoice
     ? describeStatusAction(statusChoice, getFullName(person), {
         hasAccount: Boolean(person.userId),
@@ -1465,6 +1483,8 @@ export default function PersonDetailScreen() {
             ? person.plannedFrom
             : null,
         plannedStatus: person.plannedStatus ?? null,
+        currentAbsenceName:
+          statusChoice === "markActive" ? awayAbsenceName : hasPlan ? planAbsenceName : null,
       })
     : restoresNow
       ? describeStatusAction("restore", getFullName(person))
@@ -1508,12 +1528,16 @@ export default function PersonDetailScreen() {
                           startDate: laterStart,
                           returnDate,
                           absenceName: chosenAbsenceName,
+                          plannedFrom: person.plannedFrom ?? null,
+                          currentReturnDate: person.plannedUntil ?? null,
+                          currentAbsenceName: planAbsenceName,
                         })
                       : awayDetailsChanged
                         ? describeStatusAction("setReturnDate", getFullName(person), {
                             returnDate,
                             currentReturnDate: person.awayUntil,
                             absenceName: chosenAbsenceName,
+                            currentAbsenceName: awayAbsenceName,
                           })
                         : null;
   const invitationConfirmationTitle =
@@ -1526,7 +1550,7 @@ export default function PersonDetailScreen() {
     invitationConfirmAction === "create"
       ? undefined
       : invitationConfirmAction === "resend"
-        ? "The current invitation will be canceled."
+        ? "A new invitation link is sent, and the current one stops working."
         : "The invite link stops working.";
   const invitationConfirmationLabel =
     invitationConfirmAction === "create"
@@ -1606,20 +1630,22 @@ export default function PersonDetailScreen() {
             color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
             fontFamily: mobileTypography.fontFamily.bold,
           },
-          // Edit lives in the bar, where iOS puts it, not in the action row:
-          // it is the one action about the page rather than about the person.
-          // While editing, the phones put Save and Cancel in the bar too; the
-          // web build keeps them in the footer.
-          ...createHeaderTextAction(
-            canEdit && !editing
-              ? {
-                  label: "Edit",
-                  accessibilityHint: "Opens the staff details editor",
-                  onPress: () => startEditing(),
-                }
-              : null,
-          ),
         }}
+      />
+      {/* Edit lives in the bar, where iOS puts it, not in the action row: it
+          is the one action about the page rather than about the person.
+          While editing, the phones put Save and Cancel in the bar too; the web
+          build keeps them in the footer. */}
+      <HeaderTextBarAction
+        action={
+          canEdit && !editing
+            ? {
+                label: "Edit",
+                accessibilityHint: "Opens the staff details editor",
+                onPress: () => startEditing(),
+              }
+            : null
+        }
       />
       {editing && IS_NATIVE_LIST ? (
         <EditBarActions

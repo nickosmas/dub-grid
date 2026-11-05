@@ -5,6 +5,7 @@ import {
   formatSeriesSpan,
   seriesDayDiffers,
   seriesDayPosition,
+  seriesHasPastDays,
   seriesScopeOptions,
   type SeriesSnapshotLike,
   type SeriesStateLike,
@@ -141,7 +142,7 @@ describe("seriesDayDiffers", () => {
 
 describe("seriesScopeOptions", () => {
   it("counts the days each choice reaches", () => {
-    const options = seriesScopeOptions(MON_WED, "2026-10-28");
+    const options = seriesScopeOptions(MON_WED, "2026-10-28", "2026-10-26");
     expect(options.map((option) => [option.scope, option.count, option.detail])).toEqual([
       ["this", 1, "Wed, Oct 28"],
       ["following", 3, "Oct 28 to Nov 4, 2026 · 3 days"],
@@ -150,11 +151,29 @@ describe("seriesScopeOptions", () => {
     ]);
   });
 
+  it("counts only today and later, since days before today stay as they are", () => {
+    const options = seriesScopeOptions(MON_WED, "2026-11-02", "2026-10-29");
+    expect(options.map((option) => [option.scope, option.count, option.detail])).toEqual([
+      ["this", 1, "Mon, Nov 2"],
+      ["following", 2, "Nov 2 to Nov 4, 2026 · 2 days"],
+      ["previous", 1, "Nov 2, 2026 · 1 day"],
+      ["all", 2, "Nov 2 to Nov 4, 2026 · 2 days"],
+    ]);
+  });
+
   it("leaves the counts unknown without the series' days", () => {
-    const options = seriesScopeOptions(null, "2026-10-28");
+    const options = seriesScopeOptions(null, "2026-10-28", "2026-10-26");
     expect(options[0].count).toBe(1);
     expect(options.slice(1).every((option) => option.count == null && option.detail == null)).toBe(
       true,
     );
+  });
+});
+
+describe("seriesHasPastDays", () => {
+  it("says whether any day of the series is before today", () => {
+    expect(seriesHasPastDays(MON_WED, "2026-10-26")).toBe(false);
+    expect(seriesHasPastDays(MON_WED, "2026-10-27")).toBe(true);
+    expect(seriesHasPastDays(null, "2026-10-27")).toBe(false);
   });
 });

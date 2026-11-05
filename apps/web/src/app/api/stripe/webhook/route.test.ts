@@ -384,6 +384,71 @@ describe("POST /api/stripe/webhook", () => {
     expect(update).not.toHaveProperty("trial_ends_at");
   });
 
+  it("records nothing for the trial's opening invoice for nothing", async () => {
+    constructEvent.mockReturnValue({
+      id: "evt_trial_invoice",
+      type: "invoice.payment_succeeded",
+      created: 1_780_000_000,
+      data: {
+        object: { id: "in_trial", customer: "cus_123", currency: "usd", amount_paid: 0 },
+      },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(invoiceEventUpsert).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("stores a checkout's trialing subscription without moving the in-app trial end", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-25T00:00:00.000Z"));
+    // Checkout rounded the in-app end up to Stripe's whole second.
+    organizationMaybeSingle.mockResolvedValue({
+      data: {
+        id: "11111111-1111-4111-8111-111111111111",
+        trial_ends_at: "2026-05-02T23:59:59.250Z",
+      },
+      error: null,
+    });
+    constructEvent.mockReturnValue({
+      id: "evt_checkout_trial",
+      type: "customer.subscription.created",
+      data: {
+        object: {
+          id: "sub_123",
+          customer: "cus_123",
+          status: "trialing",
+          metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+          items: { data: [{ price: { id: "price_123" }, quantity: 9 }] },
+          cancel_at: null,
+          canceled_at: null,
+          trial_end: 1_777_766_400,
+        },
+      },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(subscriptionUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripe_subscription_id: "sub_123",
+        status: "trialing",
+        trial_end: "2026-05-03T00:00:00.000Z",
+      }),
+      { onConflict: "org_id" },
+    );
+    expect(organizationUpdate).toHaveBeenCalledTimes(1);
+    expect(organizationUpdate).toHaveBeenCalledWith({
+      stripe_customer_id: "cus_123",
+      subscription_status: "trialing",
+      subscription_seats: 9,
+      payment_grace_started_at: null,
+    });
+  });
+
   it("records a canceled billing operation when Stripe cancels a subscription", async () => {
     subscriptionMaybeSingle.mockResolvedValueOnce({
       data: {

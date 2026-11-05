@@ -1292,6 +1292,36 @@ async function anyScheduleCellSnapshot(orgId: string, absenceTypeId: number): Pr
   return (count ?? 0) > 0;
 }
 
+// A person's Prefers or Only list (089, 091) stores ids, so deleting one
+// would quietly change what Auto-build gives them.
+async function anyPreferenceUses(
+  orgId: string,
+  table: "employee_shift_preferences" | "employee_job_preferences",
+  column: "shift_ids" | "job_ids",
+  id: number,
+): Promise<boolean> {
+  const { count, error } = await getServiceClient()
+    .from(table)
+    .select("employee_id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .contains(column, [id]);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
+/** Whether Schedule Rules saved this absence as the day off absence. */
+async function isSavedDayOffAbsence(orgId: string, absenceTypeId: number): Promise<boolean> {
+  const { data, error } = await getServiceClient()
+    .from("organizations")
+    .select("coverage_rule_config")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  const config = (data as { coverage_rule_config?: { dayOffAbsenceTypeId?: unknown } } | null)
+    ?.coverage_rule_config;
+  return config?.dayOffAbsenceTypeId === absenceTypeId;
+}
+
 async function focusAreaHasAnyReferencesForOrg(
   focusAreaId: number,
   orgId: string,
@@ -1448,11 +1478,12 @@ async function jobHasAnyReferencesForOrg(jobId: number, orgId: string): Promise<
     .eq("job_id", jobId);
   if ((coverageRes.count ?? 0) > 0) return true;
 
-  const [cellHasJob, recurring] = await Promise.all([
+  const [cellHasJob, preferred, recurring] = await Promise.all([
     anyScheduleCellSegment(orgId, "job_id", jobId),
+    anyPreferenceUses(orgId, "employee_job_preferences", "job_ids", jobId),
     loadAllRecurringStates(orgId),
   ]);
-  if (cellHasJob) return true;
+  if (cellHasJob || preferred) return true;
   return recurring.some((row) => recurringStateUsesJob(row.state, jobId));
 }
 
@@ -1468,11 +1499,12 @@ async function shiftCategoryHasAnyReferencesForOrg(
     .eq("preferred_shift_id", categoryId);
   if ((coverageRes.count ?? 0) > 0) return true;
 
-  const [cellHasShift, recurring] = await Promise.all([
+  const [cellHasShift, preferred, recurring] = await Promise.all([
     anyScheduleCellSegment(orgId, "shift_id", categoryId),
+    anyPreferenceUses(orgId, "employee_shift_preferences", "shift_ids", categoryId),
     loadAllRecurringStates(orgId),
   ]);
-  if (cellHasShift) return true;
+  if (cellHasShift || preferred) return true;
   return recurring.some((row) => recurringStateUsesShift(row.state, categoryId));
 }
 
@@ -1488,11 +1520,12 @@ async function absenceTypeHasAnyReferencesForOrg(
     .eq("absence_type_id", absenceTypeId);
   if ((shiftReqRes.count ?? 0) > 0) return true;
 
-  const [cellHasAbsence, recurring] = await Promise.all([
+  const [cellHasAbsence, dayOff, recurring] = await Promise.all([
     anyScheduleCellSnapshot(orgId, absenceTypeId),
+    isSavedDayOffAbsence(orgId, absenceTypeId),
     loadAllRecurringStates(orgId),
   ]);
-  if (cellHasAbsence) return true;
+  if (cellHasAbsence || dayOff) return true;
   return recurring.some((row) => recurringStateUsesAbsenceType(row.state, absenceTypeId));
 }
 

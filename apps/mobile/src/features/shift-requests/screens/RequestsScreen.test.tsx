@@ -448,6 +448,7 @@ describe("RequestsScreen", () => {
           focusAreaId: 2,
           state: openShift.state,
         },
+        requestType: null,
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );
@@ -977,6 +978,7 @@ describe("RequestsScreen", () => {
       {
         requestId: "req-3",
         body: { action: "cancel", empId: "emp-3", note: "Covered another way" },
+        requestType: "swap",
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );
@@ -1024,6 +1026,7 @@ describe("RequestsScreen", () => {
       {
         requestId: "req-2",
         body: { action: "resolve", approved: true, note: "Thanks for covering" },
+        requestType: "pickup",
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );

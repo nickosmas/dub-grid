@@ -354,7 +354,7 @@ describe("BillingSettings", () => {
 
     expect(
       await screen.findByText(
-        "2 seats in use aren't paid for yet. We update your paid seats to match the seats in use, and the change is prorated on your next invoice.",
+        "2 seats in use aren't paid for yet. Paid seats don't change on their own. When we update them to match the seats in use, the change is prorated on your next invoice.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage billing" })).toBeInTheDocument();

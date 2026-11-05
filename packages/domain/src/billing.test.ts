@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   billingHoldControls,
+  checkoutTrialEnd,
   effectiveBillingStatus,
   evaluateOrganizationBillingAccess,
   isLiveSubscriptionStatus,
@@ -344,5 +345,50 @@ describe("payment grace", () => {
         now,
       }).pause.allowed,
     ).toBe(false);
+  });
+});
+
+describe("checkoutTrialEnd", () => {
+  it("keeps the rest of a running trial, rounded up to the second", () => {
+    expect(
+      checkoutTrialEnd({ status: "trialing", trialEndsAt: "2026-10-20T00:00:00.400Z", now }),
+    ).toBe(Math.ceil(Date.parse("2026-10-20T00:00:00.400Z") / 1000));
+  });
+
+  it("treats an organization with no status yet as trialing", () => {
+    expect(checkoutTrialEnd({ status: null, trialEndsAt: "2026-10-20T00:00:00Z", now })).toBe(
+      Date.parse("2026-10-20T00:00:00Z") / 1000,
+    );
+  });
+
+  it("charges at once when less than Stripe's 48 hours are left", () => {
+    const justUnder = new Date(now.getTime() + 48 * 3_600_000).toISOString();
+    expect(checkoutTrialEnd({ status: "trialing", trialEndsAt: justUnder, now })).toBeNull();
+    const comfortable = new Date(now.getTime() + 49 * 3_600_000).toISOString();
+    expect(checkoutTrialEnd({ status: "trialing", trialEndsAt: comfortable, now })).not.toBeNull();
+  });
+
+  it("charges at once with no running trial", () => {
+    expect(checkoutTrialEnd({ status: "trialing", trialEndsAt: null, now })).toBeNull();
+    expect(
+      checkoutTrialEnd({ status: "trialing", trialEndsAt: "2026-10-10T00:00:00Z", now }),
+    ).toBeNull();
+    expect(
+      checkoutTrialEnd({ status: "trial_expired", trialEndsAt: "2026-10-20T00:00:00Z", now }),
+    ).toBeNull();
+    expect(
+      checkoutTrialEnd({ status: "canceled", trialEndsAt: "2026-10-20T00:00:00Z", now }),
+    ).toBeNull();
+  });
+
+  it("sets no trial while billing is paused", () => {
+    expect(
+      checkoutTrialEnd({
+        status: "trialing",
+        trialEndsAt: "2026-10-20T00:00:00Z",
+        billingPausedAt: "2026-10-01T00:00:00Z",
+        now,
+      }),
+    ).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ import { queryClient } from "../../../shared/lib/query-client";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useBootstrap } from "../hooks/useBootstrap";
 import { useMobilePermissionsRealtime } from "../hooks/useMobilePermissionsRealtime";
+import { useOwnRoleChangeNotice } from "../hooks/useOwnRoleChangeNotice";
 
 export function MobileRealtimeProvider({ children }: PropsWithChildren) {
   const { accessToken, session } = useSessionState();
@@ -27,6 +28,13 @@ export function MobileRealtimeProvider({ children }: PropsWithChildren) {
   useMobilePermissionsRealtime({
     accessToken,
     userId,
+    queryClient,
+  });
+
+  useOwnRoleChangeNotice({
+    accessToken,
+    userId,
+    bootstrap: bootstrapQuery.data,
     queryClient,
   });
 

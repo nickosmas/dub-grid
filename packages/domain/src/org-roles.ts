@@ -80,3 +80,36 @@ export function getEffectiveOrgRole(role: OrgRole | string | null | undefined): 
 export function getOrgRolePrivilegeRank(role: OrgRole | string | null | undefined): number {
   return PRIVILEGE_RANK[getEffectiveOrgRole(role)];
 }
+
+/** One reading of the signed-in person's role in one organization. */
+export interface OwnOrgRoleReading {
+  orgId: string | null;
+  role: string | null;
+}
+
+/**
+ * The role the server now gives the signed-in person when an earlier reading
+ * (their access token's claim, or what the app last showed) names another one
+ * for the same organization; null when there is nothing to catch up on.
+ *
+ * A different organization is never a role change: a sandbox, an org switch or
+ * an impersonation reads a different org on purpose.
+ */
+export function getOwnOrgRoleChange(
+  current: OwnOrgRoleReading,
+  earlier: OwnOrgRoleReading,
+): OrgRole | null {
+  if (!current.orgId || current.orgId !== earlier.orgId) return null;
+  const role = current.role;
+  if (role !== "super_admin" && role !== "admin" && role !== "user") return null;
+  const earlierRole = earlier.role;
+  if (earlierRole !== "super_admin" && earlierRole !== "admin" && earlierRole !== "user") {
+    return null;
+  }
+  return role === earlierRole ? null : role;
+}
+
+/** What the signed-in person is told once their own app has caught up with a role change. */
+export function getOwnOrgRoleChangedMessage(role: OrgRole): string {
+  return `Your role changed to ${ORG_ROLE_LABELS[role]}, so what you can see has updated.`;
+}

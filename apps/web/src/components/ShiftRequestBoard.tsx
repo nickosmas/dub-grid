@@ -35,11 +35,13 @@ import { fetchShiftRequests } from "@/features/schedule/client/api";
 import { queryKeys } from "@/lib/query-keys";
 import {
   describeAwaitingRecipient,
+  describeClaimApproval,
   describeShiftRequest,
   describeShiftRequestNoteRecipients,
   describeShiftRequestPill,
   groupManagerQueue,
   isAwaitingRecipient,
+  SHIFT_REQUEST_DECLINE_MESSAGE,
 } from "@dubgrid/domain";
 import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
@@ -64,6 +66,8 @@ interface ShiftRequestBoardProps {
   loading: boolean;
   currentEmpId: string | null;
   canApprove: boolean;
+  /** A Gridmaster impersonating a member: nothing is approved on the spot. */
+  isImpersonating?: boolean;
   onClaim: (requestId: string) => void | Promise<unknown>;
   onRespond: (requestId: string, accept: boolean) => void | Promise<unknown>;
   onResolve: (requestId: string, approved: boolean, note?: string) => void | Promise<unknown>;
@@ -156,6 +160,7 @@ export default function ShiftRequestBoard({
   loading,
   currentEmpId,
   canApprove,
+  isImpersonating = false,
   onClaim,
   onRespond,
   onResolve,
@@ -687,9 +692,11 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Claim",
               key: `claim:${req.id}`,
-              message: canApprove
-                ? "It goes on the schedule right away."
-                : "It's sent for manager approval.",
+              message: describeClaimApproval({
+                viewerCanApprove: canApprove,
+                posterApprovalCounts: req.parentRequestId == null,
+                impersonating: isImpersonating,
+              }),
               onConfirm: () => onClaim(req.id),
               title: `Claim ${requestLabel}?`,
               variant: "info",
@@ -732,6 +739,7 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Decline",
               key: `decline:${req.id}`,
+              message: SHIFT_REQUEST_DECLINE_MESSAGE,
               onConfirm: () => onRespond(req.id, false),
               title: requestTitle("Decline"),
               variant: "warning",

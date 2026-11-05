@@ -201,6 +201,44 @@ describe("GET /api/cron/trial-expiry", () => {
     );
   });
 
+  it("tells no organization that already subscribed during its trial to subscribe", async () => {
+    const subscribed = { stripe_subscription_id: "sub_1", status: "trialing" };
+    endingSoonQuery.mockResolvedValueOnce({
+      data: [
+        { id: "org-subscribed", trial_ends_at: "2026-06-11T00:00:00Z", subscriptions: subscribed },
+        {
+          id: "org-ended",
+          trial_ends_at: "2026-06-11T00:00:00Z",
+          subscriptions: { stripe_subscription_id: "sub_2", status: "canceled" },
+        },
+      ],
+      error: null,
+    });
+    expiredQuery.mockResolvedValueOnce({
+      data: [
+        {
+          id: "org-subscribed-late",
+          trial_ends_at: "2026-05-31T00:00:00Z",
+          subscription_status: "trialing",
+          subscriptions: [subscribed],
+        },
+      ],
+      error: null,
+    });
+
+    const res = await GET(makeReq({ authorization: `Bearer ${SECRET}` }));
+
+    const orgs = dispatchNotificationEvent.mock.calls.map(
+      ([, event]) => (event as { orgId: string }).orgId,
+    );
+    expect(orgs).toEqual(["org-ended"]);
+    await expect(res.json()).resolves.toMatchObject({
+      endingSoonDispatched: 1,
+      expiredDispatched: 0,
+      lockedDispatched: 0,
+    });
+  });
+
   it("returns counts in the response body", async () => {
     endingSoonQuery.mockResolvedValueOnce({
       data: [{ id: "org-a", trial_ends_at: "2026-06-11T00:00:00Z" }],

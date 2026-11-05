@@ -3,7 +3,8 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { addDays, formatDate, formatDateKey } from "@/lib/utils";
+import { parseLocalDateKey } from "@dubgrid/schedule-core";
+import { formatDate, formatDateKey } from "@/lib/utils";
 import {
   importPreviousSchedule,
   type ImportPreviousScheduleOutcome,
@@ -15,6 +16,7 @@ import {
   type ScheduleOperation,
 } from "../_lib/operations";
 import { getImportTargetCellKeys } from "../_lib/import-cell-keys";
+import { importPreviousRange } from "../_lib/import-range";
 
 export type ImportPreviewState = {
   sourceRange: string;
@@ -23,6 +25,8 @@ export type ImportPreviewState = {
   sourceEndDate: string;
   targetStartDate: string;
   targetEndDate: string;
+  /** The period on screen starts before today, whose days are left out. */
+  skipsPastDays: boolean;
   outcomes: ImportPreviousScheduleOutcome[];
   breakdown: ImportPreviousBreakdown;
 };
@@ -44,6 +48,7 @@ export function useScheduleImport({
   org,
   spanWeeks,
   weekStart,
+  todayKey,
   employeeNameById,
   refetchScheduleData,
   startScheduleOperation,
@@ -55,6 +60,8 @@ export function useScheduleImport({
   org: { id: string } | null;
   spanWeeks: 1 | 2 | "month";
   weekStart: Date;
+  /** The organization's today (YYYY-MM-DD): days before it are never imported into. */
+  todayKey: string;
   employeeNameById: Map<string, string>;
   refetchScheduleData: (opts?: {
     ensureStart?: string;
@@ -79,14 +86,19 @@ export function useScheduleImport({
   const handleImportPreviousPreview = useCallback(async () => {
     if (!org || spanWeeks === "month") return;
 
-    const days = spanWeeks * 7;
-    const sourceStart = addDays(weekStart, -days);
-    const sourceEnd = addDays(sourceStart, days - 1);
-    const targetEnd = addDays(weekStart, days - 1);
-    const sourceStartKey = formatDateKey(sourceStart);
-    const sourceEndKey = formatDateKey(sourceEnd);
-    const targetStartKey = formatDateKey(weekStart);
-    const targetEndKey = formatDateKey(targetEnd);
+    const range = importPreviousRange(formatDateKey(weekStart), spanWeeks * 7, todayKey);
+    if (!range) {
+      toast.info("Nothing to import: every day on screen is before today.");
+      return;
+    }
+    const {
+      sourceStart: sourceStartKey,
+      sourceEnd: sourceEndKey,
+      targetStart: targetStartKey,
+      targetEnd: targetEndKey,
+    } = range;
+    const rangeLabel = (start: string, end: string) =>
+      `${formatDate(parseLocalDateKey(start))} - ${formatDate(parseLocalDateKey(end))}`;
 
     setIsImportingPrevious(true);
     try {
@@ -113,12 +125,13 @@ export function useScheduleImport({
       }
 
       setImportPreview({
-        sourceRange: `${formatDate(sourceStart)} - ${formatDate(sourceEnd)}`,
-        targetRange: `${formatDate(weekStart)} - ${formatDate(targetEnd)}`,
+        sourceRange: rangeLabel(sourceStartKey, sourceEndKey),
+        targetRange: rangeLabel(targetStartKey, targetEndKey),
         sourceStartDate: sourceStartKey,
         sourceEndDate: sourceEndKey,
         targetStartDate: targetStartKey,
         targetEndDate: targetEndKey,
+        skipsPastDays: range.skipsPastDays,
         outcomes,
         breakdown,
       });
@@ -129,7 +142,7 @@ export function useScheduleImport({
     } finally {
       setIsImportingPrevious(false);
     }
-  }, [org, spanWeeks, weekStart, employeeNameById]);
+  }, [org, spanWeeks, weekStart, todayKey, employeeNameById]);
 
   const handleImportPrevious = useCallback(async () => {
     if (!org || spanWeeks === "month" || !importPreview) return;

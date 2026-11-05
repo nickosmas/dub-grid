@@ -1200,6 +1200,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           )
         }
         stepUpOpen={Boolean(statusStepUp.dialog)}
+        timeZone={org?.timezone ?? null}
         variant="card"
         label={label}
         focus="plan"
@@ -1232,6 +1233,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           )
         }
         stepUpOpen={Boolean(statusStepUp.dialog)}
+        timeZone={org?.timezone ?? null}
       />
     );
 

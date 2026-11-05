@@ -638,7 +638,8 @@ describe("POST /api/employees/status", () => {
       const response = await post({ action: "deactivate", startDate: "2026-11-10" });
 
       expect(response.status).toBe(400);
-      expect((await response.json()).code).toBe("NOT_PLANNABLE");
+      expect((await response.json()).code).toBe("AWAY_WHILE_SUSPENDED");
+      expect(employeeUpdate).not.toHaveBeenCalled();
     });
 
     it("moves a planned Away and cancels one", async () => {
@@ -1463,6 +1464,20 @@ describe("POST /api/employees/status", () => {
       await expect(response.json()).resolves.toEqual({
         error: "Only someone with an account can be suspended.",
         code: "NO_ACCOUNT",
+      });
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    // Leaving Active would end the suspension in the database (109).
+    it("refuses to mark a suspended person away until they're reinstated", async () => {
+      arrange({ suspended_at: "2026-10-26T00:00:00Z" });
+
+      const response = await post("deactivate");
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Reinstate them first, then mark them away.",
+        code: "AWAY_WHILE_SUSPENDED",
       });
       expect(employeeUpdate).not.toHaveBeenCalled();
     });

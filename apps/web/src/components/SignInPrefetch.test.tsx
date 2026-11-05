@@ -230,6 +230,13 @@ describe("SignInPrefetch", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("asks for nothing on the sign-out page, which is ending the session", () => {
+    mockTransitionPending = false;
+    mockPathname = "/goodbye";
+    renderPrefetch();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("waits for a session", () => {
     mockSession = null;
     renderPrefetch();
