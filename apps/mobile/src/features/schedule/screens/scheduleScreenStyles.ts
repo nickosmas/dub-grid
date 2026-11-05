@@ -134,15 +134,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // The shadow lives on this view and the clip on the one inside: iOS clips
     // a view's own shadow when it also clips its children, which is why the
     // hero's blue glow never rendered there.
+    // The glow sits below the card: its blur reaches only a few points above
+    // the top edge, inside the gap under the header. At 28 blur and 14 down it
+    // reached past that gap, and the top of the scrolling area cut it in a
+    // straight line across the page's wash.
     meHeroCard: {
       position: "relative",
       borderRadius: mobileRadii.card,
       shadowOffset: {
         width: 0,
-        height: 14,
+        height: 16,
       },
       shadowOpacity: 1,
-      shadowRadius: 28,
+      shadowRadius: 20,
       elevation: 5,
     },
     meHeroCardClip: {

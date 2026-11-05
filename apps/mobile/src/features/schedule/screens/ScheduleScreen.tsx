@@ -22,6 +22,7 @@ import Reanimated, {
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { emptySceneDayFromIso } from "../../../shared/components/empty-scene/day-scene";
 import { Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
+import { buildCoverageWash } from "../../dashboard/lib/coverage-wash";
 import { useScrollToTopOnChange } from "../../../shared/hooks/useScrollToTopOnChange";
 import { PageWash } from "../../../shared/components/PageWash";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
@@ -56,11 +57,7 @@ import {
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import {
-  mobileMotion,
-  type MobileColors,
-  mobileSoftGradientStops,
-} from "../../../shared/theme/tokens";
+import { mobileMotion, type MobileColors } from "../../../shared/theme/tokens";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -1369,10 +1366,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
-  // The staff home sits on the brand aurora, the login page's wash, on every
-  // platform (owner, 2026-11-04); the team schedule stays plain.
+  // The staff home carries Home's wash, the same blue the admin Home shows at
+  // normal coverage (owner, 2026-11-04); the team schedule stays plain.
   const homeWash = isTeamScope ? undefined : (
-    <PageWash colors={mobileSoftGradientStops("aurora", isDark)} height={viewportHeight} />
+    <PageWash colors={buildCoverageWash(null, isDark)} height={viewportHeight} />
   );
 
   return (
