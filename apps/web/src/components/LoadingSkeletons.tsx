@@ -178,10 +178,6 @@ export function PersonPageSkeleton({
                 {variant === "profile" ? <Skeleton className="h-3.5 w-52 max-w-full" /> : null}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {variant === "staff" ? <Skeleton className="h-9 w-52" /> : null}
-              <Skeleton className="h-9 w-28" />
-            </div>
           </div>
         </header>
 
@@ -201,46 +197,23 @@ export function PersonPageSkeleton({
                 tabCount > 3 ? "w-[388px]" : "w-[294px]",
               )}
             />
-            {variant === "staff" ? (
-              <Skeleton className="h-[38px] w-[340px] max-w-full dg-skeleton--control" />
-            ) : (
-              <Skeleton className="h-3.5 w-28" />
-            )}
           </div>
 
-          <div className="dg-card grid grid-cols-3">
-            {[0, 1, 2].map((cell) => (
-              <div
-                key={cell}
-                className={cn(
-                  "flex flex-col gap-3 px-5 py-5",
-                  cell > 0 && "border-l border-[var(--dg-color-border)]",
-                )}
-              >
-                <Skeleton className="h-3.5 w-20" />
-                <Skeleton className="h-7 w-14" />
+          {[0, 1].map((card) => (
+            <div key={card} className="dg-card flex flex-col">
+              <div className="border-b border-[var(--dg-color-border)] px-5 py-4">
+                <Skeleton className="h-4 w-20" />
               </div>
-            ))}
-          </div>
-
-          <Skeleton className="mt-4 h-5 w-20" />
-          <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {[0, 1, 2].map((card) => (
-              <div key={card} className="dg-card flex flex-col">
-                <div className="border-b border-[var(--dg-color-border)] px-5 py-4">
-                  <Skeleton className="h-4 w-20" />
-                </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-5 px-5 py-5">
-                  {[0, 1, 2, 3].map((field) => (
-                    <div key={field} className="flex flex-col gap-2">
-                      <Skeleton className="h-3 w-16" />
-                      <Skeleton className={cn("h-3.5", pick(DETAIL_WIDTHS, card + field))} />
-                    </div>
-                  ))}
-                </div>
+              <div className="grid gap-x-6 gap-y-5 px-5 py-5 sm:grid-cols-2">
+                {[0, 1, 2, 3].map((field) => (
+                  <div key={field} className="flex flex-col gap-2">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-9 w-full dg-skeleton--control" />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

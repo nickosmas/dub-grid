@@ -199,7 +199,7 @@ export function AccessCard({
           </InfoField>
         ) : null}
         {accountState ? (
-          <InfoField label="Account">{ACCOUNT_LABELS[accountState.kind]}</InfoField>
+          <InfoField label="Sign-in">{ACCOUNT_LABELS[accountState.kind]}</InfoField>
         ) : null}
         {lastSignInAt ? (
           <InfoField label="Last active">
