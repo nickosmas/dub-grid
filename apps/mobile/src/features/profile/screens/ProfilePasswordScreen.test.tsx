@@ -208,7 +208,10 @@ describe("ProfilePasswordScreen", () => {
       );
       expect(stepUpRun).not.toHaveBeenCalled();
       expect(requireMobileCredentialAssurance).toHaveBeenCalledWith("fresh-token");
-      expect(updateUser).toHaveBeenCalledWith({ password: "New-password-123" });
+      expect(updateUser).toHaveBeenCalledWith({
+        password: "New-password-123",
+        current_password: "Old-password-123",
+      });
       // Pushes off before the token dies, not after.
       expect(disablePushForCurrentDevice).toHaveBeenCalled();
       expect(signOutMobileSessions).toHaveBeenCalledWith("fresh-token", {
@@ -357,8 +360,9 @@ describe("ProfilePasswordScreen", () => {
     expect(screen.queryByRole("button", { name: /^Show / })).not.toBeInTheDocument();
 
     expect(screen.getByText("At least 10 characters")).toBeInTheDocument();
+    expect(screen.getByText("Lowercase letter")).toBeInTheDocument();
     expect(screen.getByText("Uppercase letter")).toBeInTheDocument();
-    expect(screen.getByText("Letter and number")).toBeInTheDocument();
+    expect(screen.getByText("Number")).toBeInTheDocument();
     expect(screen.getByText("Symbol")).toBeInTheDocument();
     expect(screen.queryByText("Too short")).not.toBeInTheDocument();
 

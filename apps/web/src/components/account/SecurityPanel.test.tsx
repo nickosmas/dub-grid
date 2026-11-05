@@ -187,7 +187,7 @@ describe("SecurityPanel session actions", () => {
     await waitFor(() => expect(updateBrowserUserPassword).toHaveBeenCalledOnce());
     expect(reauthenticateBrowserMfa).toHaveBeenCalledWith("OldPass1!xyz", undefined);
     expect(steps).toEqual(["re-sign-in", "assurance fresh-token", "update"]);
-    expect(updateBrowserUserPassword).toHaveBeenCalledWith("StrongPass1!");
+    expect(updateBrowserUserPassword).toHaveBeenCalledWith("StrongPass1!", "OldPass1!xyz");
     expect(mockSignOut).toHaveBeenCalledWith({ scope: "global", reason: "password-changed" });
   });
 
