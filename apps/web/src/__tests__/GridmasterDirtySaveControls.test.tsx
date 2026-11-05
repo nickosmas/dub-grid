@@ -76,10 +76,6 @@ vi.mock("@/hooks/useStepUpAction", () => ({
   }),
 }));
 
-vi.mock("@/lib/notify", () => ({
-  queueNotification: vi.fn(),
-}));
-
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
