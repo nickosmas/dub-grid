@@ -32,4 +32,14 @@ that hit the limit, since a rerun replaces a job's first attempt in the API.
 
 ## Verify
 
-See the pull request for the forced-timeout run on real runners.
+A temporary 20-second limit on the first attempt forced the retry on real runners.
+
+- The first run found the dpkg race: WebKit shard 1 lost its second attempt to "dpkg
+  was interrupted" because the repair met the lock.
+- With the repeating repair, all four WebKit shards were killed and recovered on
+  the next attempt, two of them after waiting on the lock. None hit "dpkg was
+  interrupted" or needed a third attempt, and all 12 suites passed.
+- The Azure mirror drop works: the retry took all 185 packages from
+  `archive.ubuntu.com`.
+- A genuinely slow mirror has not been reproduced, so that case rests on the forced
+  timeout. The limit was removed before merging.
