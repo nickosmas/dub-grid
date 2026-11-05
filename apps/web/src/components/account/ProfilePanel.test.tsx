@@ -142,7 +142,6 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof ProfilePanel
     orgId: "org-1",
     canEditProfileDirectly: true,
     isGridmaster: false,
-    canDeleteAccountDirectly: false,
     role: "admin",
     departments: [],
     isOnSchedule: true,
@@ -263,7 +262,7 @@ describe("ProfilePanel", () => {
       renderPanel({ role: "user", canManageManagementAccess: false, managementDepartmentIds: [] });
 
       expect(screen.getByText("Access")).toBeInTheDocument();
-      expect(screen.getByText("Role")).toBeInTheDocument();
+      expect(screen.getByText("Access role")).toBeInTheDocument();
       expect(screen.getByText("User")).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /add to management|edit management access/i }),
@@ -364,41 +363,15 @@ describe("ProfilePanel change-request loading", () => {
     await waitFor(() => expect(fetchOwnProfileChangeRequests).toHaveBeenCalledWith("org-1"));
   });
 
-  describe("account deletion", () => {
-    it("offers a people manager the request path, not a direct delete", async () => {
-      renderPanel({ canEditProfileDirectly: true, canDeleteAccountDirectly: false });
-      await waitFor(() =>
-        expect(
-          screen.getByRole("button", { name: /request account deletion/i }),
-        ).toBeInTheDocument(),
-      );
-      expect(screen.queryByRole("button", { name: /^delete account$/i })).not.toBeInTheDocument();
-    });
+  it("asks for a name change in its own dialog, and leaves deletion to the page", async () => {
+    renderPanel({ isOrgMember: true, canEditProfileDirectly: false });
 
-    it("gives a super admin the direct delete card with the ownership rule", async () => {
-      renderPanel({
-        canEditProfileDirectly: true,
-        canDeleteAccountDirectly: true,
-        role: "super_admin",
-      });
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: /^delete account$/i })).toBeInTheDocument(),
-      );
-      expect(
-        screen.getByText(/only Super Admin, make someone else a Super Admin first/i),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /request account deletion/i }),
-      ).not.toBeInTheDocument();
-    });
+    fireEvent.click(await screen.findByRole("button", { name: "Request a name change" }));
 
-    it("shows a gridmaster neither path", async () => {
-      renderPanel({ isGridmaster: true, canDeleteAccountDirectly: true, role: "gridmaster" });
-      await waitFor(() => expect(screen.getByText("Alice Smith")).toBeInTheDocument());
-      expect(screen.queryByRole("button", { name: /^delete account$/i })).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /request account deletion/i }),
-      ).not.toBeInTheDocument();
-    });
+    expect(
+      await screen.findByRole("dialog", { name: "Request a name change" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("First name")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete/i })).not.toBeInTheDocument();
   });
 });

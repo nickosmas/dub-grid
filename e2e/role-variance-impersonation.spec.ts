@@ -183,11 +183,11 @@ test.describe("role variance: gridmaster impersonation", () => {
       QA_GRIDMASTER_ORIGIN,
     );
     await expectNoManageControls(page, page);
-    // Not on the schedule (no linked employee), so no work Overview section.
+    // Not on the schedule (no linked employee), so no Schedule tab.
     await page.goto(`${QA_GRIDMASTER_ORIGIN}/profile`);
     await expect(page).toHaveURL(/\/profile/, { timeout: 20_000 });
     await expect(banner(page)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("button", { name: "Overview", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Schedule", exact: true })).toHaveCount(0);
 
     // The banner ends the session directly (no confirmation; the "End
     // Impersonation" dialog belongs to the portal's Impersonation view) and
