@@ -8,6 +8,7 @@ import * as Sentry from "@/lib/sentry";
 import ProgressBar from "@/components/ProgressBar";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { PersonPageSkeleton } from "@/components/LoadingSkeletons";
+import { DeleteStaffAccountCard } from "@/components/staff-detail/DeleteStaffAccountCard";
 import { MoveEmailDialog } from "@/components/staff-detail/MoveEmailDialog";
 import { useSkeletonGate } from "@/hooks/useSkeletonGate";
 import { Button } from "@/components/Button";
@@ -1503,6 +1504,25 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     }
                   />
                   <RecordCard employee={employee} />
+                  {orgId &&
+                  canManageManagementAccess &&
+                  employee.userId &&
+                  !isSelfAction(currentUser?.id, employee.userId) ? (
+                    <DeleteStaffAccountCard
+                      employee={employee}
+                      orgId={orgId}
+                      name={getEmployeeDisplayName(employee)}
+                      onDeleted={(deleted) => {
+                        syncEmployeeCaches(deleted);
+                        void queryClient.invalidateQueries({
+                          queryKey: queryKeys.org.directory(orgId),
+                        });
+                        void queryClient.invalidateQueries({
+                          queryKey: queryKeys.org.users(orgId),
+                        });
+                      }}
+                    />
+                  ) : null}
                   {canEditDetails && detailsDirty ? (
                     <UnsavedChangesBar
                       saveDisabled={detailsSaveBlocked}

@@ -845,7 +845,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:52c638e1e48b446aded5916491429e882df5c026650fbe0464bf2dea0a5b66bf"
+      "evidenceFingerprint": "sha256:efdb8feeac7e7868eb6a04a1e5d688ce34e36db384fd0fa4e468d04b8ea8c9bd"
     },
     {
       "id": "invitations",
@@ -1821,7 +1821,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0c54d17befbfe4304634d4cc710d6ce65b7d25d175fde7f495dbf139bf4fc0a0"
+      "evidenceFingerprint": "sha256:05a393de54716011e88027e2bf9f6f5d2cce499226feb5c4c6452ffb6cb4fa33"
     },
     {
       "id": "departments-focus-areas",

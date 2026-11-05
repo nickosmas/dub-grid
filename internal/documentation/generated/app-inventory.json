@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:65195b583c079a98b842b57694f27d3078cadcd47755c5050146cdd3d91825ae",
+  "sourceDigest": "sha256:3ed74a72195bad8827e7b236ac8283ab43b914edf6217845b5c84e9f78c50ed5",
   "webRoutes": [
     {
       "id": "web:/",
@@ -1264,6 +1264,15 @@
       }
     },
     {
+      "id": "http:GET:/api/employees/delete-account",
+      "method": "GET",
+      "path": "/api/employees/delete-account",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/employees/delete-account/route.ts"
+      }
+    },
+    {
       "id": "http:GET:/api/export",
       "method": "GET",
       "path": "/api/export",
@@ -2416,6 +2425,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/employees/check-phone/route.ts"
+      }
+    },
+    {
+      "id": "http:POST:/api/employees/delete-account",
+      "method": "POST",
+      "path": "/api/employees/delete-account",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/employees/delete-account/route.ts"
       }
     },
     {

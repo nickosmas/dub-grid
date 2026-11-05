@@ -690,6 +690,11 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "warning",
     headline: (d, ctx) => `Moved ${who(d, ctx, "a staff member")} to a new email`,
   },
+  "employee.account_deleted": {
+    category: "people",
+    severity: "warning",
+    headline: (d, ctx) => `Deleted the account of ${who(d, ctx, "a staff member")}`,
+  },
   "employee.removed": {
     category: "people",
     severity: "delete",
