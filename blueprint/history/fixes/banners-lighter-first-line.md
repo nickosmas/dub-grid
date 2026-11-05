@@ -23,6 +23,10 @@ bold only for what should stand out.
   so the icon, text and button share a centerline.
 - **Regular text.** Banner and Schedule bar text is regular weight. Titles and
   `strong` text stay bold, and so do the Schedule bars' own titles.
+- **Legal callouts.** The privacy policy's health information notice is no
+  longer an app banner. Its icon and title stay amber on a faint tint with a
+  side rule, and its body is document text at full size (owner, 2026-11-04,
+  option B of the canvas's Legal board).
 
 Mobile keeps its own banners. Solid bars keep their fills.
 
@@ -30,3 +34,4 @@ Mobile keeps its own banners. Solid bars keep their fills.
 
 - Boxed banner on `/privacy`: icon center 174.5, title center 174.75.
 - Schedule bars in light and dark at the new fills, with regular body text.
+- Privacy policy notice in light and dark, and at phone width.

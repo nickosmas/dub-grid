@@ -378,6 +378,9 @@
   --dg-color-banner-success-bg: #e2f4e7;
   --dg-color-banner-success-border: #93cca0;
   --dg-color-banner-success-text: #166534;
+  /* A legal document's callout (components/ui/LegalNotice.tsx). */
+  --dg-color-legal-notice-bg: #fef6e7;
+  --dg-color-legal-notice-rule: #d97706;
   /* Toasts sit on a neutral card, so their icons take bright fills in both
      themes; a banner's icon takes its text colour. */
   /* A status card's amber status and icon: a step lighter than warning text,
@@ -546,6 +549,8 @@
   --dg-color-banner-success-bg: #12301f;
   --dg-color-banner-success-border: #245e3a;
   --dg-color-banner-success-text: #bfe9cc;
+  --dg-color-legal-notice-bg: #2e2414;
+  --dg-color-legal-notice-rule: #f59e0b;
   --dg-color-status-warning-text: #fbbf24;
   --dg-color-today-bg: #152238;
   --dg-color-today-text: #93c5fd;

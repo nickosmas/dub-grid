@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Banner } from "@/components/ui/Banner";
+import { LegalNotice } from "@/components/ui/LegalNotice";
 
 export const revalidate = 86400; // 24 hours
 
@@ -271,11 +271,7 @@ export default function PrivacyPolicyPage() {
             secure; if we become aware of a security incident affecting your personal information,
             we will notify affected users and authorities as required by applicable law.
           </p>
-          <Banner
-            tone="warning"
-            title="PROHIBITION OF PROTECTED HEALTH INFORMATION (PHI)"
-            className="mt-4"
-          >
+          <LegalNotice title="PROHIBITION OF PROTECTED HEALTH INFORMATION (PHI)">
             <span>
               DubGrid is designed for operational staff scheduling and is <strong>not</strong> a
               HIPAA-compliant platform. The Service is not intended for the storage, transmission,
@@ -286,7 +282,7 @@ export default function PrivacyPolicyPage() {
               limited to operational scheduling coordination (for example, &quot;day shift needs
               coverage in Wing A&quot;).
             </span>
-          </Banner>
+          </LegalNotice>
         </section>
 
         <section style={{ marginBottom: "32px" }}>
