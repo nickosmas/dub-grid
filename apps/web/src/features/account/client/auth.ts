@@ -110,8 +110,15 @@ export async function updateBrowserUserEmail(email: string): Promise<void> {
   }
 }
 
-export async function updateBrowserUserPassword(password: string): Promise<void> {
-  const { error } = await supabase.auth.updateUser({ password });
+// Auth refuses a signed-in change without the current password; recovery is exempt.
+export async function updateBrowserUserPassword(
+  password: string,
+  currentPassword?: string,
+): Promise<void> {
+  const { error } = await supabase.auth.updateUser({
+    password,
+    current_password: currentPassword,
+  });
   if (error) {
     throw error;
   }

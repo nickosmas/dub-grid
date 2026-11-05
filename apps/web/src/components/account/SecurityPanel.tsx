@@ -147,7 +147,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       // The mutation is never automatically replayed after an ambiguous error.
       await requireCredentialAssurance(session.access_token);
       try {
-        await settleWithRequestTimeout(updateBrowserUserPassword(newPassword));
+        await settleWithRequestTimeout(updateBrowserUserPassword(newPassword, currentPassword));
       } catch (updateError) {
         // A lost response or a deadline may hide an applied change, so it
         // finishes as one: everywhere signed out, never a retry (41b2).
@@ -218,8 +218,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
             <div>
               <div className="dg-card-title">Password</div>
               <p className="dg-card-description">
-                Choose a strong password: at least 10 characters with a letter and a number, plus an
-                uppercase letter or a symbol.
+                Choose a strong password: at least 10 characters with a lowercase letter, an
+                uppercase letter, a number and a symbol.
               </p>
             </div>
             {!showPasswordForm && (

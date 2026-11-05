@@ -10,7 +10,13 @@ const auth = config.slice(
 );
 const setting = (key: string) => new RegExp(`^${key}\\s*=\\s*"?([^"\\n]*)"?`, "m").exec(auth)?.[1];
 
+const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
+const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const DIGITS = "0123456789";
+const SYMBOLS = "!@#$%^&*()_+-=[]{};'\\:\"|<>?,./`~";
+
 const SAMPLES = [
+  "Abcdefgh1!",
   "Abcdefghij!",
   "1234567890!",
   "abcdefghij1",
@@ -30,10 +36,15 @@ describe("the app's password rule against Supabase's", () => {
     const requirements = setting("password_requirements");
 
     expect(minimum).toBeGreaterThan(0);
-    expect(requirements).toBe("letters_digits");
+    expect(requirements).toBe("lower_upper_letters_digits_symbols");
     for (const password of SAMPLES.filter(isPasswordAcceptable)) {
       expect(password.length, password).toBeGreaterThanOrEqual(minimum);
-      expect(/[A-Za-z]/.test(password) && /[0-9]/.test(password), password).toBe(true);
+      for (const required of [LOWERCASE, UPPERCASE, DIGITS, SYMBOLS]) {
+        expect(
+          [...password].some((character) => required.includes(character)),
+          password,
+        ).toBe(true);
+      }
     }
     expect(SAMPLES.filter(isPasswordAcceptable).length).toBeGreaterThan(0);
   });

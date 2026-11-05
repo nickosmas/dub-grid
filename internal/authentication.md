@@ -228,6 +228,13 @@ session older than 24 hours, and a stolen older token can no longer change the
 password through the Auth API directly (F-62). Recovery and reset already run on
 a new recovery session, so they are unaffected.
 
+Production also requires the current password on a password update, so a
+signed-in change sends it as `current_password`; Supabase exempts a recovery
+session. That setting is dashboard-only, so nothing local exercises it. New
+passwords follow production's `lower_upper_letters_digits_symbols`, enforced
+first by `isPasswordAcceptable` in `@dubgrid/domain`. Supabase's symbols are
+ASCII punctuation only.
+
 ## 4. Email Verification
 
 **Invited accounts are never asked to confirm their email.** The invitation link was

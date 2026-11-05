@@ -62,7 +62,7 @@ function PasswordStrengthHints({ password }: { password: string }) {
   const level = getPasswordStrengthLevel(password);
   const hasStartedTyping = password.length > 0;
   const levelStyle =
-    level === 3
+    level === 2
       ? styles.passwordStrengthLevelStrong
       : level === 0
         ? styles.passwordStrengthLevelShort
@@ -304,7 +304,11 @@ export default function ProfilePasswordScreen() {
         let unconfirmed = false;
         try {
           const updateResult = await settleMobileAuthAction(
-            getSupabaseClient().auth.updateUser({ password: newPassword }),
+            getSupabaseClient().auth.updateUser({
+              password: newPassword,
+              // Auth refuses a signed-in change without it; recovery is exempt.
+              current_password: currentPassword,
+            }),
           );
           if (updateResult.error) throw updateResult.error;
         } catch (updateError) {

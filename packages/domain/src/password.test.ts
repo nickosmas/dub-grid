@@ -19,10 +19,10 @@ describe("getPasswordStrengthLevel", () => {
     expect(PASSWORD_STRENGTH_LABELS[0]).toBe("Too short");
   });
 
-  it("climbs as character classes are added past the length bar", () => {
+  it("is Weak past the length bar until every rule is met", () => {
     expect(getPasswordStrengthLevel("aaaaaaaaaa")).toBe(1);
-    expect(getPasswordStrengthLevel("Aaaaaaaaa1")).toBe(2);
-    expect(getPasswordStrengthLevel("Aaaaaaaa1!")).toBe(3);
+    expect(getPasswordStrengthLevel("Aaaaaaaaa1")).toBe(1);
+    expect(getPasswordStrengthLevel("Aaaaaaaa1!")).toBe(2);
   });
 
   it("indexes the label list without overflowing it", () => {
@@ -44,22 +44,31 @@ describe("isPasswordAcceptable", () => {
     expect(isPasswordAcceptable("Aa1!")).toBe(false);
   });
 
-  it("accepts a letter and a number with an uppercase letter or a symbol", () => {
-    expect(isPasswordAcceptable("Aaaaaaaaa1")).toBe(true);
-    expect(isPasswordAcceptable("aaaaaaaa1!")).toBe(true);
+  it("accepts a password with every character type", () => {
     expect(isPasswordAcceptable("Aaaaaaaa1!")).toBe(true);
   });
 
-  // Supabase requires a letter and a digit; these used to pass the app and
-  // then fail at sign-up (41d3, F-47).
+  // Supabase requires all four; these used to pass the app and then fail at
+  // sign-up (41d3, F-47).
   it("never rates a password the forms refuse above Weak", () => {
     expect(getPasswordStrengthLevel("Abcdefghij!")).toBe(1);
-    expect(getPasswordStrengthLevel("Abcdefghi1")).toBe(2);
+    expect(getPasswordStrengthLevel("Abcdefghi1")).toBe(1);
   });
 
-  it("refuses a password without a number or without a letter", () => {
-    expect(isPasswordAcceptable("Abcdefghij!")).toBe(false);
-    expect(isPasswordAcceptable("1234567890!")).toBe(false);
+  it("refuses a password missing any one character type", () => {
+    expect(isPasswordAcceptable("aaaaaaaa1!")).toBe(false);
+    expect(isPasswordAcceptable("AAAAAAAA1!")).toBe(false);
+    expect(isPasswordAcceptable("Aaaaaaaaa!")).toBe(false);
+    expect(isPasswordAcceptable("Aaaaaaaaa1")).toBe(false);
+  });
+
+  it("counts only the symbols Supabase counts", () => {
+    expect(isPasswordAcceptable("Aaaaaaaa1 ")).toBe(false);
+    expect(isPasswordAcceptable("Aaaaaaaa1é")).toBe(false);
+    expect(isPasswordAcceptable("Aaaaaaaa1😀")).toBe(false);
+    for (const symbol of "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~") {
+      expect(isPasswordAcceptable(`Aaaaaaaa1${symbol}`), symbol).toBe(true);
+    }
   });
 });
 
@@ -68,7 +77,13 @@ describe("getPasswordStrengthHints", () => {
     const hints = getPasswordStrengthHints("Aaaaaaaaa1");
     const met = Object.fromEntries(hints.map((hint) => [hint.id, hint.met]));
 
-    expect(met).toEqual({ length: true, uppercase: true, number: true, symbol: false });
+    expect(met).toEqual({
+      length: true,
+      lowercase: true,
+      uppercase: true,
+      number: true,
+      symbol: false,
+    });
   });
 });
 
