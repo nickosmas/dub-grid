@@ -3194,7 +3194,7 @@ button.dg-cc-sg-main {
   background: var(--dg-color-banner-warning-bg);
   border-radius: 10px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--dg-color-banner-warning-text);
 }
 .dg-draft-banner--danger {

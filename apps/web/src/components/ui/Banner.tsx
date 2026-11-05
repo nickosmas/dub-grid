@@ -75,15 +75,14 @@ export function Banner({
   const shape =
     layout === "bar"
       ? "items-center justify-center px-4 py-2"
-      : "items-center rounded-[10px] px-3.5 py-3";
+      : "items-start rounded-[10px] px-3.5 py-3";
 
   return (
     <div
       role={role}
       aria-label={ariaLabel}
-      className={`flex gap-2.5 text-[13px] font-medium leading-[1.5] ${shape} ${layout === "bar" ? BAR_TONE_CLASSES[tone] : TONE_CLASSES[tone]} ${className ?? ""}`}
+      className={`flex gap-2.5 text-[13px] font-normal leading-[1.5] ${shape} ${layout === "bar" ? BAR_TONE_CLASSES[tone] : TONE_CLASSES[tone]} ${className ?? ""}`}
     >
-      {/* Centered on the text, however many lines it runs. */}
       <span className="flex shrink-0">
         <StatusIcon
           tone={tone}
@@ -92,11 +91,19 @@ export function Banner({
           className={layout === "bar" ? BAR_ICON_CLASSES[tone] : ICON_CLASSES[tone]}
         />
       </span>
-      <div className={`flex min-w-0 flex-col gap-1 ${layout === "bar" ? "" : "flex-1"}`}>
+      {/* In a box, the top padding centers the first line on the icon. */}
+      <div className={`flex min-w-0 flex-col gap-1 ${layout === "bar" ? "" : "flex-1 pt-[3px]"}`}>
         {title ? <span className="font-semibold">{title}</span> : null}
         {children}
       </div>
-      {action ? <div className="flex shrink-0 items-center self-center">{action}</div> : null}
+      {/* The negative margin keeps a button from growing a one-line box past the icon. */}
+      {action ? (
+        <div
+          className={`flex shrink-0 items-center self-center ${layout === "bar" ? "" : "-my-1"}`}
+        >
+          {action}
+        </div>
+      ) : null}
     </div>
   );
 }
