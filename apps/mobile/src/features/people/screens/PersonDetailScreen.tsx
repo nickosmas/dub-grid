@@ -81,7 +81,6 @@ import {
   parseMobileStaffFieldErrors,
   resendMobilePersonInvitation,
   revokeMobilePersonInvitation,
-  requireMobileCredentialAssurance,
   updateMobilePerson,
   updateMobilePersonStatus,
   type MobileAccountLinkChallenge,
@@ -127,7 +126,6 @@ import {
   ProfileSection,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
-import { useMobileStepUpAction } from "../../profile/hooks/useMobileStepUpAction";
 import { isRoleCertificationBlocked } from "../../profile/lib/role-certification";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { EMAIL_CONFLICT_MESSAGES, PHONE_CONFLICT_MESSAGE } from "../lib/contactConflicts";
@@ -512,16 +510,12 @@ export default function PersonDetailScreen() {
     );
   }
 
-  const stepUp = useMobileStepUpAction();
   const updateMutation = useMutation({
-    mutationFn: async ({
-      actionAccessToken,
-      ...body
-    }: MobilePersonUpdateBody & { actionAccessToken?: string }) =>
+    mutationFn: async (body: MobilePersonUpdateBody) =>
       focusAreaQuestion.saveAsking(
         `${body.firstName} ${body.lastName}`,
         (focusAreaShifts) =>
-          updateMobilePerson(actionAccessToken ?? accessToken!, personId!, {
+          updateMobilePerson(accessToken!, personId!, {
             ...body,
             ...(focusAreaShifts ? { focusAreaShifts } : {}),
           }),
@@ -861,22 +855,6 @@ export default function PersonDetailScreen() {
   async function confirmSave() {
     if (!person || !draft) return;
 
-    // The staff email is the login email. Changing it for a linked account is
-    // a sensitive action, so the manager confirms their identity first, the
-    // way their own email change does.
-    const changesLoginEmail =
-      Boolean(person.userId) && normalizeOptionalStaffEmail(draft.email) !== person.email;
-    if (changesLoginEmail) {
-      try {
-        await stepUp.run(async (actionAccessToken) => {
-          await requireMobileCredentialAssurance(actionAccessToken);
-          await updateMutation.mutateAsync({ ...buildUpdateBody(), actionAccessToken });
-        });
-      } catch {
-        // The mutation owns its user-facing error.
-      }
-      return;
-    }
     return updateMutation.mutateAsync(buildUpdateBody());
   }
 
@@ -2105,9 +2083,8 @@ export default function PersonDetailScreen() {
             ? `Change the staff email to ${draft.email.trim()}?`
             : "Change the staff email?"
         }
-        visible={showSaveConfirmation && !stepUp.active}
+        visible={showSaveConfirmation}
       />
-      {stepUp.sheet}
       {focusAreaQuestion.modal}
       <ConfirmationModal {...guard.confirmationProps} />
       <BottomSheetModal
@@ -2699,6 +2676,8 @@ function EditPanel({
   serverFieldErrors: Partial<Record<MobileStaffField, string>>;
   onChange: (draft: EditDraft) => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [focusedField, setFocusedField] = useState<
     "firstName" | "lastName" | "phone" | "email" | "contactNotes" | null
   >(null);
@@ -2783,7 +2762,7 @@ function EditPanel({
             accessibilityLabel="Email"
             autoCapitalize="none"
             autoFocus={initialFocusField === "email"}
-            editable={!saving}
+            editable={!saving && !hasAccount}
             error={fieldErrors.email}
             focused={focusedField === "email"}
             keyboardType="email-address"
@@ -2796,6 +2775,11 @@ function EditPanel({
             onChangeText={(value) => setField("email", value)}
             onFocus={() => setFocusedField("email")}
           />
+          {hasAccount ? (
+            <Text style={styles.statusMessage}>
+              Only they can change this, on their own profile.
+            </Text>
+          ) : null}
         </ProfilePanel>
       </ProfileSection>
 

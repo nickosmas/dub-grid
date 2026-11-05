@@ -673,131 +673,30 @@ describe("POST /api/employees/manage", () => {
         expect(updateUserById).not.toHaveBeenCalled();
       });
 
-      it("changes the login email behind step-up, before the row", async () => {
+      // Whoever sets the sign-in email can reset the password, so a staff record
+      // can't change it, whatever the editor's level.
+      it("refuses to change a linked person's email", async () => {
         linkedManagementUser();
-        let rowsWrittenWhenAccountChanged = -1;
-        updateUserById.mockImplementation(async () => {
-          rowsWrittenWhenAccountChanged = employeeUpdatePayloads.length;
-          return { error: null };
-        });
 
         const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
-
-        expect(response.status).toBe(200);
-        expect(requireSensitiveActionAuth).toHaveBeenCalledTimes(1);
-        expect(updateUserById).toHaveBeenCalledWith(PERSON_USER_ID, {
-          email: "new@dubgrid.com",
-          email_confirm: true,
-        });
-        expect(rowsWrittenWhenAccountChanged).toBe(0);
-        expect(employeeUpdatePayloads).toContainEqual(expect.objectContaining({ version: 1 }));
-        // Sessions under the old identity end, and both addresses hear why.
-        expect(followUpLinkedLoginEmailChange).toHaveBeenCalledWith(
-          expect.objectContaining({
-            userId: PERSON_USER_ID,
-            newEmail: "new@dubgrid.com",
-            actorId: VIEWER_USER_ID,
-          }),
-        );
-        expect(updateUserById.mock.invocationCallOrder[0]).toBeLessThan(
-          followUpLinkedLoginEmailChange.mock.invocationCallOrder[0]!,
-        );
-      });
-
-      it("returns the step-up challenge without touching the account", async () => {
-        linkedManagementUser();
-        requireSensitiveActionAuth.mockResolvedValue({
-          response: NextResponse.json({ error: "step up" }, { status: 403 }),
-        });
-
-        const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
-
-        expect(response.status).toBe(403);
-        expect(updateUserById).not.toHaveBeenCalled();
-        expect(employeeUpdatePayloads).toHaveLength(0);
-      });
-
-      it("refuses from a sandbox", async () => {
-        linkedManagementUser();
-        forbidIfSandboxCookie.mockReturnValue(
-          NextResponse.json({ error: "sandbox" }, { status: 403 }),
-        );
-
-        const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
-
-        expect(response.status).toBe(403);
-        expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
-        expect(updateUserById).not.toHaveBeenCalled();
-      });
-
-      it("reports a taken address as an email conflict", async () => {
-        linkedManagementUser();
-        updateUserById.mockResolvedValue({
-          error: { status: 422, code: "email_exists", message: "already registered" },
-        });
-
-        const response = await POST(updateEmployeeRequest({ email: "taken@dubgrid.com" }));
-
-        expect(response.status).toBe(409);
-        expect(await response.json()).toMatchObject({
-          code: "EMPLOYEE_CONTACT_CONFLICT",
-          field: "email",
-        });
-        expect(employeeUpdatePayloads).toHaveLength(0);
-      });
-
-      // The sign-in, sessions and notices all change before the row, so a save
-      // the row would refuse is refused before any of them (41b2).
-      it("refuses a stale version before touching the sign-in", async () => {
-        linkedManagementUser();
-        rowToEmployee.mockReturnValue(makeEmployee({ version: 3 }));
-
-        const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
-
-        expect(response.status).toBe(409);
-        expect(await response.json()).toMatchObject({ code: "EMPLOYEE_CONFLICT" });
-        expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
-        expect(updateUserById).not.toHaveBeenCalled();
-        expect(followUpLinkedLoginEmailChange).not.toHaveBeenCalled();
-      });
-
-      it("refuses an email another person uses before touching the sign-in", async () => {
-        linkedManagementUser();
-        checkEmployeeEmailConflict.mockResolvedValue({
-          conflict: true,
-          conflictingEmployeeId: "other-employee",
-          reason: "employee_duplicate",
-        });
-
-        const response = await POST(updateEmployeeRequest({ email: "taken@dubgrid.com" }));
-
-        expect(response.status).toBe(409);
-        expect(await response.json()).toEqual({
-          code: "EMPLOYEE_CONTACT_CONFLICT",
-          error: "That email is already used by another person.",
-          field: "email",
-          message: "That email is already used by another person.",
-        });
-        expect(checkEmployeeEmailConflict).toHaveBeenCalledWith(expect.anything(), {
-          orgId: ORG_ID,
-          email: "taken@dubgrid.com",
-          excludeEmployeeId: EMPLOYEE_ID,
-          currentUserId: PERSON_USER_ID,
-        });
-        expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
-        expect(updateUserById).not.toHaveBeenCalled();
-        expect(followUpLinkedLoginEmailChange).not.toHaveBeenCalled();
-      });
-
-      it("rejects clearing the email of a linked account", async () => {
-        linkedManagementUser();
-
-        const response = await POST(updateEmployeeRequest({ email: "" }));
 
         expect(response.status).toBe(400);
         expect((await response.json()).fieldErrors.email).toBe(
-          "An account needs an email to sign in with.",
+          "Only they can change this, on their own profile.",
         );
+        expect(updateUserById).not.toHaveBeenCalled();
+        expect(followUpLinkedLoginEmailChange).not.toHaveBeenCalled();
+        expect(employeeUpdatePayloads).toHaveLength(0);
+      });
+
+      it("still saves their other details", async () => {
+        linkedManagementUser();
+
+        const response = await POST(
+          updateEmployeeRequest({ email: "mina@dubgrid.com", phone: "(415) 555-0100" }),
+        );
+
+        expect(response.status).toBe(200);
         expect(updateUserById).not.toHaveBeenCalled();
       });
     });

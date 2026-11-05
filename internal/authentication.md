@@ -263,15 +263,14 @@ person signs in with the one they already have.
 A linked staff record's email **is** the login email; there is no separate contact
 address. The two stores are kept equal in both directions:
 
-- **Manager changes it** (web `EditEmployeePanel`, mobile person editor): the
-  `/api/employees/manage` update branch and the mobile person `PATCH` treat a changed
-  email on a linked, active row as a sensitive action (`requireSensitiveActionAuth` /
-  `requireMobileSensitiveActionAuth`, step-up in the client), refuse it from a test
-  sandbox, and call `auth.admin.updateUserById(userId, { email, email_confirm: true })`
-  **before** writing the row (`features/employees/server/login-email.ts`). GoTrue
-  rejects an address another account holds, which surfaces as the usual email conflict.
-  A linked row cannot be saved with a blank email. The change applies to that account in
-  every organization it belongs to.
+- **Managers can't change it.** Whoever sets the sign-in email can reset the password,
+  so `/api/employees/manage` and the mobile person `PATCH` refuse a changed or blank
+  email on a linked row, whoever the editor is, and the web and mobile editors show it
+  read-only. Before someone has a sign-in, their email stays editable.
+- **Support changes it** (`/api/gridmaster/users/[userId]`): the one path that calls
+  `auth.admin.updateUserById(userId, { email, email_confirm: true })`
+  (`features/employees/server/login-email.ts`), behind fresh sensitive-action auth. It
+  applies in every organization the account belongs to.
 - **The person changes it** (web profile, mobile profile): after Supabase confirms the
   new address, the `on_auth_user_email_changed` trigger (migration `022`) rewrites
   `employees.email` on every linked, active row. A row in an organization where an
@@ -416,8 +415,8 @@ Instead, `lib/api-auth.ts`'s `authenticateRequest` does two things:
    The user watermark rejects tokens issued before it, but a refresh token still mints a
    newer one. That is intended after a role change, where the session should pick up new
    claims. To actually sign someone out, `endUserSessions` also deletes their provider
-   sessions and refresh tokens through `end_user_auth_sessions` (migration 046). An
-   administrator's sign-in email change uses it (finding F-21).
+   sessions and refresh tokens through `end_user_auth_sessions` (migration 046). A
+   support change to a sign-in email uses it (finding F-21).
 
 This is why `POST /api/auth/sign-out` exists: sign-out used to be purely client-side,
 which clears the browser's tokens but leaves the access token valid until it expires.
