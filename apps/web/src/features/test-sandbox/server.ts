@@ -45,10 +45,12 @@ async function cloneOrgTable(
   // Deterministic order so the new rows come back in the same order we
   // sent them — PostgREST returns inserts in input order, which lets us
   // build the id remap by index.
-  rows.sort((a, b) => Number(a.id) - Number(b.id));
+  const liveRows = rows.filter((row) => row.archived_at == null && row.status !== "removed");
+  if (liveRows.length === 0) return new Map();
+  liveRows.sort((a, b) => Number(a.id) - Number(b.id));
 
   const stripAll = new Set([...STRIP_FIELDS, ...extraStripFields]);
-  const newRows = rows.map((row) => {
+  const newRows = liveRows.map((row) => {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(row)) {
       if (stripAll.has(key)) continue;
@@ -75,8 +77,8 @@ async function cloneOrgTable(
 
   const map = new Map<number, number>();
   if (inserted) {
-    for (let i = 0; i < rows.length; i += 1) {
-      map.set(Number(rows[i].id), Number(inserted[i].id));
+    for (let i = 0; i < liveRows.length; i += 1) {
+      map.set(Number(liveRows[i].id), Number(inserted[i].id));
     }
   }
   return map;
@@ -94,7 +96,7 @@ async function cloneOrgIntoSandbox(
   sandboxOrgId: string,
 ): Promise<void> {
   // Phase 1 — truly independent tables (only FK is org_id)
-  const [departmentMap, absenceMap, indicatorMap] = await Promise.all([
+  const [departmentMap, absenceMap] = await Promise.all([
     cloneOrgTable(svc, "departments", sourceOrgId, sandboxOrgId),
     cloneOrgTable(svc, "absence_types", sourceOrgId, sandboxOrgId),
     cloneOrgTable(svc, "indicator_types", sourceOrgId, sandboxOrgId),
@@ -145,6 +147,8 @@ async function cloneOrgIntoSandbox(
     sandboxOrgId,
     [
       { col: "certification_id", map: certificationMap },
+      { col: "away_absence_type_id", map: absenceMap },
+      { col: "planned_absence_type_id", map: absenceMap },
       { col: "focus_area_ids", map: focusAreaMap, isArray: true },
       { col: "department_ids", map: departmentMap, isArray: true },
       { col: "dept_admin_ids", map: departmentMap, isArray: true },
@@ -152,10 +156,6 @@ async function cloneOrgIntoSandbox(
     ],
     ["user_id", "version"],
   );
-
-  // Silence unused-var lint for maps that aren't referenced again
-  void absenceMap;
-  void indicatorMap;
 }
 
 /**

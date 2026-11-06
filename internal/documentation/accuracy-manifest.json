@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:935715bce73accacb45969a26b1183a47fe65ce9f24ebd94ee2277b369f117a6"
+      "evidenceFingerprint": "sha256:db04b579ce2e69c52b28caa6fe912933ce9c25651df6b8f06246aa92d987c4c1"
     },
     {
       "id": "introduction",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:98979620f8eacd6554223e3df7aba615302651a723f32568299a11c10cb27a58"
+      "evidenceFingerprint": "sha256:61752697abb93df020a3d1f159fb77ac7c1377c8b5c022b6559a8c050aa250fa"
     },
     {
       "id": "quickstart",
@@ -310,7 +310,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b2303b921737e7a112c266d13f44b396d575c3efb24993b94abaa11a9af48c28"
+      "evidenceFingerprint": "sha256:70f9f3a5150faee972582550d645dcafff587f78cd39860e46cdda9f76232bcb"
     },
     {
       "id": "schedule-grid",
@@ -690,7 +690,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3b34139cf28a2a633076a78353cca9f9b101b7dbac6c515fcbde78f31059d371"
+      "evidenceFingerprint": "sha256:a67f6671332d356ea849772caafe68f47922dc399de09fa9b5e2c290ec1df577"
     },
     {
       "id": "roster",
@@ -964,7 +964,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bdf2140dd4a55924b3e99805c1d36ce9997b96eb83b44d8c9732a7aa21895c0d"
+      "evidenceFingerprint": "sha256:154c01da9e1e7431cdebce5de0942c62fb04b2991d25e3cc322b5afb1dc16950"
     },
     {
       "id": "coverage",
@@ -1439,7 +1439,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fa29f479451cae0f6d27b9b7224e9f3f143d741841a0be281281188c8ac42e74"
+      "evidenceFingerprint": "sha256:90915e414724ff0ec075cfe4b836356175808ce1642509e6adfecb2a77f4679e"
     },
     {
       "id": "profile",
@@ -1514,7 +1514,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6f8985bd1b1e8b7d332d179312636f2ccc29ac07d47a87971c601bd160e6c281"
+      "evidenceFingerprint": "sha256:40c7a252e7e9a48a1dd8c4dc683d023e3b294a91b093cd4a63dc2f446836fa4e"
     },
     {
       "id": "security-sessions",

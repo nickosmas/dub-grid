@@ -10,6 +10,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { NextRequest, NextResponse } from "next/server";
 import type { JwtPayload, Session, User } from "@supabase/supabase-js";
 import { getServiceClient } from "@/lib/supabase-service";
+import { findUsableSandbox } from "@/lib/sandbox-access";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { requireSupabasePublishableKey, requireSupabaseUrl } from "@/lib/supabase-keys";
 import { extractBearerToken, verifyAccessToken } from "@/lib/auth/verify-token";
@@ -391,15 +392,11 @@ export async function requireAuthenticatedUserWithClaims(
     }
     try {
       const serviceClient = getServiceClient();
-      const { data: ownedSandbox } = await serviceClient
-        .from("organizations")
-        .select("id")
-        .eq("id", sb.sandboxOrgId)
-        .eq("workspace_kind", "sandbox")
-        .eq("sandbox_owner_user_id", auth.user.id)
-        .eq("sandbox_owner_session_id", auth.sessionId)
-        .is("archived_at", null)
-        .maybeSingle();
+      const ownedSandbox = await findUsableSandbox(serviceClient, {
+        sandboxOrgId: sb.sandboxOrgId,
+        userId: auth.user.id,
+        sessionId: auth.sessionId,
+      });
       if (!ownedSandbox) {
         return { response: NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 }) };
       }

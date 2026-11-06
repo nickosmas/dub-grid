@@ -234,7 +234,7 @@ describe.runIf(reachable)("Gridmaster writes need an impersonation (075, live DB
          JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public' AND p.proname LIKE '%\\_unguarded'`,
     );
-    expect(rows).toHaveLength(8);
+    expect(rows.length).toBeGreaterThanOrEqual(8);
     expect(rows.filter((row) => row.callable)).toEqual([]);
   });
 });

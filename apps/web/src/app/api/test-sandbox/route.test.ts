@@ -39,6 +39,7 @@ const AUTH_SESSION_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
  */
 function buildServiceClient(opts: {
   role: "user" | "admin" | "super_admin" | null;
+  adminPermissions?: Record<string, boolean>;
   gridmaster?: boolean;
   /** profiles.org_id — the user's GLOBAL default, which any device can move. */
   profileOrgId?: string;
@@ -67,7 +68,12 @@ function buildServiceClient(opts: {
               eq: () => ({
                 is: () => ({
                   maybeSingle: async () => ({
-                    data: opts.role ? { org_role: opts.role } : null,
+                    data: opts.role
+                      ? {
+                          org_role: opts.role,
+                          admin_permissions: opts.adminPermissions ?? { canManageEmployees: true },
+                        }
+                      : null,
                     error: null,
                   }),
                 }),
@@ -168,6 +174,18 @@ describe("POST /api/test-sandbox", () => {
     expect(createSandboxForUser).toHaveBeenCalledWith(
       expect.objectContaining({ sourceOrgId: REAL_ORG }),
     );
+  });
+
+  it("refuses an Admin who can't manage staff, since a sandbox makes them Super Admin of a copy (F-198)", async () => {
+    getServiceClient.mockReturnValue(
+      buildServiceClient({ role: "admin", adminPermissions: { canEditShifts: true } }),
+    );
+
+    const { POST } = await import("./route");
+    const response = await POST(makeRequest("enter"));
+
+    expect(response.status).toBe(403);
+    expect(createSandboxForUser).not.toHaveBeenCalled();
   });
 
   it("refuses a plain user-role member (sandbox is admin+ only)", async () => {

@@ -2,9 +2,9 @@
 
 /**
  * Migration 032: a schedule snapshot or segment can no longer name a parent
- * in another organization. Cases run inside BEGIN/ROLLBACK against the
- * seeded local database and simulate an authenticated admin the way
- * PostgREST does, so both the row policy and the composite key are exercised.
+ * in another organization. Cases run inside BEGIN/ROLLBACK against the seeded
+ * local database. Signed-in callers can't write these tables at all since 122,
+ * so a signed-in attempt stops at the privilege and the rest test the key.
  *
  * Skipped when the local Postgres is unreachable (CI without Supabase).
  */
@@ -141,7 +141,7 @@ describe.runIf(reachable)("schedule children stay in their parent's organization
            VALUES ($1, $2, 'draft', 'worked')`,
           [foreignCell, fx.orgId],
         );
-      }, /row-level security|violates foreign key/);
+      }, /permission denied|row-level security/);
 
       const { rows } = await db.query(
         `SELECT 1 FROM public.schedule_cell_snapshots WHERE cell_id = $1`,
@@ -191,19 +191,18 @@ describe.runIf(reachable)("schedule children stay in their parent's organization
            VALUES ($1, $2, 0, $3)`,
           [snapshots[0].id, fx.orgId, fx.jobId],
         );
-      }, /row-level security|violates foreign key/);
+      }, /permission denied|row-level security/);
     } finally {
       await db.query("ROLLBACK");
     }
   });
 
-  it("still accepts an admin's snapshot and segment under their own cell", async () => {
+  it("still accepts a server write of a snapshot and segment under their own cell", async () => {
     await db.query("BEGIN");
     try {
       const fx = await loadFixture();
       const cell = await insertCell(fx.orgId, fx.empId, fx.date);
 
-      await asAdmin(fx);
       const { rows: snapshots } = await db.query<{ id: string }>(
         `INSERT INTO public.schedule_cell_snapshots (cell_id, org_id, snapshot_kind, state_kind)
          VALUES ($1, $2, 'draft', 'worked') RETURNING id`,
@@ -214,7 +213,6 @@ describe.runIf(reachable)("schedule children stay in their parent's organization
          VALUES ($1, $2, 0, $3)`,
         [snapshots[0].id, fx.orgId, fx.jobId],
       );
-      await asSuperuser();
 
       const { rows } = await db.query<{ job_ids: number[] }>(
         `SELECT job_ids FROM public.get_schedule_cell_snapshot_payload($1, $2, $3::date, 'draft')`,

@@ -709,13 +709,13 @@
 **Suggested fix:** Use the stored row's `user_id` (`currentEmployee.userId`, `previousRow.userId`), and drop `userId` from the request schema for this purpose.
 **Resolution:** Fixed on fix/tenant-write-guards (2026-11-06): `employees/identity` no longer accepts `userId` and renames only the stored row's account. `employees/manage` loads the stored row first and uses its account for the rename and the management-access check, so a client value is overwritten. Route tests send another account's id and fail on the old code. Client doubles, not a live run.
 
-### F-192 [P1] open - The database lets one organization's rows point at another organization's rows
+### F-192 [P1] fixed - The database lets one organization's rows point at another organization's rows
 
 **File:** `supabase/migrations` (33 foreign keys between tenant tables are single-column; only `schedule_cell_snapshots_cell_org_fkey` and `schedule_cell_segments_snapshot_org_fkey` carry `org_id`); `write_schedule_cell_snapshot_internal`; `schedule_cells_emp_id_date_key`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** `org_id` is present and RLS-checked on the row itself, but nothing ties the row's links to the same organization. Run as org A's Super Admin on a throwaway stack at 120, all of these were accepted: a schedule cell for org B's employee, a cell with org B's focus area, a recurring shift and a shift series for org B's employee, a coverage requirement with org B's focus area and job, a shift with org B's focus area, and a profile change request naming org B's employee. `write_schedule_cell_snapshot` also accepted org B's shift, job and absence ids on an org A cell; `schedule_cell_segments.shift_id` and `job_id` have no foreign key at all. The effect is real: with a cell planted for org B's employee, org B's own save for that person and date failed on `schedule_cells_emp_id_date_key`, because that unique index omits `org_id`. It needs the employee's UUID. A plain staff member can also insert a change request naming a coworker's employee id. Approval filters by org, so the foreign case fails safely, but the same-org case changes the coworker. No read leak was found through these links. The department id checks in `validate_department_ids` confirm existence, not organization.
 **Suggested fix:** A forward migration in stages: add `UNIQUE (org_id, id)` on each parent, then composite foreign keys `(org_id, x_id)` for the 33 links, `NOT VALID` first and validated after a data check; add `org_id` to `schedule_cells`' unique index; add a shared trigger refusing a change to `org_id`; validate shift, job and absence ids in the cell write functions; bind `requester_employee_id` to the requester in the insert policy.
-**Resolution:**
+**Resolution:** Fixed on fix/org-bound-database (2026-11-06), migration 124: `UNIQUE (org_id, id)` on 11 parents and composite foreign keys for all 30 links, validated in the migration, so an existing cross-organization row aborts it rather than staying; a trigger refuses any change to `org_id` on the 34 tables that always have one (`profiles` and the nullable log tables are left out); another trigger refuses a segment's shift or job owned by another organization, since neither has a foreign key; `validate_department_ids` checks the organization; the change request policy binds `requester_employee_id`. `schedule_cells_emp_id_date_key` is unchanged on purpose: its `ON CONFLICT` callers need it, and with the employee link composite it can no longer collide across organizations. Rehearsed from 120 on a seeded stack, where every planted link from this finding was refused and deleting a whole organization still cascaded; `org-bound-references.integration.test.ts` keeps those checks. Not applied to production's real data, so whether production holds a cross-organization row is unknown until the migration runs; if it does, the migration stops with no change.
 
 ### F-193 [P1] open - Editing a pending invitation's email keeps its token, so an Admin can create a confirmed account at someone else's address
 
@@ -733,13 +733,13 @@
 **Suggested fix:** Refuse in `requireOrgPermissions` and `canManageEmployees` when `orgId` differs from the verified token's org (Gridmaster impersonation and the sandbox excepted), and read the employee's suspension there. Also refuse a failed `endUserSessions` rather than only logging it.
 **Resolution:**
 
-### F-195 [P1] open - Acting on a request from another organization's session alerts the wrong organization
+### F-195 [P1] fixed - Acting on a request from another organization's session alerts the wrong organization
 
 **File:** `packages/mobile-api-core/src/shift-requests.ts:500`, `:570` (dispatch with `auth.currentOrg.id`); `respond_to_shift_request_unguarded`, `claim_shift_request_unguarded`, `cancel_shift_request_unguarded` (check `employees.user_id = auth.uid()`, no org); `apps/web/src/features/notifications/server/events.ts:249` (`getRequestInfo` reads the request unscoped)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** Someone employed in orgs A and B, on a B session, sends `PATCH /shift-requests/<A request>`. The function changes A's request, then the route dispatches under B, so B's approvers get an alert carrying A's staff names and A's approvers get nothing. It needs dual employment. Function bodies were read; the dispatch was traced, not run.
 **Suggested fix:** Require `shift_request_org_id(p_request_id) = caller_org_id()` in the three functions, and dispatch with the request's own `org_id`.
-**Resolution:**
+**Resolution:** Fixed on fix/org-bound-database (2026-11-06), migration 121: claim, respond and cancel refuse a request outside the session's organization, so the dispatch's organization is now always the request's and the dispatch code needn't change. A Gridmaster stays held by `refuse_gridmaster_outside_org`.
 
 ### F-196 [P1] open - Managers and staff can look up accounts across every organization by email
 
@@ -750,21 +750,21 @@
 **Update 2026-11-06:** the owner approved the wording of two emails for the strict approach. An invitation to an address with an account keeps the current invite and replaces "set your password" with "You already have a DubGrid account with this email address, so there's nothing to set up. Sign in with your password to accept." A new notice, "Someone tried to use your email address", goes to the owner of a taken address, at most once a day per address, and names no person, organization or other address. Still to do before building: test how Supabase answers a change to a taken address, and give the Gridmaster save error a generic refusal. Removing the inline taken-email error from My profile (#367) has not been separately confirmed.
 **Resolution:**
 
-### F-197 [P1] open - An Admin who can only edit shifts can rewrite the published schedule directly, unlogged
+### F-197 [P1] fixed - An Admin who can only edit shifts can rewrite the published schedule directly, unlogged
 
 **File:** `supabase/migrations` policies `admin_write_schedule_cells`, `admin_write_schedule_cell_snapshots`, `admin_write_schedule_cell_segments` (FOR ALL on `canEditShifts`, any `snapshot_kind`)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security)
 **Why it matters:** Run on the throwaway stack as an Admin with `canEditShifts` and no publish permission: `publish_schedule` refused, but deleting a published snapshot's segments and updating a published snapshot directly both succeeded. A browser session can do the same through PostgREST, bypassing publish, past-day locks, corrections, the snapshot history and the audit log. This is inside one organization, not cross-tenant. By a grep of direct `.from(...)` writes in web and mobile, the only browser write to these tables is `deleteShiftSeries` clearing `series_id` (`apps/web/src/lib/db/schedule.ts:499`); the rest go through server functions.
 **Suggested fix:** Move that one write into `delete_shift_series`, then revoke INSERT, UPDATE and DELETE on the three tables from `authenticated` and leave writes to the SECURITY DEFINER functions. Review the same for other tables written only by the server.
-**Resolution:**
+**Resolution:** Fixed on fix/org-bound-database (2026-11-06), migration 122 revokes INSERT, UPDATE, DELETE and TRUNCATE on the three tables from `authenticated`. The browser write this finding named was dead code (`lib/db/schedule.ts` `deleteShiftSeries`; the page uses the route), so it is removed rather than moved. No SECURITY INVOKER function writes these tables. The other server-only tables weren't reviewed.
 
-### F-198 [P1] open - Any Admin can give themselves Super Admin over a copy of all staff records, and keep it after being demoted
+### F-198 [P1] fixed - Any Admin can give themselves Super Admin over a copy of all staff records, and keep it after being demoted
 
 **File:** `apps/web/src/app/api/test-sandbox/route.ts:132`; `apps/web/src/features/test-sandbox/server.ts:41` (`select("*")`, no archived filter), `:304`; `switch_org`, `get_my_organizations`; `apps/web/src/app/api/shared/permissions.ts:425`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security)
 **Why it matters:** The route checks `org_role` only, not `admin_permissions`, and has no feature flag. An Admin with only `canEditShifts` enters the sandbox, becomes `super_admin` there, and reads every cloned person's email, phone and contact notes, offboarded people included, for example through `GET /api/export?type=staff`, which the sandbox redirect serves. `switch_org` has no `workspace_kind` filter or session binding, and nothing re-checks the source role, so a demoted Admin keeps the clone for up to 14 days. Mobile sign-in doesn't clear sandboxes as web sign-in does. Traced, not run. Stays inside one organization's data; sandbox isolation between organizations held.
 **Suggested fix:** Require `canViewStaff` and `canManageEmployees` (or restrict to Super Admins), clone only what a tester needs or mask contact fields, exclude archived staff, re-check the source role on every sandbox request, and exclude sandboxes from `switch_org` and `get_my_organizations`.
-**Resolution:**
+**Resolution:** Fixed on fix/org-bound-database (2026-11-06): entering needs a Super Admin, or an Admin who can manage staff, who can already read these records, and the Header hides the option otherwise. `findUsableSandbox` re-checks that on each request that resolves the sandbox, so a demotion takes effect at once. The clone skips archived and offboarded staff, and remaps the two absence ids it used to copy from the source organization. Migration 123 keeps sandboxes out of `switch_org` and `get_my_organizations`. Contact fields aren't masked, because the people allowed in can already see them. The clone itself was not run with the new foreign keys outside CI.
 
 ### F-199 [P2] open - Realtime sends every signed-in user the ids of rows deleted in other organizations
 

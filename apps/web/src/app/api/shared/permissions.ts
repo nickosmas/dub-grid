@@ -15,6 +15,7 @@ import {
   evaluateOrgBillingAccess,
   getPlatformBillingPolicy,
 } from "@/lib/billing-policy";
+import { findUsableSandbox } from "@/lib/sandbox-access";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { cacheGet, cacheSet, CacheKey, TTL } from "@/lib/cache";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -360,15 +361,11 @@ export async function resolveEffectiveOrgId(
     throw new Error("Invalid Test Sandbox session state");
   }
   const svc = getServiceClient();
-  const { data: ownedSandbox } = await svc
-    .from("organizations")
-    .select("id")
-    .eq("id", sb.sandboxOrgId)
-    .eq("workspace_kind", "sandbox")
-    .eq("sandbox_owner_user_id", userId)
-    .eq("sandbox_owner_session_id", auth.sessionId)
-    .is("archived_at", null)
-    .maybeSingle();
+  const ownedSandbox = await findUsableSandbox(svc, {
+    sandboxOrgId: sb.sandboxOrgId,
+    userId,
+    sessionId: auth.sessionId,
+  });
   if (!ownedSandbox) throw new Error("Invalid Test Sandbox ownership state");
   const { data: profile } = await svc
     .from("profiles")
@@ -434,15 +431,11 @@ export async function requireOrgPermissions(
     if (!sb || sb.userId !== auth.user.id || sb.sessionId !== auth.sessionId) {
       return { response: forbiddenResponse() };
     }
-    const { data: ownedSandbox } = await serviceClient
-      .from("organizations")
-      .select("id")
-      .eq("id", sb.sandboxOrgId)
-      .eq("workspace_kind", "sandbox")
-      .eq("sandbox_owner_user_id", auth.user.id)
-      .eq("sandbox_owner_session_id", auth.sessionId)
-      .is("archived_at", null)
-      .maybeSingle();
+    const ownedSandbox = await findUsableSandbox(serviceClient, {
+      sandboxOrgId: sb.sandboxOrgId,
+      userId: auth.user.id,
+      sessionId: auth.sessionId as string,
+    });
     if (ownedSandbox) {
       const { data: profile } = await serviceClient
         .from("profiles")
