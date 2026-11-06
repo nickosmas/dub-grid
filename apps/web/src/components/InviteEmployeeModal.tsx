@@ -46,6 +46,8 @@ interface InviteEmployeeModalProps {
   orgId: string;
   onClose: () => void;
   onInvited: (updatedEmployee?: Employee | null) => void | Promise<void>;
+  /** Says the person won't be on the schedule. Onboarding hides it: teammates may be scheduled. */
+  showOffScheduleNote?: boolean;
   /** Available departments (for management staff mode). Accepts NamedItem[] or Department[]. */
   departments?: (NamedItem | Department)[];
   /** Retained for callers that reopen the modal from a pending-invitation
@@ -55,6 +57,7 @@ interface InviteEmployeeModalProps {
 
 export default function InviteEmployeeModal({
   employee,
+  showOffScheduleNote = true,
   orgId,
   onClose,
   onInvited,
@@ -321,24 +324,11 @@ export default function InviteEmployeeModal({
             recipient already has an account elsewhere (cross-org case) or
             needs a fresh signup. */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Employee context */}
-          <div
-            style={{
-              padding: "12px 16px",
-              background: "var(--dg-color-bg-secondary)",
-              borderRadius: "var(--dg-radius-md)",
-              fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--dg-color-text-secondary)",
-            }}
-          >
-            {isManagementInvite ? (
-              "For someone who signs in to manage but isn\u2019t on the schedule."
-            ) : (
-              <>
-                They&apos;ll get an email with a link to set a password and join your organization.
-              </>
-            )}
-          </div>
+          {isManagementInvite && showOffScheduleNote && (
+            <Banner tone="info">
+              They won&apos;t be on the schedule. Their access role sets what they can see and do.
+            </Banner>
+          )}
 
           {/* Name fields (management staff mode) */}
           {isManagementInvite && (

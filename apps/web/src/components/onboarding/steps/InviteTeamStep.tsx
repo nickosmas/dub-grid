@@ -47,6 +47,7 @@ export default function InviteTeamStep({ onNext, onBack }: InviteTeamStepProps) 
       {showInvite && (
         <InviteEmployeeModal
           employee={null}
+          showOffScheduleNote={false}
           orgId={org.id}
           departments={departments}
           onClose={() => setShowInvite(false)}

@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { X, type LucideIcon } from "lucide-react";
+import { Button } from "@/components/Button";
 import { StatusIcon } from "./StatusIcon";
 
 export type BannerTone = "info" | "success" | "warning" | "danger";
@@ -117,5 +118,22 @@ export function BannerIcon({ tone, icon }: { tone: BannerTone; icon?: LucideIcon
       size={BOX_ICON_SIZE}
       className={`shrink-0 ${ICON_CLASSES[tone]}`}
     />
+  );
+}
+
+/** Dismisses a banner: a ghost button the size of the buttons beside it. */
+export function BannerDismissButton({
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <Button
+      type="button"
+      aria-label="Dismiss"
+      className={`dg-btn dg-btn-ghost dg-btn-icon dg-btn-sm ${className ?? ""}`}
+      {...props}
+    >
+      <X aria-hidden="true" />
+    </Button>
   );
 }

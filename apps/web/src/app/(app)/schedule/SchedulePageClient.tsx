@@ -65,10 +65,9 @@ import {
   type StaffingScheduleState,
 } from "./_lib/open-shift-staffing";
 import { OpenShiftStaffingModal } from "@/components/schedule/OpenShiftStaffingModal";
-import { CloseButton } from "@/components/ui/CloseButton";
 import { Hint } from "@/components/ui/hint";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
-import { BannerIcon } from "@/components/ui/Banner";
+import { BannerDismissButton, BannerIcon } from "@/components/ui/Banner";
 import { hint } from "@/components/ui/hint.types";
 import {
   CalendarCheck,
@@ -8779,11 +8778,7 @@ function SchedulerContent({
                       content={hint("Hide this banner for the rest of this session")}
                       side="bottom"
                     >
-                      <CloseButton
-                        size="sm"
-                        onClick={dismissOutOfWindowDrafts}
-                        aria-label="Dismiss"
-                      />
+                      <BannerDismissButton onClick={dismissOutOfWindowDrafts} />
                     </Hint>
                   </div>
                 </div>
@@ -8864,11 +8859,7 @@ function SchedulerContent({
                         content={hint("Hide this banner for the rest of this session")}
                         side="bottom"
                       >
-                        <CloseButton
-                          size="sm"
-                          onClick={dismissOutOfWindowPublishes}
-                          aria-label="Dismiss"
-                        />
+                        <BannerDismissButton onClick={dismissOutOfWindowPublishes} />
                       </Hint>
                     </div>
                   </div>
@@ -8982,8 +8973,7 @@ function SchedulerContent({
                           >
                             View History
                           </Button>
-                          <CloseButton
-                            size="sm"
+                          <BannerDismissButton
                             // Not async: the write is deliberately
                             // fire-and-forget and the banner goes away on the
                             // spot, so there is nothing to await and nothing
@@ -8996,7 +8986,6 @@ function SchedulerContent({
                               setPublishHistory([]);
                               setShowPublishDiff(false);
                             }}
-                            aria-label="Dismiss"
                           />
                         </>
                       )}

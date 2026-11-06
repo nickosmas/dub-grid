@@ -28,6 +28,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { Archive, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { Banner } from "@/components/ui/Banner";
 import { NumberField } from "@/components/ui/number-field";
 import { Switch } from "@/components/ui/switch";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
@@ -2050,18 +2051,7 @@ function JobRow({
               defaultOpen={overrideCount > 0}
             >
               {selectedShifts.length === 0 ? (
-                <div
-                  style={{
-                    padding: "12px 14px",
-                    borderRadius: "var(--dg-radius-sm)",
-                    border: "1px solid var(--dg-color-border-light)",
-                    background: "var(--dg-color-bg-secondary)",
-                    color: "var(--dg-color-text-muted)",
-                    fontSize: "var(--dg-fs-label)",
-                  }}
-                >
-                  Select at least one shift above to configure this job.
-                </div>
+                <Banner tone="info">Select at least one shift above to configure this job.</Banner>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {selectedShifts.map((shift) => {
@@ -2832,21 +2822,13 @@ export default function JobsSettings({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {scheduleRoles.length === 0 ? (
-        <div
-          style={{
-            padding: "12px 14px",
-            borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--dg-color-border-light)",
-            background: "var(--dg-color-bg-secondary)",
-            color: "var(--dg-color-text-secondary)",
-            fontSize: "var(--dg-fs-label)",
-            lineHeight: 1.5,
-          }}
-        >
-          No schedule-eligible roles are configured yet. Jobs can still be limited by{" "}
-          {certificationLabel.toLowerCase()}, but role gating stays open until you mark roles as
-          schedule-eligible.
-        </div>
+        <Banner tone="warning">
+          <span>
+            No schedule-eligible roles are configured yet. Jobs can still be limited by{" "}
+            {certificationLabel.toLowerCase()}, but role gating stays open until you mark roles as
+            schedule-eligible.
+          </span>
+        </Banner>
       ) : null}
 
       <JobSectionCard
