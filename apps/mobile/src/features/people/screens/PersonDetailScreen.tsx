@@ -2777,7 +2777,7 @@ function EditPanel({
           />
           {hasAccount ? (
             <Text style={styles.statusMessage}>
-              Only they can change this, on their own profile.
+              This is their sign-in email, so they change it on their own profile.
             </Text>
           ) : null}
         </ProfilePanel>

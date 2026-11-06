@@ -682,7 +682,7 @@ describe("POST /api/employees/manage", () => {
 
         expect(response.status).toBe(400);
         expect((await response.json()).fieldErrors.email).toBe(
-          "Only they can change this, on their own profile.",
+          "This is their sign-in email, so they change it on their own profile.",
         );
         expect(updateUserById).not.toHaveBeenCalled();
         expect(followUpLinkedLoginEmailChange).not.toHaveBeenCalled();

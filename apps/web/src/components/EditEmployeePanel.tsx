@@ -810,18 +810,18 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                             marginTop: 4,
                           }}
                         >
-                          Only they can change this, on their own profile.
+                          This is their sign-in email, so they change it on their own profile.
                           {onMoveToNewEmail ? (
-                            <>
-                              {" "}
+                            <span className="block">
+                              Lost access to this email?{" "}
                               <button
                                 type="button"
                                 onClick={onMoveToNewEmail}
                                 className="cursor-pointer border-0 bg-transparent p-0 font-semibold text-[var(--dg-color-link)] hover:underline"
                               >
-                                Move to a new email
+                                Move them to a new one
                               </button>
-                            </>
+                            </span>
                           ) : null}
                         </div>
                       )}

@@ -70,7 +70,7 @@ export function InviteEmail({
       {kind === "moved" ? (
         <Text style={styles.paragraph}>
           Already use DubGrid with another organization? Contact support@dubgrid.com and we&apos;ll
-          keep you on one sign-in.
+          keep you on one account.
         </Text>
       ) : null}
       <Text style={{ ...styles.fine, margin: "0 0 8px" }}>
