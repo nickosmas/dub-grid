@@ -64,6 +64,11 @@ export function serverVouchedUser(
   return session.user;
 }
 
+function isSignOutTeardown({ pathname, search }: Pick<Location, "pathname" | "search">): boolean {
+  const scope = new URLSearchParams(search).get("scope");
+  return pathname === "/goodbye" && (scope === "local" || scope === "global");
+}
+
 export default function AuthProvider({
   children,
   serverVerifiedUserId,
@@ -86,6 +91,9 @@ export default function AuthProvider({
     let isMounted = true;
     const isCurrentGeneration = (generation: number) =>
       isMounted && authGenerationRef.current === generation;
+    // This page ends the session as it loads. Checking that session with the
+    // auth server would hold the auth lock the sign-out is queued behind.
+    const isEndingSession = isSignOutTeardown(window.location);
 
     const commitAuthState = (
       generation: number,
@@ -107,6 +115,10 @@ export default function AuthProvider({
     // session so the app doesn't spin forever.
     const checkSession = async () => {
       const generation = authGenerationRef.current;
+      if (isEndingSession) {
+        commitAuthState(generation, null, null);
+        return;
+      }
       try {
         const params = new URLSearchParams(window.location.search);
         const isVerifiedLoginHandoff =
@@ -180,7 +192,11 @@ export default function AuthProvider({
     } = subscribeToBrowserAuthChanges((event: AuthChangeEvent, nextSession: Session | null) => {
       const generation = ++authGenerationRef.current;
 
-      if (event === "SIGNED_OUT" || !nextSession?.access_token) {
+      if (
+        event === "SIGNED_OUT" ||
+        !nextSession?.access_token ||
+        (event === "INITIAL_SESSION" && isEndingSession)
+      ) {
         commitAuthState(generation, null, null);
         return;
       }

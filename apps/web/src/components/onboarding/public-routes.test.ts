@@ -3,6 +3,7 @@ import { isPublicRoute, isSignInRoute } from "./public-routes";
 
 const SIGN_IN_PATHS = [
   "/login",
+  "/goodbye",
   "/forgot-password",
   "/reset-password",
   "/accept-invite",
@@ -15,7 +16,7 @@ describe("isSignInRoute", () => {
     expect(isSignInRoute(path)).toBe(true);
   });
 
-  it.each(["/dashboard", "/schedule", "/accept-terms", "/goodbye", "/onboarding", "/loginx", "/"])(
+  it.each(["/dashboard", "/schedule", "/accept-terms", "/onboarding", "/loginx", "/"])(
     "keeps the app shell on %s",
     (path) => {
       expect(isSignInRoute(path)).toBe(false);

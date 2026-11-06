@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session, User } from "@supabase/supabase-js";
 
 const getBrowserAuthSession = vi.fn();
@@ -118,6 +118,54 @@ describe("AuthProvider", () => {
     expect(await screen.findByText("user-1")).toBeTruthy();
     await act(async () => check.resolve(null));
     await waitFor(() => expect(screen.getByText("signed out")).toBeTruthy());
+  });
+
+  describe("on the page ending the session", () => {
+    afterEach(() => window.history.replaceState(null, "", "/"));
+
+    it.each(["local", "global"])(
+      "leaves the auth lock to the %s sign-out, even when the auth client announces the session",
+      async (scope) => {
+        window.history.replaceState(null, "", `/goodbye?scope=${scope}`);
+
+        render(
+          <AuthProvider serverVerifiedUserId="user-1">
+            <AuthState />
+          </AuthProvider>,
+        );
+        act(() => authChange.current?.("INITIAL_SESSION", sessionFor(user)));
+
+        expect(await screen.findByText("signed out")).toBeTruthy();
+        expect(getVerifiedBrowserAuthUser).not.toHaveBeenCalled();
+      },
+    );
+
+    it("still hears a sign-in after moving on from the page", async () => {
+      window.history.replaceState(null, "", "/goodbye?scope=local");
+      render(
+        <AuthProvider>
+          <AuthState />
+        </AuthProvider>,
+      );
+
+      await act(async () => authChange.current?.("SIGNED_IN", sessionFor(user)));
+
+      expect(await screen.findByText("user-1")).toBeTruthy();
+    });
+
+    it("checks the session as usual when nothing is ending it", async () => {
+      window.history.replaceState(null, "", "/goodbye?scope=other");
+      getVerifiedBrowserAuthUser.mockResolvedValue(user);
+
+      render(
+        <AuthProvider>
+          <AuthState />
+        </AuthProvider>,
+      );
+
+      expect(await screen.findByText("user-1")).toBeTruthy();
+      expect(getVerifiedBrowserAuthUser).toHaveBeenCalled();
+    });
   });
 
   it("waits for the auth server when the server verified nobody", async () => {

@@ -48,7 +48,9 @@ export async function signOutFromBrowser(
   // alongside it. The route verifies the token itself rather than asking Auth,
   // so the session ending there first cannot stop the marker being written.
   // Non-fatal: a failure here must never trap the user in a signed-in state.
-  const revocation = fetchWithTimeout("/api/auth/sign-out", {
+  // Not awaited: keepalive finishes it, and nobody should wait on a cold
+  // function once this browser's session is gone.
+  void fetchWithTimeout("/api/auth/sign-out", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     // A refusal the server records only after checking it (F-28).
@@ -74,7 +76,6 @@ export async function signOutFromBrowser(
   } finally {
     clearSupabaseBrowserAuthState();
     broadcastBrowserSignOut();
-    await revocation;
   }
 }
 
