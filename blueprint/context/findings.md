@@ -723,7 +723,7 @@
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** The token is treated as proof of the inbox, but PATCH moves it to a new address. An Admin invites their own mailbox, reads the token, changes the email to `victim@otherhospital.org`, and registers with that token and a chosen password. The result is a confirmed account at the victim's address with a password the attacker knows. If another organization later invites that person, the invitation finds it as an existing account, and the attacker's live session can then follow them into that organization. If an unconfirmed account with no memberships already holds the address, its password is overwritten instead. Traced, not run.
 **Suggested fix:** Rotate the token (and resend) whenever the email changes, using `replace_pending_invitation_access`, and refuse a register whose token predates the email change.
-**Resolution:**
+**Resolution:** Fixed on fix/invitation-email-rotates-token (2026-11-06): PATCH replaces the token and expiry with the address and mails the new link to the new address only, so the old token no longer exists and nothing further is needed at register. A failed send restores the invitation, and the new address's send limit is checked first. It was the only route that changed an invitation's address; 049 already keeps the column from browsers. Route tests use a client double. Not done: a link already moved to another address before this fix stays live until it expires, and production's audit rows weren't checked for one.
 
 ### F-194 [P1] open - API requests aren't bound to the session's organization, so a person suspended in one organization keeps access to it through another
 
