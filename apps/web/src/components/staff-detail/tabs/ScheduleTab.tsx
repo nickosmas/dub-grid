@@ -16,7 +16,12 @@ import { DAY_LABELS } from "@/lib/constants";
 import { downloadCsvFile } from "@/lib/export-csv";
 import { queryKeys } from "@/lib/query-keys";
 import { buildScheduleWeeks } from "@/lib/schedule-rows";
-import { buildShiftRecords, shiftRecordsToCsv, type ShiftRecordLookups } from "@/lib/shift-records";
+import {
+  buildShiftRecords,
+  shiftRecordsToCsv,
+  type ShiftRecordCorrection,
+  type ShiftRecordLookups,
+} from "@/lib/shift-records";
 import { buildTimeOff, type TimeOffPerson } from "@/lib/time-off";
 import { createAssignmentDefinitionByPairMap } from "@/lib/shift-job-segments";
 import type {
@@ -43,7 +48,7 @@ interface ScheduleTabProps {
   today: string;
   periodPhrase: string;
   lookups: ShiftRecordLookups;
-  corrections?: ReadonlyMap<string, string | null>;
+  corrections?: ReadonlyMap<string, ShiftRecordCorrection>;
   noteCounts?: ReadonlyMap<string, number>;
   absenceTypes: AbsenceType[];
   dayOffAbsenceTypeId: number | null | undefined;

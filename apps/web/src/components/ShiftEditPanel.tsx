@@ -86,6 +86,7 @@ import { Banner } from "@/components/ui/Banner";
 import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import {
+  CorrectedDayCard,
   ShiftPanelView,
   type PanelViewDetail,
   type PanelViewStatus,
@@ -4048,10 +4049,13 @@ export default function ShiftEditPanel({
   const inDetailMode = !allowShiftEdits || (!showPicker && hasActiveShift);
   const dateKey = formatDateKey(modal.date);
 
+  /** What the shift above doesn't already say. */
   function buildViewDetails(): PanelViewDetail[] {
     if (isAbsence) return [{ label: "Time", value: "Whole day · no hours" }];
 
     const count = currentSegments.length;
+    // Two shifts draw as cards holding each one's time and Mentored switch.
+    const cardsShowTimes = count > 1 && !!onCustomTimeChange;
     const starts = parseMultiTimes(customStartTime, count);
     const ends = parseMultiTimes(customEndTime, count);
     let lastEnd: string | null = null;
@@ -4094,8 +4098,10 @@ export default function ShiftEditPanel({
         .filter((name): name is string => Boolean(name));
       const prefix = count > 1 ? `Shift ${index + 1} ` : "";
       return [
-        ...(time ? [{ label: count > 1 ? `Shift ${index + 1}` : "Time", value: time }] : []),
-        { label: `${prefix}mentored`.replace(/^m/, "M"), value: segment.isMentored ? "Yes" : "No" },
+        ...(time && !cardsShowTimes
+          ? [{ label: count > 1 ? `Shift ${index + 1}` : "Time", value: time }]
+          : []),
+        ...(count === 1 && segment.isMentored ? [{ label: "Mentored", value: "Yes" }] : []),
         ...(noteNames.length > 0
           ? [{ label: `${prefix}notes`.replace(/^n/, "N"), value: noteNames.join(", ") }]
           : []),
@@ -4435,41 +4441,12 @@ export default function ShiftEditPanel({
             padding: isMobile ? "16px" : "20px 24px",
           }}
         >
-          {((correctedView && correctedView.kind !== "none") || correctedNotes.length > 0) && (
-            <div
-              data-correction-change
-              style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}
-            >
-              {correctedView && correctedView.kind !== "none" && (
-                <ShiftChangeCard change={correctedView} layout="stacked" />
-              )}
-              {correctedNotes.map((note) => (
-                <p
-                  key={note}
-                  style={{
-                    margin: 0,
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-text-secondary)",
-                  }}
-                >
-                  {note}
-                </p>
-              ))}
-            </div>
-          )}
           {correctedLabel && (
-            <p
-              data-correction-notice
-              style={{
-                margin: "0 0 16px",
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-muted)",
-                lineHeight: 1.45,
-                whiteSpace: "pre-line",
-              }}
-            >
-              {correctedLabel}
-            </p>
+            <CorrectedDayCard
+              change={correctedView}
+              notes={correctedNotes}
+              detail={correctedLabel}
+            />
           )}
           {pastDayNotice && (
             <p
