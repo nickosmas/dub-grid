@@ -25,9 +25,9 @@ server routes that make each change, through `dispatchNotificationEvent`.
   and `internal/architecture/folder-structure.md`.
 - Regenerated the documentation inventory.
 
-The `schedule_published` case in `dispatchNotificationEvent` has no dispatcher
-left, since publishing alerts through `notifyPublishedShiftChanges`. It stays for
-now; the notification type itself is still read for older alerts.
+The `schedule_published` case in `dispatchNotificationEvent` had no dispatcher left,
+since publishing alerts through `notifyPublishedShiftChanges`, so it went too (#332).
+The notification type stays, because older alerts still read it.
 
 ## Verify
 
