@@ -30,7 +30,6 @@ export const dynamic = "force-dynamic";
 const patchSchema = z.object({
   employeeId: z.string().uuid(),
   orgId: z.string().uuid(),
-  userId: z.string().uuid().nullable(),
   firstName: staffNameSchema,
   lastName: staffNameSchema,
   phone: optionalUsPhoneSchema,
@@ -86,7 +85,7 @@ export async function PATCH(req: NextRequest) {
     return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
   }
 
-  const { employeeId, userId, firstName, lastName, phone, email, expectedVersion } = parsed.data;
+  const { employeeId, firstName, lastName, phone, email, expectedVersion } = parsed.data;
   // Effective (sandbox-redirected) org; resolved inside the try, declared here
   // so the catch block can reference it for logging. (H-1)
   let orgId = parsed.data.orgId;
@@ -155,7 +154,7 @@ export async function PATCH(req: NextRequest) {
 
     // Mirror first/last name to the linked profile so display names stay in
     // sync across the app (people list, schedule chips, audit log actor labels).
-    if (userId) {
+    if (currentEmployee.userId) {
       const { error: profileError } = await serviceClient
         .from("profiles")
         .update({
@@ -163,7 +162,7 @@ export async function PATCH(req: NextRequest) {
           last_name: lastName,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", userId);
+        .eq("id", currentEmployee.userId);
       if (profileError) throw profileError;
     }
 

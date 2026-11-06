@@ -95,6 +95,7 @@ const ORG_ID = "577a93d3-8f6a-4b45-a93d-b9731122ce11";
 const EMPLOYEE_ID = "d660d308-4e0d-4daf-84fd-6753405e6740";
 const VIEWER_USER_ID = "3f1c5b7e-90ab-4c3d-8e2f-6a5b4c3d2e1f";
 const PERSON_USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
+const OTHER_ORG_USER_ID = "1b6f0c52-7d0e-4f7e-9a10-3c2d5e8f7a11";
 
 function makeServiceClient() {
   const chain: Record<string, unknown> = {};
@@ -644,6 +645,70 @@ describe("POST /api/employees/manage", () => {
       });
     });
 
+    describe("the linked account", () => {
+      function profileRenames() {
+        const serviceClient = makeServiceClient();
+        const renamedIds: unknown[] = [];
+        const from = serviceClient.from;
+        serviceClient.from = vi.fn((table: string) =>
+          table === "profiles"
+            ? ({
+                update: () => ({
+                  eq: async (_column: string, id: unknown) => {
+                    renamedIds.push(id);
+                    return { error: null };
+                  },
+                }),
+              } as unknown as ReturnType<typeof from>)
+            : from(table),
+        );
+        mockAuth({ canManageEmployees: true });
+        requireOrgPermissions.mockResolvedValue({
+          permissions: { canViewStaff: true, canManageEmployees: true },
+          serviceClient,
+          actor: { id: VIEWER_USER_ID },
+        });
+        return renamedIds;
+      }
+
+      it("renames the account linked to the stored row, not one named in the request", async () => {
+        const renamedIds = profileRenames();
+        fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([
+          { user_id: PERSON_USER_ID, department_ids: [4], dept_admin_ids: [] },
+        ]);
+
+        const response = await POST(updateEmployeeRequest({ userId: OTHER_ORG_USER_ID }));
+
+        expect(response.status).toBe(200);
+        expect(renamedIds).toEqual([PERSON_USER_ID]);
+      });
+
+      it("reads management access from the stored row's account", async () => {
+        profileRenames();
+        fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([]);
+
+        await POST(updateEmployeeRequest({ userId: OTHER_ORG_USER_ID }));
+
+        expect(fetchMobileManagementMembershipRowsByUserIds).toHaveBeenCalledWith(
+          expect.anything(),
+          ORG_ID,
+          [PERSON_USER_ID],
+        );
+      });
+
+      it("renames no account when the stored row has none", async () => {
+        const renamedIds = profileRenames();
+        rowToEmployee.mockReturnValue(makeEmployee({ userId: null }));
+
+        const response = await POST(
+          updateEmployeeRequest({ userId: OTHER_ORG_USER_ID, focusAreaIds: [3] }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(renamedIds).toEqual([]);
+      });
+    });
+
     describe("login email", () => {
       function linkedManagementUser() {
         mockAuth({ canManageEmployees: true });
@@ -666,7 +731,9 @@ describe("POST /api/employees/manage", () => {
         linkedManagementUser();
         rowToEmployee.mockReturnValue(makeEmployee({ userId: null }));
 
-        const response = await POST(updateEmployeeRequest({ email: "new@dubgrid.com" }));
+        const response = await POST(
+          updateEmployeeRequest({ email: "new@dubgrid.com", userId: null, focusAreaIds: [3] }),
+        );
 
         expect(response.status).toBe(200);
         expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
