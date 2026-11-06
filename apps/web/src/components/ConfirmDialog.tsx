@@ -83,7 +83,7 @@ export default function ConfirmDialog({
   onSecondaryConfirm,
   isSecondaryLoading,
   secondaryConfirmTone = "confirm",
-  maxWidth = 420,
+  maxWidth = 480,
   wrapActions = false,
   confirmDisabled = false,
   secondaryConfirmDisabled = false,

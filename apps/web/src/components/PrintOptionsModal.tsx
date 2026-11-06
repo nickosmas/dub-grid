@@ -89,7 +89,6 @@ export default function PrintOptionsModal({
         title="Print schedule"
         onClose={onClose}
         onRequestClose={requestClose}
-        style={{ maxWidth: 400 }}
         footer={
           <div className="dg-modal-actions">
             <Button onClick={handleActionClose} className="dg-btn dg-btn-secondary">

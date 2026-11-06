@@ -37,7 +37,6 @@ export function StepUpDialog({ method, error, onConfirm, onCancel }: StepUpDialo
             return false;
           }}
           aria-describedby={`${id}-description`}
-          className="max-w-md"
           footer={actions}
         >
           {fields}
