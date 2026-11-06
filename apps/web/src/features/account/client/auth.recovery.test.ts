@@ -175,31 +175,24 @@ describe("signOutFromBrowser recovery", () => {
         finishSignOut = () => resolve({ error: null });
       }),
     );
-    let finishRevocation!: () => void;
-    vi.mocked(fetch).mockReturnValue(
-      new Promise((resolve) => {
-        finishRevocation = () => resolve(new Response(JSON.stringify({ success: true })));
-      }),
-    );
+    vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
 
     const signOut = signOutFromBrowser("local");
     await new Promise((resolve) => setTimeout(resolve, 0));
     // Both are in flight, the request first so it carries this session's cookies.
-    expect(fetch).toHaveBeenCalledWith("/api/auth/sign-out", expect.anything());
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/auth/sign-out",
+      expect.objectContaining({ keepalive: true }),
+    );
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(vi.mocked(fetch).mock.invocationCallOrder[0]).toBeLessThan(
       mocks.signOut.mock.invocationCallOrder[0]!,
     );
 
+    // The revocation is still pending: keepalive finishes it, and the person
+    // waits only for this browser's session to go.
     finishSignOut();
-    let settled = false;
-    void signOut.then(() => {
-      settled = true;
-    });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(settled).toBe(false);
-
-    finishRevocation();
     await signOut;
+    expect(mocks.clear).toHaveBeenCalledOnce();
   });
 });

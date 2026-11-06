@@ -120,8 +120,6 @@ function primeGridmasterPortal(queryClient: QueryClient): void {
  * the gate, this stays put. It also primes the queries on a hard navigation
  * after an organization switch, where the sign-in form is no longer running.
  */
-const SIGN_OUT_ROUTE = "/goodbye";
-
 export default function SignInPrefetch() {
   const pending = useAuthTransitionPending();
   const { session } = useAuth();
@@ -147,7 +145,7 @@ function usePrimeHardLoad(pending: boolean, accessToken: string | null) {
     primed.current = true;
     // A sign-in primes through HoldSignInQueries instead. The sign-out page
     // revokes this session as it loads, so anything asked there answers 401.
-    if (pending || isSignInRoute(pathname) || pathname === SIGN_OUT_ROUTE) return;
+    if (pending || isSignInRoute(pathname)) return;
     if (!signInTarget(accessToken)) return;
     primeSignInQueries(queryClient, accessToken, {
       dashboard: pathname === POST_LOGIN_DESTINATION,
