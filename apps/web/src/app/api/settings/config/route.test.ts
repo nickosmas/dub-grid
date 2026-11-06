@@ -755,3 +755,95 @@ describe("batch saves", () => {
     });
   });
 });
+
+describe("saving absence and schedule note types", () => {
+  const FOREIGN_ID = 9001;
+
+  /** Finds a row only when the update was filtered to the organization that owns it. */
+  function ownedRowClient(ownerOrg: string) {
+    const updates: Array<{ table: string; filters: Record<string, unknown> }> = [];
+    const client = {
+      from: (table: string) => {
+        const filters: Record<string, unknown> = {};
+        let payload: Record<string, unknown> = {};
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = (column: string, value: unknown) => {
+          filters[column] = value;
+          return chain;
+        };
+        chain.update = (row: Record<string, unknown>) => {
+          payload = row;
+          updates.push({ table, filters });
+          return chain;
+        };
+        chain.insert = () => chain;
+        chain.maybeSingle = async () => ({
+          data:
+            filters.org_id === ownerOrg ? { id: filters.id, ...payload, org_id: ownerOrg } : null,
+          error: null,
+        });
+        chain.then = (resolve: (v: unknown) => unknown) => resolve({ data: [], error: null });
+        return chain;
+      },
+    };
+    return { client, updates };
+  }
+
+  async function save(body: Record<string, unknown>, ownerOrg: string) {
+    const recorded = ownedRowClient(ownerOrg);
+    getServiceClient.mockReturnValue(recorded.client);
+    requireOrgPermissions.mockResolvedValue({
+      actor: { id: "actor-1", email: "a@example.com" },
+      serviceClient: recorded.client,
+      orgId: REAL_ORG,
+    });
+    const { POST } = await import("./route");
+    const res = await POST(
+      new NextRequest("https://app.test/api/settings/config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ orgId: REAL_ORG, ...body }),
+      }),
+    );
+    if (!res) throw new Error("The route returned no response.");
+    return { res, ...recorded };
+  }
+
+  const absenceType = {
+    id: FOREIGN_ID,
+    orgId: REAL_ORG,
+    label: "SICK",
+    name: "Sick",
+    color: "#111111",
+    border: "#222222",
+    text: "#333333",
+    sortOrder: 1,
+  };
+  const indicatorType = {
+    id: FOREIGN_ID,
+    orgId: REAL_ORG,
+    name: "Note",
+    color: "#111111",
+    sortOrder: 1,
+  };
+
+  it.each([
+    ["upsertAbsenceType", "absence_types", { absenceType }],
+    ["upsertIndicatorType", "indicator_types", { indicatorType }],
+  ])("%s refuses another organization's id", async (action, table, fields) => {
+    const { res, updates } = await save({ action, ...fields }, SANDBOX_ORG);
+
+    expect(res.status).toBe(404);
+    expect(updates).toEqual([{ table, filters: { org_id: REAL_ORG, id: FOREIGN_ID } }]);
+  });
+
+  it.each([
+    ["upsertAbsenceType", { absenceType }],
+    ["upsertIndicatorType", { indicatorType }],
+  ])("%s still saves the organization's own row", async (action, fields) => {
+    const { res } = await save({ action, ...fields }, REAL_ORG);
+
+    expect(res.status).toBe(200);
+  });
+});

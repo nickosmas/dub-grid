@@ -50,6 +50,7 @@ const SANDBOX_ORG_ID = "22222222-2222-2222-2222-222222222222";
 const EMPLOYEE_ID = "33333333-3333-3333-3333-333333333333";
 const USER_ID = "44444444-4444-4444-4444-444444444444";
 const ACTOR_ID = "55555555-5555-5555-5555-555555555555";
+const OTHER_ORG_USER_ID = "66666666-6666-6666-6666-666666666666";
 
 function dbEmployee(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -307,5 +308,58 @@ describe("PATCH /api/employees/identity", () => {
     expect(auditPayload?.details.changedFields).toEqual(
       expect.arrayContaining(["firstName", "email"]),
     );
+  });
+
+  describe("the linked account", () => {
+    function profileUpdateRecorder() {
+      const ids: unknown[] = [];
+      const profileUpdate = vi.fn(() => ({
+        eq: vi.fn(async (_column: string, id: unknown) => {
+          ids.push(id);
+          return { error: null };
+        }),
+      }));
+      return { ids, profileUpdate };
+    }
+
+    async function send(current: ReturnType<typeof dbEmployee>, profileUpdate: () => unknown) {
+      getServiceClient.mockReturnValue(
+        makeServiceClient({
+          current,
+          updatedRow: { ...current, first_name: "New", version: 4 },
+          profileUpdate: profileUpdate as ReturnType<typeof vi.fn>,
+        }),
+      );
+      const { PATCH } = await importRoute();
+      return PATCH(
+        makeRequest({
+          employeeId: EMPLOYEE_ID,
+          orgId: REAL_ORG_ID,
+          userId: OTHER_ORG_USER_ID,
+          firstName: "New",
+          lastName: "Name",
+          phone: "",
+          expectedVersion: 3,
+        }),
+      );
+    }
+
+    it("renames the account linked to the stored row, not one named in the request", async () => {
+      const { ids, profileUpdate } = profileUpdateRecorder();
+
+      const res = await send(dbEmployee({ user_id: USER_ID }), profileUpdate);
+
+      expect(res.status).toBe(200);
+      expect(ids).toEqual([USER_ID]);
+    });
+
+    it("renames no account when the stored row has none", async () => {
+      const { profileUpdate } = profileUpdateRecorder();
+
+      const res = await send(dbEmployee({ user_id: null }), profileUpdate);
+
+      expect(res.status).toBe(200);
+      expect(profileUpdate).not.toHaveBeenCalled();
+    });
   });
 });

@@ -2450,7 +2450,6 @@ export function MembersSection({
                 const identityResult = await updateEmployeeIdentity({
                   employeeId: selectedPerson.employeeId,
                   orgId,
-                  userId: selectedPerson.userId,
                   firstName: data.firstName,
                   lastName: data.lastName,
                   email: data.email,
