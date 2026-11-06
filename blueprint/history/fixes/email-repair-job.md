@@ -37,8 +37,8 @@ changing an email for someone who lost their mailbox.
   Save stays off. My profile's email is checked in every organization the
   person belongs to, so it stops most clashes before they start; the wording
   above only shows if someone takes the address in the moment before the save.
-- **Runbook.** `internal/operations/lost-mailbox-email-change.md`, a draft for
-  the owner's review.
+- **Runbook.** `internal/operations/lost-mailbox-email-change.md`, approved by
+  the owner.
 
 ## Not in this fix
 

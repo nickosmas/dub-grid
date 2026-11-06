@@ -1,8 +1,7 @@
 # Changing a sign-in email when the mailbox is lost
 
-> **Draft for the owner's review (2026-11-05).** How much proof support asks for
-> is the owner's call. Until this note is removed, treat the checks below as
-> the minimum.
+> **Approved by the owner (2026-11-05).** How much proof support asks for is the
+> owner's call, so change the checks below only with their approval.
 
 Whoever controls a sign-in email can reset the password, so changing one on
 request hands over the account. This runbook is for a Gridmaster asked to do
@@ -14,7 +13,7 @@ where support changes a sign-in email.
 | Situation                                                 | What happens                                                                                                    |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | They can still sign in                                    | They change it themselves on My profile. Support does nothing.                                                  |
-| They've lost the mailbox and are in one organization      | A Super Admin there uses **Move to a new email** on the staff page. Support does nothing.                       |
+| They've lost the mailbox and are in one organization      | A Super Admin there uses **Move them to a new one** on the staff page. Support does nothing.                    |
 | They've lost the mailbox and are in several organizations | A move covers one organization only, so each would have to move them. Use this runbook to change it everywhere. |
 | They're the organization's only Super Admin               | Nobody there can move them. Use this runbook, with the stronger check below.                                    |
 | They also lost their authenticator                        | Use this runbook, then **Reset two-factor** on the same page. It asks for a reason.                             |

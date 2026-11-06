@@ -694,14 +694,15 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "people",
     severity: "update",
     // Written by the daily job, which has no actor.
-    headline: (d, ctx) => `${who(d, ctx, "A staff member")}'s email now matches their sign-in`,
+    headline: (d, ctx) =>
+      `${who(d, ctx, "A staff member")}'s email now matches their sign-in email`,
     suppressKeys: ["previousEmail", "email"],
   },
   "employee.email_sync_blocked": {
     category: "people",
     severity: "warning",
     headline: (d, ctx) =>
-      `${who(d, ctx, "A staff member")}'s email couldn't match their sign-in: another staff record uses it`,
+      `${who(d, ctx, "A staff member")}'s email couldn't be updated: another staff record uses their sign-in email`,
     suppressKeys: ["email", "holderEmpId"],
   },
   "employee.account_deleted": {

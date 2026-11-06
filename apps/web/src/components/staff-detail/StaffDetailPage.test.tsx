@@ -171,6 +171,13 @@ function renderPage(employeeId = "emp-2") {
   );
 }
 
+/** The Account field in Access, not another mention of the same words on the page. */
+function accountFieldShowing(value: string) {
+  return screen
+    .getAllByText(value)
+    .find((element) => element.previousElementSibling?.textContent === "Account");
+}
+
 describe("StaffDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -219,7 +226,7 @@ describe("StaffDetailPage", () => {
 
     const record = await screen.findByTestId("person-record");
     expect(within(record).getByText("Joined").nextElementSibling).toHaveTextContent(JOINED_DAY);
-    expect(screen.getByText("Sign-in").nextElementSibling).toHaveTextContent("Linked account");
+    expect(accountFieldShowing("Linked account")).toBeDefined();
   });
 
   it("keeps the joined date on screen after a save whose response carries none", async () => {
@@ -279,10 +286,8 @@ describe("StaffDetailPage", () => {
       const card = await screen.findByRole("region", { name: "Invitation" });
       expect(card).toHaveAttribute("data-invitation", "expired");
       expect(within(card).getByText(/^Invite expired /)).toBeInTheDocument();
-      await screen.findByText("Account");
-      expect(screen.getByText("Sign-in").nextElementSibling).toHaveTextContent(
-        "Invitation expired",
-      );
+      await screen.findByText("Account", { selector: "dt" });
+      expect(accountFieldShowing("Invitation expired")).toBeDefined();
       expect(screen.queryByRole("button", { name: "Send invitation" })).not.toBeInTheDocument();
       expect(within(card).queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument();
 
@@ -302,10 +307,8 @@ describe("StaffDetailPage", () => {
       expect(within(card).getByText(/^The invite expires /)).toBeInTheDocument();
       expect(within(card).getByRole("button", { name: "Resend" })).toBeInTheDocument();
       expect(within(card).getByRole("button", { name: "Revoke" })).toBeInTheDocument();
-      await screen.findByText("Account");
-      expect(screen.getByText("Sign-in").nextElementSibling).toHaveTextContent(
-        "Invitation pending",
-      );
+      await screen.findByText("Account", { selector: "dt" });
+      expect(accountFieldShowing("Invitation pending")).toBeDefined();
     });
 
     it("offers Invite when there is no open invitation", async () => {

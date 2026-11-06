@@ -288,7 +288,7 @@ export default function GridmasterDashboard({
               <OversightCard
                 label="Org Risk"
                 value={overview.orgRisk.riskiestOrganizations.length}
-                detail={`${overview.orgRisk.pendingSetupCount} setup, ${overview.orgRisk.noLoginCount} stale login`}
+                detail={`${overview.orgRisk.pendingSetupCount} setup, ${overview.orgRisk.noLoginCount} stale sign-in`}
                 tone={overview.orgRisk.riskiestOrganizations.length > 0 ? "warning" : "good"}
               />
               <OversightCard

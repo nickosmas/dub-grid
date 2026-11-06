@@ -194,7 +194,7 @@ export function AddManagementUserToScheduleModal({
                 ? `${person.firstName} ${person.lastName}`.trim()
                 : person.email}
             </strong>{" "}
-            on the schedule so you can assign them shifts. They'll keep their login and management
+            on the schedule so you can assign them shifts. They'll keep their account and management
             access.
           </div>
 

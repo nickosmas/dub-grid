@@ -264,7 +264,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
             className="dg-auth-link"
             style={{ color: "var(--dg-color-text-subtle)" }}
           >
-            &larr; Back to login
+            &larr; Back to sign in
           </Button>
         </div>
       </Card>

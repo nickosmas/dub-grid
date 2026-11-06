@@ -73,7 +73,7 @@ export function DeleteStaffAccountCard({
     ? "Offboard them first. Their account can be deleted once they've left."
     : usedElsewhere
       ? "This account is also used outside your organization, so it can't be deleted here."
-      : "Removes their sign-in for good. Their staff record, shifts and history stay.";
+      : "Deletes their account for good. Their staff record, shifts and history stay.";
 
   return (
     <section aria-labelledby="staff-delete-account-title" className="dg-card">
@@ -109,7 +109,7 @@ export function DeleteStaffAccountCard({
           onConfirm={handleDelete}
           message={
             <div className="flex flex-col gap-3.5">
-              <span>This removes their sign-in for good, and it can&apos;t be undone.</span>
+              <span>This deletes their account for good, and it can&apos;t be undone.</span>
               <div>
                 <label className="dg-label" htmlFor="delete-staff-account-input">
                   Type <strong>{CONFIRM_PHRASE}</strong> to confirm
