@@ -11,6 +11,7 @@ import type {
   DbShiftCategory,
 } from "@dubgrid/db-types";
 import type { Employee } from "@dubgrid/domain";
+import { buildPermissionContext } from "@dubgrid/authz";
 import { getServiceClient } from "@/lib/supabase-service";
 import { cacheDel, CacheKey } from "@/lib/cache";
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
@@ -173,6 +174,29 @@ async function fetchLinkedEmployeeByUserId(
   return rowToEmployee(data as DbEmployee);
 }
 
+/**
+ * Internal notes are written about someone, for the people who manage them, so
+ * a person's own record comes back without them unless they manage staff. A
+ * manager keeps theirs: their editor saves the whole record, so a blank here
+ * would erase the notes on the next save.
+ */
+export async function employeeForSelf(employee: Employee, userId: string, orgId: string) {
+  const { data, error } = await getServiceClient()
+    .from("organization_memberships")
+    .select("org_role, admin_permissions")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  const { canManageEmployees } = buildPermissionContext(
+    data?.org_role ?? "user",
+    orgId,
+    data?.admin_permissions ?? null,
+  );
+  return canManageEmployees ? employee : { ...employee, contactNotes: "" };
+}
+
 async function fetchOwnMembership(
   userId: string,
   orgId: string,
@@ -310,8 +334,8 @@ export async function fetchSelfWorkProfileSnapshot(
   }
   const managementDepartmentIds = membership.departmentIds;
 
-  const employee = await fetchLinkedEmployeeByUserId(userId, orgId);
-  if (!employee) {
+  const linkedEmployee = await fetchLinkedEmployeeByUserId(userId, orgId);
+  if (!linkedEmployee) {
     return {
       profile,
       isOrgMember: true,
@@ -321,6 +345,7 @@ export async function fetchSelfWorkProfileSnapshot(
       recurringShifts: [],
     };
   }
+  const employee = await employeeForSelf(linkedEmployee, userId, orgId);
 
   const [assignmentContext, timeZone] = await Promise.all([
     fetchAssignmentContext(orgId),
@@ -483,7 +508,7 @@ export async function updateSelfLinkedEmployeePhone(input: {
     const latestEmployee = await fetchLinkedEmployeeByUserId(input.userId, input.orgId);
     throw Object.assign(new Error(changedElsewhereMessage("your profile")), {
       code: "EMPLOYEE_CONFLICT" as const,
-      employee: latestEmployee ?? employee,
+      employee: await employeeForSelf(latestEmployee ?? employee, input.userId, input.orgId),
     });
   }
 
@@ -508,7 +533,7 @@ export async function updateSelfLinkedEmployeePhone(input: {
     }),
   ]);
 
-  return { employee: updatedEmployee };
+  return { employee: await employeeForSelf(updatedEmployee, input.userId, input.orgId) };
 }
 
 /** Records two-factor as off, returning whether it was recorded on before. */
