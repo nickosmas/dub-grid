@@ -111,7 +111,12 @@ describe("PATCH /api/organizations/app-only-user", () => {
     expect(res.status).toBe(200);
     expect(resolveEffectiveOrgId).toHaveBeenCalledWith(expect.anything(), ACTOR_ID, REAL_ORG_ID);
     // canManageEmployees must be checked against the effective org, never the raw one.
-    expect(canManageEmployees).toHaveBeenCalledWith(expect.anything(), ACTOR_ID, SANDBOX_ORG_ID);
+    expect(canManageEmployees).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      ACTOR_ID,
+      SANDBOX_ORG_ID,
+    );
     expect(validateStaffOrgReferences).toHaveBeenCalledWith(
       expect.anything(),
       SANDBOX_ORG_ID,
@@ -128,7 +133,12 @@ describe("PATCH /api/organizations/app-only-user", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(canManageEmployees).toHaveBeenCalledWith(expect.anything(), ACTOR_ID, REAL_ORG_ID);
+    expect(canManageEmployees).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      ACTOR_ID,
+      REAL_ORG_ID,
+    );
   });
 
   it("returns 403 when the caller cannot manage employees in the effective org", async () => {

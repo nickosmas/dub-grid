@@ -13,6 +13,9 @@ const sendResendEmail = vi.fn();
 const loggerWarn = vi.fn();
 const loggerError = vi.fn();
 
+vi.mock("@/lib/supabase-admin-users", () => ({
+  findAuthUserByEmail: vi.fn(async () => null),
+}));
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
 }));

@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-policy";
 import { createNameMismatchResponseBody } from "@/lib/account-linking";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -58,11 +59,42 @@ export async function canAssignOrgRole(
   return isOrgSuperAdminOrGridmaster(serviceClient, actorId, orgId);
 }
 
-export async function canManageEmployees(
+/**
+ * False when this request is for another organization than its session's, or
+ * the caller is suspended from `orgId`. A live membership proves neither (F-194).
+ * The claims already name the sandbox for a caller inside one.
+ */
+export async function isActingInSessionOrg(
+  req: NextRequest,
   serviceClient: ServiceClient,
   actorId: string,
   orgId: string,
 ): Promise<boolean> {
+  if (await isGridmasterActor(serviceClient, actorId)) return true;
+
+  const auth = await requireAuthenticatedUserWithClaims(req);
+  if ("response" in auth || auth.user.id !== actorId) return false;
+  const { org_id: sessionOrgId } = auth.claims;
+  if (typeof sessionOrgId === "string" && sessionOrgId && sessionOrgId !== orgId) return false;
+
+  const { data: employee, error } = await serviceClient
+    .from("employees")
+    .select("suspended_at")
+    .eq("user_id", actorId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  return employee?.suspended_at == null;
+}
+
+export async function canManageEmployees(
+  req: NextRequest,
+  serviceClient: ServiceClient,
+  actorId: string,
+  orgId: string,
+): Promise<boolean> {
+  if (!(await isActingInSessionOrg(req, serviceClient, actorId, orgId))) return false;
+
   const [{ data: membership }, { data: profile }, { data: organization }] = await Promise.all([
     serviceClient
       .from("organization_memberships")

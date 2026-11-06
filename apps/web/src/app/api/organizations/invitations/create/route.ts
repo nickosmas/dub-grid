@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
   let chosenPermissions: Record<string, boolean> | null = null;
 
   try {
-    const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
+    const hasPermission = await canManageEmployees(req, serviceClient, user.id, orgId);
     if (!hasPermission) {
       return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }

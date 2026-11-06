@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
   try {
     const orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
     const serviceClient = getServiceClient();
-    if (!(await canManageEmployees(serviceClient, user.id, orgId))) {
+    if (!(await canManageEmployees(req, serviceClient, user.id, orgId))) {
       return refuse(API_ERRORS.CANNOT_MANAGE_EMPLOYEES, 403);
     }
 

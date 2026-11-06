@@ -30,6 +30,11 @@ const KNOWN_BENIGN_CONSOLE_PATTERNS: readonly RegExp[] = [
   // transient network blip falls back to a full browser navigation rather
   // than failing the interaction. The fallback is the point of the message.
   /Failed to fetch RSC payload for .*\. Falling back to browser navigation\./,
+  // WebKit logs a request cancelled by a navigation as this bare error, with no
+  // URL. A spec walking routes leaves pages with requests still in flight. The
+  // same walk on Chromium and Firefox still reports a real network failure, and
+  // a server failure is still caught by a spec's response listener.
+  /^TypeError: Load failed$/,
 ];
 
 export function isKnownBenignConsoleNoise(messageText: string): boolean {

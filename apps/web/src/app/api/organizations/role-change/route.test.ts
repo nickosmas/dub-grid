@@ -16,6 +16,10 @@ const auditInsert = vi.fn();
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
+vi.mock("@/app/api/employees/shared", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/api/employees/shared")>()),
+  isActingInSessionOrg: vi.fn(async () => true),
+}));
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
   requireSensitiveActionAuth: (req: NextRequest) => requireSensitiveActionAuth(req),

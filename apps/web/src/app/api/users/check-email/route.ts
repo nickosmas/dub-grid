@@ -18,25 +18,18 @@ const bodySchema = z.object({
 
 /**
  * Pre-flight email lookup for the Add-Employee flow. Tells the admin whether
- * the email already maps to a DubGrid user (any org), without revealing
- * which orgs that user belongs to.
+ * this person is already in the organization, and nothing about anyone else:
+ * an account outside it, a Gridmaster's included, reads the same as no account.
  *
  * Returns:
- * - `exists`            — true if a `auth.users` row matches the email.
- * - `displayName`       — the matched profile's display name when present.
- * - `existsInThisOrg`   — true if the matched user has a non-archived
- *                         membership in the caller's org. The UI uses this
- *                         to hard-block "you're inviting someone already in
- *                         this org" before the trigger / unique index fires.
- * - `existingEmployeeId`— the matched user's `employees.id` in this org
- *                         when they have one (so the UI can deep-link).
- *
- * A match on a Gridmaster account is reported as `exists: false` outright —
- * Gridmaster is a platform-level role never surfaced to org users, and this
- * endpoint's whole job is a friendly "they'll join your org" preview that
- * would otherwise leak a platform admin's real name and account status to
- * an org-level admin. The DB trigger still blocks the save itself with its
- * own sanitized "That email address is reserved." message either way.
+ * - `exists`            — true if the address belongs to someone in this org.
+ * - `displayName`       — that person's display name when present.
+ * - `existsInThisOrg`   — true if they have a non-archived membership in the
+ *                         caller's org. The UI uses this to hard-block
+ *                         "you're inviting someone already in this org" before
+ *                         the trigger / unique index fires.
+ * - `existingEmployeeId`— their `employees.id` in this org when they have one
+ *                         (so the UI can deep-link).
  *
  * Auth: must be an authenticated user with `canManageEmployees` on `orgId`.
  * Rate-limited per-user via the standard `apiLimiter`.
@@ -78,7 +71,7 @@ export async function POST(req: NextRequest) {
 
   const serviceClient = getServiceClient();
 
-  const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
+  const hasPermission = await canManageEmployees(req, serviceClient, user.id, orgId);
   if (!hasPermission) {
     return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
   }
@@ -122,7 +115,10 @@ export async function POST(req: NextRequest) {
   ]);
 
   const profile = profileResult.data;
-  if (profile?.platform_role === "gridmaster") {
+  // Someone outside this organization reads the same as nobody at all: whether
+  // an address has an account elsewhere isn't this organization's to know (F-196).
+  const inThisOrg = membershipResult.data !== null || employeeResult.data !== null;
+  if (profile?.platform_role === "gridmaster" || !inThisOrg) {
     return NextResponse.json({
       exists: false,
       displayName: null,

@@ -25,7 +25,8 @@ type Claims = JwtPayload & {
 
 type AuthResult = { session: Session; user: User; sessionId: string } | { response: NextResponse };
 
-type UserAuthResult = { user: User; sessionId: string } | { response: NextResponse };
+type UserAuthResult =
+  { user: User; sessionId: string; sessionOrgId: string | null } | { response: NextResponse };
 
 type ClaimsAuthResult =
   { session: Session; user: User; sessionId: string; claims: Claims } | { response: NextResponse };
@@ -240,7 +241,24 @@ export async function requireAuthenticatedSession(req: NextRequest): Promise<Aut
 export async function requireAuthenticatedUser(req: NextRequest): Promise<UserAuthResult> {
   const auth = await authenticateRequest(req);
   if ("response" in auth) return auth;
-  return { user: auth.user, sessionId: auth.verified.sessionId };
+  return {
+    user: auth.user,
+    sessionId: auth.verified.sessionId,
+    sessionOrgId: tokenOrgId(auth.verified.claims),
+  };
+}
+
+function tokenOrgId(claims: { org_id?: unknown }): string | null {
+  return typeof claims.org_id === "string" && claims.org_id ? claims.org_id : null;
+}
+
+/**
+ * The organization this request's session is in, for a caller that has already
+ * authenticated it. A token names none when its session's organization is gone.
+ */
+export async function readSessionOrgId(req: NextRequest): Promise<string | null> {
+  const token = await verifyRequestToken(req);
+  return "response" in token ? null : tokenOrgId(token.verified.claims);
 }
 
 export async function requireLiveAuthenticatedSession(

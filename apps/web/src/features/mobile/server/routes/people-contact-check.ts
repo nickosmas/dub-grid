@@ -14,7 +14,6 @@ const bodySchema = z.object({
   email: z.string().trim().optional(),
   phone: z.string().trim().optional(),
   excludeEmployeeId: z.string().uuid().optional(),
-  currentUserId: z.string().uuid().nullable().optional(),
 });
 
 /**
@@ -52,7 +51,6 @@ export async function POST(req: NextRequest) {
             orgId: auth.currentOrg.id,
             email,
             excludeEmployeeId: parsed.data.excludeEmployeeId,
-            currentUserId: parsed.data.currentUserId,
           })
         : Promise.resolve(null),
       phone

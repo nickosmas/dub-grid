@@ -121,20 +121,23 @@ describe("POST /api/users/check-email", () => {
     });
   });
 
-  it("reports a match outside this org without an employee id", async () => {
+  it("reads an account outside this org the same as no account (F-196)", async () => {
     findAuthUserByEmail.mockResolvedValue({
       id: MATCHED_USER_ID,
       email: "elsewhere@test.com",
       emailConfirmed: true,
     });
-    profileMaybeSingle.mockResolvedValue({ data: null, error: null });
+    profileMaybeSingle.mockResolvedValue({
+      data: { first_name: "Avery", last_name: "Stone", platform_role: "none" },
+      error: null,
+    });
 
     const { POST } = await importRoute();
     const res = await POST(makeRequest({ email: "elsewhere@test.com", orgId: ORG_ID }));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
-      exists: true,
+      exists: false,
       displayName: null,
       existsInThisOrg: false,
       existingEmployeeId: null,

@@ -37,12 +37,13 @@ function refuse(error: string, status: number) {
 type ServiceClient = ReturnType<typeof getServiceClient>;
 
 async function canManageSuperAdminOnly(
+  req: NextRequest,
   serviceClient: ServiceClient,
   actorId: string,
   orgId: string,
 ): Promise<boolean> {
   const [canManage, isSuperAdmin] = await Promise.all([
-    canManageEmployees(serviceClient, actorId, orgId),
+    canManageEmployees(req, serviceClient, actorId, orgId),
     isOrgSuperAdminOrGridmaster(serviceClient, actorId, orgId),
   ]);
   return canManage && isSuperAdmin;
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
   try {
     const orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
     const serviceClient = getServiceClient();
-    if (!(await canManageSuperAdminOnly(serviceClient, user.id, orgId))) {
+    if (!(await canManageSuperAdminOnly(req, serviceClient, user.id, orgId))) {
       return refuse(API_ERRORS.FORBIDDEN, 403);
     }
     const employee = await fetchEmployee(serviceClient, orgId, parsed.data.empId);
@@ -152,7 +153,7 @@ export async function POST(req: NextRequest) {
   try {
     const orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
     const serviceClient = getServiceClient();
-    if (!(await canManageSuperAdminOnly(serviceClient, user.id, orgId))) {
+    if (!(await canManageSuperAdminOnly(req, serviceClient, user.id, orgId))) {
       return refuse(API_ERRORS.FORBIDDEN, 403);
     }
 

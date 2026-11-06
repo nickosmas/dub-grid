@@ -45,7 +45,7 @@ describe("getEmployeeContactConflict", () => {
     });
   });
 
-  it("reports protected account emails as reserved without exposing the account type", () => {
+  it("words a Gridmaster's address like any other account's (F-196)", () => {
     expect(
       getEmployeeContactConflict({
         code: "23505",
@@ -54,9 +54,9 @@ describe("getEmployeeContactConflict", () => {
       }),
     ).toEqual({
       code: "EMPLOYEE_CONTACT_CONFLICT",
-      error: "That email address is reserved.",
+      error: "Someone else already signs in with that email. Use a different one.",
       field: "email",
-      message: "That email address is reserved.",
+      message: "Someone else already signs in with that email. Use a different one.",
     });
   });
 

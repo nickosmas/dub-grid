@@ -108,7 +108,7 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 | POST   | `/api/organizations/delete`             | Soft-delete the caller's org (super_admin only, fresh sensitive-action auth)               |
 | GET    | `/api/organizations/invitations`        | List pending invitations                                                                   |
 | POST   | `/api/organizations/invitations`        | Create an invitation                                                                       |
-| PATCH  | `/api/organizations/invitations`        | Update an invitation (access changes replace the token atomically)                         |
+| PATCH  | `/api/organizations/invitations`        | Update an invitation (access and address changes replace the token and send a new link)    |
 | DELETE | `/api/organizations/invitations`        | Revoke an invitation                                                                       |
 | POST   | `/api/organizations/invitations/create` | Create an invitation and email its link; a failed send creates nothing                     |
 | POST   | `/api/organizations/role-change`        | Change a member's org role                                                                 |
