@@ -46,7 +46,7 @@ function resolutionMessage({
   const deletion = request.type === "account_deletion";
   if (action === "approve") {
     return deletion
-      ? "Their account is deleted and they're removed from your organization. This can't be undone."
+      ? "Their account is deleted and they're removed from your organization. This can't be undone. If they also use this account with another organization, they're offboarded here and the account stays."
       : undefined;
   }
   return undefined;
@@ -212,7 +212,8 @@ function AccountDeletionDetails({ request }: { request: ProfileChangeRequest }) 
   return (
     <Banner tone="danger" icon={Trash2} title="Account deletion request">
       Approving will permanently delete this user&apos;s account and remove them from your
-      organization. This can&apos;t be undone.
+      organization. This can&apos;t be undone. If they also use this account with another
+      organization, they&apos;re offboarded here and the account stays.
     </Banner>
   );
 }

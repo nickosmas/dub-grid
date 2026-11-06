@@ -5,6 +5,11 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { Employee } from "@dubgrid/domain";
 import { indefiniteArticle } from "@dubgrid/domain";
 import { buildPermissionContext } from "@dubgrid/authz";
+import { endAccessInOrganization } from "@/features/employees/server/offboard-access";
+import {
+  applyStatusChange,
+  type StatusChangeContext,
+} from "@/features/employees/server/status-change";
 import { fetchLinkedEmployeeForUser } from "@/features/mobile/server";
 import { deleteUserAccountWithCleanup } from "@/features/account/server/account-deletion";
 import { cacheDel, CacheKey } from "@/lib/cache";
@@ -582,6 +587,68 @@ async function applyProfileUpdateRequest(input: {
   ]);
 }
 
+async function usedInAnotherOrganization(
+  serviceClient: SupabaseClient,
+  userId: string,
+  orgId: string,
+): Promise<boolean> {
+  const { count, error } = await serviceClient
+    .from("organization_memberships")
+    .select("user_id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .neq("org_id", orgId)
+    .is("archived_at", null);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
+/**
+ * One organization's Super Admin can't end a sign-in another organization relies
+ * on, so an approval there ends this organization's part: they're offboarded the
+ * usual way, and the account stays for the others.
+ */
+async function offboardHereOnly(input: {
+  serviceClient: SupabaseClient;
+  orgId: string;
+  actor: User;
+  userId: string;
+}): Promise<void> {
+  const { serviceClient, orgId, actor, userId } = input;
+  const employee = await fetchLinkedEmployeeForUser(serviceClient, orgId, userId);
+  if (!employee) {
+    await endAccessInOrganization(serviceClient, {
+      orgId,
+      userId,
+      actorId: actor.id,
+      at: new Date().toISOString(),
+    });
+    return;
+  }
+  if (employee.status === "removed") return;
+
+  // Only a Super Admin or Gridmaster reaches this, which the caller has checked.
+  const result = await applyStatusChange(
+    {
+      serviceClient: serviceClient as StatusChangeContext["serviceClient"],
+      orgId,
+      actor: { id: actor.id, email: actor.email, isGridmaster: false, isSuperAdmin: true },
+      request: { ipAddress: null, userAgent: null },
+    },
+    {
+      empId: employee.id,
+      action: "remove",
+      expectedVersion: employee.version,
+      note: "Account deletion requested. The account is used in another organization, so it stays.",
+      returnDate: null,
+      startDate: null,
+      lastDay: null,
+    },
+  );
+  if (result.status >= 400) {
+    throw new Error(String(result.body.error ?? "We couldn't offboard them. Try again."));
+  }
+}
+
 export async function resolveProfileChangeRequest(input: {
   serviceClient: SupabaseClient;
   actor: User;
@@ -627,14 +694,25 @@ export async function resolveProfileChangeRequest(input: {
       if (!request.requesterUserId) {
         throw new Error("This account deletion request no longer has a user.");
       }
-      await deleteUserAccountWithCleanup({
-        serviceClient: input.serviceClient,
-        userId: request.requesterUserId,
-        actorId: input.actor.id,
-        actorEmail: input.actor.email ?? null,
-        reason: "admin_approved_request",
-        requestId: request.id,
-      });
+      if (
+        await usedInAnotherOrganization(input.serviceClient, request.requesterUserId, input.orgId)
+      ) {
+        await offboardHereOnly({
+          serviceClient: input.serviceClient,
+          orgId: input.orgId,
+          actor: input.actor,
+          userId: request.requesterUserId,
+        });
+      } else {
+        await deleteUserAccountWithCleanup({
+          serviceClient: input.serviceClient,
+          userId: request.requesterUserId,
+          actorId: input.actor.id,
+          actorEmail: input.actor.email ?? null,
+          reason: "admin_approved_request",
+          requestId: request.id,
+        });
+      }
     }
   }
 
