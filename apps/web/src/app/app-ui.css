@@ -3189,23 +3189,27 @@ button.dg-cc-sg-main {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 8px 14px;
+  padding: 7px 13px;
   margin: 8px 16px;
   background: var(--dg-color-banner-warning-bg);
-  border-radius: 10px;
+  border: 1px solid var(--dg-color-banner-warning-border);
+  border-radius: var(--dg-btn-radius);
   font-size: 13px;
   font-weight: 400;
   color: var(--dg-color-text-primary);
 }
 .dg-draft-banner--danger {
   background: var(--dg-color-banner-danger-bg);
+  border-color: var(--dg-color-banner-danger-border);
 }
 .dg-draft-banner--info {
   background: var(--dg-color-banner-info-bg);
+  border-color: var(--dg-color-banner-info-border);
 }
 .dg-draft-banner-actions {
   margin-left: auto;
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 /* Draft breakdown chips */

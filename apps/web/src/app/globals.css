@@ -364,23 +364,23 @@
   --dg-color-info-bg: #eff6ff;
   --dg-color-info-text: #1d4ed8;
   --dg-color-info-border: #bfdbfe;
-  /* Banners and notices (components/ui/Banner.tsx): a soft fill, neutral text
-     and a tone icon, at least 3:1 on its fill. Tone text remains for titles
+  /* Banners and notices (components/ui/Banner.tsx): a soft fill, a border a
+     step deeper, neutral text and a tone icon, at least 3:1 on its fill. Tone text remains for titles
      that carry the tone, such as a legal notice's. */
   --dg-color-banner-warning-bg: #fdeed2;
-  --dg-color-banner-warning-border: #e9bc69;
+  --dg-color-banner-warning-border: #f3d08c;
   --dg-color-banner-warning-text: #92400e;
   --dg-color-banner-warning-icon: #b45309;
   --dg-color-banner-danger-bg: #fce5e2;
-  --dg-color-banner-danger-border: #eba59e;
+  --dg-color-banner-danger-border: #f3b6af;
   --dg-color-banner-danger-text: #b91c1c;
   --dg-color-banner-danger-icon: #dc2626;
   --dg-color-banner-info-bg: #e3eefc;
-  --dg-color-banner-info-border: #9dc0ee;
+  --dg-color-banner-info-border: #a9c8f3;
   --dg-color-banner-info-text: #1d4ed8;
   --dg-color-banner-info-icon: #2563eb;
   --dg-color-banner-success-bg: #e2f4e7;
-  --dg-color-banner-success-border: #93cca0;
+  --dg-color-banner-success-border: #a3d7b1;
   --dg-color-banner-success-text: #166534;
   --dg-color-banner-success-icon: #15803d;
   /* A legal document's callout (components/ui/LegalNotice.tsx). */
