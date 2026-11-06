@@ -480,6 +480,9 @@ Calls the `gdpr_erase_user_data(p_user_id)` RPC which:
 
 Follows the same erasure path with additional guards:
 
+- A super admin can also delete someone else's account from their staff page
+  (`/api/employees/delete-account`), once they're offboarded and only if the account
+  isn't used in another organization.
 - Only super admins delete their own account directly. Every other member,
   people managers included, submits an account-deletion request that a super
   admin approves from People > Requests (with fresh sensitive-action auth).
