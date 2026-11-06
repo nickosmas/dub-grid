@@ -2,9 +2,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendResendEmail = vi.fn();
+const findAuthUserByEmail = vi.fn();
 
 vi.mock("@/lib/resend", () => ({
   sendResendEmail: (...args: unknown[]) => sendResendEmail(...args),
+}));
+vi.mock("@/lib/supabase-admin-users", () => ({
+  findAuthUserByEmail: (...args: unknown[]) => findAuthUserByEmail(...args),
 }));
 vi.mock("@/lib/env.server", () => ({ serverEnv: {} }));
 
@@ -27,6 +31,31 @@ describe("sendInvitationEmail", () => {
   beforeEach(() => {
     sendResendEmail.mockReset();
     sendResendEmail.mockResolvedValue(undefined);
+    findAuthUserByEmail.mockReset();
+    findAuthUserByEmail.mockResolvedValue(null);
+  });
+
+  it("asks someone new to set a password", async () => {
+    await sendInvitationEmail({ ...input, kind: "new" });
+
+    expect(sent().html).toContain("set your password");
+  });
+
+  it("tells someone with an account to sign in instead (F-196)", async () => {
+    findAuthUserByEmail.mockResolvedValue({ id: "u", email: input.email, emailConfirmed: true });
+
+    await sendInvitationEmail({ ...input, kind: "new" });
+
+    expect(sent().html).toContain("Sign in with your password to accept.");
+    expect(sent().html).not.toContain("set your password");
+  });
+
+  it("asks an abandoned, unconfirmed signup to set a password", async () => {
+    findAuthUserByEmail.mockResolvedValue({ id: "u", email: input.email, emailConfirmed: false });
+
+    await sendInvitationEmail({ ...input, kind: "new" });
+
+    expect(sent().html).toContain("set your password");
   });
 
   it("sends a first invitation under the invited subject", async () => {

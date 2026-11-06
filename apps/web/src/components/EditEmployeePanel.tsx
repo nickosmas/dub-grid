@@ -44,7 +44,6 @@ import {
   checkEmployeeEmailConflict,
   checkEmployeePhoneConflict,
   fetchEmployeeHasStarted,
-  type EmployeeEmailConflictResult,
 } from "@/features/employees/client";
 import {
   EMAIL_BELONGS_TO_SOMEONE_ELSE,
@@ -202,8 +201,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [emailConflict, setEmailConflict] = useState(false);
-    const [emailConflictReason, setEmailConflictReason] =
-      useState<EmployeeEmailConflictResult["reason"]>(undefined);
     const [phoneConflict, setPhoneConflict] = useState(false);
 
     // Pre-flight: flag a duplicate contact email before Save is pressed,
@@ -221,16 +218,14 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         validateEmail(trimmed)
       ) {
         setEmailConflict(false);
-        setEmailConflictReason(undefined);
         return;
       }
       let cancelled = false;
       const timer = setTimeout(() => {
-        checkEmployeeEmailConflict(trimmed, orgId, employee.id, employee.userId)
+        checkEmployeeEmailConflict(trimmed, orgId, employee.id)
           .then((result) => {
             if (!cancelled) {
               setEmailConflict(result.conflict);
-              setEmailConflictReason(result.reason);
             }
           })
           .catch((err) => {
@@ -241,7 +236,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             if (!cancelled) {
               console.error("checkEmployeeEmailConflict failed", err);
               setEmailConflict(false);
-              setEmailConflictReason(undefined);
             }
           });
       }, 400);
@@ -846,9 +840,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                           }}
                           role="alert"
                         >
-                          {emailConflictReason === "gridmaster"
-                            ? "That email address is reserved."
-                            : EMAIL_BELONGS_TO_SOMEONE_ELSE}
+                          {EMAIL_BELONGS_TO_SOMEONE_ELSE}
                         </div>
                       )}
                     </div>

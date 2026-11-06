@@ -18,7 +18,7 @@ import { SelectableTag } from "@/components/ui/selectable-tag";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { Banner } from "@/components/ui/Banner";
-import { FlaskConical, UserCheck } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 import {
   createOrganizationInvitation,
   checkUserExistsByEmail,
@@ -129,15 +129,10 @@ export default function InviteEmployeeModal({
     ? validateEmail(trimmedEmail)
     : "Email address is required";
 
-  // Pre-flight: when the email is a valid format, check whether it already
-  // maps to a DubGrid user (any org). Debounced to avoid spamming the
-  // endpoint on every keystroke. Three outcomes drive the UI:
-  //   - existsInThisOrg → block submission (red banner; admin should open
-  //     the existing record instead).
-  //   - exists && !existsInThisOrg → info banner (cross-org reuse); admin
-  //     can still send the invite. Note that the roster will show the
-  //     existing user's profile name after they accept.
-  //   - !exists → no banner; standard new-user invitation.
+  // Pre-flight: when the email is a valid format, check whether that person is
+  // already in this organization, and block submission if so (the admin should
+  // open the existing record instead). Debounced to avoid spamming the endpoint
+  // on every keystroke.
   useEffect(() => {
     if (!isManagementInvite || requiredEmailError) {
       setEmailLookup(null);
@@ -430,26 +425,6 @@ export default function InviteEmployeeModal({
                   </span>
                 </Banner>
               )}
-              {!fieldErrors.email &&
-                !emailLookupLoading &&
-                emailLookup?.exists &&
-                !emailLookup.existsInThisOrg && (
-                  <Banner tone="info" icon={UserCheck} className="mt-2">
-                    <span>
-                      <strong>{emailLookup.displayName ?? trimmedEmail}</strong> already has a
-                      DubGrid account. They&apos;ll join your organization when they accept the
-                      invite
-                      {emailLookup.displayName ? (
-                        <>
-                          {", and your roster will show their name as "}
-                          <strong>{emailLookup.displayName}</strong>.
-                        </>
-                      ) : (
-                        <>.</>
-                      )}
-                    </span>
-                  </Banner>
-                )}
             </div>
           ) : !trimmedEmail ? (
             <div

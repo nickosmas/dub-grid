@@ -675,6 +675,97 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
   });
 });
 
+describe("changing a pending invitation's address (F-193)", () => {
+  const redirect = () =>
+    makePatchRequest({
+      orgId: ORG_ID,
+      invitationId: INVITATION_ID,
+      expectedUpdatedAt: EXPECTED_UPDATED_AT,
+      email: "new@test.com",
+    });
+
+  it("replaces the token, so the old link dies, and mails the new one only to the new address", async () => {
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...CURRENT_INVITATION_ROW, email: "new@test.com" },
+      error: null,
+    });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(redirect());
+
+    expect(response.status).toBe(200);
+    const token = invitationUpdateOperations[0].values.token;
+    expect(typeof token).toBe("string");
+    expect(token).not.toBe(CURRENT_INVITATION_ROW.token);
+    expect(sendInvitationEmail).toHaveBeenCalledTimes(1);
+    expect(sendInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "new@test.com", token }),
+    );
+    expect(JSON.stringify(await response.json())).not.toContain(token as string);
+  });
+
+  it("keeps the token and sends nothing when the address stays the same", async () => {
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...CURRENT_INVITATION_ROW, first_name: "Avery" },
+      error: null,
+    });
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        email: "old@test.com",
+        firstName: "Avery",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(invitationUpdateOperations[0].values).not.toHaveProperty("token");
+    expect(sendInvitationEmail).not.toHaveBeenCalled();
+  });
+
+  it("puts the invitation back when the new address can't be emailed", async () => {
+    const updatedAt = "2026-01-02T00:00:00.000Z";
+    invitationUpdateMaybeSingle
+      .mockResolvedValueOnce({
+        data: { ...CURRENT_INVITATION_ROW, email: "new@test.com", updated_at: updatedAt },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: INVITATION_ID }, error: null });
+    sendInvitationEmail.mockRejectedValue(new Error("mail failed"));
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(redirect());
+
+    expect(response.status).toBe(502);
+    const [update, restore] = invitationUpdateOperations;
+    expect(restore.values).toMatchObject({
+      token: CURRENT_INVITATION_ROW.token,
+      email: "old@test.com",
+      expires_at: CURRENT_INVITATION_ROW.expires_at,
+    });
+    expect(restore.filters).toContainEqual(["token", update.values.token]);
+    expect(restore.filters).toContainEqual(["updated_at", updatedAt]);
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("leaves the invitation alone once the new address has had enough invites", async () => {
+    checkRateLimit.mockImplementation(async (_limiter: unknown, key: string) =>
+      key.startsWith("invite-email:")
+        ? { limited: true, misconfigured: false, reset: Date.now() + 60_000 }
+        : { limited: false, misconfigured: false },
+    );
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(redirect());
+
+    expect(response.status).toBe(429);
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+});
+
 describe("POST /api/organizations/invitations - replace_access tier ceiling", () => {
   const pendingInvitation = {
     ...CURRENT_INVITATION_ROW,

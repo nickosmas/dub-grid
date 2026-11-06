@@ -399,7 +399,7 @@ export function parseMobileNameMismatchError(error: unknown): MobileNameMismatch
 
 export type MobileStaffField = "firstName" | "lastName" | "email" | "phone" | "contactNotes";
 
-export type MobileContactConflictReason = "employee_duplicate" | "gridmaster" | "other_account";
+export type MobileContactConflictReason = "employee_duplicate" | "other_account";
 
 const CONTACT_CONFLICT_FIELDS: Record<string, MobileStaffField> = {
   email: "email",
@@ -1147,7 +1147,6 @@ export function checkMobilePersonContact(
     email?: string;
     phone?: string;
     excludeEmployeeId?: string;
-    currentUserId?: string | null;
   },
 ) {
   return mobileApiRequest(
