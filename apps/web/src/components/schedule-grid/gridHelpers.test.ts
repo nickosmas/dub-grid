@@ -83,7 +83,7 @@ describe("formatPublishedMetadata", () => {
       "Published Oct 18, 2026, 2:05 PM UTC by Mina.",
     );
     expect(formatPublishedMetadata({ ...base, resolvePublisherName: () => null })).toBe(
-      "Published Oct 18, 2026, 2:05 PM UTC by Unknown author.",
+      "Published Oct 18, 2026, 2:05 PM UTC.",
     );
   });
 
@@ -125,7 +125,7 @@ describe("formatCorrectionLabel", () => {
     expect(formatCorrectionLabel({ reason: null })).toBe("Corrected.");
     expect(
       formatCorrectionLabel({ reason: null, correctedBy: "user-1", resolveName: () => null }),
-    ).toBe("Corrected by Unknown author.");
+    ).toBe("Corrected.");
     expect(formatCorrectionLabel({ reason: null, correctedAt: "not a date" })).toBe("Corrected.");
   });
 });

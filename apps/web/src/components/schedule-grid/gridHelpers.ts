@@ -304,12 +304,9 @@ export function formatPublishedMetadata(args: {
   timeZone?: string | null;
 }): string {
   const { publishedAt: publishedAtIso, publishedBy, resolvePublisherName, timeZone } = args;
-  // No resolver means the viewer is not shown who published, not that the
-  // publisher is unknown; "Unknown author" is for a resolver that has no name.
-  const publisherName =
-    publishedBy && resolvePublisherName
-      ? (resolvePublisherName(publishedBy) ?? "Unknown author")
-      : null;
+  // A name still loading is left out; a resolver that finds nobody answers
+  // "Deleted user". Without a resolver, the viewer isn't shown who published.
+  const publisherName = publishedBy ? (resolvePublisherName?.(publishedBy) ?? null) : null;
   const publishedAt = new Date(publishedAtIso);
   const publishedDateTime = Number.isNaN(publishedAt.getTime())
     ? "Published at an unknown time"
@@ -330,7 +327,7 @@ export function formatCorrectionLabel(args: {
   const at = correctedAt ? new Date(correctedAt) : null;
   const when =
     at && !Number.isNaN(at.getTime()) ? ` ${publishedAtFormatter(timeZone).format(at)}` : "";
-  const name = correctedBy && resolveName ? (resolveName(correctedBy) ?? "Unknown author") : null;
+  const name = correctedBy ? (resolveName?.(correctedBy) ?? null) : null;
   const summary = `Corrected${when}${name ? ` by ${name}` : ""}.`;
   return reason ? `${summary}\nReason: ${correctionReasonLabel(reason)}` : summary;
 }

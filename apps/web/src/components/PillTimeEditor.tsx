@@ -64,6 +64,7 @@ export function PillTimeEditor({
   defaultEnd,
   minTime,
   maxTime,
+  customLabel = "Custom time",
   onSave,
   onRemove,
 }: {
@@ -75,6 +76,8 @@ export function PillTimeEditor({
   minTime?: string | null;
   /** Latest allowed end time (HH:MM). */
   maxTime?: string | null;
+  /** What the set times are called, such as "Time worked" beside an absence. */
+  customLabel?: string;
   onSave: (start: string | null, end: string | null) => void;
   onRemove: () => void;
 }) {
@@ -246,7 +249,7 @@ export function PillTimeEditor({
               letterSpacing: "0.06em",
             }}
           >
-            Custom time
+            {customLabel}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -336,7 +339,7 @@ export function PillTimeEditor({
             letterSpacing: "0.06em",
           }}
         >
-          Custom time
+          {customLabel}
         </span>
         <div style={{ display: "flex", gap: 6 }}>
           <Button
