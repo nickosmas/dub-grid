@@ -506,6 +506,7 @@ export async function POST(req: NextRequest) {
                 await serviceClient
                   .from("invitations")
                   .delete()
+                  .eq("org_id", org.id)
                   .eq("id", invitationId)
                   .eq("token", token)
                   .is("accepted_at", null);

@@ -727,6 +727,7 @@ export async function resolveProfileChangeRequest(input: {
       updated_at: now,
       version: request.version + 1,
     })
+    .eq("org_id", input.orgId)
     .eq("id", request.id)
     .eq("status", "pending")
     .select(PROFILE_CHANGE_REQUEST_COLS)

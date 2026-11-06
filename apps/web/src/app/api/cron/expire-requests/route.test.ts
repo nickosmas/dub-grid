@@ -16,14 +16,16 @@ vi.mock("@/lib/supabase-service", () => ({
     from: (table: string) => {
       // Two terminal patterns:
       //   - SELECT chain: .select().lt().in()/.is().is().limit()
-      //   - UPDATE chain: .update().eq().in() → resolves directly
+      //   - UPDATE chain: .update().eq().eq().in() → resolves directly
       if (table === "shift_requests") {
         const myIndex = fromCallIndex++;
         const builder: Record<string, unknown> = {};
         builder.select = vi.fn(() => builder);
         builder.update = vi.fn(() => ({
           eq: () => ({
-            in: () => shiftRequestsUpdate(),
+            eq: () => ({
+              in: () => shiftRequestsUpdate(),
+            }),
           }),
         }));
         builder.lt = vi.fn(() => builder);
