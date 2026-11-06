@@ -2775,10 +2775,17 @@ export async function POST(req: NextRequest) {
           const { data: updated, error } = await serviceClient
             .from("absence_types")
             .update(row)
+            .eq("org_id", row.org_id)
             .eq("id", validatedAbsenceType.absenceType.id)
             .select()
-            .single();
+            .maybeSingle();
           if (error) throw error;
+          if (!updated) {
+            return NextResponse.json(
+              { error: "We couldn't find that absence type. Refresh and try again." },
+              { status: 404 },
+            );
+          }
           savedRow = updated;
         } else {
           const { data: inserted, error } = await serviceClient
@@ -2872,10 +2879,17 @@ export async function POST(req: NextRequest) {
           const { data: updated, error } = await serviceClient
             .from("indicator_types")
             .update(row)
+            .eq("org_id", row.org_id)
             .eq("id", validatedIndicatorType.indicatorType.id)
             .select()
-            .single();
+            .maybeSingle();
           if (error) throw error;
+          if (!updated) {
+            return NextResponse.json(
+              { error: "We couldn't find that schedule note type. Refresh and try again." },
+              { status: 404 },
+            );
+          }
           savedRow = updated;
         } else {
           const { data: inserted, error } = await serviceClient

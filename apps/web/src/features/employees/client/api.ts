@@ -23,7 +23,6 @@ import type {
 export interface UpdateEmployeeIdentityInput {
   employeeId: string;
   orgId: string;
-  userId: string | null;
   firstName: string;
   lastName: string;
   phone: string;

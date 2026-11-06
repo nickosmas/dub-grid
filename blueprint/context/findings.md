@@ -692,3 +692,182 @@
 **Why it matters:** GHSA-mrhx-c7xc-m3w5 (high): a huge array posted against a schema with a length or size constraint walks every element before the constraint fails, so request validation in the web routes and the mobile API can be pushed into memory exhaustion. Vercel caps a request body at 4.5 MB, which bounds what one request supplies. Fixed only in zod 4.6.6.
 **Suggested fix:** Upgrade to zod 4 across web, mobile and the packages in one change (Dependabot #190 has the version bump; the schema API changes need the code), keeping one zod copy so `instanceof` checks hold (see the identical-specifier note). The allowlist entry holds until 2026-12-01.
 **Resolution:**
+
+### F-190 [P0] fixed - One organization's settings save can take over another organization's absence types and schedule note types
+
+**File:** `apps/web/src/app/api/settings/config/route.ts:2775` (`upsertAbsenceType`), `:2872` (`upsertIndicatorType`)
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** Both updates run on the service client with `.update(row).eq("id", id)` and no `org_id` filter, and `row.org_id` is the caller's organization. The ids are `BIGINT IDENTITY`, so they can be counted through. An Admin with `canManageScheduleDefinitions` or `canManageIndicatorTypes` in org A sends another organization's id: that row is rewritten and moved to org A. Reproduced at the database on a throwaway stack at migration 120 with a service-role update: org B dropped from 11 to 10 absence types and 173 of its schedule snapshots then pointed at a type owned by org A. Nothing stops it: no trigger guards `org_id`, and the foreign keys are single-column. Every other upsert in this route filters on `org_id`. The HTTP route itself was traced, not run.
+**Suggested fix:** Add `.eq("org_id", effectiveOrgId)` to both updates and answer 404 on no row. Add a route test that a foreign id is refused. F-192's `org_id` immutability trigger is the backstop.
+**Resolution:** Fixed on fix/tenant-write-guards (2026-11-06): both updates now filter on the effective organization and answer 404 when no row matches. Route tests send a foreign id and fail on the old code. The route was tested with a client double, not run against a live database.
+
+### F-191 [P0] fixed - A manager can rename any account on the platform through a client-supplied `userId`
+
+**File:** `apps/web/src/app/api/employees/identity/route.ts:158`; `apps/web/src/app/api/employees/manage/route.ts:917` (`syncLinkedProfileName(nextEmployee.userId)`)
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** Both routes authorize on the caller's organization and load the employee row with an org filter, then update `profiles` with the service client using the `userId` from the request body, never comparing it to that row's `user_id`. A manager in org A sends one of their own employee ids plus any other person's user id, and that person's name changes everywhere they appear, in any organization, Gridmasters included. The precondition is the victim's UUID: not enumerable, but known for anyone who has shared or left an organization, since it stays in that organization's audit rows. Traced, not run.
+**Suggested fix:** Use the stored row's `user_id` (`currentEmployee.userId`, `previousRow.userId`), and drop `userId` from the request schema for this purpose.
+**Resolution:** Fixed on fix/tenant-write-guards (2026-11-06): `employees/identity` no longer accepts `userId` and renames only the stored row's account. `employees/manage` loads the stored row first and uses its account for the rename and the management-access check, so a client value is overwritten. Route tests send another account's id and fail on the old code. Client doubles, not a live run.
+
+### F-192 [P1] open - The database lets one organization's rows point at another organization's rows
+
+**File:** `supabase/migrations` (33 foreign keys between tenant tables are single-column; only `schedule_cell_snapshots_cell_org_fkey` and `schedule_cell_segments_snapshot_org_fkey` carry `org_id`); `write_schedule_cell_snapshot_internal`; `schedule_cells_emp_id_date_key`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** `org_id` is present and RLS-checked on the row itself, but nothing ties the row's links to the same organization. Run as org A's Super Admin on a throwaway stack at 120, all of these were accepted: a schedule cell for org B's employee, a cell with org B's focus area, a recurring shift and a shift series for org B's employee, a coverage requirement with org B's focus area and job, a shift with org B's focus area, and a profile change request naming org B's employee. `write_schedule_cell_snapshot` also accepted org B's shift, job and absence ids on an org A cell; `schedule_cell_segments.shift_id` and `job_id` have no foreign key at all. The effect is real: with a cell planted for org B's employee, org B's own save for that person and date failed on `schedule_cells_emp_id_date_key`, because that unique index omits `org_id`. It needs the employee's UUID. A plain staff member can also insert a change request naming a coworker's employee id. Approval filters by org, so the foreign case fails safely, but the same-org case changes the coworker. No read leak was found through these links. The department id checks in `validate_department_ids` confirm existence, not organization.
+**Suggested fix:** A forward migration in stages: add `UNIQUE (org_id, id)` on each parent, then composite foreign keys `(org_id, x_id)` for the 33 links, `NOT VALID` first and validated after a data check; add `org_id` to `schedule_cells`' unique index; add a shared trigger refusing a change to `org_id`; validate shift, job and absence ids in the cell write functions; bind `requester_employee_id` to the requester in the insert policy.
+**Resolution:**
+
+### F-193 [P1] open - Editing a pending invitation's email keeps its token, so an Admin can create a confirmed account at someone else's address
+
+**File:** `apps/web/src/app/api/organizations/invitations/route.ts:391` (PATCH changes `email`, not `token`); `apps/web/src/app/api/invitations/register/route.ts:129` (`email_confirm: true`), `:167`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** The token is treated as proof of the inbox, but PATCH moves it to a new address. An Admin invites their own mailbox, reads the token, changes the email to `victim@otherhospital.org`, and registers with that token and a chosen password. The result is a confirmed account at the victim's address with a password the attacker knows. If another organization later invites that person, the invitation finds it as an existing account, and the attacker's live session can then follow them into that organization. If an unconfirmed account with no memberships already holds the address, its password is overwritten instead. Traced, not run.
+**Suggested fix:** Rotate the token (and resend) whenever the email changes, using `replace_pending_invitation_access`, and refuse a register whose token predates the email change.
+**Resolution:**
+
+### F-194 [P1] open - API requests aren't bound to the session's organization, so a person suspended in one organization keeps access to it through another
+
+**File:** `apps/web/src/app/api/shared/permissions.ts:471` (`requireOrgPermissions`), `apps/web/src/app/api/employees/shared.ts` (`canManageEmployees`); `apps/web/src/proxy.ts:825` (the matcher excludes `/api`)
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** The API authorizes on the client-supplied `orgId` plus a live membership, and never compares it to the token's `org_id` or the host. Suspension leaves the membership live and only sets `employees.suspended_at`, which the token hook checks for the session's active organization and these helpers never read. Someone suspended in org A who also belongs to org B signs in to B and posts `orgId: A`: service-client routes accept it, including schedule and staff management. Non-members are still refused, so this is limited to people with memberships in both. Per-session organization isolation holds on pages and RLS, not in `/api`. Mobile is safe because it uses only the token's org. Traced, not run.
+**Suggested fix:** Refuse in `requireOrgPermissions` and `canManageEmployees` when `orgId` differs from the verified token's org (Gridmaster impersonation and the sandbox excepted), and read the employee's suspension there. Also refuse a failed `endUserSessions` rather than only logging it.
+**Resolution:**
+
+### F-195 [P1] open - Acting on a request from another organization's session alerts the wrong organization
+
+**File:** `packages/mobile-api-core/src/shift-requests.ts:500`, `:570` (dispatch with `auth.currentOrg.id`); `respond_to_shift_request_unguarded`, `claim_shift_request_unguarded`, `cancel_shift_request_unguarded` (check `employees.user_id = auth.uid()`, no org); `apps/web/src/features/notifications/server/events.ts:249` (`getRequestInfo` reads the request unscoped)
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** Someone employed in orgs A and B, on a B session, sends `PATCH /shift-requests/<A request>`. The function changes A's request, then the route dispatches under B, so B's approvers get an alert carrying A's staff names and A's approvers get nothing. It needs dual employment. Function bodies were read; the dispatch was traced, not run.
+**Suggested fix:** Require `shift_request_org_id(p_request_id) = caller_org_id()` in the three functions, and dispatch with the request's own `org_id`.
+**Resolution:**
+
+### F-196 [P1] open - Managers and staff can look up accounts across every organization by email
+
+**File:** `apps/web/src/app/api/users/check-email/route.ts` (`exists`, `displayName`); `apps/web/src/features/employees/server/contact-conflicts.ts:113`, `:211`; `apps/web/src/app/api/employees/check-email/route.ts`; `account/profile/contact-check`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** `users/check-email` gives anyone with `canManageEmployees` whether an address has a DubGrid account anywhere, with that person's name, for the Add-Employee preview. `employees/check-email` returns `reason: "gridmaster"`, identifying platform staff, and a client-chosen `currentUserId` turns it into an account-exists check. `account/profile/contact-check` answers `emailTaken` for any address to any signed-in staff member. Limited per user only. A competitor or a former employee in another organization can test who works where. Read in code; `users/check-email`'s name return is documented behaviour, so this is a product decision as well as a defect.
+**Suggested fix:** Return no name for a person outside the caller's organization, answer the same generic "they'll get an invite" for any address not in this organization, drop `currentUserId` from the client (use the row's own `user_id`), and never distinguish a Gridmaster.
+**Update 2026-11-06:** the owner approved the wording of two emails for the strict approach. An invitation to an address with an account keeps the current invite and replaces "set your password" with "You already have a DubGrid account with this email address, so there's nothing to set up. Sign in with your password to accept." A new notice, "Someone tried to use your email address", goes to the owner of a taken address, at most once a day per address, and names no person, organization or other address. Still to do before building: test how Supabase answers a change to a taken address, and give the Gridmaster save error a generic refusal. Removing the inline taken-email error from My profile (#367) has not been separately confirmed.
+**Resolution:**
+
+### F-197 [P1] open - An Admin who can only edit shifts can rewrite the published schedule directly, unlogged
+
+**File:** `supabase/migrations` policies `admin_write_schedule_cells`, `admin_write_schedule_cell_snapshots`, `admin_write_schedule_cell_segments` (FOR ALL on `canEditShifts`, any `snapshot_kind`)
+**Found:** 2026-11-06 by /audit (scope: full; lens: security)
+**Why it matters:** Run on the throwaway stack as an Admin with `canEditShifts` and no publish permission: `publish_schedule` refused, but deleting a published snapshot's segments and updating a published snapshot directly both succeeded. A browser session can do the same through PostgREST, bypassing publish, past-day locks, corrections, the snapshot history and the audit log. This is inside one organization, not cross-tenant. By a grep of direct `.from(...)` writes in web and mobile, the only browser write to these tables is `deleteShiftSeries` clearing `series_id` (`apps/web/src/lib/db/schedule.ts:499`); the rest go through server functions.
+**Suggested fix:** Move that one write into `delete_shift_series`, then revoke INSERT, UPDATE and DELETE on the three tables from `authenticated` and leave writes to the SECURITY DEFINER functions. Review the same for other tables written only by the server.
+**Resolution:**
+
+### F-198 [P1] open - Any Admin can give themselves Super Admin over a copy of all staff records, and keep it after being demoted
+
+**File:** `apps/web/src/app/api/test-sandbox/route.ts:132`; `apps/web/src/features/test-sandbox/server.ts:41` (`select("*")`, no archived filter), `:304`; `switch_org`, `get_my_organizations`; `apps/web/src/app/api/shared/permissions.ts:425`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security)
+**Why it matters:** The route checks `org_role` only, not `admin_permissions`, and has no feature flag. An Admin with only `canEditShifts` enters the sandbox, becomes `super_admin` there, and reads every cloned person's email, phone and contact notes, offboarded people included, for example through `GET /api/export?type=staff`, which the sandbox redirect serves. `switch_org` has no `workspace_kind` filter or session binding, and nothing re-checks the source role, so a demoted Admin keeps the clone for up to 14 days. Mobile sign-in doesn't clear sandboxes as web sign-in does. Traced, not run. Stays inside one organization's data; sandbox isolation between organizations held.
+**Suggested fix:** Require `canViewStaff` and `canManageEmployees` (or restrict to Super Admins), clone only what a tester needs or mask contact fields, exclude archived staff, re-check the source role on every sandbox request, and exclude sandboxes from `switch_org` and `get_my_organizations`.
+**Resolution:**
+
+### F-199 [P2] open - Realtime sends every signed-in user the ids of rows deleted in other organizations
+
+**File:** `supabase/migrations/001_schema.sql:1604` (the `supabase_realtime` publication, 29 tables); `apps/web/src/hooks/useOrgRealtimeInvalidation.ts`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** Confirmed live on the throwaway stack: a staff user of org A, subscribed to `schedule_cells` with no filter, received `{"id": ...}` for a row deleted in org B; an UPDATE in org B correctly did not arrive. Postgres Changes cannot apply RLS or filters to DELETE. Only primary keys travel, so the leak is ids, timing and volume, but ids of deleted memberships and profiles are person identifiers.
+**Suggested fix:** Move invalidation to Broadcast from the database (`realtime.broadcast_changes`) on the private per-organization channels already in use, then remove these tables from the publication. Until then remove tables no client subscribes to, and check the dashboard's "Allow public access" Realtime setting is off.
+**Resolution:**
+
+### F-200 [P2] open - Super Admins can change write-once organization fields directly, including the subdomain
+
+**File:** column UPDATE grants on `organizations` to `authenticated` (`slug`, `feature_overrides`, `employee_count`, `data_retention_days`, among others); `admin_update_organization`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** Confirmed on the throwaway stack: an org A Super Admin updated their own `slug`, `feature_overrides` and `employee_count` through the table. I found no customer path that changes `slug`, which the app treats as permanent. Changing it frees the old subdomain, which another organization's Super Admin can then claim the same way, serving their sign-in page at a name the first organization's staff trust. Taking a name in use and the reserved names were refused.
+**Suggested fix:** Revoke UPDATE on `slug`, `employee_count` and any Gridmaster-owned field, or all columns and route writes through `organizations/settings`.
+**Resolution:**
+
+### F-201 [P2] open - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
+
+**File:** `apps/web/src/app/api/employees/manage`, `organizations/settings`, `import/employees`, `shifts/discard`, `employees/status`, `employees/identity` (none set `gridmasterNeedsImpersonation`); `start_impersonation` (migration 057)
+**Found:** 2026-11-06 by /audit (scope: full; lens: security)
+**Why it matters:** F-75's rule binds a Gridmaster's organization writes to an active impersonation, but only schedule, requests, recurring, publish and settings/config apply it. A stale or stolen Gridmaster token can edit staff, organization settings or drafts in any organization with no notice to it, and `shifts/discard` uses direct service-role writes that migration 075 doesn't cover. `start_impersonation` writes no `audit_log` row itself: the route does, after the RPC, so a direct call with a fresh-proof token skips it and the notice email (`impersonation_sessions` still records it). The API role stays `gridmaster` while impersonating, so an impersonator isn't limited to the target's rights. Read in code.
+**Suggested fix:** Make the impersonation requirement the default for any Gridmaster write in `requireOrgPermissions`, with named exceptions, and apply it in `canManageEmployees`. Write the audit row inside `start_impersonation`, as migration 071 does elsewhere.
+**Resolution:**
+
+### F-202 [P2] open - The server code has no enforced tenant boundary: 196 files can reach the service client
+
+**File:** `apps/web/src/lib` and every route using `serviceClient`; `eslint-rules/`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** RLS is the boundary for browser reads, but most server work uses the service client, which bypasses it, so each query depends on someone remembering `.eq("org_id", ...)`. F-190 is exactly that miss, in 2 of 21 updates in one file, and earlier audits found the same class (F-8 to F-16, 2026-07). `org-isolation.integration.test.ts` is good but tests policies, not routes, and no check covers a foreign id sent to a route.
+**Suggested fix:** Add a tenant-scoped helper (`orgDb(orgId).from(table)` that applies the filter), a lint rule refusing a bare `.eq("id", ...)` on a tenant table in a mutation, and a generated CI test that signs in as org A and sends org B's ids to every mutation route. Turn the probes from this audit into a live test over every table in the inventory.
+**Resolution:**
+
+### F-203 [P2] open - Deleted organizations' data is kept indefinitely and the retention jobs never run
+
+**File:** `purge_expired_data`, `purge_scheduled_accounts`, `flag_inactive_accounts` (no caller in `apps/`, `packages/`, `.github/` or `apps/web/vercel.json`, no `pg_cron`); `apps/web/src/app/api/organizations/delete/route.ts:107`; `apps/web/src/app/privacy/page.tsx:308`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** Organization delete is a soft archive, `purge_expired_data` skips archived organizations, and nothing hard-deletes them, so staff data outlives the customer. The Privacy Policy promises configurable retention, and the open question on self-serve data export is still unanswered. A Supabase dashboard schedule wouldn't show in the repo, so check that first.
+**Suggested fix:** Schedule the jobs, define a hard-delete window after archive with a verified per-organization export before it, and align the policy text.
+**Resolution:**
+
+### F-204 [P2] open - Auth cookies are readable by script, and sign-in pages allow inline scripts
+
+**File:** `apps/web/src/lib/auth/session-cookies.ts`, `apps/web/src/lib/supabase.ts`, `apps/web/src/proxy.ts:261` (public pages keep `'unsafe-inline'`), `supabase/config.toml:292`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security)
+**Why it matters:** No `cookieOptions` are set, so `@supabase/ssr` defaults apply: not HttpOnly, with a 400-day life, which the browser client needs in order to read them. `/login`, `/accept-invite` and `/reset-password` run under `script-src 'unsafe-inline'` though they render dynamically, so an XSS there reads refresh tokens. There is no server-side session time limit; the web idle timeout is client-side only. `connect-src https://*.supabase.co` allows sending data to any Supabase project. Cookies are host-only, which is correct for subdomains. The flag behaviour is from the library's defaults, not observed in production.
+**Suggested fix:** Use the nonce CSP on those pages, set Secure and SameSite explicitly, set Supabase's session time-box and inactivity timeout, and narrow `connect-src` to the project host. Moving tokens out of script reach is a larger decision.
+**Resolution:**
+
+### F-205 [P2] open - Mobile access and data outlast a session
+
+**File:** `apps/mobile/src/shared/lib/auth-reset.ts:28`; `apps/mobile/src/features/profile/screens/ProfileScreen.tsx:194`; `apps/mobile/src/shared/providers/AuthSessionProvider.tsx:116`; `apps/mobile/src/shared/lib/query-persistence.ts:22`; `packages/mobile-api-core/src/auth.ts`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:**
+
+- Push disable is client-only and needs a live token, so a remote sign-out or forced teardown leaves the phone receiving the organization's alerts, with coworker names on the lock screen, until the next sign-in. No revoke path touches `mobile_device_tokens`.
+- A session that died while the app was closed never crosses the cache-clear boundary, so team schedules stay in plain AsyncStorage for up to 24 hours. They don't render for another user: keys carry user and org.
+- Mobile auth never reads `deactivated_at`, `terminated_at` or `suspended_at`, relying on the Redis marker (which fails open) and `auth.getUser`, while web checks the first two.
+
+Traced, not run on a device. Whether `allowBackup` carries the cache into device backups is unchecked.
+**Suggested fix:** Delete `mobile_device_tokens` rows server-side wherever sessions are ended, clear the cache at cold start when the session restores empty, and check account state in mobile auth as web does.
+**Resolution:**
+
+### F-206 [P2] open - The mobile API shows staff more than the organization's settings allow
+
+**File:** `apps/web/src/features/mobile/server/routes/shift-swap-options.ts:207`; `packages/mobile-api-core/src/read.ts:574`; `apps/web/src/features/mobile/server/routes/person.ts:174`; `apps/web/src/features/mobile/server/data.ts:1356`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security)
+**Why it matters:** Inside one organization: swap options return entries without `withScheduleVisibility`, so item 46f's hidden publisher and change details reach staff. `/people` and `/people/[id]` leave a coworker's suspension, planned status and dates, first day, `orgRole` and `adminPermissions` in the response, and the detail route has no internal-account filter. Staff open shifts are computed from draft rows, so unpublished edits can be inferred. Traced, not run.
+**Suggested fix:** Apply the visibility helper to swap options, build the staff response from an allowed-fields list rather than a strip list, and use published rows for anyone who can't edit.
+**Resolution:**
+
+### F-207 [P2] open - Telemetry sends staff emails to third parties and can't be tied to an organization
+
+**File:** `apps/web/src/components/AuthProvider.tsx:100`; `apps/web/src/components/PostHogProvider.tsx:44`; `apps/web/src/lib/sentry.ts:260`; `apps/web/sentry.server.config.ts`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** `setSentryUser` sends the email with no consent gate, despite `sendDefaultPii: false`. `orgId` is never passed, so the `org_id` tag is never set and one customer's events can't be found or removed. PostHog identifies by email (consent-gated) with no organization group. The server config has no `beforeSend`, and `redactSecurityValue` removes secrets, not names or emails.
+**Suggested fix:** Send the user id only, set the `org_id` tag, add a server `beforeSend` that drops bodies and emails, and identify in PostHog by id with an organization group.
+**Resolution:**
+
+### F-208 [P2] open - One attacker can trip the shared login limit for every organization
+
+**File:** `apps/web/src/app/api/auth/login/route.ts:413`; `apps/web/src/lib/rate-limit.ts:134`
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:** The email, IP and `login:global` limiters run together in `Promise.all`, so a request the IP limiter refuses may still count against the global 500 per 10 seconds, which is about 50 requests a second from one address. Mobile shares the key, and recovery has the same shape at 100 per 10 seconds. Upstash's counting wasn't run, so this needs a test.
+**Suggested fix:** Check the IP limiter first and only then consume the global one.
+**Resolution:**
+
+### F-209 [P3] open - Smaller multi-tenancy gaps
+
+**File:** see each item
+**Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
+**Why it matters:**
+
+- `create_shift_request_unguarded` and `change_user_role` look up idempotency keys across all organizations, so a reused key returns or skips on another organization's row. Keys are client UUIDs, so a collision is unlikely.
+- `status-change.ts:711`, `offboard-access.ts:32` and `organizations/access/route.ts:520` end a shared person's sessions in every organization. The code says deliberate, and `endAccessInOrganization` already scopes this for Move email.
+- `sender.ts:226` throttles email per user with no organization, so a busy org A can stop org B's emails to a shared person.
+- `calendar-subscription.ts:57` keeps serving a Suspended person's feed.
+- `auth/data-export/route.ts:54` includes former organizations' draft snapshots.
+- `cron/expire-requests` alerts staff of archived organizations.
+- `admin_profiles_update` lets one organization's admin rename someone whose active organization it is, though the profile is global.
+- `recovery-request.ts:88` builds reset links from the request origin, `/api/validate-domain` reveals names by slug, and the reserved slug list omits `auth`, `mail`, `docs` and `support`.
+- `audit_log.org_id` and `job_shift_overrides.org_id` have no foreign key (intended for the audit log, so it survives an organization), and `notifications`, `calendar_feed_tokens` and `billing_invoice_events` have no index leading on `org_id`.
+- `graphql_public` is exposed though the app doesn't use it.
+
+**Suggested fix:** Fix alongside the larger findings; scope the idempotency lookups and the email throttle by organization first.
+**Resolution:**

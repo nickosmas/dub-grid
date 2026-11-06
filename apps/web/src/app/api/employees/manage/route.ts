@@ -751,13 +751,22 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        // The stored row says who this person is linked to. `userId` in the
+        // body is the client's copy and could name any account on the platform.
+        const previousRow = await fetchLatestEmployee(
+          auth.serviceClient,
+          data.orgId,
+          data.employee.id,
+        );
+        const linkedUserId = previousRow?.userId ?? null;
+
         // Someone with management access doesn't need at least one focus
         // area to fall back on — they can come off the schedule entirely and
         // keep managing. Only require it when they have no management
         // department assignment of their own.
-        const managementMembership = data.employee.userId
+        const managementMembership = linkedUserId
           ? await fetchMobileManagementMembershipRowsByUserIds(auth.serviceClient, data.orgId, [
-              data.employee.userId,
+              linkedUserId,
             ])
           : [];
         const hasManagementAccess = (managementMembership[0]?.department_ids?.length ?? 0) > 0;
@@ -784,6 +793,7 @@ export async function POST(req: NextRequest) {
 
         const nextEmployee = {
           ...data.employee,
+          userId: linkedUserId,
           firstName: normalizedFields.firstName ?? data.employee.firstName,
           lastName: normalizedFields.lastName ?? data.employee.lastName,
           phone: normalizedFields.phone ?? data.employee.phone,
@@ -791,13 +801,6 @@ export async function POST(req: NextRequest) {
           contactNotes: normalizedFields.contactNotes ?? data.employee.contactNotes,
         };
 
-        // Snapshot the prior row so we can diff status vs profile fields
-        // for notification dispatch after a successful update.
-        const previousRow = await fetchLatestEmployee(
-          auth.serviceClient,
-          data.orgId,
-          nextEmployee.id,
-        );
         const changedProfileFields = previousRow
           ? diffEmployeeProfileFields(previousRow, nextEmployee)
           : [];
@@ -853,7 +856,6 @@ export async function POST(req: NextRequest) {
         // The staff email is the sign-in email, and whoever sets it can reset
         // the password. So it changes only on the person's own profile, where
         // both addresses confirm, or through support: never from a staff record.
-        const linkedUserId = previousRow?.userId ?? null;
         if (linkedUserId && !nextEmployee.email?.trim()) {
           return buildStaffValidationErrorResponse({ email: LINKED_EMAIL_REQUIRED_MESSAGE });
         }
@@ -916,7 +918,7 @@ export async function POST(req: NextRequest) {
 
         await syncLinkedProfileName(
           auth.serviceClient,
-          nextEmployee.userId,
+          linkedUserId,
           nextEmployee.firstName,
           nextEmployee.lastName,
         );
