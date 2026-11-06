@@ -26,7 +26,6 @@ export default function ScheduleOperationModal({
       onClose={() => {}}
       onRequestClose={() => false}
       showCloseButton={false}
-      style={{ maxWidth: 420 }}
       aria-describedby={detail ? descId : undefined}
     >
       <div

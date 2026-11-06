@@ -43,7 +43,6 @@ export default function InactivityGuard() {
       alert={{ icon: Timer }}
       title="Still there?"
       onClose={handleStay}
-      style={{ maxWidth: 400 }}
       footer={
         <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
           <Button type="button" className="dg-btn dg-btn-secondary" onClick={handleExpire}>

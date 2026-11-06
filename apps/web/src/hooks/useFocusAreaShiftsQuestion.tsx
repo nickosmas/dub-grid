@@ -55,7 +55,6 @@ export function useFocusAreaShiftsQuestion() {
         secondaryConfirmLabel={question.keepLabel}
         secondaryConfirmTone="neutral"
         variant="warning"
-        maxWidth={460}
         onConfirm={() => answer("clear")}
         onSecondaryConfirm={() => answer("keep")}
         onCancel={() => answer(null)}

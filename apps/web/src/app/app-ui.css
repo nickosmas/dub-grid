@@ -1734,7 +1734,8 @@ button.dg-cc-sg-main {
   background: var(--dg-color-surface);
   border-radius: var(--dg-radius-xl);
   padding: 28px var(--dg-modal-px);
-  min-width: 320px;
+  /* Beats any smaller max-width, so a popup can only go wider than this. */
+  min-width: 480px;
   max-width: 480px;
   max-height: calc(100vh - 48px);
   width: 100%;
@@ -1937,12 +1938,6 @@ button.dg-cc-sg-main {
   border-color: var(--dg-color-danger-border);
   background: var(--dg-color-danger-bg);
   color: var(--dg-color-danger-text);
-}
-.dg-modal--auth-help {
-  max-width: 360px;
-}
-.dg-modal--account-disabled {
-  max-width: 400px;
 }
 /* Activity details keeps context quiet so the event and changed values lead. */
 .dg-activity-details-modal {

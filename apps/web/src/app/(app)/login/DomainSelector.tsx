@@ -203,11 +203,7 @@ export default function DomainSelector() {
         </Card>
 
         {showHelp && (
-          <Modal
-            title="How to find your domain"
-            onClose={() => setShowHelp(false)}
-            className="dg-modal--auth-help"
-          >
+          <Modal title="How to find your domain" onClose={() => setShowHelp(false)}>
             <p className="dg-auth-modal-copy">
               Your organization&apos;s domain is the address you use for DubGrid, such as{" "}
               <strong>yourorg</strong>.{baseDomain}. Enter the first part. If you don&apos;t know
