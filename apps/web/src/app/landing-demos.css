@@ -350,8 +350,9 @@
   align-items: center;
   gap: 10px;
   min-height: 34px;
-  padding: 8px 14px;
-  border-radius: 10px;
+  padding: 7px 13px;
+  border: 1px solid var(--dg-color-banner-warning-border);
+  border-radius: var(--dg-btn-radius);
   background: var(--dg-color-banner-warning-bg);
   color: var(--dg-color-text-primary);
   font-size: 14px;
