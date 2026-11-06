@@ -122,6 +122,14 @@ export type NotificationEvent =
       empId: string;
     }
   | {
+      action: "employee_email_blocked";
+      orgId: string;
+      empId: string;
+      signInEmail: string;
+      /** The staff record already holding the address, when it could be found. */
+      holderEmpId: string | null;
+    }
+  | {
       action: "employee_profile_changed";
       orgId: string;
       empId: string;
@@ -1225,6 +1233,26 @@ async function dispatchNotificationEventInternal(
       return;
     }
 
+    case "employee_email_blocked": {
+      const [superAdmins, empName, holderName] = await Promise.all([
+        getOrgSuperAdmins(event.orgId),
+        getEmployeeName(event.empId),
+        event.holderEmpId ? getEmployeeName(event.holderEmpId) : null,
+      ]);
+      await Promise.all(
+        superAdmins.map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "employee_profile_changed" as NotificationType,
+            `${empName}'s email needs a fix`,
+            emailBlockedBody(event.signInEmail, holderName),
+            { empId: event.empId, signInEmail: event.signInEmail },
+          ),
+        ),
+      );
+      return;
+    }
     case "billing_access_locked": {
       const superAdmins = await getOrgSuperAdmins(event.orgId);
       const alreadySent = await hasExistingNotification(event.orgId, {
@@ -1400,6 +1428,11 @@ export function trialExpiredBody(
     return `Your free trial ended on ${endedOn}. Add a payment method by ${formatEmailDate(graceEndsAt.toISOString(), timeZone)} to keep your organization open.`;
   }
   return `Your free trial ended on ${endedOn}, so your organization is on hold. Add a payment method to reopen it.`;
+}
+
+export function emailBlockedBody(signInEmail: string, holderName: string | null): string {
+  const holder = holderName ? `${holderName}'s staff record` : "another staff record";
+  return `They now sign in with ${signInEmail}, but ${holder} already uses it. Change that record's email and theirs will update within a day.`;
 }
 
 export function accessLockedBody(reason: "trial" | "payment"): string {

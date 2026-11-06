@@ -106,6 +106,9 @@ export function isSessionExpiredError(error: unknown): boolean {
   return SESSION_EXPIRED_PATTERN.test(message);
 }
 
+/** A sign-in email another account holds. */
+export const EMAIL_TAKEN_MESSAGE = "That email belongs to someone else. Try a different one.";
+
 /**
  * Raw error messages rewritten into friendly, user-facing copy. The union of
  * the web and mobile pattern tables, with overlapping auth/session patterns
@@ -159,6 +162,10 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   {
     pattern: /not assigned to the focus area|required focus area/i,
     message: "You are not assigned to the schedule area required for this shift.",
+  },
+  {
+    pattern: /already been registered|email_exists/i,
+    message: EMAIL_TAKEN_MESSAGE,
   },
   {
     pattern: /another active shift request/i,

@@ -11,6 +11,7 @@ const reopenRestoredAccess = vi.fn();
 const endUserSessions = vi.fn();
 const disablePush = vi.fn();
 const scheduleSuspensionNotice = vi.fn();
+const repairLinkedEmails = vi.fn();
 /** org_role by "<userId>:<orgId>", and platform_role by user id. */
 const orgRoles = new Map<string, string>();
 const platformRoles = new Map<string, string>();
@@ -19,6 +20,10 @@ const superAdminCount = vi.fn(() => 2);
 vi.mock("@/features/employees/server/offboard-access", () => ({
   endOffboardedAccess: (...args: unknown[]) => endOffboardedAccess(...args),
   reopenRestoredAccess: (...args: unknown[]) => reopenRestoredAccess(...args),
+}));
+
+vi.mock("@/features/employees/server/linked-email-repair", () => ({
+  repairLinkedEmails: (...args: unknown[]) => repairLinkedEmails(...args),
 }));
 
 vi.mock("@/features/employees/server/suspension-notice", () => ({
@@ -200,6 +205,7 @@ function away(id: string, orgId: string, awayUntil: string, timezone: string) {
 describe("GET /api/cron/return-from-away", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    repairLinkedEmails.mockResolvedValue({ repaired: 0, blocked: 0 });
     orgRoles.clear();
     platformRoles.clear();
     superAdminCount.mockReturnValue(2);
@@ -259,6 +265,8 @@ describe("GET /api/cron/return-from-away", () => {
       reinstated: 0,
       suspended: 0,
       restored: 0,
+      emailsRepaired: 0,
+      emailsBlocked: 0,
       returned: 1,
       skipped: 0,
     });
@@ -308,6 +316,8 @@ describe("GET /api/cron/return-from-away", () => {
       reinstated: 0,
       suspended: 0,
       restored: 0,
+      emailsRepaired: 0,
+      emailsBlocked: 0,
       returned: 1,
       skipped: 0,
     });
@@ -325,6 +335,8 @@ describe("GET /api/cron/return-from-away", () => {
       reinstated: 0,
       suspended: 0,
       restored: 0,
+      emailsRepaired: 0,
+      emailsBlocked: 0,
       returned: 0,
     });
     expect(updateEmployee).not.toHaveBeenCalled();
@@ -347,6 +359,8 @@ describe("GET /api/cron/return-from-away", () => {
       reinstated: 0,
       suspended: 0,
       restored: 0,
+      emailsRepaired: 0,
+      emailsBlocked: 0,
       returned: 0,
       skipped: 1,
     });
@@ -365,6 +379,8 @@ describe("GET /api/cron/return-from-away", () => {
       reinstated: 0,
       suspended: 0,
       restored: 0,
+      emailsRepaired: 0,
+      emailsBlocked: 0,
       returned: 0,
     });
     expect(selectLte).toHaveBeenCalledWith("planned_from", "2026-10-28", "away");
@@ -767,6 +783,31 @@ describe("GET /api/cron/return-from-away", () => {
     });
   });
 
+  it("reports the email repair's counts", async () => {
+    repairLinkedEmails.mockResolvedValue({ repaired: 2, blocked: 1 });
+    rows([]);
+
+    const body = await (await GET(makeReq())).json();
+
+    expect(body).toMatchObject({ ok: true, emailsRepaired: 2, emailsBlocked: 1 });
+  });
+
+  it("still returns people when the email repair fails", async () => {
+    repairLinkedEmails.mockRejectedValue(new Error("auth down"));
+    selectLte.mockImplementation(async (column: string) => ({
+      data:
+        column === "away_until"
+          ? [away("emp-la", "org-la", "2026-10-26", "America/Los_Angeles")]
+          : [],
+      error: null,
+    }));
+
+    const body = await (await GET(makeReq())).json();
+
+    expect(body).toMatchObject({ ok: true, emailsRepaired: 0, emailsBlocked: 0 });
+    expect(body.returned).toBe(1);
+  });
+
   it("still returns people when starting plans fails", async () => {
     selectLte.mockImplementation(async (column: string) =>
       column === "planned_from"
@@ -783,6 +824,8 @@ describe("GET /api/cron/return-from-away", () => {
       reinstated: 0,
       suspended: 0,
       restored: 0,
+      emailsRepaired: 0,
+      emailsBlocked: 0,
       returned: 1,
       skipped: 0,
     });

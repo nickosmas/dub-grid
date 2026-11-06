@@ -19,6 +19,7 @@ const BROWSER_MUTATION_ROUTES = [
   "apps/web/src/app/api/account/mfa-lifecycle/route.ts",
   "apps/web/src/app/api/account/mfa-status/route.ts",
   "apps/web/src/app/api/account/notification-preferences/route.ts",
+  "apps/web/src/app/api/account/profile/contact-check/route.ts",
   "apps/web/src/app/api/account/profile/phone/route.ts",
   "apps/web/src/app/api/account/profile/route.ts",
   "apps/web/src/app/api/account/sessions/route.ts",

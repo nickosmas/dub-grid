@@ -74,7 +74,7 @@ const FLAG_INFO: Record<string, { label: string; description: string }> = {
   cron_return_from_away: {
     label: "Return From Away",
     description:
-      "A daily background job that applies dated status changes: returns from Away, planned Away starts, offboarding after a last day, suspensions starting and ending, and planned restores. Turning this off leaves everyone in their current status until someone changes it by hand.",
+      "A daily background job that applies dated status changes: returns from Away, planned Away starts, offboarding after a last day, suspensions starting and ending, and planned restores. It also brings staff emails back in step with sign-ins. Turning this off leaves everyone in their current status until someone changes it by hand.",
   },
   cron_sandbox_cleanup: {
     label: "Sandbox Cleanup",
