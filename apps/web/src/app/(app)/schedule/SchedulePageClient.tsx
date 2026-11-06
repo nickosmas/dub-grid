@@ -65,6 +65,7 @@ import {
   type StaffingScheduleState,
 } from "./_lib/open-shift-staffing";
 import { OpenShiftStaffingModal } from "@/components/schedule/OpenShiftStaffingModal";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { Hint } from "@/components/ui/hint";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { BannerIcon } from "@/components/ui/Banner";
@@ -8778,13 +8779,11 @@ function SchedulerContent({
                       content={hint("Hide this banner for the rest of this session")}
                       side="bottom"
                     >
-                      <Button
-                        type="button"
+                      <CloseButton
+                        size="sm"
                         onClick={dismissOutOfWindowDrafts}
-                        className="dg-btn dg-btn-secondary dg-btn-sm"
-                      >
-                        Close
-                      </Button>
+                        aria-label="Dismiss"
+                      />
                     </Hint>
                   </div>
                 </div>
@@ -8865,13 +8864,11 @@ function SchedulerContent({
                         content={hint("Hide this banner for the rest of this session")}
                         side="bottom"
                       >
-                        <Button
-                          type="button"
+                        <CloseButton
+                          size="sm"
                           onClick={dismissOutOfWindowPublishes}
-                          className="dg-btn dg-btn-secondary dg-btn-sm"
-                        >
-                          Close
-                        </Button>
+                          aria-label="Dismiss"
+                        />
                       </Hint>
                     </div>
                   </div>
@@ -8985,7 +8982,8 @@ function SchedulerContent({
                           >
                             View History
                           </Button>
-                          <Button
+                          <CloseButton
+                            size="sm"
                             // Not async: the write is deliberately
                             // fire-and-forget and the banner goes away on the
                             // spot, so there is nothing to await and nothing
@@ -8998,14 +8996,8 @@ function SchedulerContent({
                               setPublishHistory([]);
                               setShowPublishDiff(false);
                             }}
-                            className="dg-btn dg-btn-secondary"
-                            style={{
-                              fontSize: "var(--dg-fs-caption)",
-                              padding: "5px 12px",
-                            }}
-                          >
-                            Close
-                          </Button>
+                            aria-label="Dismiss"
+                          />
                         </>
                       )}
                     </div>

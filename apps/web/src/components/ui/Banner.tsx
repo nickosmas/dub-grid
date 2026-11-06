@@ -8,10 +8,10 @@ const BOX_ICON_SIZE = 20;
 const BAR_ICON_SIZE = 25;
 
 const TONE_CLASSES: Record<BannerTone, string> = {
-  info: "bg-[var(--dg-color-banner-info-bg)]",
-  success: "bg-[var(--dg-color-banner-success-bg)]",
-  warning: "bg-[var(--dg-color-banner-warning-bg)]",
-  danger: "bg-[var(--dg-color-banner-danger-bg)]",
+  info: "border-[var(--dg-color-banner-info-border)] bg-[var(--dg-color-banner-info-bg)]",
+  success: "border-[var(--dg-color-banner-success-border)] bg-[var(--dg-color-banner-success-bg)]",
+  warning: "border-[var(--dg-color-banner-warning-border)] bg-[var(--dg-color-banner-warning-bg)]",
+  danger: "border-[var(--dg-color-banner-danger-border)] bg-[var(--dg-color-banner-danger-bg)]",
 };
 
 const BAR_TONE_CLASSES: Record<BannerTone, string> = {
@@ -61,7 +61,7 @@ export interface BannerProps {
   className?: string;
 }
 
-/** Every banner and notice in the app: a tinted fill, a tone icon and neutral text, no border. */
+/** Every banner and notice in the app: a tinted fill and border, a tone icon and neutral text. */
 export function Banner({
   tone,
   icon,
@@ -76,7 +76,7 @@ export function Banner({
   const shape =
     layout === "bar"
       ? "items-center justify-center px-4 py-2"
-      : "items-start rounded-[10px] px-3.5 py-3";
+      : "items-start rounded-[var(--dg-btn-radius)] border px-[13px] py-[11px]";
 
   return (
     <div
@@ -99,7 +99,7 @@ export function Banner({
       {/* The negative margin keeps a button from growing a one-line box past the icon. */}
       {action ? (
         <div
-          className={`flex shrink-0 items-center self-center ${layout === "bar" ? "" : "-my-1"}`}
+          className={`flex shrink-0 items-center self-center ${layout === "bar" ? "" : "-my-[7px]"}`}
         >
           {action}
         </div>
