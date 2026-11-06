@@ -330,7 +330,7 @@ export default function AllUsersView({
                   <th style={gmHeaderStyle("Sessions")}>Sessions</th>
                   <th style={gmHeaderStyle("Mobile")}>Mobile</th>
                   <th style={gmHeaderStyle("Memberships")}>Memberships</th>
-                  <th style={gmHeaderStyle("Last login")}>Last login</th>
+                  <th style={gmHeaderStyle("Last sign-in")}>Last sign-in</th>
                   <th style={gmHeaderStyle("Date joined")}>Date joined</th>
                 </tr>
               </thead>

@@ -56,7 +56,7 @@ const GM_COLUMN_WIDTHS: Record<string, number> = {
   IP: 120,
   "IP address": 130,
   "Last active": 108,
-  "Last login": 108,
+  "Last sign-in": 108,
   Memberships: 116,
   Mobile: 84,
   "Org users": 96,

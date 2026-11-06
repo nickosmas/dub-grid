@@ -312,7 +312,7 @@ function ResetPasswordContent() {
             heading="Invalid or expired link"
             message="This password reset link is invalid or has expired. Request a new one."
             primaryCta={{ label: "Request a new link", href: "/forgot-password" }}
-            secondaryCta={{ label: "Back to login", href: "/login" }}
+            secondaryCta={{ label: "Back to sign in", href: "/login" }}
           />
         ) : state === "success" ? (
           <AuthStateCard

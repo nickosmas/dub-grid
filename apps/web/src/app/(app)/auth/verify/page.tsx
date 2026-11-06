@@ -74,7 +74,7 @@ export default function AuthVerifyPage() {
             heading="Invalid or expired link"
             message="This link is invalid or has expired. Request a new one."
             primaryCta={{
-              label: isRecovery ? "Request a new link" : "Back to Login",
+              label: isRecovery ? "Request a new link" : "Back to sign in",
               href: isRecovery ? "/forgot-password" : "/login",
             }}
           />
