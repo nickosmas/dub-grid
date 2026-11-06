@@ -9311,7 +9311,6 @@ function SchedulerContent({
               <Modal
                 title="Choose Assignment"
                 onClose={() => setCoverageGapSelection(null)}
-                style={{ maxWidth: 420 }}
                 footer={
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
                     <Button
