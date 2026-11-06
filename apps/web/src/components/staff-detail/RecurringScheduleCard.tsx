@@ -179,11 +179,7 @@ export function RecurringScheduleCard({
       </div>
       <div className="dg-card-body">
         {recurringShifts.length === 0 ? (
-          <EmptyState
-            size="compact"
-            icon={<CalendarClock size={20} />}
-            title="No recurring shifts configured"
-          />
+          <EmptyState size="compact" title="No recurring shifts configured" />
         ) : (
           <div>
             <div className="grid grid-cols-7 items-stretch gap-1 text-center">

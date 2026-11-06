@@ -15,6 +15,7 @@ export function usePersonPeriod(): {
   today: string;
   step: (step: -1 | 1) => void;
   goToToday: () => void;
+  goToMonthOf: (date: string) => void;
   setCustomRange: (range: PeriodRange) => void;
 } {
   const [today] = useState(() => localIsoToday());
@@ -25,10 +26,11 @@ export function usePersonPeriod(): {
     [],
   );
   const goToToday = useCallback(() => setPeriod(monthPeriod(today)), [today]);
+  const goToMonthOf = useCallback((date: string) => setPeriod(monthPeriod(date)), []);
   const setCustomRange = useCallback(
     (range: PeriodRange) => setPeriod({ kind: "custom", range }),
     [],
   );
 
-  return { period, today, step, goToToday, setCustomRange };
+  return { period, today, step, goToToday, goToMonthOf, setCustomRange };
 }

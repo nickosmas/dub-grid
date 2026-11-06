@@ -58,7 +58,7 @@ function MembershipFacts({
     return (
       <EmptyState
         size="inline"
-        title="No membership."
+        title="No membership"
         description="They cannot sign in to this organization."
       />
     );
@@ -222,7 +222,7 @@ function InvitationHistory({
   renderActions?: (invitation: Invitation) => ReactNode;
 }) {
   if (invitations.length === 0) {
-    return <EmptyState size="inline" title="No invitations sent." />;
+    return <EmptyState size="inline" title="No invitations sent" />;
   }
   const nowMs = Date.now();
   return (
@@ -289,7 +289,7 @@ export function PersonOrganizationCard({
 
       <PersonSubheading>Staff record</PersonSubheading>
       {employees.length === 0 ? (
-        <EmptyState size="inline" title="No staff record." />
+        <EmptyState size="inline" title="No staff record" />
       ) : (
         employees.map((employee) => (
           <div key={employee.id} className="flex flex-col gap-3">

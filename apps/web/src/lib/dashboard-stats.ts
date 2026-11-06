@@ -716,7 +716,7 @@ export function buildActivityFeed(
       highlight: summary,
       timestamp: historyEntry.publishedAt,
       relativeTime: relativeTimeString(new Date(historyEntry.publishedAt)),
-      href: "/schedule",
+      href: `/schedule?date=${historyEntry.startDate}`,
     });
   }
 
@@ -736,7 +736,7 @@ export function buildActivityFeed(
       highlight: req.requesterShiftDate,
       timestamp: req.createdAt,
       relativeTime: relativeTimeString(new Date(req.createdAt)),
-      href: "/schedule",
+      href: `/schedule?date=${req.requesterShiftDate}`,
     });
   }
 

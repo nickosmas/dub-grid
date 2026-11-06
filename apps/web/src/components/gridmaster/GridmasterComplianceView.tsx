@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { exportGridmasterAuditLog, fetchGridmasterCompliance } from "@/features/gridmaster/client";
 import { requireCredentialAssurance } from "@/features/account/client";
@@ -32,7 +31,7 @@ function Stat({ label, value }: { label: string; value: number }) {
           fontSize: "var(--dg-fs-card-title)",
           fontWeight: 700,
           color: "var(--dg-color-text-primary)",
-          fontFamily: "var(--font-dm-mono), monospace",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
@@ -180,7 +179,7 @@ export default function GridmasterComplianceView({
           onClick={() => setExportConfirm(true)}
           disabled={exporting}
         >
-          <ButtonLoading loading={exporting} spinnerSize={16} icon={<Upload size={16} />}>
+          <ButtonLoading loading={exporting} spinnerSize={16}>
             Export High-Risk Audit
           </ButtonLoading>
         </Button>
@@ -218,22 +217,6 @@ export default function GridmasterComplianceView({
                 <div style={{ padding: 16 }}>
                   <EmptyState
                     size="compact"
-                    icon={
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <ellipse cx="12" cy="5" rx="9" ry="3" />
-                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                      </svg>
-                    }
                     title="No retention data yet"
                     description="Organization retention configuration will appear here once set."
                   />
@@ -277,20 +260,6 @@ export default function GridmasterComplianceView({
                 <div style={{ padding: 16 }}>
                   <EmptyState
                     size="compact"
-                    icon={
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                      </svg>
-                    }
                     title="No compliance events"
                     description="GDPR and account deletion activity will appear here."
                   />

@@ -68,7 +68,7 @@ describe("AuthTransitionScreen", () => {
         await vi.advanceTimersByTimeAsync(15_000);
       });
       expect(
-        screen.getByText("This is taking a little longer than usual. It’s still loading."),
+        screen.getByText("This is taking longer than usual. You can keep waiting or try again."),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
       expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();

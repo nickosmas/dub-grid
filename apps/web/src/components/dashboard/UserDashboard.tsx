@@ -218,6 +218,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     shiftRequests,
     absenceTypeById,
     viewMode,
+    periodLabel,
   } = props;
   const isScheduleEditor = permissions.canEditShifts || permissions.canEditNotes;
   const isTwoWeekView = viewMode === "2weeks";
@@ -460,7 +461,6 @@ export default function UserDashboard(props: DashboardContentProps) {
         <div className="dg-card-body" style={{ padding: "18px" }}>
           <EmptyState
             size="inline"
-            icon={<UserRound size={22} />}
             title={impersonating ? "No personal schedule in this view" : "No schedule to show"}
             description={
               impersonating
@@ -539,7 +539,7 @@ export default function UserDashboard(props: DashboardContentProps) {
         }}
       />
       <AvailableShiftsSection
-        isTwoWeekView={isTwoWeekView}
+        periodLabel={periodLabel}
         items={availableShiftItems}
         style={{
           gridColumn: stackLayout ? undefined : "2",
@@ -555,6 +555,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       items={myScheduleItems}
       isTwoWeekView={isTwoWeekView}
       periodDates={periodDates}
+      periodLabel={periodLabel}
       todayKey={todayKey}
       weeklyHours={weeklyHours}
     />
@@ -596,7 +597,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       }
     >
       {!hasScheduleItems ? (
-        <ScheduleEmptyState isMobile={isMobile} isTwoWeekView={isTwoWeekView} />
+        <ScheduleEmptyState isMobile={isMobile} periodLabel={periodLabel} />
       ) : stackLayout ? (
         <div
           data-testid="user-dashboard-content-grid"
@@ -2136,14 +2137,13 @@ function MeHeroCard({
 
 function ScheduleEmptyState({
   isMobile,
-  isTwoWeekView,
+  periodLabel,
   style,
 }: {
   isMobile: boolean;
-  isTwoWeekView: boolean;
+  periodLabel: string;
   style?: CSSProperties;
 }) {
-  const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
   return (
     <EmptyState
       data-testid="user-dashboard-empty-schedule"
@@ -2180,7 +2180,6 @@ function HeroEmptyState({ style }: { style?: CSSProperties }) {
       >
         <EmptyState
           size="inline"
-          icon={<CalendarDays size={20} />}
           title="No upcoming shifts"
           description="Your next shift will show up here once it's published."
           style={{ flex: 1 }}
@@ -2635,7 +2634,6 @@ function CoverRequestsSection({
         {requests.length === 0 ? (
           <EmptyState
             size="inline"
-            icon={<Check size={20} />}
             title="No requests for you"
             description="When a teammate asks you to swap or cover a shift, it shows here."
           />
@@ -2652,17 +2650,16 @@ function CoverRequestsSection({
 }
 
 function AvailableShiftsSection({
-  isTwoWeekView = false,
+  periodLabel,
   items,
   style,
 }: {
-  isTwoWeekView?: boolean;
+  periodLabel: string;
   items: AvailableShiftItem[];
   style?: CSSProperties;
 }) {
   const pickupCount = items.filter((item) => item.kind === "pickup").length;
   const coverageCount = items.length - pickupCount;
-  const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
   const summaryParts = [
     pickupCount > 0 ? `${pickupCount} pickup${pickupCount === 1 ? "" : "s"}` : null,
     coverageCount > 0 ? `${coverageCount} coverage gap${coverageCount === 1 ? "" : "s"}` : null,
@@ -2696,7 +2693,6 @@ function AvailableShiftsSection({
         {items.length === 0 ? (
           <EmptyState
             size="inline"
-            icon={<CalendarDays size={20} />}
             title="No open shifts"
             description="Shifts you can pick up show here."
           />
@@ -2766,7 +2762,6 @@ function ActionRailSection({
       {items.length === 0 ? (
         <EmptyState
           size="inline"
-          icon={<Check size={20} />}
           title="Nothing to pick up"
           description="Open shifts and requests for you show here."
         />
@@ -2820,6 +2815,7 @@ function MyWeekSection({
   items,
   isTwoWeekView = false,
   periodDates,
+  periodLabel,
   style,
   todayKey,
   weeklyHours,
@@ -2828,12 +2824,12 @@ function MyWeekSection({
   items: DashboardScheduleItem[];
   isTwoWeekView?: boolean;
   periodDates: Date[];
+  periodLabel: string;
   style?: CSSProperties;
   todayKey: string;
   weeklyHours: number;
 }) {
   const groups = groupScheduleItemsByDate(items, periodDates);
-  const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
   const hoursLabel = weeklyHours > 0 ? `${formatHoursLabel(weeklyHours)}h ${periodLabel}` : null;
 
   if (groups.length === 0) {

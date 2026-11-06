@@ -757,7 +757,6 @@ export default function MobileDayView({
       {!hasAnySectionContent && (
         <EmptyState
           size="compact"
-          icon={<CalendarOff size={22} />}
           title={isCellInteractive ? "Nobody assigned here yet" : "No shifts found for this period"}
           description={
             isCellInteractive

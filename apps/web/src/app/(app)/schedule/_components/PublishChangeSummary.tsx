@@ -128,7 +128,7 @@ export function PublishChangeSummary({
               title={editorLabel(row)}
               description={row.isOnline && !row.isCurrentUser ? "On the schedule now" : undefined}
               breakdown={row}
-              emptyMessage="No unpublished changes."
+              emptyMessage="No unpublished changes"
             />
           ))}
         </div>

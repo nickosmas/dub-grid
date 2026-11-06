@@ -1,3 +1,4 @@
+import { capitalizeFirst, singularLabelNoun } from "@dubgrid/domain";
 import React from "react";
 import Link from "next/link";
 import { formatPublishedAt, formatPublishedSummary } from "@dubgrid/schedule-core";
@@ -50,10 +51,10 @@ export default function CoverageBySectionCard({
   const subtitle = !hasRequirements
     ? "No coverage requirements configured"
     : isUnpublished
-      ? "Not published yet"
+      ? null
       : isPartial
         ? "Published dates only · required vs scheduled"
-        : `${periodLabel} · required vs scheduled`;
+        : `${capitalizeFirst(periodLabel)} · required vs scheduled`;
   const publishSummary =
     hasRequirements && !isUnpublished && publishHistory
       ? formatPublishedSummary(
@@ -68,7 +69,7 @@ export default function CoverageBySectionCard({
         <div className="dg-card-header">
           <div>
             <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
-            <div className="dg-card-subtitle">{subtitle}</div>
+            {subtitle ? <div className="dg-card-subtitle">{subtitle}</div> : null}
             {publishSummary && (
               <div
                 style={{
@@ -96,7 +97,7 @@ export default function CoverageBySectionCard({
             }
             description={
               !hasRequirements
-                ? `Set up coverage requirements in Settings to track how well each ${focusAreaLabel.toLowerCase()} is staffed.`
+                ? `Set up coverage requirements in Settings to track how well each ${singularLabelNoun(focusAreaLabel)} is staffed.`
                 : isUnpublished
                   ? "Coverage details will appear after this period is published."
                   : isPartial
@@ -125,7 +126,7 @@ export default function CoverageBySectionCard({
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">Coverage by {focusAreaLabel.toLowerCase()}</div>
-          <div className="dg-card-subtitle">{subtitle}</div>
+          {subtitle ? <div className="dg-card-subtitle">{subtitle}</div> : null}
           {publishSummary && (
             <div
               style={{
@@ -138,7 +139,7 @@ export default function CoverageBySectionCard({
             </div>
           )}
         </div>
-        {onExpand && <ExpandButton onClick={onExpand} label="Expand coverage" />}
+        {onExpand && !isUnpublished && <ExpandButton onClick={onExpand} label="Expand coverage" />}
       </div>
 
       <div className="dg-card-body">

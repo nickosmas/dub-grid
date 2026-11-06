@@ -62,6 +62,7 @@ import {
 
 export type ViewMode = "week" | "2weeks";
 
+import { formatCompactRangeLabel, type PeriodRange } from "@/lib/period-presets";
 import DashboardHeader from "./DashboardHeader";
 import UserDashboard from "./UserDashboard";
 import AdminDashboard from "./AdminDashboard";
@@ -223,7 +224,15 @@ export function buildDashboardHeroMetrics(input: {
   return metrics;
 }
 
-export function getDashboardPeriodLabel(viewMode: ViewMode): string {
+/** Names the period by its dates unless it holds today, so another week never reads "this week". */
+export function getDashboardPeriodLabel(
+  viewMode: ViewMode,
+  range: PeriodRange,
+  todayKey: string,
+): string {
+  if (todayKey < range.startDate || todayKey > range.endDate) {
+    return formatCompactRangeLabel(range);
+  }
   return viewMode === "2weeks" ? "these 2 weeks" : "this week";
 }
 
@@ -313,7 +322,6 @@ export default function DashboardView({
   // ─── View mode + period navigation ─────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const periodDays = viewMode === "2weeks" ? 14 : 7;
-  const periodLabel = getDashboardPeriodLabel(viewMode);
   const overtimeThreshold = getDashboardOvertimeThreshold(periodDays);
 
   // The 2-week view aligns to the org's biweekly pay-period anchor (when set),
@@ -367,6 +375,11 @@ export default function DashboardView({
 
   const periodStartKey = useMemo(() => formatDateKey(periodStart), [periodStart]);
   const periodEndKey = useMemo(() => formatDateKey(periodEnd), [periodEnd]);
+  const periodLabel = getDashboardPeriodLabel(
+    viewMode,
+    { startDate: periodStartKey, endDate: periodEndKey },
+    todayKey,
+  );
   const prevPeriodStartKey = useMemo(() => formatDateKey(prevPeriodStart), [prevPeriodStart]);
   const prevPeriodEndKey = useMemo(() => formatDateKey(addDays(periodStart, -1)), [periodStart]);
 
@@ -1177,11 +1190,10 @@ export default function DashboardView({
         {/* ─── Role-specific dashboard content ─────────────── */}
         <DashboardContent {...contentProps} />
 
-        {/* ─── Expanded Panels (shared across all roles) ───── */}
+        {/* ─── Expanded Panels (admin dashboards) ───── */}
         {expandedPanel === "coverage" && (
           <ExpandedCoverage
             sections={sectionCoverage}
-            focusAreas={focusAreas}
             focusAreaLabel={org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea}
             hasRequirements={hasCoverageRequirements}
             publishedWindowState={publishedWindowState}

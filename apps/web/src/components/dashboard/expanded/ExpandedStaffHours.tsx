@@ -84,7 +84,7 @@ export default function ExpandedStaffHours({
   const otCount = currentHours.filter((h) => h.isOvertime).length;
 
   return (
-    <Modal title="Staff hours" onClose={onClose} style={modalStyle}>
+    <Modal title="Overtime watch" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Controls row */}
         <div

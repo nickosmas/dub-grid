@@ -1916,7 +1916,7 @@ export default function OrganizationSetupWizard({
             </div>
 
             {invitationRows.length === 0 ? (
-              <EmptyState size="compact" title="No employees with email addresses to invite." />
+              <EmptyState size="compact" title="No employees with email addresses to invite" />
             ) : (
               <>
                 {/* Select all */}

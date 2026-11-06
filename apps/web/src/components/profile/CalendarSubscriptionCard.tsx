@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Calendar, Copy } from "lucide-react";
+import { Calendar } from "lucide-react";
 import { toast } from "sonner";
 
 import { buildCalendarSubscribeLinks } from "@dubgrid/domain";
@@ -187,7 +187,6 @@ export function CalendarSubscriptionCard() {
                     }
                     className="dg-btn dg-btn-secondary"
                   >
-                    <Copy className="mr-1 size-4" />
                     Copy link
                   </Button>
                 </div>

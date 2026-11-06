@@ -132,7 +132,7 @@ describe("AdminDashboard", () => {
     expect(screen.getByText("Day shift \u00b7 Mon, May 11")).toBeInTheDocument();
     expect(screen.getByText("2 urgent open shifts")).toBeInTheDocument();
     expect(screen.getByText("1 unpublished change")).toBeInTheDocument();
-    expect(screen.getByText("these 2 weeks \u00b7 required vs scheduled")).toBeInTheDocument();
+    expect(screen.getByText("These 2 weeks \u00b7 required vs scheduled")).toBeInTheDocument();
     expect(screen.getByText("2 unfilled these 2 weeks")).toBeInTheDocument();
     expect(screen.getByText("Staff over 80h these 2 weeks")).toBeInTheDocument();
 

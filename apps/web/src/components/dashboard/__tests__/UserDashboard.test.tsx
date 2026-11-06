@@ -378,8 +378,10 @@ describe("dashboard user mode selection", () => {
   });
 
   it("labels admin dashboard periods and overtime thresholds from the selected range", () => {
-    expect(getDashboardPeriodLabel("week")).toBe("this week");
-    expect(getDashboardPeriodLabel("2weeks")).toBe("these 2 weeks");
+    const range = { startDate: "2026-11-01", endDate: "2026-11-07" };
+    expect(getDashboardPeriodLabel("week", range, "2026-11-04")).toBe("this week");
+    expect(getDashboardPeriodLabel("2weeks", range, "2026-11-04")).toBe("these 2 weeks");
+    expect(getDashboardPeriodLabel("week", range, "2026-11-20")).toBe("Nov 1 - Nov 7");
     expect(getDashboardOvertimeThreshold(1)).toBe(40);
     expect(getDashboardOvertimeThreshold(7)).toBe(40);
     expect(getDashboardOvertimeThreshold(14)).toBe(40);
@@ -1712,7 +1714,7 @@ describe("UserDashboard", () => {
     const emptyState = screen.getByTestId("user-dashboard-empty-schedule");
 
     expect(emptyState).toHaveTextContent("You're not scheduled this week");
-    expect(emptyState.style.border).toBe("");
+    expect(emptyState.style.border).toBe("1px dashed var(--dg-color-border)");
     expect(emptyState).toHaveStyle({
       alignItems: "center",
       justifyContent: "center",

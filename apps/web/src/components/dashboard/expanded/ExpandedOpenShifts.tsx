@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import Link from "next/link";
+import { formatDateKey } from "@/lib/utils";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import Modal from "@/components/Modal";
@@ -33,7 +34,13 @@ const BADGE_STYLES: Record<
   },
 };
 
-const URGENCY_OPTIONS = ["all", "high", "medium", "low"] as const;
+type UrgencyFilter = "all" | "urgent" | "open";
+
+const URGENCY_OPTIONS: { value: UrgencyFilter; label: string }[] = [
+  { value: "all", label: "All urgency" },
+  { value: "urgent", label: "Urgent" },
+  { value: "open", label: "Open" },
+];
 
 interface ExpandedOpenShiftsProps {
   openShifts: OpenShift[];
@@ -48,14 +55,16 @@ export default function ExpandedOpenShifts({
   focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   onClose,
 }: ExpandedOpenShiftsProps) {
-  const [urgencyFilter, setUrgencyFilter] = useState<"all" | OpenShift["urgency"]>("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
   const [focusAreaFilter, setFocusAreaFilter] = useState<string>("all");
   const isUnpublished = publishedWindowState === "unpublished";
   const isPartial = publishedWindowState === "partial";
 
   const filtered = useMemo(() => {
     let list = openShifts;
-    if (urgencyFilter !== "all") list = list.filter((s) => s.urgency === urgencyFilter);
+    if (urgencyFilter !== "all") {
+      list = list.filter((s) => (s.urgency === "high") === (urgencyFilter === "urgent"));
+    }
     if (focusAreaFilter !== "all") list = list.filter((s) => s.focusAreaName === focusAreaFilter);
     return list;
   }, [openShifts, urgencyFilter, focusAreaFilter]);
@@ -110,10 +119,7 @@ export default function ExpandedOpenShifts({
               <span style={filterLabelStyle}>Filter:</span>
               <CustomSelect
                 value={urgencyFilter}
-                options={URGENCY_OPTIONS.map((opt) => ({
-                  value: opt,
-                  label: opt === "all" ? "All urgency" : opt.charAt(0).toUpperCase() + opt.slice(1),
-                }))}
+                options={URGENCY_OPTIONS}
                 onChange={(val) => setUrgencyFilter(val as typeof urgencyFilter)}
                 fontSize="var(--dg-fs-label)"
               />
@@ -188,7 +194,7 @@ export default function ExpandedOpenShifts({
                   return (
                     <Link
                       key={shift.id}
-                      href="/schedule"
+                      href={`/schedule?date=${formatDateKey(shift.date)}`}
                       style={{
                         display: "block",
                         textDecoration: "none",

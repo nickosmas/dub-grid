@@ -292,7 +292,7 @@ export default function EnhancedImpersonation({
               />
               {orgSearch && <SearchClearButton onClear={() => setOrgSearch("")} />}
             </div>
-            <div style={{ maxHeight: 200, overflowY: "auto" }}>
+            <div style={{ maxHeight: "min(420px, 50vh)", overflowY: "auto" }}>
               {filteredOrgs.length === 0 ? (
                 <div
                   style={{
@@ -597,7 +597,7 @@ export default function EnhancedImpersonation({
                 )}
               </div>
             ) : (
-              <div style={{ maxHeight: 280, overflowY: "auto" }}>
+              <div style={{ maxHeight: "min(420px, 50vh)", overflowY: "auto" }}>
                 {filteredUsers.length === 0 ? (
                   <div
                     style={{

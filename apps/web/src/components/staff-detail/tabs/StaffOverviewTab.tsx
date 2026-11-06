@@ -103,6 +103,7 @@ export function StaffOverviewTab({
   );
 
   const firstName = employee.firstName || "They";
+  const nothingInPeriod = summary?.shiftCount === 0 && summary.hours === 0;
   const stats = [
     { label: "Hours", value: summary ? `${summary.hours}h` : "-" },
     { label: "Shifts", value: summary ? String(summary.shiftCount) : "-" },
@@ -111,32 +112,34 @@ export function StaffOverviewTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <section
-        data-testid="overview-summary"
-        aria-label={`${sentence(periodPhrase)} in numbers`}
-        className="dg-card"
-      >
-        <div className="grid grid-cols-3">
-          {stats.map((stat, index) => (
-            <div
-              key={stat.label}
-              className={`min-w-0 px-5 py-4 ${index > 0 ? "border-l border-[var(--dg-color-border-light)]" : ""}`}
-            >
-              <div className="text-[13px] font-medium text-[var(--dg-color-text-secondary)]">
-                {stat.label}
+      {nothingInPeriod ? null : (
+        <section
+          data-testid="overview-summary"
+          aria-label={`${sentence(periodPhrase)} in numbers`}
+          className="dg-card"
+        >
+          <div className="grid grid-cols-3">
+            {stats.map((stat, index) => (
+              <div
+                key={stat.label}
+                className={`min-w-0 px-5 py-4 ${index > 0 ? "border-l border-[var(--dg-color-border-light)]" : ""}`}
+              >
+                <div className="text-[13px] font-medium text-[var(--dg-color-text-secondary)]">
+                  {stat.label}
+                </div>
+                <div className="dg-tabular-nums mt-1 text-[28px] font-bold leading-[1.1] tracking-tight text-[var(--dg-color-text-primary)]">
+                  {stat.value}
+                </div>
               </div>
-              <div className="dg-tabular-nums mt-1 text-[28px] font-bold leading-[1.1] tracking-tight text-[var(--dg-color-text-primary)]">
-                {stat.value}
-              </div>
-            </div>
-          ))}
-        </div>
-        {mix.length > 0 ? (
-          <div className="border-t border-[var(--dg-color-border-light)] px-5 py-4">
-            <WorkMixBreakdown mix={mix} periodPhrase={periodPhrase} title={mixTitle} />
+            ))}
           </div>
-        ) : null}
-      </section>
+          {mix.length > 0 ? (
+            <div className="border-t border-[var(--dg-color-border-light)] px-5 py-4">
+              <WorkMixBreakdown mix={mix} periodPhrase={periodPhrase} title={mixTitle} />
+            </div>
+          ) : null}
+        </section>
+      )}
 
       {nextDays ? (
         <MyScheduleRow
