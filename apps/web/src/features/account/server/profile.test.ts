@@ -1,11 +1,12 @@
 // @vitest-environment node
 
+import type { Employee } from "@dubgrid/domain";
 import { describe, expect, it, vi } from "vitest";
 
 const from = vi.fn();
 vi.mock("@/lib/supabase-service", () => ({ getServiceClient: () => ({ from }) }));
 
-import { fetchSelfWorkProfileSnapshot, recordSelfMfaOff } from "./profile";
+import { employeeForSelf, fetchSelfWorkProfileSnapshot, recordSelfMfaOff } from "./profile";
 
 function tableBuilder(result: { data: unknown; error: null }) {
   const builder: Record<string, unknown> = {};
@@ -66,6 +67,31 @@ describe("fetchSelfWorkProfileSnapshot", () => {
       isOrgMember: true,
       employee: null,
       managementDepartmentIds: [7],
+    });
+  });
+});
+
+describe("employeeForSelf", () => {
+  const employee = { id: "emp-1", contactNotes: "Written by a manager" } as Employee;
+
+  it("leaves internal notes out for someone who doesn't manage staff", async () => {
+    from.mockReturnValue(
+      tableBuilder({ data: { org_role: "user", admin_permissions: null }, error: null }),
+    );
+
+    await expect(employeeForSelf(employee, "user-1", "org-1")).resolves.toMatchObject({
+      contactNotes: "",
+    });
+  });
+
+  // A manager's editor saves the whole record, so a blank here would erase them.
+  it("keeps them for a manager", async () => {
+    from.mockReturnValue(
+      tableBuilder({ data: { org_role: "super_admin", admin_permissions: null }, error: null }),
+    );
+
+    await expect(employeeForSelf(employee, "user-1", "org-1")).resolves.toMatchObject({
+      contactNotes: "Written by a manager",
     });
   });
 });
