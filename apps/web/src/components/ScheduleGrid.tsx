@@ -31,7 +31,13 @@ import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { formatReturnDate, type StatusMarkKind } from "@dubgrid/domain";
 import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
-import { isNewShiftChange, isPastDateKey, type ShiftChange } from "@dubgrid/schedule-core";
+import {
+  formatShiftChangeHours,
+  isNewShiftChange,
+  isPastDateKey,
+  shiftChangeItemMinutes,
+  type ShiftChange,
+} from "@dubgrid/schedule-core";
 import { ShiftChangeBesideCurrent } from "@/components/shift-change/ShiftChangeCard";
 import {
   buildShiftChangeResolvers,
@@ -2645,7 +2651,7 @@ const SectionBlock = memo(function SectionBlock({
                                 label: restOfDayAbsenceName,
                                 jobName: null,
                                 focusAreaName: null,
-                                timeLabel: absenceLayout?.time ?? "Part of the day",
+                                timeLabel: `${absenceLayout?.time ?? "Part of the day"}, not worked`,
                                 isCustomTime: false,
                                 isMentored: false,
                               },
@@ -2683,6 +2689,21 @@ const SectionBlock = memo(function SectionBlock({
                                 assignment?.defaultEndTime ??
                                 category?.endTime ??
                                 null;
+                              const minutes =
+                                start && end
+                                  ? shiftChangeItemMinutes({
+                                      kind: "shift",
+                                      key: String(entryIndex),
+                                      shiftName: null,
+                                      jobName: "",
+                                      focusAreaName: null,
+                                      start,
+                                      end,
+                                      breakMinutes: category?.breakMinutes ?? null,
+                                    })
+                                  : null;
+                              const hours =
+                                minutes != null ? formatShiftChangeHours(minutes) : null;
                               const focusArea =
                                 assignment?.focusAreaId != null
                                   ? (focusAreas.find((area) => area.id === assignment.focusAreaId)
@@ -2711,8 +2732,16 @@ const SectionBlock = memo(function SectionBlock({
                                 jobName: isGeneralShift ? "General shift" : (job?.name ?? null),
                                 focusAreaName: focusArea,
                                 timeLabel:
-                                  start && end ? `${fmt12h(start)} - ${fmt12h(end)}` : null,
-                                isCustomTime: !!customTime,
+                                  start && end
+                                    ? [
+                                        `${fmt12h(start)} - ${fmt12h(end)}`,
+                                        hours && restOfDayAbsenceName ? `${hours} worked` : hours,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" · ")
+                                    : null,
+                                // An absence beside the shift is why its times differ.
+                                isCustomTime: !!customTime && !restOfDayAbsenceName,
                                 isMentored: cellSegments[entryIndex]?.isMentored ?? false,
                               };
                             });
