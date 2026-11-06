@@ -2931,6 +2931,35 @@ describe("ScheduleGrid", () => {
       expect(screen.getAllByLabelText(/then Sick 11:00 AM - 3:00 PM/).length).toBeGreaterThan(0);
     });
 
+    it("says on the hover card what was worked, not that the time is custom", async () => {
+      observedWidth = 1440;
+
+      renderGrid({
+        spanWeeks: 1,
+        assignments: twoPillAssignmentDefinitions,
+        shiftForKey: () => "D",
+        assignmentIdsForKey: () => [1],
+        absenceTypeMap,
+        showShiftDetailHoverCards: true,
+        restOfDayAbsenceTypeIdForKey: () => 9,
+        restOfDayAbsenceLayoutForKey: () => ({
+          first: false,
+          joinsShift: true,
+          shortTime: "11 - 3",
+          time: "11:00 AM - 3:00 PM",
+        }),
+        getCustomShiftTimes: () => ({ start: "07:00", end: "11:00" }),
+      });
+
+      fireEvent.mouseEnter(
+        screen.getAllByRole("gridcell")[0].querySelector("[data-shift-pill]") as HTMLElement,
+      );
+
+      expect(await screen.findByText("7:00 AM - 11:00 AM · 4 hrs worked")).toBeInTheDocument();
+      expect(screen.getByText("11:00 AM - 3:00 PM, not worked")).toBeInTheDocument();
+      expect(screen.queryByText(/Custom time/)).not.toBeInTheDocument();
+    });
+
     it("puts an arrived-late absence first, joined to the shift it meets (item 50d)", () => {
       observedWidth = 1440;
 

@@ -2001,6 +2001,20 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByRole("button", { name: "Set custom time" })).toBeInTheDocument();
     });
 
+    it("calls a shift's times beside an absence Time worked, not Custom time", () => {
+      renderDay({
+        onCustomTimeChange: vi.fn(),
+        currentRestOfDayAbsenceTypeId: 8,
+        currentRestOfDayAbsenceStartTime: "11:00",
+        currentRestOfDayAbsenceEndTime: "15:00",
+        customStartTime: "07:00",
+        customEndTime: "11:00",
+      });
+
+      expect(screen.getByText("Time worked")).toBeInTheDocument();
+      expect(screen.queryByText("Custom time")).toBeNull();
+    });
+
     it("labels a corrected day and shows only what it was, above the shift as it stands", () => {
       const worked = (customStartTime: string | null, customEndTime: string | null) => ({
         kind: "worked" as const,
