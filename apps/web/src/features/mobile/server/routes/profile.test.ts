@@ -179,6 +179,26 @@ describe("mobile profile routes", () => {
     expect(payload.joinedAt).toBe("2026-03-05T14:00:00.000Z");
   });
 
+  it("leaves internal notes out unless the person manages staff", async () => {
+    fetchLinkedEmployeeForUser.mockResolvedValue({
+      ...(await fetchLinkedEmployeeForUser()),
+      contactNotes: "Written by a manager",
+    });
+    const { GET } = await import("./profile");
+    const url = "http://localhost/api/mobile/v1/profile";
+
+    const staff = await (await GET(new Request(url) as never)).json();
+    expect(staff.linkedEmployee.contactNotes).toBe("");
+
+    const auth = mockAuth();
+    requireMobileAuth.mockResolvedValue({
+      ...auth,
+      permissions: { ...auth.permissions, canManageEmployees: true },
+    });
+    const manager = await (await GET(new Request(url) as never)).json();
+    expect(manager.linkedEmployee.contactNotes).toBe("Written by a manager");
+  });
+
   it("returns no joined date for a caller with no membership", async () => {
     requireMobileAuth.mockResolvedValue({ ...mockAuth(), membership: null });
 

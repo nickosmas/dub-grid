@@ -4,6 +4,8 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 const cacheDel = vi.fn();
 const deleteUserAccountWithCleanup = vi.fn();
 const fetchLinkedEmployeeForUser = vi.fn();
+const applyStatusChange = vi.fn();
+const endAccessInOrganization = vi.fn();
 const loggerError = vi.fn();
 
 vi.mock("server-only", () => ({}));
@@ -19,6 +21,14 @@ vi.mock("@/lib/cache", () => ({
 
 vi.mock("@/features/account/server/account-deletion", () => ({
   deleteUserAccountWithCleanup: (...args: unknown[]) => deleteUserAccountWithCleanup(...args),
+}));
+
+vi.mock("@/features/employees/server/status-change", () => ({
+  applyStatusChange: (...args: unknown[]) => applyStatusChange(...args),
+}));
+
+vi.mock("@/features/employees/server/offboard-access", () => ({
+  endAccessInOrganization: (...args: unknown[]) => endAccessInOrganization(...args),
 }));
 
 vi.mock("@/features/mobile/server", () => ({
@@ -497,5 +507,106 @@ describe("resolveProfileChangeRequest", () => {
       }),
     ).rejects.toThrow("Unauthorized: only a super admin can decide an account deletion.");
     expect(deleteUserAccountWithCleanup).not.toHaveBeenCalled();
+  });
+
+  describe("approving an account deletion", () => {
+    function approvalClient(otherOrganizations: number) {
+      const requestRow = makeRequestRow({
+        request_type: "account_deletion",
+        requested_changes: {},
+      });
+      const resolved = { ...requestRow, status: "approved" };
+      let requestReads = 0;
+      const chain = (result: unknown) => {
+        const builder: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "neq", "is", "update", "order", "limit"]) {
+          builder[method] = vi.fn(() => builder);
+        }
+        builder.maybeSingle = vi.fn(async () => result);
+        builder.single = vi.fn(async () => result);
+        builder.then = (resolve: (value: unknown) => unknown) => resolve(result);
+        return builder;
+      };
+      return {
+        from: vi.fn((table: string) => {
+          if (table === "organization_memberships") {
+            return chain({
+              data: { org_role: "super_admin", admin_permissions: null },
+              count: otherOrganizations,
+              error: null,
+            });
+          }
+          if (table === "profile_change_requests") {
+            requestReads += 1;
+            return chain({ data: requestReads === 1 ? requestRow : resolved, error: null });
+          }
+          if (table === "profiles") return chain({ data: { platform_role: null }, error: null });
+          return chain({ data: null, error: null });
+        }),
+      } as unknown as SupabaseClient;
+    }
+    const approve = (serviceClient: SupabaseClient) =>
+      resolveProfileChangeRequest({
+        serviceClient,
+        actor: { id: ACTOR_ID, email: "owner@example.com" } as User,
+        orgId: ORG_ID,
+        requestId: REQUEST_ID,
+        action: "approve",
+      });
+
+    it("deletes an account only this organization uses", async () => {
+      await approve(approvalClient(0));
+
+      expect(deleteUserAccountWithCleanup).toHaveBeenCalledOnce();
+      expect(applyStatusChange).not.toHaveBeenCalled();
+    });
+
+    it("offboards them here and keeps an account used elsewhere", async () => {
+      fetchLinkedEmployeeForUser.mockResolvedValue({
+        id: EMPLOYEE_ID,
+        status: "active",
+        version: 7,
+      });
+      applyStatusChange.mockResolvedValue({ status: 200, body: {} });
+
+      await approve(approvalClient(1));
+
+      expect(deleteUserAccountWithCleanup).not.toHaveBeenCalled();
+      expect(applyStatusChange).toHaveBeenCalledWith(
+        expect.objectContaining({ orgId: ORG_ID }),
+        expect.objectContaining({ empId: EMPLOYEE_ID, action: "remove", expectedVersion: 7 }),
+      );
+    });
+
+    it("leaves someone already offboarded as they are", async () => {
+      fetchLinkedEmployeeForUser.mockResolvedValue({ id: EMPLOYEE_ID, status: "removed" });
+
+      await approve(approvalClient(1));
+
+      expect(applyStatusChange).not.toHaveBeenCalled();
+      expect(deleteUserAccountWithCleanup).not.toHaveBeenCalled();
+    });
+
+    it("ends access here when they have no staff record", async () => {
+      fetchLinkedEmployeeForUser.mockResolvedValue(null);
+
+      await approve(approvalClient(1));
+
+      expect(endAccessInOrganization).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ orgId: ORG_ID, userId: REQUESTER_USER_ID }),
+      );
+    });
+
+    it("stops the approval when the offboard is refused", async () => {
+      fetchLinkedEmployeeForUser.mockResolvedValue({
+        id: EMPLOYEE_ID,
+        status: "active",
+        version: 7,
+      });
+      applyStatusChange.mockResolvedValue({ status: 409, body: { error: "Refused." } });
+
+      await expect(approve(approvalClient(1))).rejects.toThrow("Refused.");
+    });
   });
 });

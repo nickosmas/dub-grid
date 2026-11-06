@@ -31,5 +31,6 @@ Super Admin. It now reads open memberships only, as the self-delete route alread
 
 ## Not in this fix
 
-- Approving someone's own request still deletes across every organization.
+- Approving someone's own request was limited to one organization in
+  fix/deletion-approval-one-org.
 - The app is unchanged: this is web only.
