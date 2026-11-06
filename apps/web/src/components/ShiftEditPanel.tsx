@@ -509,6 +509,8 @@ export default function ShiftEditPanel({
   const hasActiveShift = !!(currentShift && currentShift !== "OFF");
   const isAbsence = currentAbsenceTypeId != null;
   const hasRestOfDayAbsence = currentRestOfDayAbsenceTypeId != null;
+  // Beside an absence the times are when they worked, not a change to the shift.
+  const timeEditorLabel = hasRestOfDayAbsence ? "Time worked" : undefined;
   // A repeating absence keeps its own choice of days to remove.
   const runDateKeys =
     isAbsence && !seriesId && absenceRun && absenceRun.dateKeys.length >= 2
@@ -3477,6 +3479,7 @@ export default function ShiftEditPanel({
                         defaultEnd={defaultEnd}
                         minTime={getTimeBounds(assignment).minTime}
                         maxTime={getTimeBounds(assignment).maxTime}
+                        customLabel={timeEditorLabel}
                         onSave={(start, end) => {
                           if (editShiftTimesBesideAbsence(i, start, end)) return;
                           const newStarts = [...pillStarts];
@@ -4086,8 +4089,10 @@ export default function ShiftEditPanel({
       const time = window
         ? [
             window,
-            minutes != null ? formatShiftChangeHours(minutes) : null,
-            isCustom ? "custom time" : null,
+            minutes != null
+              ? `${formatShiftChangeHours(minutes)}${hasRestOfDayAbsence ? " worked" : ""}`
+              : null,
+            isCustom && !hasRestOfDayAbsence ? "custom time" : null,
           ]
             .filter(Boolean)
             .join(" · ")
@@ -4591,6 +4596,7 @@ export default function ShiftEditPanel({
                         defaultEnd={defaults.end}
                         minTime={getTimeBounds(matchedCode).minTime}
                         maxTime={getTimeBounds(matchedCode).maxTime}
+                        customLabel={timeEditorLabel}
                         onSave={(start, end) => {
                           if (!editShiftTimesBesideAbsence(0, start, end)) {
                             onCustomTimeChange(start, end);
