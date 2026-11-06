@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
 
 import { Button } from "@/components/Button";
+import { Banner } from "@/components/ui/Banner";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -179,24 +180,17 @@ export function AddManagementUserToScheduleModal({
         }
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div
-            style={{
-              padding: "12px 16px",
-              borderRadius: "var(--dg-radius-lg)",
-              background: "var(--dg-color-bg-secondary)",
-              color: "var(--dg-color-text-secondary)",
-              fontSize: "var(--dg-fs-label)",
-            }}
-          >
-            Put{" "}
-            <strong>
-              {person.firstName || person.lastName
-                ? `${person.firstName} ${person.lastName}`.trim()
-                : person.email}
-            </strong>{" "}
-            on the schedule so you can assign them shifts. They'll keep their account and management
-            access.
-          </div>
+          <Banner tone="info">
+            <span>
+              Put{" "}
+              <strong>
+                {person.firstName || person.lastName
+                  ? `${person.firstName} ${person.lastName}`.trim()
+                  : person.email}
+              </strong>{" "}
+              on the schedule so you can assign them shifts. They'll keep their account and access.
+            </span>
+          </Banner>
 
           <div>
             <label style={fieldLabelStyle}>Employment</label>
