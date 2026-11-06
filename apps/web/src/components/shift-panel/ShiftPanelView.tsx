@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { ShiftChange } from "@dubgrid/schedule-core";
-import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
+import { ShiftChangeBesideCurrent } from "@/components/shift-change/ShiftChangeCard";
 
 export interface PanelViewDetail {
   label: string;
@@ -97,14 +97,12 @@ function StatusCard({ status }: { status: NonNullable<PanelViewStatus> }) {
         }
         dotColor="var(--dg-color-warning-text)"
       />
-      {status.kind === "changed" ? (
-        <ShiftChangeCard change={status.change} layout="stacked" />
-      ) : null}
+      {status.kind === "changed" ? <ShiftChangeBesideCurrent change={status.change} /> : null}
     </div>
   );
 }
 
-/** A corrected past day: what it was, what it is now, and who corrected it. */
+/** A corrected past day, above the shift as it stands: what it was, and who corrected it. */
 export function CorrectedDayCard({
   change,
   notes,
@@ -130,7 +128,7 @@ export function CorrectedDayCard({
       />
       {shownChange || notes.length > 0 ? (
         <div data-correction-change style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {shownChange ? <ShiftChangeCard change={shownChange} layout="stacked" /> : null}
+          {shownChange ? <ShiftChangeBesideCurrent change={shownChange} /> : null}
           {notes.map((note) => (
             <p
               key={note}

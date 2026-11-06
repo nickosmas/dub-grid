@@ -30,9 +30,14 @@
   already shows, and Mentored for one shift only when it is on. With nothing left to
   say, there is no box.
 - **Corrected day.** A **Corrected day** card in the panel holds who and when, the
-  reason, and Before and After, like the "Changed since it was published" card. The
-  grid's hover card carries the same label, and the staff page's Schedule list adds
-  what the day was.
+  reason, and what the day was. The grid's hover card carries the same label, and the
+  staff page's Schedule list adds what the day was.
+- **Only Was beside the current shift.** The owner's call on review: the After side
+  repeats the shift already on screen. The corrected card, "Changed since it was
+  published" and the grid's hover card now show one Was block, days with several items
+  included, so the hover card's day bar goes with its After side. "Shift 1" drops when
+  that side holds one shift. The Activity log, with no shift beside it, keeps the full
+  Before and After.
 
 ## Verify
 

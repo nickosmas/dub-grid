@@ -2001,7 +2001,7 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByRole("button", { name: "Set custom time" })).toBeInTheDocument();
     });
 
-    it("labels a corrected day and shows it before and after", () => {
+    it("labels a corrected day and shows only what it was, above the shift as it stands", () => {
       const worked = (customStartTime: string | null, customEndTime: string | null) => ({
         kind: "worked" as const,
         segments: [{ shiftId: 11, jobId: 102, position: 0, isMentored: false }],
@@ -2020,9 +2020,10 @@ describe("ShiftEditPanel", () => {
       expect(card).toHaveTextContent("Corrected day");
       expect(card).toHaveTextContent("Corrected Nov 2 by Mina.");
       expect(card).toHaveTextContent("Reason: Left at 1");
-      expect(card).toHaveTextContent("Before");
-      expect(card).toHaveTextContent("After");
-      expect(card).toHaveTextContent("1:00 PM");
+      expect(card).toHaveTextContent("Was");
+      expect(card).toHaveTextContent("3:00 PM");
+      expect(card).not.toHaveTextContent("After");
+      expect(card).not.toHaveTextContent("1:00 PM");
     });
 
     it("repeats nothing the two shift cards already show when a repeating day opens", () => {
