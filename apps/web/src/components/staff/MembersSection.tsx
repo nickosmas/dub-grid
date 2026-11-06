@@ -378,6 +378,7 @@ export function MembersSection({
 
   const {
     directory,
+    loading: directoryLoading,
     hasMore: directoryHasMore,
     loadingMore: directoryLoadingMore,
     loadMore: loadMoreDirectory,
@@ -1736,6 +1737,7 @@ export function MembersSection({
                               useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
                               orgRole={effectiveOrgRoleByEmployeeId.get(employee.id) ?? null}
                               invitationStateReady={invitationStateReady}
+                              directoryLoading={directoryLoading}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={() => undefined}
@@ -1815,12 +1817,13 @@ export function MembersSection({
                           </TableHead>
                           {canViewEmployeeDetails && (
                             <TableHead className="border-r border-[var(--dg-color-border-light)]">
-                              Account
+                              {/* Holds the column while its cells load, so nothing shifts. */}
+                              <div className="min-w-[104px]">Account</div>
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
                             <TableHead className="border-r border-[var(--dg-color-border-light)]">
-                              Access
+                              <div className="min-w-[132px]">Access</div>
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
@@ -1858,6 +1861,7 @@ export function MembersSection({
                                 directoryByEmployeeId.get(employee.id)?.membershipUpdatedAt,
                               )}
                               invitationStateReady={invitationStateReady}
+                              directoryLoading={directoryLoading}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={(employeeId) =>

@@ -76,6 +76,7 @@ function shiftRow(record: ShiftRecord): ScheduleRow {
     record.absenceName ? `then ${record.absenceName}` : null,
     record.focusArea,
     record.was ? `was ${record.was}` : null,
+    record.correctedFrom,
     record.correctionReason,
     record.noteCount > 0
       ? `${record.noteCount} schedule ${record.noteCount === 1 ? "note" : "notes"}`

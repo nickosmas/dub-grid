@@ -32,7 +32,7 @@ import { Popover, PopoverContent } from "@/components/ui/popover";
 import { formatReturnDate, type StatusMarkKind } from "@dubgrid/domain";
 import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import { isNewShiftChange, isPastDateKey, type ShiftChange } from "@dubgrid/schedule-core";
-import { ShiftChangeCard, ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
+import { ShiftChangeBesideCurrent } from "@/components/shift-change/ShiftChangeCard";
 import {
   buildShiftChangeResolvers,
   cellStateFromParts,
@@ -718,26 +718,6 @@ const SHIFT_DETAIL_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
 });
 
 /** One change in the hover card: the full card for several items, else what it was. */
-function HoverChangeView({ view }: { view: ShiftChange }) {
-  if (view.kind === "multi") {
-    return <ShiftChangeCard change={view} layout="stacked" showDayBar />;
-  }
-  if (isNewShiftChange(view)) {
-    // One item on a day that had nothing has no Before to show.
-    return (
-      <div
-        style={{
-          fontSize: "var(--dg-fs-caption)",
-          color: "var(--dg-color-text-muted)",
-        }}
-      >
-        {formatShiftChangeWasText(view)}
-      </div>
-    );
-  }
-  return <ShiftChangeWas change={view} />;
-}
-
 function ShiftDetailHoverCard({
   enabled,
   employeeName,
@@ -788,9 +768,6 @@ function ShiftDetailHoverCard({
   const shownCorrectionNotes = correctionLabel ? correctionNotes : [];
   const hasRichChanges =
     shownChanges.length > 0 || !!shownCorrection || shownCorrectionNotes.length > 0;
-  const hasMultiChange =
-    shownChanges.some((change) => change.view.kind === "multi") ||
-    shownCorrection?.kind === "multi";
 
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
@@ -819,7 +796,7 @@ function ShiftDetailHoverCard({
           showArrow
           style={{
             display: "block",
-            width: hasMultiChange ? 340 : 300,
+            width: 300,
             maxWidth: "calc(100vw - 32px)",
             padding: 0,
             border: "1px solid var(--dg-color-border)",
@@ -949,7 +926,7 @@ function ShiftDetailHoverCard({
                             : "Not published yet. Staff still see the published shift."}
                         </div>
                       ) : null}
-                      <HoverChangeView view={view} />
+                      <ShiftChangeBesideCurrent change={view} />
                     </div>
                   ))}
                   {publicationLabel ? (
@@ -968,7 +945,19 @@ function ShiftDetailHoverCard({
                       data-correction-change
                       style={{ display: "flex", flexDirection: "column", gap: 6 }}
                     >
-                      {shownCorrection ? <HoverChangeView view={shownCorrection} /> : null}
+                      <div
+                        data-correction-title
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: "var(--dg-color-text-primary)",
+                        }}
+                      >
+                        Corrected day
+                      </div>
+                      {shownCorrection ? (
+                        <ShiftChangeBesideCurrent change={shownCorrection} />
+                      ) : null}
                       {shownCorrectionNotes.map((note) => (
                         <div
                           key={note}

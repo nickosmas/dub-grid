@@ -1,5 +1,4 @@
 import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
-import { Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { calcTimeDuration } from "@/lib/utils";
 import { Button } from "@/components/Button";
@@ -160,45 +159,58 @@ export function PillTimeEditor({
     setEditing(false);
   }
 
-  // State 1: No custom time set — show "Custom time" button to add one
+  // State 1: No custom time set. The time shown is the shift's own, so it reads
+  // apart from the button that overrides it.
   if (!hasCustomTime && !editing) {
+    const defaultRange = [
+      defaultStart ? fmt12h(defaultStart) : null,
+      defaultEnd ? fmt12h(defaultEnd) : null,
+    ]
+      .filter(Boolean)
+      .join(" - ");
+    const defaultDuration = calcTimeDuration(defaultStart, defaultEnd);
     return (
-      <Hint content={hint("Override this shift's start and end times")} side="left">
-        <Button
-          data-tour="edit-panel-custom-time"
-          onClick={() => startEditing()}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            fontSize: "var(--dg-fs-footnote)",
-            color: "var(--dg-color-text-subtle)",
-            background: "none",
-            border: "1px dashed var(--dg-color-border)",
-            borderRadius: "var(--dg-radius-md)",
-            padding: "6px 10px",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            width: "100%",
-            justifyContent: "center",
-            marginTop: 8,
-          }}
-        >
-          <Clock size={10} strokeWidth={2.5} />
-          Custom time
-          {(defaultStart || defaultEnd) && (
-            <span style={{ color: "var(--dg-color-text-muted)" }}>
-              ·{" "}
-              {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null]
-                .filter(Boolean)
-                .join(" - ")}
-              {calcTimeDuration(defaultStart, defaultEnd)
-                ? ` (${calcTimeDuration(defaultStart, defaultEnd)})`
-                : ""}
-            </span>
+      <div
+        data-standard-time
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          marginTop: 8,
+          fontSize: "var(--dg-fs-footnote)",
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: "var(--dg-color-text-muted)" }}>
+            {defaultRange ? "Standard shift time" : "No standard shift time"}
+          </div>
+          {defaultRange && (
+            <div
+              className="dg-tabular-nums"
+              style={{ color: "var(--dg-color-text-secondary)", fontWeight: 600 }}
+            >
+              {defaultRange}
+              {defaultDuration ? ` (${defaultDuration})` : ""}
+            </div>
           )}
-        </Button>
-      </Hint>
+        </div>
+        <Hint content={hint("Override this shift's start and end times")} side="left">
+          <Button
+            data-tour="edit-panel-custom-time"
+            onClick={() => startEditing()}
+            className="dg-btn dg-btn-secondary"
+            style={{
+              flexShrink: 0,
+              fontSize: "var(--dg-fs-footnote)",
+              padding: "6px 10px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Set custom time
+          </Button>
+        </Hint>
+      </div>
     );
   }
 

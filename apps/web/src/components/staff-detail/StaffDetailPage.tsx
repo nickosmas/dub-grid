@@ -26,6 +26,11 @@ import { useSharedStepUp } from "@/hooks/useSharedStepUp";
 import { useFocusAreaShiftsQuestion } from "@/hooks/useFocusAreaShiftsQuestion";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import {
+  buildShiftChangeResolvers,
+  describeCellStateChange,
+  formatShiftChangeWasText,
+} from "@/lib/shift-change-web";
+import {
   changedElsewhereMessage,
   canOffboardAtTier,
   correctionReasonLabel,
@@ -1023,18 +1028,42 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     queryFn: () => fetchScheduleNotes(orgId!, period.range.startDate, period.range.endDate),
     enabled: Boolean(orgId) && activeTab === "schedule" && canSeeNotes,
   });
-  const correctionsByDate = useMemo(
-    () =>
-      new Map(
-        (correctionsQuery.data ?? [])
-          .filter((correction) => correction.empId === employeeId)
-          .map((correction) => [
-            correction.date,
-            correction.reason ? correctionReasonLabel(correction.reason) : null,
-          ]),
-      ),
-    [correctionsQuery.data, employeeId],
-  );
+  const correctionsByDate = useMemo(() => {
+    const resolvers = buildShiftChangeResolvers({
+      assignments,
+      shiftCategories,
+      jobs,
+      absenceTypes,
+      focusAreas,
+    });
+    return new Map(
+      (correctionsQuery.data ?? [])
+        .filter((correction) => correction.empId === employeeId)
+        .map((correction) => [
+          correction.date,
+          {
+            reason: correction.reason ? correctionReasonLabel(correction.reason) : null,
+            correctedFrom:
+              formatShiftChangeWasText(
+                describeCellStateChange(
+                  correction.before,
+                  correction.after,
+                  correction.date,
+                  resolvers,
+                ),
+              )?.replace(/\n/g, " ") ?? null,
+          },
+        ]),
+    );
+  }, [
+    absenceTypes,
+    assignments,
+    correctionsQuery.data,
+    employeeId,
+    focusAreas,
+    jobs,
+    shiftCategories,
+  ]);
   const noteCountsByDate = useMemo(() => {
     const counts = new Map<string, number>();
     for (const note of notesQuery.data ?? []) {
