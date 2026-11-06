@@ -37,7 +37,7 @@ export function StaffWithoutAccountSearch({ onOpen }: { onOpen: (employeeId: str
   return (
     <PersonSection
       title="Staff without an account"
-      description="Staff records that were never linked to a sign-in, in every organization."
+      description="Staff records that were never linked to an account, in every organization."
     >
       <form className="flex flex-wrap gap-2" onSubmit={submit} role="search">
         <input

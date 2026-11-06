@@ -363,7 +363,7 @@ export default function OrganizationDetail({
               }}
             >
               <InfoRow
-                label="Last login"
+                label="Last sign-in"
                 value={
                   orgHealthQuery.data.supportSnapshot.lastLoginAt
                     ? formatDateTimeLabel(orgHealthQuery.data.supportSnapshot.lastLoginAt)

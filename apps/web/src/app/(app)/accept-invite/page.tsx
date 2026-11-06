@@ -313,13 +313,13 @@ function AcceptInviteContent() {
           <AuthStateCard
             heading="Invitation no longer valid"
             message={describeDeadInvitation(accountCreated)}
-            primaryCta={{ label: "Go to login", href: "/login" }}
+            primaryCta={{ label: "Go to sign in", href: "/login" }}
           />
         ) : state === "no-token" ? (
           <AuthStateCard
             heading="Invalid link"
             message="This invitation link is incomplete. Open the link from your email again."
-            primaryCta={{ label: "Go to login", href: "/login" }}
+            primaryCta={{ label: "Go to sign in", href: "/login" }}
           />
         ) : state === "success" ? (
           <SuccessState orgSlug={orgSlug} getLoginUrl={getLoginUrl} />
@@ -522,7 +522,7 @@ function SuccessState({
         </>
       }
       primaryCta={{
-        label: "Sign In Now",
+        label: "Sign in now",
         onClick: () => (window.location.href = getLoginUrl(orgSlug)),
       }}
     />

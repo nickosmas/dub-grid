@@ -5,7 +5,8 @@ import {
 } from "@/lib/employee-contact-conflicts";
 
 export const LINKED_EMAIL_REQUIRED_MESSAGE = "An account needs an email to sign in with.";
-export const LINKED_EMAIL_OWNER_ONLY_MESSAGE = "Only they can change this, on their own profile.";
+export const LINKED_EMAIL_OWNER_ONLY_MESSAGE =
+  "This is their sign-in email, so they change it on their own profile.";
 
 /** Thrown when GoTrue refuses the new address because another account holds it. */
 export class LoginEmailConflictError extends Error {

@@ -69,7 +69,7 @@ function ForgotPasswordContent() {
                 link. Check your inbox and spam folder.
               </>
             }
-            secondaryCta={{ label: "Back to login", href: "/login" }}
+            secondaryCta={{ label: "Back to sign in", href: "/login" }}
           />
         ) : (
           <>
@@ -114,7 +114,7 @@ function ForgotPasswordContent() {
 
             <div className="dg-auth-back-link">
               <Link href="/login" className="dg-auth-link dg-auth-link--subtle">
-                Back to login
+                Back to sign in
               </Link>
             </div>
           </>

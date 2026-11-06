@@ -51,9 +51,9 @@ describe("InviteEmail", () => {
     expect(body).not.toMatch(/has invited you/i);
   });
 
-  it("offers to keep one sign-in only after a move", async () => {
-    expect(await text({ kind: "moved" })).toContain("we'll keep you on one sign-in");
-    expect(await text()).not.toContain("one sign-in");
+  it("offers to keep one account only after a move", async () => {
+    expect(await text({ kind: "moved" })).toContain("we'll keep you on one account");
+    expect(await text()).not.toContain("one account");
   });
 
   it("still describes the 72 hours when the deadline is unknown", async () => {

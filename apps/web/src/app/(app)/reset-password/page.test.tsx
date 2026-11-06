@@ -24,7 +24,7 @@ vi.mock("@/components/profile/MFAVerify", () => ({
     <section>
       <h1>Two-factor authentication</h1>
       <button onClick={onVerified}>Verify code</button>
-      <button onClick={onCancel}>Back to login</button>
+      <button onClick={onCancel}>Back to sign in</button>
     </section>
   ),
 }));
@@ -90,7 +90,7 @@ describe("ResetPasswordPage", () => {
 
         await screen.findByRole("heading", { name: "Two-factor authentication" });
         await act(async () => {
-          fireEvent.click(screen.getByRole("button", { name: "Back to login" }));
+          fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
         });
 
         expect(signOutFromBrowser).toHaveBeenCalledWith("local");

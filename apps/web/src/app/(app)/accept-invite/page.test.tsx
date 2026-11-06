@@ -159,7 +159,7 @@ describe("AcceptInvitePage", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Invalid link" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Go to login" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to sign in" })).toBeInTheDocument();
     expect(mocks.fetchInvitationLookup).not.toHaveBeenCalled();
   });
 
@@ -391,7 +391,7 @@ describe("AcceptInvitePage", () => {
       await screen.findByRole("heading", { name: "Invitation no longer valid" }),
     ).toBeInTheDocument();
     expect(screen.getByText(DEAD_INVITATION_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Go to login" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to sign in" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
   });
 

@@ -195,7 +195,7 @@ export default function RootPage() {
           <div className="flex items-center gap-4">
             <ThemeToggleButton onDarkSurface />
             <Link href="/login" prefetch={false} className="landing-nav-sign-in dg-btn dg-btn-lg">
-              Sign In
+              Sign in
             </Link>
             {/* Mobile hamburger */}
             <Button
@@ -244,7 +244,7 @@ export default function RootPage() {
               ))}
             </nav>
             <Link href="/login" prefetch={false} className="dg-btn dg-btn-primary dg-btn-lg">
-              Sign In
+              Sign in
             </Link>
           </div>
         </div>

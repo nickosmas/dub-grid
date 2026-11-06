@@ -67,8 +67,8 @@ export function MoveEmailDialog({ employee, orgId, name, onMoved, onClose }: Mov
           message={
             <div className="flex flex-col gap-3.5">
               <span>
-                Use this only if they can&apos;t reach their current email. If they can, they should
-                change it on their own profile instead.
+                Use this only if they can&apos;t get into this email anymore. If they still can, ask
+                them to change it on their profile.
               </span>
               <div>
                 <label className="dg-label" htmlFor="move-email-input">
@@ -90,7 +90,7 @@ export function MoveEmailDialog({ employee, orgId, name, onMoved, onClose }: Mov
           }
           summary={{
             points: [
-              "Their current sign-in loses access to this organization.",
+              "Their current sign-in email loses access to this organization.",
               "An invite goes to the new email, with the same access role.",
               "Their staff record, shifts and history stay as they are.",
             ],
