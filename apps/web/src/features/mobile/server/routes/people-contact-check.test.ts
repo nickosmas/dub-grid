@@ -82,7 +82,7 @@ describe("mobile people contact-check route", () => {
 
   // The org must come from the session, never the body: a sandboxed caller has
   // to be checked against the clone they are actually editing.
-  it("checks against the caller's effective org and passes the exemptions through", async () => {
+  it("checks against the caller's effective org and ignores a client-supplied account", async () => {
     const { POST } = await import("./people-contact-check");
     await POST(
       makeRequest({
@@ -99,7 +99,6 @@ describe("mobile people contact-check route", () => {
         orgId: ORG_ID,
         email: "mina@example.com",
         excludeEmployeeId: EMPLOYEE_ID,
-        currentUserId: USER_ID,
       },
     );
     expect(checkEmployeePhoneConflict).toHaveBeenCalledWith(

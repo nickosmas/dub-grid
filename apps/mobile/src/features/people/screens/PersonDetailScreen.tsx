@@ -447,7 +447,6 @@ export default function PersonDetailScreen() {
         email: emailToCheck || undefined,
         phone: phoneToCheck || undefined,
         excludeEmployeeId: person.id,
-        currentUserId: person.userId,
       })
         .then((result) => {
           if (cancelled) return;
