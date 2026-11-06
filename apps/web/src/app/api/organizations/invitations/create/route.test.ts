@@ -731,7 +731,10 @@ describe("POST /api/organizations/invitations/create", () => {
 
 describe("an Admin's permissions chosen before the invite (113)", () => {
   function clientWithInvitationUpdate() {
-    const eq = vi.fn(async () => ({ error: null }));
+    const eq = vi.fn();
+    eq.mockImplementation((column: string) =>
+      column === "org_id" ? { eq } : Promise.resolve({ error: null }),
+    );
     const update = vi.fn((_row: { admin_permissions: Record<string, boolean> }) => ({ eq }));
     const from = vi.fn(() => ({ update }));
     return { client: { rpc: invitationRpc(), from }, update, eq };

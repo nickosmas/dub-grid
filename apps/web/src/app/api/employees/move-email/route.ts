@@ -322,6 +322,7 @@ async function inviteToNewAddress(input: {
         const { error: permissionsError } = await serviceClient
           .from("invitations")
           .update({ admin_permissions: membership.admin_permissions })
+          .eq("org_id", orgId)
           .eq("id", invitationId);
         if (permissionsError) throw permissionsError;
       }
@@ -337,6 +338,7 @@ async function inviteToNewAddress(input: {
       await serviceClient
         .from("invitations")
         .delete()
+        .eq("org_id", orgId)
         .eq("id", invitationId)
         .eq("token", token)
         .is("accepted_at", null);
