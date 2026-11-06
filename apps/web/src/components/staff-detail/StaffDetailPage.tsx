@@ -6,7 +6,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ProgressBar from "@/components/ProgressBar";
+import { getEmployeeDisplayName } from "@/lib/utils";
 import { PersonPageSkeleton } from "@/components/LoadingSkeletons";
+import { DeleteStaffAccountCard } from "@/components/staff-detail/DeleteStaffAccountCard";
+import { MoveEmailDialog } from "@/components/staff-detail/MoveEmailDialog";
 import { useSkeletonGate } from "@/hooks/useSkeletonGate";
 import { Button } from "@/components/Button";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
@@ -95,7 +98,8 @@ import {
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import EditEmployeePanel, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { UnsavedChangesBar } from "@/components/ui/UnsavedChangesBar";
 import { SpanTabs } from "@/components/ui/span-tabs";
 import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import { usePersonPeriod } from "@/hooks/usePersonPeriod";
@@ -121,10 +125,10 @@ interface StaffDetailPageProps {
   employeeId: string;
 }
 
-export type StaffPageTab = "overview" | "schedule" | "requests" | "activity";
+export type StaffPageTab = "account" | "schedule" | "requests" | "activity";
 
 const TAB_LABELS: Record<StaffPageTab, string> = {
-  overview: "Overview",
+  account: "Account",
   schedule: "Schedule",
   requests: "Requests",
   activity: "Activity",
@@ -135,12 +139,13 @@ const LEGACY_TABS: Record<string, StaffPageTab> = {
   shifts: "schedule",
   timeoff: "schedule",
   recurring: "schedule",
-  access: "overview",
+  overview: "schedule",
+  access: "account",
 };
 
 /** The tab an old `?section=` link meant, from before the page had tabs. */
 function tabForLegacySection(section: string): StaffPageTab {
-  return section === "activity" ? "activity" : "overview";
+  return section === "activity" ? "activity" : "account";
 }
 
 /** Each day of a range, as the local dates the dashboard's strip reads. */
@@ -181,7 +186,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [managementAccessDirty, setManagementAccessDirty] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddToScheduleModal, setShowAddToScheduleModal] = useState(false);
-  const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [isEditingAccess, setIsEditingAccess] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [detailsSaveBlocked, setDetailsSaveBlocked] = useState(false);
@@ -364,7 +368,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     setIsEditingManagementAccess(false);
     setShowInviteModal(false);
     setShowAddToScheduleModal(false);
-    setIsEditingDetails(false);
     setIsEditingAccess(false);
   }, [employeeId]);
 
@@ -889,7 +892,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   );
   const availableTabs = useMemo<StaffPageTab[]>(
     () => [
-      "overview",
+      "account",
       "schedule",
       ...(canReviewRequests ? (["requests"] as const) : []),
       ...(canViewActivity ? (["activity"] as const) : []),
@@ -902,10 +905,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const requestedTab = legacyTab ?? rawTab;
   const activeTab: StaffPageTab = availableTabs.includes(requestedTab as StaffPageTab)
     ? (requestedTab as StaffPageTab)
-    : "overview";
+    : "account";
   const hrefForTab = useCallback(
     (tab: StaffPageTab) =>
-      tab === "overview" ? `/people/${employeeId}` : `/people/${employeeId}?tab=${tab}`,
+      tab === "account" ? `/people/${employeeId}` : `/people/${employeeId}?tab=${tab}`,
     [employeeId],
   );
   useEffect(() => {
@@ -934,8 +937,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         period.range.startDate,
         period.range.endDate,
       ),
-    enabled:
-      Boolean(orgId) && Boolean(employee) && (activeTab === "overview" || activeTab === "schedule"),
+    enabled: Boolean(orgId) && Boolean(employee) && activeTab === "schedule",
   });
   const today = useMemo(() => getIsoDateInTimeZone(new Date(), org?.timezone), [org?.timezone]);
   const dayOffAbsenceTypeId = org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null;
@@ -959,7 +961,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         stripRange.startDate,
         stripRange.endDate,
       ),
-    enabled: Boolean(orgId) && Boolean(employee) && activeTab === "overview",
+    enabled: Boolean(orgId) && Boolean(employee) && activeTab === "schedule",
   });
   const stripDates = useMemo(() => rangeDates(stripRange), [stripRange]);
   const shiftRequestsQuery = useQuery({
@@ -968,7 +970,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       : ["shiftRequests", "anon", "employee", employeeId],
     queryFn: () => fetchShiftRequests(orgId!, assignmentLabelMapRef.current, { empId: employeeId }),
     enabled:
-      Boolean(orgId) && canReviewRequests && (activeTab === "requests" || activeTab === "overview"),
+      Boolean(orgId) && canReviewRequests && (activeTab === "requests" || activeTab === "account"),
   });
   const canSeeProfileRequests = Boolean(
     perms.isGridmaster || perms.isSuperAdmin || perms.canManageEmployees,
@@ -981,7 +983,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     enabled:
       Boolean(orgId) &&
       canSeeProfileRequests &&
-      (activeTab === "requests" || activeTab === "overview"),
+      (activeTab === "requests" || activeTab === "account"),
   });
   const requestRows = useMemo(() => {
     if (!shiftRequestsQuery.data) return undefined;
@@ -1080,15 +1082,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [absenceTypes, assignmentById, categoryById, focusAreas, jobs],
   );
 
-  const closeDetailsEditor = useCallback(() => {
-    setDetailsDirty(false);
-    setIsEditingDetails(false);
-  }, []);
-  const { requestClose: requestDetailsClose, unsavedChangesDialog: detailsUnsavedChangesDialog } =
-    useUnsavedChangesPrompt({ hasUnsavedChanges: detailsDirty, onDiscard: closeDetailsEditor });
+  const [movingToNewEmail, setMovingToNewEmail] = useState(false);
   // Matches the directory table's Access column: the membership's role, or the
   // role a pending invitation will grant once it is accepted.
   const effectiveOrgRole = directoryPerson?.orgRole ?? pendingInvite?.roleToAssign ?? null;
+  // The server applies the same limits: an Admin can't choose who holds another
+  // Admin's access, and a person changes their own email on their profile.
+  const canMoveToNewEmail =
+    Boolean(employee?.userId) &&
+    employee?.status !== "removed" &&
+    !isSelfAction(currentUser?.id, employee?.userId) &&
+    (effectiveOrgRole === "user" ||
+      effectiveOrgRole === null ||
+      Boolean(perms.isSuperAdmin) ||
+      Boolean(perms.isGridmaster));
   const hasPendingManagementInvite =
     !!directoryPerson &&
     directoryPerson.managementDepartmentIds.length > 0 &&
@@ -1293,7 +1300,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     return person ? `${person.firstName} ${person.lastName}`.trim() : null;
   };
   const openPerson = (id: string) =>
-    router.push(activeTab === "overview" ? `/people/${id}` : `/people/${id}?tab=${activeTab}`);
+    router.push(activeTab === "account" ? `/people/${id}` : `/people/${id}?tab=${activeTab}`);
   const pager = neighbors ? (
     <PersonPager
       position={neighbors.position}
@@ -1354,15 +1361,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             onClick={() => setShowAddToScheduleModal(true)}
           >
             Add to schedule
-          </Button>
-        )}
-        {canEditDetails && (
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary"
-            onClick={() => setIsEditingDetails(true)}
-          >
-            Edit details
           </Button>
         )}
       </>
@@ -1436,7 +1434,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     <InvitationCard
                       state={accountState}
                       onInvite={canSendInvitation ? () => setShowInviteModal(true) : undefined}
-                      onEditDetails={canEditDetails ? () => setIsEditingDetails(true) : undefined}
+                      onEditDetails={
+                        canEditDetails
+                          ? () => router.replace(hrefForTab("account"), { scroll: false })
+                          : undefined
+                      }
                       onResend={handleResendInvitation}
                       onRevoke={handleRevokeInvitation}
                     />
@@ -1460,17 +1462,105 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
                   />
                 </div>
-                <PersonPeriodControl
-                  period={period}
-                  today={periodToday}
-                  onStep={stepPeriod}
-                  onToday={goToPeriodToday}
-                  onCustomRangeChange={setPeriodRange}
-                />
+                {activeTab !== "account" ? (
+                  <PersonPeriodControl
+                    period={period}
+                    today={periodToday}
+                    onStep={stepPeriod}
+                    onToday={goToPeriodToday}
+                    onCustomRangeChange={setPeriodRange}
+                  />
+                ) : null}
               </div>
 
               <section aria-label={TAB_LABELS[activeTab]}>
-                {activeTab === "overview" && (
+                {/* Stays mounted so a draft survives a look at another tab. */}
+                <div hidden={activeTab !== "account"} className="flex flex-col gap-4">
+                  {canEditDetails ? (
+                    <EditEmployeePanel
+                      ref={detailsEditorRef}
+                      sectioned
+                      persistent
+                      hideActions
+                      flushHorizontal
+                      employee={employee}
+                      orgId={orgId ?? undefined}
+                      focusAreas={focusAreas}
+                      certifications={certifications}
+                      roles={orgRoles}
+                      focusAreaLabel={org?.focusAreaLabel}
+                      certificationLabel={org?.certificationLabel}
+                      roleLabel={org?.roleLabel}
+                      isManagementUser={directoryPerson?.isManagementUser}
+                      onSave={handleSaveEmployee}
+                      onCancel={() => undefined}
+                      onDirtyChange={setDetailsDirty}
+                      onSaveBlockedChange={setDetailsSaveBlocked}
+                      pendingInvitation={pendingInvite ?? undefined}
+                      onSaveWithReinvite={handleSaveEmployeeWithReinvite}
+                      onMoveToNewEmail={
+                        canMoveToNewEmail ? () => setMovingToNewEmail(true) : undefined
+                      }
+                    />
+                  ) : (
+                    <WorkCard
+                      employee={employee}
+                      focusAreas={focusAreas}
+                      certifications={certifications}
+                      roles={orgRoles}
+                      focusAreaLabel={org?.focusAreaLabel}
+                      certificationLabel={org?.certificationLabel}
+                      roleLabel={org?.roleLabel}
+                      showScheduleDetails={showScheduleDetails}
+                    />
+                  )}
+                  <AccessCard
+                    orgRole={effectiveOrgRole}
+                    invited={Boolean(pendingInvite)}
+                    adminPermissions={directoryPerson?.adminPermissions}
+                    managedDepartments={managedDepartments}
+                    accountState={accountState}
+                    lastSignInAt={directoryPerson?.lastSignInAt}
+                    onEditAccess={
+                      canManageManagementAccess && effectiveOrgRole
+                        ? () => setIsEditingAccess(true)
+                        : undefined
+                    }
+                    onEditManagement={
+                      canManageManagementAccess && employee.status !== "removed"
+                        ? () => setIsEditingManagementAccess(true)
+                        : undefined
+                    }
+                  />
+                  <RecordCard employee={employee} />
+                  {orgId &&
+                  canManageManagementAccess &&
+                  employee.userId &&
+                  !isSelfAction(currentUser?.id, employee.userId) ? (
+                    <DeleteStaffAccountCard
+                      employee={employee}
+                      orgId={orgId}
+                      name={getEmployeeDisplayName(employee)}
+                      onDeleted={(deleted) => {
+                        syncEmployeeCaches(deleted);
+                        void queryClient.invalidateQueries({
+                          queryKey: queryKeys.org.directory(orgId),
+                        });
+                        void queryClient.invalidateQueries({
+                          queryKey: queryKeys.org.users(orgId),
+                        });
+                      }}
+                    />
+                  ) : null}
+                  {canEditDetails && detailsDirty ? (
+                    <UnsavedChangesBar
+                      saveDisabled={detailsSaveBlocked}
+                      onDiscard={() => detailsEditorRef.current?.requestDismiss()}
+                      onSave={() => void detailsEditorRef.current?.save()}
+                    />
+                  ) : null}
+                </div>
+                {activeTab === "schedule" && (
                   <StaffOverviewTab
                     employee={employee}
                     periodShifts={periodShiftsQuery.data}
@@ -1493,87 +1583,58 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       emptyDescription: "Shifts show up here once they're on the schedule.",
                       editorView: true,
                     }}
-                    waitingRequests={waitingRequests}
-                    about={
-                      <div className="flex flex-col gap-4">
-                        <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
-                          <WorkCard
-                            employee={employee}
-                            focusAreas={focusAreas}
-                            certifications={certifications}
-                            roles={orgRoles}
-                            focusAreaLabel={org?.focusAreaLabel}
-                            certificationLabel={org?.certificationLabel}
-                            roleLabel={org?.roleLabel}
-                            showScheduleDetails={showScheduleDetails}
-                          />
-                          <AccessCard
-                            orgRole={effectiveOrgRole}
-                            invited={Boolean(pendingInvite)}
-                            adminPermissions={directoryPerson?.adminPermissions}
-                            managedDepartments={managedDepartments}
-                            accountState={accountState}
-                            lastSignInAt={directoryPerson?.lastSignInAt}
-                            onEditAccess={
-                              canManageManagementAccess && effectiveOrgRole
-                                ? () => setIsEditingAccess(true)
-                                : undefined
-                            }
-                            onEditManagement={
-                              canManageManagementAccess && employee.status !== "removed"
-                                ? () => setIsEditingManagementAccess(true)
-                                : undefined
-                            }
-                          />
-                          <RecordCard employee={employee} />
-                        </div>
-                      </div>
-                    }
                   />
                 )}
                 {activeTab === "schedule" && (
-                  <ScheduleTab
-                    employee={employee}
-                    shifts={periodShiftsQuery.data}
-                    loading={periodShiftsQuery.isPending}
-                    range={period.range}
-                    today={today}
-                    periodPhrase={periodRange.phrase}
-                    lookups={shiftRecordLookups}
-                    corrections={correctionsByDate}
-                    noteCounts={noteCountsByDate}
-                    absenceTypes={absenceTypes}
-                    dayOffAbsenceTypeId={dayOffAbsenceTypeId}
-                    loadMonth={
-                      orgId
-                        ? {
-                            key: [...queryKeys.shifts.all(orgId), "employee", employeeId, "month"],
-                            load: (startDate, endDate) =>
-                              fetchEmployeeShifts(
+                  <div className="mt-6">
+                    <ScheduleTab
+                      employee={employee}
+                      shifts={periodShiftsQuery.data}
+                      loading={periodShiftsQuery.isPending}
+                      range={period.range}
+                      today={today}
+                      periodPhrase={periodRange.phrase}
+                      lookups={shiftRecordLookups}
+                      corrections={correctionsByDate}
+                      noteCounts={noteCountsByDate}
+                      absenceTypes={absenceTypes}
+                      dayOffAbsenceTypeId={dayOffAbsenceTypeId}
+                      loadMonth={
+                        orgId
+                          ? {
+                              key: [
+                                ...queryKeys.shifts.all(orgId),
+                                "employee",
                                 employeeId,
-                                orgId,
-                                assignmentLabelMapRef.current,
-                                absenceTypeMapRef.current,
-                                startDate,
-                                endDate,
-                              ),
-                          }
-                        : undefined
-                    }
-                    recurringSchedule={
-                      perms.canViewRecurringShifts && orgId && showScheduleDetails
-                        ? {
-                            orgId,
-                            recurringShifts,
-                            assignments,
-                            shiftCategories,
-                            jobs,
-                            focusAreas,
-                            absenceTypes,
-                          }
-                        : null
-                    }
-                  />
+                                "month",
+                              ],
+                              load: (startDate, endDate) =>
+                                fetchEmployeeShifts(
+                                  employeeId,
+                                  orgId,
+                                  assignmentLabelMapRef.current,
+                                  absenceTypeMapRef.current,
+                                  startDate,
+                                  endDate,
+                                ),
+                            }
+                          : undefined
+                      }
+                      recurringSchedule={
+                        perms.canViewRecurringShifts && orgId && showScheduleDetails
+                          ? {
+                              orgId,
+                              recurringShifts,
+                              assignments,
+                              shiftCategories,
+                              jobs,
+                              focusAreas,
+                              absenceTypes,
+                            }
+                          : null
+                      }
+                    />
+                  </div>
                 )}
                 {activeTab === "requests" && (
                   <RequestsTab
@@ -1614,61 +1675,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         </div>
       )}
 
-      {isEditingDetails && employee && (
-        <Modal
-          title="Edit details"
-          onClose={closeDetailsEditor}
-          onRequestClose={requestDetailsClose}
-          className="dg-modal--tight-header"
-          style={{ maxWidth: 640, width: "100%" }}
-          footer={
-            <EditorActionRow
-              secondaryAction={
-                <Button
-                  type="button"
-                  className="dg-btn dg-btn-secondary"
-                  onClick={() => detailsEditorRef.current?.requestDismiss()}
-                >
-                  {getEditorDismissLabel({ hasUnsavedChanges: detailsDirty })}
-                </Button>
-              }
-              primaryAction={
-                <Button
-                  type="button"
-                  className="dg-btn dg-btn-primary"
-                  disabled={!detailsDirty || detailsSaveBlocked}
-                  onClick={() => void detailsEditorRef.current?.save()}
-                >
-                  {EDITOR_ACTION_LABELS.save}
-                </Button>
-              }
-            />
-          }
-        >
-          <EditEmployeePanel
-            ref={detailsEditorRef}
-            hideActions
-            flushHorizontal
-            employee={employee}
-            orgId={orgId ?? undefined}
-            focusAreas={focusAreas}
-            certifications={certifications}
-            roles={orgRoles}
-            focusAreaLabel={org?.focusAreaLabel}
-            certificationLabel={org?.certificationLabel}
-            roleLabel={org?.roleLabel}
-            isManagementUser={directoryPerson?.isManagementUser}
-            onSave={handleSaveEmployee}
-            onSaveCompleted={closeDetailsEditor}
-            onCancel={closeDetailsEditor}
-            onDirtyChange={setDetailsDirty}
-            onSaveBlockedChange={setDetailsSaveBlocked}
-            pendingInvitation={pendingInvite ?? undefined}
-            onSaveWithReinvite={handleSaveEmployeeWithReinvite}
-          />
-        </Modal>
-      )}
-      {detailsUnsavedChangesDialog}
+      {movingToNewEmail && employee && orgId ? (
+        <MoveEmailDialog
+          employee={employee}
+          orgId={orgId}
+          name={getEmployeeDisplayName(employee)}
+          onMoved={(moved) => {
+            syncEmployeeCaches(moved);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) });
+            void invitationsQuery.refetch();
+          }}
+          onClose={() => setMovingToNewEmail(false)}
+        />
+      ) : null}
 
       {isEditingAccess && employee && effectiveOrgRole && (
         <Modal

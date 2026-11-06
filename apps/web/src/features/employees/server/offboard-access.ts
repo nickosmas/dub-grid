@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { revokeAllUserSessions } from "@/lib/auth/revocation";
+import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
+import { endUserSession, revokeAllUserSessions } from "@/lib/auth/revocation";
 import { cacheDel, CacheKey } from "@/lib/db/shared";
 import logger from "@/lib/logger";
 
@@ -50,6 +51,46 @@ export async function endOffboardedAccess(
     return;
   }
   await clearMembershipCaches(orgId);
+}
+
+/**
+ * Ends one sign-in's access to one organization and leaves the rest alone: an
+ * Offboard signs them out everywhere, but someone who lost their mailbox can't
+ * reset a password to get back into their other organizations. Throws if the
+ * membership stays open; ending its sessions is best effort, since every
+ * organization route checks the membership on each request.
+ */
+export async function endAccessInOrganization(
+  serviceClient: SupabaseClient,
+  input: { orgId: string; userId: string; actorId: string; at: string },
+): Promise<void> {
+  const { orgId, userId, actorId, at } = input;
+  const { data: sessions, error: sessionsError } = await serviceClient
+    .from("user_sessions")
+    .select("supabase_session_id")
+    .eq("user_id", userId)
+    .eq("active_org_id", orgId);
+  if (sessionsError) throw sessionsError;
+
+  const { error } = await serviceClient
+    .from("organization_memberships")
+    .update({ archived_at: at, archived_by: actorId })
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .is("archived_at", null);
+  if (error) throw error;
+  await clearMembershipCaches(orgId);
+
+  try {
+    for (const session of sessions ?? []) {
+      if (session.supabase_session_id) {
+        await endUserSession(userId, session.supabase_session_id as string);
+      }
+    }
+    await disableMobilePushTokensForOrg(serviceClient, { userId, orgId });
+  } catch (err) {
+    logger.error({ error: err, orgId, userId }, "Failed to end sessions in one organization");
+  }
 }
 
 /**

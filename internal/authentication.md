@@ -263,15 +263,22 @@ person signs in with the one they already have.
 A linked staff record's email **is** the login email; there is no separate contact
 address. The two stores are kept equal in both directions:
 
-- **Manager changes it** (web `EditEmployeePanel`, mobile person editor): the
-  `/api/employees/manage` update branch and the mobile person `PATCH` treat a changed
-  email on a linked, active row as a sensitive action (`requireSensitiveActionAuth` /
-  `requireMobileSensitiveActionAuth`, step-up in the client), refuse it from a test
-  sandbox, and call `auth.admin.updateUserById(userId, { email, email_confirm: true })`
-  **before** writing the row (`features/employees/server/login-email.ts`). GoTrue
-  rejects an address another account holds, which surfaces as the usual email conflict.
-  A linked row cannot be saved with a blank email. The change applies to that account in
-  every organization it belongs to.
+- **Managers can't change it.** Whoever sets the sign-in email can reset the password,
+  so `/api/employees/manage` and the mobile person `PATCH` refuse a changed or blank
+  email on a linked row, whoever the editor is, and the web and mobile editors show it
+  read-only. Before someone has a sign-in, their email stays editable.
+- **An organization moves its own record** (`/api/employees/move-email`, web only): for
+  someone who lost their mailbox. The record leaves the old sign-in for the new address,
+  the old sign-in loses this organization only (`endAccessInOrganization`, never an
+  everywhere sign-out, since they may not be able to reset a password), and an invite
+  carries the same role. It is not a sign-in change: other organizations keep the old
+  sign-in until they move too, or support changes it. Accepting on one sign-in joins them
+  up again. Only a Super Admin moves an Admin or Super Admin, because the invite gives
+  that access to whoever opens the mailbox.
+- **Support changes it** (`/api/gridmaster/users/[userId]`): the one path that calls
+  `auth.admin.updateUserById(userId, { email, email_confirm: true })`
+  (`features/employees/server/login-email.ts`), behind fresh sensitive-action auth. It
+  applies in every organization the account belongs to.
 - **The person changes it** (web profile, mobile profile): after Supabase confirms the
   new address, the `on_auth_user_email_changed` trigger (migration `022`) rewrites
   `employees.email` on every linked, active row. A row in an organization where an
@@ -416,8 +423,8 @@ Instead, `lib/api-auth.ts`'s `authenticateRequest` does two things:
    The user watermark rejects tokens issued before it, but a refresh token still mints a
    newer one. That is intended after a role change, where the session should pick up new
    claims. To actually sign someone out, `endUserSessions` also deletes their provider
-   sessions and refresh tokens through `end_user_auth_sessions` (migration 046). An
-   administrator's sign-in email change uses it (finding F-21).
+   sessions and refresh tokens through `end_user_auth_sessions` (migration 046). A
+   support change to a sign-in email uses it (finding F-21).
 
 This is why `POST /api/auth/sign-out` exists: sign-out used to be purely client-side,
 which clears the browser's tokens but leaves the access token valid until it expires.

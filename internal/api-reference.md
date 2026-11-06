@@ -121,16 +121,19 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 
 ### Employees
 
-| Method | Path                               | Purpose                                                                                                                                            |
-| ------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/employees/manage`            | Create or update an employee record                                                                                                                |
-| POST   | `/api/employees/status`            | Update employee status (active/benched/terminated)                                                                                                 |
-| PATCH  | `/api/employees/identity`          | Update employee identity fields                                                                                                                    |
-| POST   | `/api/employees/check-email`       | Pre-flight duplicate check for an invite or management-access email                                                                                |
-| POST   | `/api/employees/check-phone`       | Pre-flight duplicate check for an invite phone number                                                                                              |
-| GET    | `/api/people/change-requests`      | List pending people change requests (account deletions are listed for super admins only)                                                           |
-| PATCH  | `/api/people/change-requests/[id]` | Approve or reject a people change request (only a super admin decides an account deletion, and approving one requires fresh sensitive-action auth) |
-| POST   | `/api/import/employees`            | Bulk-import employees from CSV (blocks exact duplicates, warns on similar names)                                                                   |
+| Method | Path                               | Purpose                                                                                                                                                            |
+| ------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/api/employees/manage`            | Create or update an employee record                                                                                                                                |
+| GET    | `/api/employees/delete-account`    | Whether a Super Admin can delete this person's account from here                                                                                                   |
+| POST   | `/api/employees/delete-account`    | Delete an offboarded person's sign-in, refused if it's used in another organization (fresh sensitive-action auth)                                                  |
+| POST   | `/api/employees/move-email`        | Move a joined person's staff record to a new address: ends this organization's access to the old sign-in and invites the new address (fresh sensitive-action auth) |
+| POST   | `/api/employees/status`            | Update employee status (active/benched/terminated)                                                                                                                 |
+| PATCH  | `/api/employees/identity`          | Update employee identity fields                                                                                                                                    |
+| POST   | `/api/employees/check-email`       | Pre-flight duplicate check for an invite or management-access email                                                                                                |
+| POST   | `/api/employees/check-phone`       | Pre-flight duplicate check for an invite phone number                                                                                                              |
+| GET    | `/api/people/change-requests`      | List pending people change requests (account deletions are listed for super admins only)                                                                           |
+| PATCH  | `/api/people/change-requests/[id]` | Approve or reject a people change request (only a super admin decides an account deletion, and approving one requires fresh sensitive-action auth)                 |
+| POST   | `/api/import/employees`            | Bulk-import employees from CSV (blocks exact duplicates, warns on similar names)                                                                                   |
 
 ---
 

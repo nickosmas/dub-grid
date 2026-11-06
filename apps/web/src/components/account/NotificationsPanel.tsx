@@ -1,6 +1,5 @@
 "use client";
 
-import { SectionCard } from "@/components/settings/shared";
 import {
   NotificationPreferences,
   notificationCategoriesForRole,
@@ -15,12 +14,10 @@ interface NotificationsPanelProps {
 
 export function NotificationsPanel({ isGridmaster, isSuperAdmin }: NotificationsPanelProps) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard>
-        <NotificationPreferences
-          visibleCategories={notificationCategoriesForRole({ isGridmaster, isSuperAdmin })}
-        />
-      </SectionCard>
+    <div className="dg-card-body">
+      <NotificationPreferences
+        visibleCategories={notificationCategoriesForRole({ isGridmaster, isSuperAdmin })}
+      />
     </div>
   );
 }

@@ -2,98 +2,55 @@
 
 import { ExternalLink } from "lucide-react";
 
-import { SectionCard } from "@/components/settings/shared";
 import { Button } from "@/components/Button";
 import { openConsentPreferences } from "@/components/CookieConsent";
 
-interface PolicyLink {
-  href: string;
-  label: string;
-  description: string;
-}
-
-const POLICY_LINKS: PolicyLink[] = [
-  {
-    href: "/privacy",
-    label: "Privacy policy",
-    description: "What we collect, why we collect it, and how we use it.",
-  },
-  {
-    href: "/terms",
-    label: "Terms of service",
-    description: "The agreement that covers your use of DubGrid.",
-  },
-  {
-    href: "/cookie-policy",
-    label: "Cookie policy",
-    description: "Which cookies DubGrid sets and what each one does.",
-  },
+const POLICY_LINKS = [
+  { href: "/privacy", label: "Privacy policy" },
+  { href: "/terms", label: "Terms of service" },
+  { href: "/cookie-policy", label: "Cookie policy" },
 ];
 
 export function DataPrivacyPanel() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SectionCard>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <div className="dg-card-title">Cookie preferences</div>
-            <p className="dg-card-description">
-              Choose which cookies and analytics the app uses on this device.
-            </p>
+    <div className="divide-y divide-[var(--dg-color-border-light)]">
+      <div className="dg-card-body flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-60">
+          <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
+            Cookie preferences
           </div>
-          <Button
-            type="button"
-            onClick={openConsentPreferences}
-            className="dg-btn dg-btn-secondary self-start"
-          >
-            Manage cookie preferences
-          </Button>
+          <p className="dg-card-description">
+            Choose which cookies and analytics the app uses on this device.
+          </p>
         </div>
-      </SectionCard>
-
-      <SectionCard>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <div className="dg-card-title">Policies</div>
-            <p className="dg-card-description">
-              The legal documents that govern your use of DubGrid.
-            </p>
-          </div>
-          <ul
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              listStyle: "none",
-              padding: 0,
-              margin: 0,
-            }}
-          >
-            {POLICY_LINKS.map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between gap-3 rounded-[8px] border border-[var(--dg-color-border)] bg-[var(--dg-color-surface)] px-3 py-2 text-[13px] text-[var(--dg-color-text-primary)] no-underline transition-colors hover:bg-[var(--dg-color-surface-hover)]"
-                >
-                  <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span className="font-medium">{link.label}</span>
-                    <span className="text-[12px] text-[var(--dg-color-text-muted)]">
-                      {link.description}
-                    </span>
-                  </span>
-                  <ExternalLink
-                    size={14}
-                    aria-hidden="true"
-                    className="shrink-0 text-[var(--dg-color-text-muted)]"
-                  />
-                </a>
-              </li>
-            ))}
-          </ul>
+        <Button
+          type="button"
+          onClick={openConsentPreferences}
+          className="dg-btn dg-btn-secondary dg-btn-sm"
+        >
+          Manage cookies
+        </Button>
+      </div>
+      <div className="dg-card-body">
+        <div className="mb-1 text-[14px] font-medium text-[var(--dg-color-text-primary)]">
+          Policies
         </div>
-      </SectionCard>
+        <ul className="m-0 flex list-none flex-wrap gap-x-5 gap-y-1 p-0">
+          {POLICY_LINKS.map((link) => (
+            <li key={link.href}>
+              <a
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[13px] text-[var(--dg-color-link)] no-underline hover:underline"
+              >
+                {link.label}
+                <ExternalLink size={12} aria-hidden="true" />
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
