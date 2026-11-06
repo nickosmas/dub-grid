@@ -148,15 +148,16 @@ ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
 
 ### 2.4 Invitation Edge Cases
 
-| Scenario                            | Behavior                                                       | Mechanism                                                       |
-| ----------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------- |
-| Duplicate invite to same email      | Old expired invite cleaned up, new one issued                  | DELETE expired + INSERT with UNIQUE constraint                  |
-| Employee contact email changes      | A pending invitation to the old address is revoked and audited | `revoke_invitation_on_email_change()` trigger (migration `010`) |
-| User clicks expired link            | Returns error — invite expired                                 | `expires_at` check in validation                                |
-| User clicks already-used link       | Returns error — already accepted                               | `accepted_at IS NULL` check                                     |
-| Two users race to accept same token | First UPDATE wins; second gets no row back                     | Atomic UPDATE ... WHERE accepted_at IS NULL                     |
-| Admin revokes before user accepts   | Returns error — revoked                                        | `revoked_at IS NULL` check                                      |
-| Employee already has linked account | Invite blocked — user_id already set                           | Pre-check in invite creation                                    |
+| Scenario                             | Behavior                                                                        | Mechanism                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Duplicate invite to same email       | Old expired invite cleaned up, new one issued                                   | DELETE expired + INSERT with UNIQUE constraint                  |
+| Employee contact email changes       | A pending invitation to the old address is revoked and audited                  | `revoke_invitation_on_email_change()` trigger (migration `010`) |
+| A pending invitation's email changes | A new token goes only to the new address; a failed send restores the invitation | `PATCH /api/organizations/invitations`                          |
+| User clicks expired link             | Returns error — invite expired                                                  | `expires_at` check in validation                                |
+| User clicks already-used link        | Returns error — already accepted                                                | `accepted_at IS NULL` check                                     |
+| Two users race to accept same token  | First UPDATE wins; second gets no row back                                      | Atomic UPDATE ... WHERE accepted_at IS NULL                     |
+| Admin revokes before user accepts    | Returns error — revoked                                                         | `revoked_at IS NULL` check                                      |
+| Employee already has linked account  | Invite blocked — user_id already set                                            | Pre-check in invite creation                                    |
 
 ---
 
@@ -463,6 +464,12 @@ Org access is still resolved per request by `requireOrgPermissions` against
 `organization_memberships`, and the effective org by `resolveEffectiveOrgId` — never
 from a client-supplied org id and never from a JWT claim alone. That separation is what
 makes an hour-stale token safe.
+
+Both `requireOrgPermissions` and `canManageEmployees` also refuse a request for another
+organization than the one its session is in, and anyone suspended from the organization
+asked for. Only the session's organization has passed the token hook's checks, so a
+membership alone doesn't prove access. A Gridmaster is exempt, the sandbox counts as the
+session's organization, and a token naming no organization falls back to the membership.
 
 ### Request authorization contract
 

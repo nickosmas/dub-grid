@@ -209,7 +209,12 @@ describe("PATCH /api/employees/identity", () => {
     expect(res.status).toBe(200);
     expect(resolveEffectiveOrgId).toHaveBeenCalledWith(expect.anything(), ACTOR_ID, REAL_ORG_ID);
     // Permission check ran against the SANDBOX org, not the body-supplied real org.
-    expect(canManageEmployees).toHaveBeenCalledWith(expect.anything(), ACTOR_ID, SANDBOX_ORG_ID);
+    expect(canManageEmployees).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      ACTOR_ID,
+      SANDBOX_ORG_ID,
+    );
   });
 
   it("returns 409 EMPLOYEE_IDENTITY_CONFLICT when expectedVersion mismatches", async () => {

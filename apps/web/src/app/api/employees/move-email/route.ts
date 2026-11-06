@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
   try {
     const orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
     const serviceClient = getServiceClient();
-    if (!(await canManageEmployees(serviceClient, user.id, orgId))) {
+    if (!(await canManageEmployees(req, serviceClient, user.id, orgId))) {
       return refuse(API_ERRORS.CANNOT_MANAGE_EMPLOYEES, 403);
     }
 
@@ -322,6 +322,7 @@ async function inviteToNewAddress(input: {
         const { error: permissionsError } = await serviceClient
           .from("invitations")
           .update({ admin_permissions: membership.admin_permissions })
+          .eq("org_id", orgId)
           .eq("id", invitationId);
         if (permissionsError) throw permissionsError;
       }
@@ -337,6 +338,7 @@ async function inviteToNewAddress(input: {
       await serviceClient
         .from("invitations")
         .delete()
+        .eq("org_id", orgId)
         .eq("id", invitationId)
         .eq("token", token)
         .is("accepted_at", null);

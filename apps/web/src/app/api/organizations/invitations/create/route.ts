@@ -139,6 +139,7 @@ async function refreshPendingInvitation(
   const { data, error } = await serviceClient
     .from("invitations")
     .update({ token, expires_at: expiresAt })
+    .eq("org_id", orgId)
     .eq("id", current.id)
     .eq("token", current.token)
     .is("accepted_at", null)
@@ -166,23 +167,27 @@ function sameIds(stored: number[] | null, requested: number[]): boolean {
 
 async function storeInvitationPermissions(
   serviceClient: ReturnType<typeof getServiceClient>,
+  orgId: string,
   invitationId: string,
   permissions: Record<string, boolean>,
 ) {
   const { error } = await serviceClient
     .from("invitations")
     .update({ admin_permissions: permissions })
+    .eq("org_id", orgId)
     .eq("id", invitationId);
   if (error) throw error;
 }
 
 async function restoreRefreshedInvitation(
   serviceClient: ReturnType<typeof getServiceClient>,
+  orgId: string,
   refreshed: RefreshedInvitation,
 ) {
   const { error } = await serviceClient
     .from("invitations")
     .update({ token: refreshed.previousToken, expires_at: refreshed.previousExpiresAt })
+    .eq("org_id", orgId)
     .eq("id", refreshed.invitationId)
     .eq("token", refreshed.token);
   if (error) {
@@ -241,7 +246,7 @@ export async function POST(req: NextRequest) {
   let chosenPermissions: Record<string, boolean> | null = null;
 
   try {
-    const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
+    const hasPermission = await canManageEmployees(req, serviceClient, user.id, orgId);
     if (!hasPermission) {
       return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }
@@ -346,7 +351,7 @@ export async function POST(req: NextRequest) {
     const token = data.token as string;
     try {
       if (chosenPermissions) {
-        await storeInvitationPermissions(serviceClient, invitationId, chosenPermissions);
+        await storeInvitationPermissions(serviceClient, orgId, invitationId, chosenPermissions);
       }
       await sendPendingInvitationEmail({
         orgId,
@@ -360,6 +365,7 @@ export async function POST(req: NextRequest) {
       const { error: removeError } = await serviceClient
         .from("invitations")
         .delete()
+        .eq("org_id", orgId)
         .eq("id", invitationId)
         .eq("token", token)
         .is("accepted_at", null);
@@ -444,6 +450,7 @@ export async function POST(req: NextRequest) {
             if (chosenPermissions) {
               await storeInvitationPermissions(
                 serviceClient,
+                orgId,
                 refreshed.invitationId,
                 chosenPermissions,
               );
@@ -456,7 +463,7 @@ export async function POST(req: NextRequest) {
               kind: "reissue",
             });
           } catch (sendError) {
-            await restoreRefreshedInvitation(serviceClient, refreshed);
+            await restoreRefreshedInvitation(serviceClient, orgId, refreshed);
             return deliveryFailedResponse(sendError, true);
           }
           // This rotates the token on a pending row and the caller sends it

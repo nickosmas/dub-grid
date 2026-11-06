@@ -186,6 +186,7 @@ export async function issueCalendarSubscription(
         revoked_at: null,
         updated_at: issuedAt,
       })
+      .eq("user_id", userId)
       .eq("id", current.id)
       .eq("token_hash", current.token_hash);
     update = current.revoked_at

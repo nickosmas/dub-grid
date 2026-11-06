@@ -15,6 +15,7 @@ const auditInsert = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: vi.fn(() => ({})),
+  readSessionOrgId: vi.fn(async () => null),
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
 }));
 

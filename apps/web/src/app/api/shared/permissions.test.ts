@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const requireAuthenticatedUser = vi.fn();
+const readSessionOrgId = vi.fn();
 const createRequestSupabaseClient = vi.fn();
 const getServiceClient = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  readSessionOrgId: (req: NextRequest) => readSessionOrgId(req),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -30,7 +32,7 @@ type MockAccessRow = {
     subscription_status: string | null;
     trial_ends_at: string | null;
   } | null;
-  employee?: { status: string | null } | null;
+  employee?: { status?: string | null; suspended_at?: string | null } | null;
   impersonation?: { session_id: string } | null;
   impersonationFilters?: Array<[string, unknown]>;
   setup?: Partial<MockSetupRows>;
@@ -284,6 +286,94 @@ describe("requireOrgPermissions", () => {
   // That matters more now that tokens are verified locally: a token can be up
   // to an hour old, so its org claims must never be the thing that grants
   // access. These lock that in.
+  describe("the session's organization (F-194)", () => {
+    const USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
+    const SESSION_ORG = "11111111-1111-4111-8111-111111111111";
+    const OTHER_ORG = "99999999-9999-4999-8999-999999999999";
+    const organization = {
+      suspended_at: null,
+      subscription_status: "active",
+      trial_ends_at: null,
+    };
+    const member = {
+      membership: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
+      profile: { platform_role: "none" },
+      organization,
+    };
+
+    function signedInTo(sessionOrgId: string | null) {
+      requireAuthenticatedUser.mockResolvedValue({
+        user: { id: USER_ID },
+        sessionId: "session-1",
+        sessionOrgId,
+      });
+    }
+
+    async function ask(orgId: string, options?: { actor: { id: string } }) {
+      const { requireOrgPermissions } = await import("./permissions");
+      return requireOrgPermissions(
+        makeRequest(),
+        orgId,
+        () => true,
+        options as Parameters<typeof requireOrgPermissions>[3],
+      );
+    }
+
+    it("refuses a member of both organizations asking for the one their session isn't in", async () => {
+      signedInTo(SESSION_ORG);
+      getServiceClient.mockReturnValue(createServiceClientMock(member));
+
+      const result = await ask(OTHER_ORG);
+
+      expect("response" in result && result.response.status).toBe(403);
+    });
+
+    it("lets them work in their session's organization", async () => {
+      signedInTo(SESSION_ORG);
+      getServiceClient.mockReturnValue(createServiceClientMock(member));
+
+      expect("response" in (await ask(SESSION_ORG))).toBe(false);
+    });
+
+    it("checks a caller passed in as the actor the same way", async () => {
+      readSessionOrgId.mockResolvedValue(SESSION_ORG);
+      getServiceClient.mockReturnValue(createServiceClientMock(member));
+
+      const refused = await ask(OTHER_ORG, { actor: { id: USER_ID } });
+      const allowed = await ask(SESSION_ORG, { actor: { id: USER_ID } });
+
+      expect("response" in refused && refused.response.status).toBe(403);
+      expect("response" in allowed).toBe(false);
+    });
+
+    it("refuses someone suspended from the organization, even in their own session", async () => {
+      signedInTo(SESSION_ORG);
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          ...member,
+          employee: { suspended_at: "2026-11-01T00:00:00.000Z" },
+        }),
+      );
+
+      const result = await ask(SESSION_ORG);
+
+      expect("response" in result && result.response.status).toBe(403);
+    });
+
+    it("leaves a Gridmaster free to manage other organizations", async () => {
+      signedInTo(SESSION_ORG);
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: null,
+          profile: { platform_role: "gridmaster" },
+          organization,
+        }),
+      );
+
+      expect("response" in (await ask(OTHER_ORG))).toBe(false);
+    });
+  });
+
   describe("tenant isolation", () => {
     const OTHER_ORG = "99999999-9999-4999-8999-999999999999";
 
