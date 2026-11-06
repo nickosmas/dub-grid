@@ -46,6 +46,8 @@ const AUTHENTICATED_SCOPED_ROUTES: Record<string, string> = {
     "The authenticated user ID and the verified token's organization scope the caller's own notifications.",
   "apps/web/src/app/api/account/permissions/route.ts":
     "The authenticated user ID and live membership query build the returned permission context.",
+  "apps/web/src/app/api/account/profile/contact-check/route.ts":
+    "Reads only for the caller: their own staff records, by their verified user id.",
   "apps/web/src/app/api/account/profile/route.ts":
     "The authenticated user ID owns the global profile and employee lookup.",
   "apps/web/src/app/api/account/sessions/route.ts":

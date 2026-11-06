@@ -13,7 +13,7 @@ export type EmployeeContactConflict = {
  * `ilike` reads `_` and `%` as wildcards, so `john_doe@x.com` would match
  * `john.doe@x.com`, which the case-insensitive unique index accepts.
  */
-function escapeLikePattern(value: string): string {
+export function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
@@ -183,4 +183,57 @@ export async function checkEmployeePhoneConflict(
     conflict: !!conflictRow,
     conflictingEmployeeId: (conflictRow?.id as string | undefined) ?? null,
   };
+}
+
+/**
+ * Whether someone else holds the email or phone a person is about to give
+ * themselves. A sign-in email reaches every organization they belong to, so it
+ * has to be free in each one, the way the Gridmaster change checks it. A phone
+ * lives on one staff record, so only that organization matters.
+ */
+export async function checkOwnContact(
+  serviceClient: SupabaseClient,
+  input: { userId: string; orgId: string | null; email: string | null; phone: string | null },
+): Promise<{ emailTaken: boolean; phoneTaken: boolean }> {
+  const { data, error } = await serviceClient
+    .from("employees")
+    .select("id, org_id")
+    .eq("user_id", input.userId)
+    .is("archived_at", null);
+  if (error) {
+    throw new EmployeeContactLookupError("own contact check lookup failed", error);
+  }
+  const ownRecords = (data ?? []) as Array<{ id: string; org_id: string }>;
+
+  let emailTaken = false;
+  if (input.email) {
+    const account = await findAuthUserByEmail(input.email);
+    emailTaken = Boolean(account && account.id !== input.userId);
+    if (!emailTaken) {
+      const checks = await Promise.all(
+        ownRecords.map((record) =>
+          checkEmployeeEmailConflict(serviceClient, {
+            orgId: record.org_id,
+            email: input.email as string,
+            excludeEmployeeId: record.id,
+            currentUserId: input.userId,
+          }),
+        ),
+      );
+      emailTaken = checks.some((check) => check.conflict);
+    }
+  }
+
+  const recordHere = ownRecords.find((record) => record.org_id === input.orgId);
+  let phoneTaken = false;
+  if (input.phone && recordHere) {
+    const check = await checkEmployeePhoneConflict(serviceClient, {
+      orgId: recordHere.org_id,
+      phone: input.phone,
+      excludeEmployeeId: recordHere.id,
+    });
+    phoneTaken = check.conflict;
+  }
+
+  return { emailTaken, phoneTaken };
 }

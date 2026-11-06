@@ -278,12 +278,19 @@ address. The two stores are kept equal in both directions:
 - **Support changes it** (`/api/gridmaster/users/[userId]`): the one path that calls
   `auth.admin.updateUserById(userId, { email, email_confirm: true })`
   (`features/employees/server/login-email.ts`), behind fresh sensitive-action auth. It
-  applies in every organization the account belongs to.
+  applies in every organization the account belongs to. Support follows
+  [the lost-mailbox runbook](operations/lost-mailbox-email-change.md) to prove who is
+  asking first.
 - **The person changes it** (web profile, mobile profile): after Supabase confirms the
   new address, the `on_auth_user_email_changed` trigger (migration `022`) rewrites
   `employees.email` on every linked, active row. A row in an organization where an
   unlinked staff record already holds that address is left alone with a warning rather
   than failing the confirmation.
+- **The daily job catches what the trigger left behind** (`repairLinkedEmails`, a step of
+  `/api/cron/return-from-away`, under its `cron_return_from_away` switch): it moves any
+  linked row that differs from its sign-in. If another staff record still holds the
+  address, it alerts that organization's Super Admins once, logs it, and tries again the
+  next day. It never changes the other record.
 - **Linking** (migration `023`): a staff row linked to an account without an email takes
   the account's email at link time, and rows that were already in that state were
   backfilled once. There is no separate "contact" address to explain in the editors; a

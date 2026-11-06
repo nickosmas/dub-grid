@@ -241,6 +241,21 @@ export function updateSelfProfileDetails(input: {
   });
 }
 
+/** Whether someone else holds the email or phone you're about to give yourself. */
+export async function checkOwnContact(input: {
+  orgId: string | null;
+  email: string | null;
+  phone: string | null;
+}): Promise<{ emailTaken: boolean; phoneTaken: boolean }> {
+  const response = await fetch("/api/account/profile/contact-check", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(`Contact check failed with ${response.status}`);
+  return response.json();
+}
+
 export function updateSelfProfilePhone(input: {
   orgId: string;
   phone: string;

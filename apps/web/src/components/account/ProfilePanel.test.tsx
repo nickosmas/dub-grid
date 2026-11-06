@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { ProfilePanel } from "@/components/account/ProfilePanel";
 import {
+  checkOwnContact,
   fetchOwnProfileChangeRequests,
   requireCredentialAssurance,
   updateBrowserUserEmail,
@@ -26,6 +27,7 @@ vi.mock("@/hooks/useStepUpAction", () => ({
 
 vi.mock("@/features/account/client", () => ({
   cancelOwnProfileChangeRequest: vi.fn(),
+  checkOwnContact: vi.fn(),
   createOwnProfileChangeRequest: vi.fn(),
   fetchOwnProfileChangeRequests: vi.fn().mockResolvedValue({ requests: [] }),
   requireCredentialAssurance: vi.fn(),
@@ -167,7 +169,14 @@ describe("ProfilePanel", () => {
     });
     vi.mocked(requireCredentialAssurance).mockResolvedValue({ success: true });
     vi.mocked(updateEmployee).mockResolvedValue({ ...employee, roleIds: [3], version: 5 });
+    vi.mocked(checkOwnContact).mockResolvedValue({ emailTaken: false, phoneTaken: false });
   });
+
+  async function saveOnceChecked() {
+    const save = screen.getByRole("button", { name: "Save changes" });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+  }
 
   it("opens as one persistent editor and preserves a dirty draft across a background refetch", () => {
     const view = renderPanel();
@@ -205,7 +214,7 @@ describe("ProfilePanel", () => {
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "new@example.com" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await saveOnceChecked();
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(order).toEqual(["assurance", "employee", "email"]));
@@ -215,13 +224,68 @@ describe("ProfilePanel", () => {
     );
   });
 
+  it("says what saved and why the email didn't if the address is taken at the last moment", async () => {
+    vi.mocked(updateBrowserUserEmail).mockRejectedValue(
+      new Error("A user with this email address has already been registered"),
+    );
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: "Change work details" }));
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+    await saveOnceChecked();
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "That email belongs to someone else, so your email stayed the same. Your other changes were saved.",
+      ),
+    );
+  });
+
+  it("says so and keeps Save off when an email or phone belongs to someone else", async () => {
+    vi.mocked(checkOwnContact).mockResolvedValue({ emailTaken: true, phoneTaken: true });
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "taken@example.com" } });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "(503) 555-0142" } });
+
+    expect(await screen.findByText("That email belongs to someone else.")).toBeInTheDocument();
+    expect(screen.getByText("That phone number belongs to someone else.")).toBeInTheDocument();
+    expect(checkOwnContact).toHaveBeenCalledWith({
+      orgId: "org-1",
+      email: "taken@example.com",
+      phone: "(503) 555-0142",
+    });
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+  });
+
+  it("keeps Save off until the new email has been checked", async () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+
+    const save = screen.getByRole("button", { name: "Save changes" });
+    expect(save).toBeDisabled();
+    await waitFor(() => expect(save).toBeEnabled());
+  });
+
+  it("lets the save decide when the check can't answer", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(checkOwnContact).mockRejectedValue(new Error("offline"));
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled());
+    consoleError.mockRestore();
+  });
+
   it("keeps the typed account draft and confirmation when step-up is cancelled", async () => {
     stepUpRun.mockResolvedValueOnce(false);
 
     renderPanel();
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Draft" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await saveOnceChecked();
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(stepUpRun).toHaveBeenCalledOnce());
