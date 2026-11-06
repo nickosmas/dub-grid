@@ -21,7 +21,7 @@ export function UnsavedChangesBar({
     <div
       role="region"
       aria-label="Unsaved changes"
-      className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-border)] bg-[var(--dg-color-surface)] py-2.5 pl-4 pr-3 shadow-lg"
+      className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[var(--dg-btn-radius)] border border-[var(--dg-color-border)] bg-[var(--dg-color-surface)] py-2.5 pl-4 pr-3 shadow-lg"
     >
       <span className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
         Unsaved changes

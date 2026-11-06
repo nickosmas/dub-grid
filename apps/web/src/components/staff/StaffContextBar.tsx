@@ -77,7 +77,7 @@ interface StaffContextBarProps {
 }
 
 const MODE_BAR_CLASS =
-  "flex items-center flex-wrap gap-x-3 gap-y-2 px-4 py-2.5 rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-control-active-border)] bg-[var(--dg-color-control-active-bg)]";
+  "flex items-center flex-wrap gap-x-3 gap-y-2 px-4 py-2.5 rounded-[var(--dg-btn-radius)] border border-[var(--dg-color-control-active-border)] bg-[var(--dg-color-control-active-bg)]";
 const MODE_BAR_TITLE_CLASS = "text-[13px] font-semibold text-[var(--dg-color-control-active-text)]";
 
 export function StaffContextBar({
@@ -278,7 +278,7 @@ export function StaffContextBar({
                 {describeStatusAction(plan.action, "").label} ({plan.eligible.length})
               </Button>
             ))}
-            <Button onClick={onClearSelection} className="dg-btn dg-btn-ghost dg-btn-sm">
+            <Button onClick={onClearSelection} className="dg-btn dg-btn-secondary dg-btn-sm">
               Clear selection
             </Button>
           </div>

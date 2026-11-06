@@ -14,6 +14,7 @@ import {
 } from "@/types";
 import { buildAssignableShiftOptions } from "@/lib/assignable-shifts";
 import { Button } from "@/components/Button";
+import { Banner } from "@/components/ui/Banner";
 import { FILLED_PILL_BORDER, toDarkPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
@@ -466,21 +467,14 @@ export default function ShiftPicker({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {workingShift && (
-        <div
-          className="dg-tabular-nums"
-          style={{
-            padding: "10px 12px",
-            borderRadius: "var(--dg-radius-md)",
-            background: "var(--dg-color-surface-alt)",
-            fontSize: "var(--dg-fs-label)",
-            color: "var(--dg-color-text-muted)",
-          }}
-        >
-          Already working{" "}
-          <strong style={{ color: "var(--dg-color-text-primary)" }}>
-            {workingWindow ? `${workingShift.name}, ${workingWindow}` : workingShift.name}
-          </strong>
-        </div>
+        <Banner tone="info" className="dg-tabular-nums">
+          <span>
+            Already working{" "}
+            <strong>
+              {workingWindow ? `${workingShift.name}, ${workingWindow}` : workingShift.name}
+            </strong>
+          </span>
+        </Banner>
       )}
 
       {/* Tabs — stretch to fill when few, horizontal scroll when many */}

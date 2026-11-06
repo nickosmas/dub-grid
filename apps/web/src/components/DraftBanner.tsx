@@ -5,10 +5,9 @@ import type { DraftBreakdown } from "@/lib/draft-utils";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import ChangeCountChips from "@/components/ChangeCountChips";
-import { CloseButton } from "@/components/ui/CloseButton";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
-import { BannerIcon } from "@/components/ui/Banner";
+import { BannerDismissButton, BannerIcon } from "@/components/ui/Banner";
 
 interface DraftBannerProps {
   onPublish: () => void;
@@ -84,7 +83,7 @@ export default function DraftBanner({
         </Hint>
         {onDismiss && (
           <Hint content={hint("Hide this banner for the rest of this session")} side="bottom">
-            <CloseButton size="sm" onClick={onDismiss} aria-label="Dismiss" />
+            <BannerDismissButton onClick={onDismiss} />
           </Hint>
         )}
       </div>
