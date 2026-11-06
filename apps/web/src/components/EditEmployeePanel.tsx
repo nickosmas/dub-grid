@@ -42,9 +42,14 @@ import { hasSavedScheduleAssignment } from "@/components/staff/capability-state"
 import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   checkEmployeeEmailConflict,
+  checkEmployeePhoneConflict,
   fetchEmployeeHasStarted,
   type EmployeeEmailConflictResult,
 } from "@/features/employees/client";
+import {
+  EMAIL_BELONGS_TO_SOMEONE_ELSE,
+  PHONE_BELONGS_TO_SOMEONE_ELSE,
+} from "@/lib/employee-contact-conflicts";
 
 export interface EditEmployeePanelProps {
   employee: Employee;
@@ -199,6 +204,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const [emailConflict, setEmailConflict] = useState(false);
     const [emailConflictReason, setEmailConflictReason] =
       useState<EmployeeEmailConflictResult["reason"]>(undefined);
+    const [phoneConflict, setPhoneConflict] = useState(false);
 
     // Pre-flight: flag a duplicate contact email before Save is pressed,
     // instead of only surfacing it via the unique_active_employee_email_per_org
@@ -248,6 +254,37 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     useEffect(() => {
       onEmailConflictChange?.(emailConflict);
     }, [emailConflict, onEmailConflictChange]);
+
+    useEffect(() => {
+      const trimmed = form.phone.trim();
+      const digits = trimmed.replace(/\D/g, "");
+      if (
+        !orgId ||
+        !digits ||
+        digits === (employee.phone || "").replace(/\D/g, "") ||
+        validatePhone(trimmed)
+      ) {
+        setPhoneConflict(false);
+        return;
+      }
+      let cancelled = false;
+      const timer = setTimeout(() => {
+        checkEmployeePhoneConflict(trimmed, orgId, employee.id)
+          .then((result) => {
+            if (!cancelled) setPhoneConflict(result.conflict);
+          })
+          .catch((err) => {
+            if (!cancelled) {
+              console.error("checkEmployeePhoneConflict failed", err);
+              setPhoneConflict(false);
+            }
+          });
+      }, 400);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }, [form.phone, employee.phone, employee.id, orgId]);
 
     // The email is the login email, so a linked account cannot be left without one.
     const validateStaffEmail = useCallback(
@@ -344,9 +381,10 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           validateStaffEmail(form.email) ||
           validatePhone(form.phone) ||
           validateNotes(form.contactNotes) ||
-          emailConflict,
+          emailConflict ||
+          phoneConflict,
         ),
-      [form, isManagementUser, emailConflict, validateStaffEmail],
+      [form, isManagementUser, emailConflict, phoneConflict, validateStaffEmail],
     );
 
     useEffect(() => {
@@ -374,7 +412,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         validateStaffEmail(form.email) ||
         validatePhone(form.phone) ||
         validateNotes(form.contactNotes) ||
-        emailConflict
+        emailConflict ||
+        phoneConflict
       ) {
         setTouched({
           firstName: true,
@@ -426,6 +465,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       validateStaffEmail,
       isManagementUser,
       emailConflict,
+      phoneConflict,
     ]);
 
     const handleDismiss = useCallback(() => {
@@ -725,6 +765,18 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                           {fieldErrors.phone}
                         </div>
                       )}
+                      {!fieldErrors.phone && phoneConflict && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-danger)",
+                            marginTop: 4,
+                          }}
+                          role="alert"
+                        >
+                          {PHONE_BELONGS_TO_SOMEONE_ELSE}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label htmlFor={`${identityFieldIdPrefix}-email`} style={fieldLabel}>
@@ -796,7 +848,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         >
                           {emailConflictReason === "gridmaster"
                             ? "That email address is reserved."
-                            : "That email is already used by another person on your team."}
+                            : EMAIL_BELONGS_TO_SOMEONE_ELSE}
                         </div>
                       )}
                     </div>

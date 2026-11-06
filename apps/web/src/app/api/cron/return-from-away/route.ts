@@ -12,6 +12,7 @@ import {
   endOffboardedAccess,
   reopenRestoredAccess,
 } from "@/features/employees/server/offboard-access";
+import { repairLinkedEmails } from "@/features/employees/server/linked-email-repair";
 import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
 import { endUserSessions } from "@/lib/auth/revocation";
 import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
@@ -31,6 +32,8 @@ export const dynamic = "force-dynamic";
 // whose return date has come is set
 // back to Active. Their recurring schedules were kept while they were away and
 // the fills already start from the return date, so nothing else changes.
+// It also brings any linked staff record that fell behind its sign-in email
+// back in step (repairLinkedEmails).
 //
 // Auth: Vercel cron sends `Authorization: Bearer ${CRON_SECRET}`.
 
@@ -147,6 +150,15 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     logger.error({ error }, "return-from-away: restoring planned returns failed");
   }
+  let emailsRepaired = 0;
+  let emailsBlocked = 0;
+  try {
+    const repair = await repairLinkedEmails(db);
+    emailsRepaired = repair.repaired;
+    emailsBlocked = repair.blocked;
+  } catch (error) {
+    logger.error({ error }, "return-from-away: repairing linked emails failed");
+  }
 
   const { data, error } = await db
     .from("employees")
@@ -172,6 +184,8 @@ export async function GET(req: NextRequest) {
       reinstated,
       suspended,
       restored,
+      emailsRepaired,
+      emailsBlocked,
       returned: 0,
     });
   }
@@ -237,6 +251,8 @@ export async function GET(req: NextRequest) {
     reinstated,
     suspended,
     restored,
+    emailsRepaired,
+    emailsBlocked,
     returned: returned.length,
     skipped: due.length - returned.length,
   });

@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
-import { checkEmployeeEmailConflict, fetchEmployeeHasStarted } from "@/features/employees/client";
+import {
+  checkEmployeeEmailConflict,
+  checkEmployeePhoneConflict,
+  fetchEmployeeHasStarted,
+} from "@/features/employees/client";
 import { Employee, FocusArea, Invitation, NamedItem } from "@/types";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
 
@@ -14,6 +18,7 @@ vi.mock("@/hooks", async (importOriginal) => ({
 
 vi.mock("@/features/employees/client", () => ({
   checkEmployeeEmailConflict: vi.fn(),
+  checkEmployeePhoneConflict: vi.fn(),
   fetchEmployeeHasStarted: vi.fn(async () => true),
 }));
 
@@ -33,6 +38,7 @@ vi.mock("@/hooks/useStepUpAction", () => ({
 }));
 
 const checkEmployeeEmailConflictMock = vi.mocked(checkEmployeeEmailConflict);
+const checkEmployeePhoneConflictMock = vi.mocked(checkEmployeePhoneConflict);
 const DESIGNATIONS: NamedItem[] = [
   { id: 1, orgId: "org-1", name: "JLCSN", abbr: "JLCSN", sortOrder: 0 },
   { id: 2, orgId: "org-1", name: "CSN III", abbr: "CSN III", sortOrder: 1 },
@@ -581,6 +587,47 @@ describe("EditEmployeePanel", () => {
   // -------------------------------------------------------------------------
   // Real-time duplicate-email check
   // -------------------------------------------------------------------------
+  describe("Real-time duplicate-phone check", () => {
+    beforeEach(() => {
+      checkEmployeePhoneConflictMock.mockReset();
+    });
+
+    it("flags a number that belongs to someone else and blocks saving", async () => {
+      const user = userEvent.setup();
+      checkEmployeePhoneConflictMock.mockResolvedValue({
+        conflict: true,
+        conflictingEmployeeId: "other-emp",
+      });
+      renderPanel({ orgId: "org-1" });
+
+      const phoneInput = screen.getByDisplayValue("(415) 425-3334");
+      await user.clear(phoneInput);
+      await user.type(phoneInput, "5035550142");
+
+      expect(
+        await screen.findByText("That phone number belongs to someone else."),
+      ).toBeInTheDocument();
+      expect(checkEmployeePhoneConflictMock).toHaveBeenCalledWith(
+        "5035550142",
+        "org-1",
+        expect.any(String),
+      );
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    });
+
+    it("doesn't check a number that's only been reformatted", async () => {
+      const user = userEvent.setup();
+      renderPanel({ orgId: "org-1" });
+
+      const phoneInput = screen.getByDisplayValue("(415) 425-3334");
+      await user.clear(phoneInput);
+      await user.type(phoneInput, "4154253334");
+
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      expect(checkEmployeePhoneConflictMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("Real-time duplicate-email check", () => {
     beforeEach(() => {
       // mockReset (not mockClear) also drops any queued mockResolvedValueOnce
@@ -605,7 +652,7 @@ describe("EditEmployeePanel", () => {
       await user.clear(emailInput);
       await user.type(emailInput, "taken@example.com");
 
-      await screen.findByText(/already used by another person on your team/i);
+      await screen.findByText(/belongs to someone else/i);
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
       await user.click(screen.getByRole("button", { name: "Save" }));
@@ -657,7 +704,7 @@ describe("EditEmployeePanel", () => {
       const emailInput = screen.getByDisplayValue("alice@example.com");
       await user.clear(emailInput);
       await user.type(emailInput, "taken@example.com");
-      await screen.findByText(/already used by another person on your team/i);
+      await screen.findByText(/belongs to someone else/i);
 
       checkEmployeeEmailConflictMock.mockResolvedValueOnce({
         conflict: false,
@@ -667,9 +714,7 @@ describe("EditEmployeePanel", () => {
       await user.type(emailInput, "free@example.com");
 
       await waitFor(() =>
-        expect(
-          screen.queryByText(/already used by another person on your team/i),
-        ).not.toBeInTheDocument(),
+        expect(screen.queryByText(/belongs to someone else/i)).not.toBeInTheDocument(),
       );
       expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
 
@@ -698,7 +743,7 @@ describe("EditEmployeePanel", () => {
       // debounce lands relative to typing speed.
       const emailInput = screen.getByDisplayValue("alice@example.com");
       fireEvent.change(emailInput, { target: { value: "taken@example.com" } });
-      await screen.findByText(/already used by another person on your team/i);
+      await screen.findByText(/belongs to someone else/i);
 
       // The callback fires from an effect after the render that shows the
       // warning, so it is awaited rather than read in the same tick: under a
@@ -711,9 +756,7 @@ describe("EditEmployeePanel", () => {
       });
       fireEvent.change(emailInput, { target: { value: "free@example.com" } });
       await waitFor(() => {
-        expect(
-          screen.queryByText(/already used by another person on your team/i),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/belongs to someone else/i)).not.toBeInTheDocument();
         expect(onEmailConflictChange).toHaveBeenLastCalledWith(false);
       });
     });

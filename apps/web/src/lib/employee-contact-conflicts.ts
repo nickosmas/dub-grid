@@ -9,6 +9,9 @@ export interface EmployeeContactConflict {
   message: string;
 }
 
+export const EMAIL_BELONGS_TO_SOMEONE_ELSE = "That email belongs to someone else.";
+export const PHONE_BELONGS_TO_SOMEONE_ELSE = "That phone number belongs to someone else.";
+
 /** Why an email cannot be a person's contact or sign-in email. */
 export type EmailConflictReason = "employee_duplicate" | "gridmaster" | "other_account";
 

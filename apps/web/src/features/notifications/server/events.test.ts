@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { accessLockedBody, dispatchNotificationEvent, trialExpiredBody } from "./events";
+import {
+  accessLockedBody,
+  emailBlockedBody,
+  dispatchNotificationEvent,
+  trialExpiredBody,
+} from "./events";
 import { sendNotification } from "./sender";
 
 const fromMock = vi.fn();
@@ -836,6 +841,15 @@ describe("dispatchNotificationEvent", () => {
       lockedAt: "2026-06-03T12:00:00.000Z",
     });
     expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("names who holds the address when a staff email can't follow its sign-in", () => {
+    expect(emailBlockedBody("maya@example.com", "Sam Lee")).toBe(
+      "They now sign in with maya@example.com, but Sam Lee's staff record already uses it. Change that record's email and theirs will update within a day.",
+    );
+    expect(emailBlockedBody("maya@example.com", null)).toBe(
+      "They now sign in with maya@example.com, but another staff record already uses it. Change that record's email and theirs will update within a day.",
+    );
   });
 
   it("says what ran out when access locks", () => {

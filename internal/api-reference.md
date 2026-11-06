@@ -74,6 +74,7 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 | GET                    | `/api/account/org-context`              | Return the caller's current org context                                                  |
 | GET                    | `/api/account/permissions`              | Return the caller's resolved permission set (impersonation-aware)                        |
 | PATCH                  | `/api/account/profile`                  | Update display name, avatar, etc.                                                        |
+| POST                   | `/api/account/profile/contact-check`    | Whether your changed email or phone belongs to someone else                              |
 | PATCH                  | `/api/account/profile/phone`            | Update phone number                                                                      |
 | GET                    | `/api/account/change-requests`          | List pending profile change requests                                                     |
 | POST                   | `/api/account/change-requests`          | Submit a profile change request                                                          |

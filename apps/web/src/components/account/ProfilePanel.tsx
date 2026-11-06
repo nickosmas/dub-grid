@@ -14,14 +14,20 @@ import {
 } from "@dubgrid/contracts";
 import { toast } from "sonner";
 import { Clock } from "lucide-react";
+import { EMAIL_TAKEN_MESSAGE } from "@dubgrid/client-errors";
 
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Modal from "@/components/Modal";
+import {
+  EMAIL_BELONGS_TO_SOMEONE_ELSE,
+  PHONE_BELONGS_TO_SOMEONE_ELSE,
+} from "@/lib/employee-contact-conflicts";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { formatClientLabel } from "@/lib/client-facing";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { useOwnContactCheck } from "@/components/account/useOwnContactCheck";
 import { UnsavedChangesBar } from "@/components/ui/UnsavedChangesBar";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
@@ -108,6 +114,12 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 type PendingConfirm = "account-details" | "name-change-request" | null;
+
+function savedBeforeEmailFailure(err: unknown): string {
+  return extractErrorMessage(err, "") === EMAIL_TAKEN_MESSAGE
+    ? "That email belongs to someone else, so your email stayed the same. Your other changes were saved."
+    : "Your profile was saved, but we couldn't start the email change. Try the email again.";
+}
 
 function AccountCard({
   title,
@@ -224,8 +236,20 @@ export function ProfilePanel({
     phoneError || !employee ? editPhone.trim() : normalizeOptionalUsPhone(editPhone);
   const hasPhoneChanges = normalizedPhone !== savedPhone;
   const hasAnyChanges = hasNameChanges || hasEmailChanges || hasPhoneChanges || workHasChanges;
+  const contactCheck = useOwnContactCheck({
+    orgId,
+    email: hasEmailChanges && !emailError ? editedEmail : null,
+    phone: hasPhoneChanges && !phoneError && normalizedPhone ? normalizedPhone : null,
+  });
   const hasInvalidDraft = Boolean(
-    firstNameError || lastNameError || emailError || phoneError || workSaveBlocked,
+    firstNameError ||
+    lastNameError ||
+    emailError ||
+    phoneError ||
+    workSaveBlocked ||
+    contactCheck.checking ||
+    contactCheck.emailTaken ||
+    contactCheck.phoneTaken,
   );
 
   useEffect(() => {
@@ -488,7 +512,7 @@ export function ProfilePanel({
           } catch (err) {
             toast.error(
               profileSaved
-                ? "Your profile was saved, but we couldn't start the email change. Try the email again."
+                ? savedBeforeEmailFailure(err)
                 : extractErrorMessage(err, "We couldn't update your email. Try again."),
             );
             return false;
@@ -736,6 +760,11 @@ export function ProfilePanel({
                 className="dg-input"
               />
               {emailError && <p className="dg-form-error">{emailError}</p>}
+              {!emailError && contactCheck.emailTaken && (
+                <p className="dg-form-error" role="alert">
+                  {EMAIL_BELONGS_TO_SOMEONE_ELSE}
+                </p>
+              )}
             </div>
             {employee && (
               <div>
@@ -754,6 +783,11 @@ export function ProfilePanel({
                   className="dg-input"
                 />
                 {phoneError && <p className="dg-form-error">{phoneError}</p>}
+                {!phoneError && contactCheck.phoneTaken && (
+                  <p className="dg-form-error" role="alert">
+                    {PHONE_BELONGS_TO_SOMEONE_ELSE}
+                  </p>
+                )}
               </div>
             )}
           </div>

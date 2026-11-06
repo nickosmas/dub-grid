@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:3ed74a72195bad8827e7b236ac8283ab43b914edf6217845b5c84e9f78c50ed5",
+  "sourceDigest": "sha256:cec674076c081bd7576c7b8a930b6ccff627936bd90fd1ed4407a38403e4eed5",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2317,6 +2317,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/account/mfa-status/route.ts"
+      }
+    },
+    {
+      "id": "http:POST:/api/account/profile/contact-check",
+      "method": "POST",
+      "path": "/api/account/profile/contact-check",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/account/profile/contact-check/route.ts"
       }
     },
     {
