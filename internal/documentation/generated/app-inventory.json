@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:b82969094cf9f7f75c4e3efd605d27588e66a800c1ebc0474ad875511c316fc6",
+  "sourceDigest": "sha256:09ddafb50de1d997d7e6b28e08973a06c604f3b0de35b39e2bd2759e8a75a63c",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5068,7 +5068,7 @@
       "version": "124",
       "name": "org_bound_references",
       "file": "124_org_bound_references.sql",
-      "sha256": "6bb17a4057431bcf1bd54bcb646d8867e3a29b09cddf97221ba0f5575682f29d",
+      "sha256": "d1f46e00c1a79db37c5eb496550dd6b7bac7075223121c50a028eeed56ac8f4d",
       "source": {
         "path": "supabase/migrations/124_org_bound_references.sql"
       }

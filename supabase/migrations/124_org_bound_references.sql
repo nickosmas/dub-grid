@@ -11,6 +11,10 @@
 -- The three links to profiles aren't changed: a profile has no single
 -- organization. ON DELETE SET NULL names its column because org_id is NOT NULL.
 --
+-- Each key keeps its name: the app names some of them in PostgREST embeds
+-- (`employees!shift_requests_requester_emp_id_fkey`), and it has to work on both
+-- sides of this migration.
+--
 -- VALIDATE aborts this whole migration on an existing cross-organization row,
 -- which is the moment to look at that row rather than a reason to skip it.
 
@@ -82,155 +86,155 @@ CREATE UNIQUE INDEX IF NOT EXISTS shift_series_org_id_id_key ON public.shift_ser
 
 ALTER TABLE public.calendar_feed_tokens
   DROP CONSTRAINT calendar_feed_tokens_employee_id_fkey,
-  ADD CONSTRAINT calendar_feed_tokens_employee_id_org_fkey FOREIGN KEY (org_id, employee_id)
+  ADD CONSTRAINT calendar_feed_tokens_employee_id_fkey FOREIGN KEY (org_id, employee_id)
     REFERENCES public.employees (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.coverage_requirements
   DROP CONSTRAINT coverage_requirements_focus_area_id_fkey,
-  ADD CONSTRAINT coverage_requirements_focus_area_id_org_fkey FOREIGN KEY (org_id, focus_area_id)
+  ADD CONSTRAINT coverage_requirements_focus_area_id_fkey FOREIGN KEY (org_id, focus_area_id)
     REFERENCES public.focus_areas (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.coverage_requirements
   DROP CONSTRAINT coverage_requirements_job_id_fkey,
-  ADD CONSTRAINT coverage_requirements_job_id_org_fkey FOREIGN KEY (org_id, job_id)
+  ADD CONSTRAINT coverage_requirements_job_id_fkey FOREIGN KEY (org_id, job_id)
     REFERENCES public.jobs (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.coverage_requirements
   DROP CONSTRAINT coverage_requirements_preferred_shift_id_fkey,
-  ADD CONSTRAINT coverage_requirements_preferred_shift_id_org_fkey FOREIGN KEY (org_id, preferred_shift_id)
+  ADD CONSTRAINT coverage_requirements_preferred_shift_id_fkey FOREIGN KEY (org_id, preferred_shift_id)
     REFERENCES public.shift_categories (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.employee_job_preferences
   DROP CONSTRAINT employee_job_preferences_employee_id_fkey,
-  ADD CONSTRAINT employee_job_preferences_employee_id_org_fkey FOREIGN KEY (org_id, employee_id)
+  ADD CONSTRAINT employee_job_preferences_employee_id_fkey FOREIGN KEY (org_id, employee_id)
     REFERENCES public.employees (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.employee_shift_preferences
   DROP CONSTRAINT employee_shift_preferences_employee_id_fkey,
-  ADD CONSTRAINT employee_shift_preferences_employee_id_org_fkey FOREIGN KEY (org_id, employee_id)
+  ADD CONSTRAINT employee_shift_preferences_employee_id_fkey FOREIGN KEY (org_id, employee_id)
     REFERENCES public.employees (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.employees
   DROP CONSTRAINT employees_away_absence_type_id_fkey,
-  ADD CONSTRAINT employees_away_absence_type_id_org_fkey FOREIGN KEY (org_id, away_absence_type_id)
+  ADD CONSTRAINT employees_away_absence_type_id_fkey FOREIGN KEY (org_id, away_absence_type_id)
     REFERENCES public.absence_types (org_id, id) ON DELETE SET NULL (away_absence_type_id) NOT VALID;
 ALTER TABLE public.employees
   DROP CONSTRAINT employees_certification_id_fkey,
-  ADD CONSTRAINT employees_certification_id_org_fkey FOREIGN KEY (org_id, certification_id)
+  ADD CONSTRAINT employees_certification_id_fkey FOREIGN KEY (org_id, certification_id)
     REFERENCES public.certifications (org_id, id) ON DELETE SET NULL (certification_id) NOT VALID;
 ALTER TABLE public.employees
   DROP CONSTRAINT employees_planned_absence_type_id_fkey,
-  ADD CONSTRAINT employees_planned_absence_type_id_org_fkey FOREIGN KEY (org_id, planned_absence_type_id)
+  ADD CONSTRAINT employees_planned_absence_type_id_fkey FOREIGN KEY (org_id, planned_absence_type_id)
     REFERENCES public.absence_types (org_id, id) ON DELETE SET NULL (planned_absence_type_id) NOT VALID;
 ALTER TABLE public.focus_areas
   DROP CONSTRAINT focus_areas_department_id_fkey,
-  ADD CONSTRAINT focus_areas_department_id_org_fkey FOREIGN KEY (org_id, department_id)
+  ADD CONSTRAINT focus_areas_department_id_fkey FOREIGN KEY (org_id, department_id)
     REFERENCES public.departments (org_id, id) ON DELETE SET NULL (department_id) NOT VALID;
 ALTER TABLE public.invitations
   DROP CONSTRAINT invitations_employee_id_fkey,
-  ADD CONSTRAINT invitations_employee_id_org_fkey FOREIGN KEY (org_id, employee_id)
+  ADD CONSTRAINT invitations_employee_id_fkey FOREIGN KEY (org_id, employee_id)
     REFERENCES public.employees (org_id, id) ON DELETE SET NULL (employee_id) NOT VALID;
 ALTER TABLE public.job_shift_overrides
   DROP CONSTRAINT job_shift_overrides_job_id_fkey,
-  ADD CONSTRAINT job_shift_overrides_job_id_org_fkey FOREIGN KEY (org_id, job_id)
+  ADD CONSTRAINT job_shift_overrides_job_id_fkey FOREIGN KEY (org_id, job_id)
     REFERENCES public.jobs (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.job_shift_overrides
   DROP CONSTRAINT job_shift_overrides_shift_id_fkey,
-  ADD CONSTRAINT job_shift_overrides_shift_id_org_fkey FOREIGN KEY (org_id, shift_id)
+  ADD CONSTRAINT job_shift_overrides_shift_id_fkey FOREIGN KEY (org_id, shift_id)
     REFERENCES public.shift_categories (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.profile_change_requests
   DROP CONSTRAINT profile_change_requests_requester_employee_id_fkey,
-  ADD CONSTRAINT profile_change_requests_requester_employee_id_org_fkey FOREIGN KEY (org_id, requester_employee_id)
+  ADD CONSTRAINT profile_change_requests_requester_employee_id_fkey FOREIGN KEY (org_id, requester_employee_id)
     REFERENCES public.employees (org_id, id) ON DELETE SET NULL (requester_employee_id) NOT VALID;
 ALTER TABLE public.recurring_shifts
   DROP CONSTRAINT recurring_shifts_emp_id_fkey,
-  ADD CONSTRAINT recurring_shifts_emp_id_org_fkey FOREIGN KEY (org_id, emp_id)
+  ADD CONSTRAINT recurring_shifts_emp_id_fkey FOREIGN KEY (org_id, emp_id)
     REFERENCES public.employees (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.schedule_cell_corrections
   DROP CONSTRAINT schedule_cell_corrections_emp_id_fkey,
-  ADD CONSTRAINT schedule_cell_corrections_emp_id_org_fkey FOREIGN KEY (org_id, emp_id)
+  ADD CONSTRAINT schedule_cell_corrections_emp_id_fkey FOREIGN KEY (org_id, emp_id)
     REFERENCES public.employees (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.schedule_cell_snapshots
   DROP CONSTRAINT schedule_cell_snapshots_absence_type_id_fkey,
-  ADD CONSTRAINT schedule_cell_snapshots_absence_type_id_org_fkey FOREIGN KEY (org_id, absence_type_id)
+  ADD CONSTRAINT schedule_cell_snapshots_absence_type_id_fkey FOREIGN KEY (org_id, absence_type_id)
     REFERENCES public.absence_types (org_id, id) ON DELETE SET NULL (absence_type_id) NOT VALID;
 ALTER TABLE public.schedule_cells
   DROP CONSTRAINT schedule_cells_emp_id_fkey,
-  ADD CONSTRAINT schedule_cells_emp_id_org_fkey FOREIGN KEY (org_id, emp_id)
+  ADD CONSTRAINT schedule_cells_emp_id_fkey FOREIGN KEY (org_id, emp_id)
     REFERENCES public.employees (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.schedule_cells
   DROP CONSTRAINT schedule_cells_focus_area_id_fkey,
-  ADD CONSTRAINT schedule_cells_focus_area_id_org_fkey FOREIGN KEY (org_id, focus_area_id)
+  ADD CONSTRAINT schedule_cells_focus_area_id_fkey FOREIGN KEY (org_id, focus_area_id)
     REFERENCES public.focus_areas (org_id, id) ON DELETE SET NULL (focus_area_id) NOT VALID;
 ALTER TABLE public.schedule_cells
   DROP CONSTRAINT schedule_cells_series_id_fkey,
-  ADD CONSTRAINT schedule_cells_series_id_org_fkey FOREIGN KEY (org_id, series_id)
+  ADD CONSTRAINT schedule_cells_series_id_fkey FOREIGN KEY (org_id, series_id)
     REFERENCES public.shift_series (org_id, id) ON DELETE SET NULL (series_id) NOT VALID;
 ALTER TABLE public.schedule_notes
   DROP CONSTRAINT schedule_notes_emp_id_fkey,
-  ADD CONSTRAINT schedule_notes_emp_id_org_fkey FOREIGN KEY (org_id, emp_id)
+  ADD CONSTRAINT schedule_notes_emp_id_fkey FOREIGN KEY (org_id, emp_id)
     REFERENCES public.employees (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.schedule_notes
   DROP CONSTRAINT schedule_notes_focus_area_id_fkey,
-  ADD CONSTRAINT schedule_notes_focus_area_id_org_fkey FOREIGN KEY (org_id, focus_area_id)
+  ADD CONSTRAINT schedule_notes_focus_area_id_fkey FOREIGN KEY (org_id, focus_area_id)
     REFERENCES public.focus_areas (org_id, id) ON DELETE SET NULL (focus_area_id) NOT VALID;
 ALTER TABLE public.schedule_notes
   DROP CONSTRAINT schedule_notes_indicator_type_id_fkey,
-  ADD CONSTRAINT schedule_notes_indicator_type_id_org_fkey FOREIGN KEY (org_id, indicator_type_id)
+  ADD CONSTRAINT schedule_notes_indicator_type_id_fkey FOREIGN KEY (org_id, indicator_type_id)
     REFERENCES public.indicator_types (org_id, id) NOT VALID;
 ALTER TABLE public.schedule_publish_changes
   DROP CONSTRAINT schedule_publish_changes_publish_history_id_fkey,
-  ADD CONSTRAINT schedule_publish_changes_publish_history_id_org_fkey FOREIGN KEY (org_id, publish_history_id)
+  ADD CONSTRAINT schedule_publish_changes_publish_history_id_fkey FOREIGN KEY (org_id, publish_history_id)
     REFERENCES public.publish_history (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.shift_categories
   DROP CONSTRAINT shift_categories_focus_area_id_fkey,
-  ADD CONSTRAINT shift_categories_focus_area_id_org_fkey FOREIGN KEY (org_id, focus_area_id)
+  ADD CONSTRAINT shift_categories_focus_area_id_fkey FOREIGN KEY (org_id, focus_area_id)
     REFERENCES public.focus_areas (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.shift_requests
   DROP CONSTRAINT shift_requests_absence_type_id_fkey,
-  ADD CONSTRAINT shift_requests_absence_type_id_org_fkey FOREIGN KEY (org_id, absence_type_id)
+  ADD CONSTRAINT shift_requests_absence_type_id_fkey FOREIGN KEY (org_id, absence_type_id)
     REFERENCES public.absence_types (org_id, id) ON DELETE SET NULL (absence_type_id) NOT VALID;
 ALTER TABLE public.shift_requests
   DROP CONSTRAINT shift_requests_parent_request_id_fkey,
-  ADD CONSTRAINT shift_requests_parent_request_id_org_fkey FOREIGN KEY (org_id, parent_request_id)
+  ADD CONSTRAINT shift_requests_parent_request_id_fkey FOREIGN KEY (org_id, parent_request_id)
     REFERENCES public.shift_requests (org_id, id) ON DELETE SET NULL (parent_request_id) NOT VALID;
 ALTER TABLE public.shift_requests
   DROP CONSTRAINT shift_requests_requester_emp_id_fkey,
-  ADD CONSTRAINT shift_requests_requester_emp_id_org_fkey FOREIGN KEY (org_id, requester_emp_id)
+  ADD CONSTRAINT shift_requests_requester_emp_id_fkey FOREIGN KEY (org_id, requester_emp_id)
     REFERENCES public.employees (org_id, id) ON DELETE CASCADE NOT VALID;
 ALTER TABLE public.shift_requests
   DROP CONSTRAINT shift_requests_target_emp_id_fkey,
-  ADD CONSTRAINT shift_requests_target_emp_id_org_fkey FOREIGN KEY (org_id, target_emp_id)
+  ADD CONSTRAINT shift_requests_target_emp_id_fkey FOREIGN KEY (org_id, target_emp_id)
     REFERENCES public.employees (org_id, id) ON DELETE SET NULL (target_emp_id) NOT VALID;
 ALTER TABLE public.shift_series
   DROP CONSTRAINT shift_series_emp_id_fkey,
-  ADD CONSTRAINT shift_series_emp_id_org_fkey FOREIGN KEY (org_id, emp_id)
+  ADD CONSTRAINT shift_series_emp_id_fkey FOREIGN KEY (org_id, emp_id)
     REFERENCES public.employees (org_id, id) ON DELETE CASCADE NOT VALID;
 
-ALTER TABLE public.calendar_feed_tokens VALIDATE CONSTRAINT calendar_feed_tokens_employee_id_org_fkey;
-ALTER TABLE public.coverage_requirements VALIDATE CONSTRAINT coverage_requirements_focus_area_id_org_fkey;
-ALTER TABLE public.coverage_requirements VALIDATE CONSTRAINT coverage_requirements_job_id_org_fkey;
-ALTER TABLE public.coverage_requirements VALIDATE CONSTRAINT coverage_requirements_preferred_shift_id_org_fkey;
-ALTER TABLE public.employee_job_preferences VALIDATE CONSTRAINT employee_job_preferences_employee_id_org_fkey;
-ALTER TABLE public.employee_shift_preferences VALIDATE CONSTRAINT employee_shift_preferences_employee_id_org_fkey;
-ALTER TABLE public.employees VALIDATE CONSTRAINT employees_away_absence_type_id_org_fkey;
-ALTER TABLE public.employees VALIDATE CONSTRAINT employees_certification_id_org_fkey;
-ALTER TABLE public.employees VALIDATE CONSTRAINT employees_planned_absence_type_id_org_fkey;
-ALTER TABLE public.focus_areas VALIDATE CONSTRAINT focus_areas_department_id_org_fkey;
-ALTER TABLE public.invitations VALIDATE CONSTRAINT invitations_employee_id_org_fkey;
-ALTER TABLE public.job_shift_overrides VALIDATE CONSTRAINT job_shift_overrides_job_id_org_fkey;
-ALTER TABLE public.job_shift_overrides VALIDATE CONSTRAINT job_shift_overrides_shift_id_org_fkey;
-ALTER TABLE public.profile_change_requests VALIDATE CONSTRAINT profile_change_requests_requester_employee_id_org_fkey;
-ALTER TABLE public.recurring_shifts VALIDATE CONSTRAINT recurring_shifts_emp_id_org_fkey;
-ALTER TABLE public.schedule_cell_corrections VALIDATE CONSTRAINT schedule_cell_corrections_emp_id_org_fkey;
-ALTER TABLE public.schedule_cell_snapshots VALIDATE CONSTRAINT schedule_cell_snapshots_absence_type_id_org_fkey;
-ALTER TABLE public.schedule_cells VALIDATE CONSTRAINT schedule_cells_emp_id_org_fkey;
-ALTER TABLE public.schedule_cells VALIDATE CONSTRAINT schedule_cells_focus_area_id_org_fkey;
-ALTER TABLE public.schedule_cells VALIDATE CONSTRAINT schedule_cells_series_id_org_fkey;
-ALTER TABLE public.schedule_notes VALIDATE CONSTRAINT schedule_notes_emp_id_org_fkey;
-ALTER TABLE public.schedule_notes VALIDATE CONSTRAINT schedule_notes_focus_area_id_org_fkey;
-ALTER TABLE public.schedule_notes VALIDATE CONSTRAINT schedule_notes_indicator_type_id_org_fkey;
-ALTER TABLE public.schedule_publish_changes VALIDATE CONSTRAINT schedule_publish_changes_publish_history_id_org_fkey;
-ALTER TABLE public.shift_categories VALIDATE CONSTRAINT shift_categories_focus_area_id_org_fkey;
-ALTER TABLE public.shift_requests VALIDATE CONSTRAINT shift_requests_absence_type_id_org_fkey;
-ALTER TABLE public.shift_requests VALIDATE CONSTRAINT shift_requests_parent_request_id_org_fkey;
-ALTER TABLE public.shift_requests VALIDATE CONSTRAINT shift_requests_requester_emp_id_org_fkey;
-ALTER TABLE public.shift_requests VALIDATE CONSTRAINT shift_requests_target_emp_id_org_fkey;
-ALTER TABLE public.shift_series VALIDATE CONSTRAINT shift_series_emp_id_org_fkey;
+ALTER TABLE public.calendar_feed_tokens VALIDATE CONSTRAINT calendar_feed_tokens_employee_id_fkey;
+ALTER TABLE public.coverage_requirements VALIDATE CONSTRAINT coverage_requirements_focus_area_id_fkey;
+ALTER TABLE public.coverage_requirements VALIDATE CONSTRAINT coverage_requirements_job_id_fkey;
+ALTER TABLE public.coverage_requirements VALIDATE CONSTRAINT coverage_requirements_preferred_shift_id_fkey;
+ALTER TABLE public.employee_job_preferences VALIDATE CONSTRAINT employee_job_preferences_employee_id_fkey;
+ALTER TABLE public.employee_shift_preferences VALIDATE CONSTRAINT employee_shift_preferences_employee_id_fkey;
+ALTER TABLE public.employees VALIDATE CONSTRAINT employees_away_absence_type_id_fkey;
+ALTER TABLE public.employees VALIDATE CONSTRAINT employees_certification_id_fkey;
+ALTER TABLE public.employees VALIDATE CONSTRAINT employees_planned_absence_type_id_fkey;
+ALTER TABLE public.focus_areas VALIDATE CONSTRAINT focus_areas_department_id_fkey;
+ALTER TABLE public.invitations VALIDATE CONSTRAINT invitations_employee_id_fkey;
+ALTER TABLE public.job_shift_overrides VALIDATE CONSTRAINT job_shift_overrides_job_id_fkey;
+ALTER TABLE public.job_shift_overrides VALIDATE CONSTRAINT job_shift_overrides_shift_id_fkey;
+ALTER TABLE public.profile_change_requests VALIDATE CONSTRAINT profile_change_requests_requester_employee_id_fkey;
+ALTER TABLE public.recurring_shifts VALIDATE CONSTRAINT recurring_shifts_emp_id_fkey;
+ALTER TABLE public.schedule_cell_corrections VALIDATE CONSTRAINT schedule_cell_corrections_emp_id_fkey;
+ALTER TABLE public.schedule_cell_snapshots VALIDATE CONSTRAINT schedule_cell_snapshots_absence_type_id_fkey;
+ALTER TABLE public.schedule_cells VALIDATE CONSTRAINT schedule_cells_emp_id_fkey;
+ALTER TABLE public.schedule_cells VALIDATE CONSTRAINT schedule_cells_focus_area_id_fkey;
+ALTER TABLE public.schedule_cells VALIDATE CONSTRAINT schedule_cells_series_id_fkey;
+ALTER TABLE public.schedule_notes VALIDATE CONSTRAINT schedule_notes_emp_id_fkey;
+ALTER TABLE public.schedule_notes VALIDATE CONSTRAINT schedule_notes_focus_area_id_fkey;
+ALTER TABLE public.schedule_notes VALIDATE CONSTRAINT schedule_notes_indicator_type_id_fkey;
+ALTER TABLE public.schedule_publish_changes VALIDATE CONSTRAINT schedule_publish_changes_publish_history_id_fkey;
+ALTER TABLE public.shift_categories VALIDATE CONSTRAINT shift_categories_focus_area_id_fkey;
+ALTER TABLE public.shift_requests VALIDATE CONSTRAINT shift_requests_absence_type_id_fkey;
+ALTER TABLE public.shift_requests VALIDATE CONSTRAINT shift_requests_parent_request_id_fkey;
+ALTER TABLE public.shift_requests VALIDATE CONSTRAINT shift_requests_requester_emp_id_fkey;
+ALTER TABLE public.shift_requests VALIDATE CONSTRAINT shift_requests_target_emp_id_fkey;
+ALTER TABLE public.shift_series VALIDATE CONSTRAINT shift_series_emp_id_fkey;
 
 -- schedule_cell_segments has no foreign key to its shift or job, and a shift or
 -- job may later be removed while a segment records it. So this refuses only an

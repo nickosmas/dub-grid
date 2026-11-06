@@ -107,7 +107,7 @@ describe.skipIf(!reachable)("organization-bound references", () => {
         `INSERT INTO public.schedule_cells (org_id, emp_id, date) VALUES ($1, $2, '2031-01-01')`,
         [orgA, foreign],
       ),
-    ).toContain("schedule_cells_emp_id_org_fkey");
+    ).toContain("schedule_cells_emp_id_fkey");
   });
 
   it("refuses a cell with another organization's focus area", async () => {
@@ -120,7 +120,7 @@ describe.skipIf(!reachable)("organization-bound references", () => {
          VALUES ($1, $2, '2031-01-01', $3)`,
         [orgA, own, foreign],
       ),
-    ).toContain("schedule_cells_focus_area_id_org_fkey");
+    ).toContain("schedule_cells_focus_area_id_fkey");
   });
 
   it("accepts a cell inside one organization", async () => {
@@ -181,6 +181,20 @@ describe.skipIf(!reachable)("organization-bound references", () => {
     );
 
     expect(rows).toEqual([]);
+  });
+
+  it("keeps the key names the app's embeds ask for", async () => {
+    const { rows } = await db.query<{ conname: string }>(
+      `SELECT conname
+         FROM pg_constraint
+        WHERE conrelid = 'public.shift_requests'::regclass
+          AND conname IN (
+            'shift_requests_requester_emp_id_fkey',
+            'shift_requests_target_emp_id_fkey'
+          )`,
+    );
+
+    expect(rows).toHaveLength(2);
   });
 
   it("refuses department ids from another organization", async () => {
