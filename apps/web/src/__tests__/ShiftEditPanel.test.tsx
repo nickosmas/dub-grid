@@ -33,6 +33,7 @@ import {
   AssignmentDefinition,
   ShiftDisplayMode,
   ShiftJobSegment,
+  ScheduleCellState,
 } from "@/types";
 
 vi.mock("@/features/schedule/client", () => ({
@@ -290,6 +291,11 @@ function renderPanel(
     seriesId?: string | null;
     absenceRun?: { dateKeys: string[] } | null;
     onRemoveAbsenceRun?: ReturnType<typeof vi.fn>;
+    correctedLabel?: string | null;
+    correctedChange?: {
+      before: ScheduleCellState | null;
+      after: ScheduleCellState | null;
+    } | null;
     auditInfo?: {
       createdByName: string | null;
       updatedByName: string | null;
@@ -311,6 +317,8 @@ function panelElement(
 ) {
   return (
     <ShiftEditPanel
+      correctedLabel={overrides.correctedLabel}
+      correctedChange={overrides.correctedChange}
       modal={overrides.modalOverride ?? modal}
       currentShift={overrides.currentShift ?? null}
       currentAssignmentIds={overrides.currentAssignmentIds ?? []}
@@ -1982,6 +1990,54 @@ describe("ShiftEditPanel", () => {
       expect(screen.queryByRole("button", { name: "Add an absence" })).toBeNull();
       // Nobody works on after leaving early.
       expect(screen.queryByRole("button", { name: "Add another shift" })).toBeNull();
+    });
+
+    it("says the time it shows is the shift's own, apart from the custom time button", () => {
+      renderDay({ onCustomTimeChange: vi.fn() });
+
+      const row = document.querySelector("[data-standard-time]");
+      expect(row).toHaveTextContent("Standard shift time");
+      expect(row).toHaveTextContent("7:00 AM - 3:00 PM (8h)");
+      expect(screen.getByRole("button", { name: "Set custom time" })).toBeInTheDocument();
+    });
+
+    it("labels a corrected day and shows only what it was, above the shift as it stands", () => {
+      const worked = (customStartTime: string | null, customEndTime: string | null) => ({
+        kind: "worked" as const,
+        segments: [{ shiftId: 11, jobId: 102, position: 0, isMentored: false }],
+        absenceTypeId: null,
+        customStartTime,
+        customEndTime,
+        seriesId: null,
+        fromRecurring: false,
+      });
+      renderDay({
+        correctedLabel: "Corrected Nov 2 by Mina.\nReason: Left at 1",
+        correctedChange: { before: worked(null, null), after: worked("07:00", "13:00") },
+      });
+
+      const card = document.querySelector("[data-corrected-day]");
+      expect(card).toHaveTextContent("Corrected day");
+      expect(card).toHaveTextContent("Corrected Nov 2 by Mina.");
+      expect(card).toHaveTextContent("Reason: Left at 1");
+      expect(card).toHaveTextContent("Was");
+      expect(card).toHaveTextContent("3:00 PM");
+      expect(card).not.toHaveTextContent("After");
+      expect(card).not.toHaveTextContent("1:00 PM");
+    });
+
+    it("repeats nothing the two shift cards already show when a repeating day opens", () => {
+      renderDay({
+        seriesId: "series-1",
+        onCustomTimeChange: vi.fn(),
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+      });
+
+      expect(screen.getAllByRole("switch", { name: /Mentored assignment for/ })).toHaveLength(2);
+      expect(screen.queryByText("Shift 1 mentored")).toBeNull();
+      expect(screen.queryByText("Shift 2")).toBeNull();
     });
 
     it("hides Add another shift at two shifts but still offers an absence", () => {

@@ -2630,6 +2630,9 @@ describe("ScheduleGrid", () => {
       await waitFor(() => {
         const change = document.querySelector("[data-correction-change]");
         expect(change?.textContent).toMatch(/3:00 PM/);
+        expect(document.querySelector("[data-correction-title]")).toHaveTextContent(
+          "Corrected day",
+        );
       });
     });
   });

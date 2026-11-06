@@ -126,13 +126,16 @@ describe("buildShiftRecords", () => {
       RANGE,
       lookups,
       {
-        corrections: new Map([["2026-10-12", "Left early"]]),
+        corrections: new Map([
+          ["2026-10-12", { reason: "Left early", correctedFrom: "Was Day Shift" }],
+        ]),
         noteCounts: new Map([["2026-10-12", 2]]),
       },
     );
     expect(record).toMatchObject({
       state: "corrected",
       correctionReason: "Left early",
+      correctedFrom: "Was Day Shift",
       absenceName: "Sick",
       noteCount: 2,
       hours: 4,

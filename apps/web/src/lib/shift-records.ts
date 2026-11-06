@@ -19,9 +19,16 @@ export interface ShiftRecord {
   /** The published shifts a draft replaces, spelled out. */
   was: string | null;
   correctionReason: string | null;
+  /** What a corrected day was before its first correction, such as "Was Day Shift 7:00 AM - 3:00 PM". */
+  correctedFrom: string | null;
   /** An absence beside the shifts, such as "Sick". */
   absenceName: string | null;
   noteCount: number;
+}
+
+export interface ShiftRecordCorrection {
+  reason: string | null;
+  correctedFrom: string | null;
 }
 
 export interface ShiftRecordLookups {
@@ -58,8 +65,8 @@ export function buildShiftRecords(
   range: { startDate: string; endDate: string },
   lookups: ShiftRecordLookups,
   extras: {
-    /** Corrected days, by date, with their reason. */
-    corrections?: ReadonlyMap<string, string | null>;
+    /** Corrected days, by date. */
+    corrections?: ReadonlyMap<string, ShiftRecordCorrection>;
     /** Schedule notes per date. */
     noteCounts?: ReadonlyMap<string, number>;
   } = {},
@@ -92,7 +99,7 @@ export function buildShiftRecords(
             .map((item) => item.name)
             .join(", ") || null
         : null;
-    const correctionReason = extras.corrections?.get(date);
+    const correction = extras.corrections?.get(date);
 
     records.push({
       date,
@@ -112,10 +119,11 @@ export function buildShiftRecords(
             entry.customEndTime,
             lookups.shiftById,
           ),
-      state: draftKind ? "draft" : correctionReason !== undefined ? "corrected" : "published",
+      state: draftKind ? "draft" : correction ? "corrected" : "published",
       draftKind,
       was,
-      correctionReason: correctionReason ?? null,
+      correctionReason: correction?.reason ?? null,
+      correctedFrom: correction?.correctedFrom ?? null,
       absenceName:
         absenceId != null
           ? (lookups.absenceById.get(absenceId)?.name ??
