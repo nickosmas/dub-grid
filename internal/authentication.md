@@ -464,6 +464,12 @@ Org access is still resolved per request by `requireOrgPermissions` against
 from a client-supplied org id and never from a JWT claim alone. That separation is what
 makes an hour-stale token safe.
 
+Both `requireOrgPermissions` and `canManageEmployees` also refuse a request for another
+organization than the one its session is in, and anyone suspended from the organization
+asked for. Only the session's organization has passed the token hook's checks, so a
+membership alone doesn't prove access. A Gridmaster is exempt, the sandbox counts as the
+session's organization, and a token naming no organization falls back to the membership.
+
 ### Request authorization contract
 
 | Surface                         | Identity authority                                                                   | Live access authority                                                                                                 | What is never sufficient                                            |

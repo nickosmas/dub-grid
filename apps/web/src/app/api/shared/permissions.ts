@@ -8,7 +8,11 @@ import {
 import { fetchHiddenEmployeeIds, fetchHiddenInternalUserIds } from "@dubgrid/data-access";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import type { AdminPermissions, OrganizationRole } from "@/types";
-import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
+import {
+  createRequestSupabaseClient,
+  readSessionOrgId,
+  requireAuthenticatedUser,
+} from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   BILLING_ACCESS_SELECT,
@@ -386,7 +390,7 @@ export async function requireOrgPermissions(
   options?: OrgPermissionOptions,
 ): Promise<AuthorizedOrgRequest | { response: NextResponse }> {
   let auth = options?.actor
-    ? { user: options.actor, sessionId: null as string | null }
+    ? { user: options.actor, sessionId: null as string | null, sessionOrgId: null as string | null }
     : await requireAuthenticatedUser(req);
   if ("response" in auth) {
     return { response: auth.response };
@@ -422,6 +426,7 @@ export async function requireOrgPermissions(
   const sandboxCookieValue = options?.ignoreSandbox
     ? null
     : req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
+  let redirectedToSandbox = false;
   if (sandboxCookieValue) {
     const sb = getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`);
     if (auth.sessionId == null) {
@@ -451,6 +456,7 @@ export async function requireOrgPermissions(
         .maybeSingle();
       if (profile?.platform_role !== "gridmaster") {
         orgId = ownedSandbox.id;
+        redirectedToSandbox = true;
       }
     } else {
       return { response: forbiddenResponse() };
@@ -466,27 +472,34 @@ export async function requireOrgPermissions(
     ? null
     : isOrganizationSetupCompleteCached(serviceClient, orgId);
   setupCompleteAnswer?.catch(() => {});
-  const [{ data: membership }, { data: profile }, { data: organization }] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("org_role, admin_permissions")
-      .eq("user_id", auth.user.id)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .maybeSingle(),
-    serviceClient
-      .from("profiles")
-      .select("platform_role, deactivated_at, terminated_at")
-      .eq("id", auth.user.id)
-      .maybeSingle(),
-    serviceClient
-      .from("organizations")
-      .select(
-        `archived_at, suspended_at, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, ${BILLING_ACCESS_SELECT}`,
-      )
-      .eq("id", orgId)
-      .maybeSingle(),
-  ]);
+  const [{ data: membership }, { data: profile }, { data: organization }, { data: employee }] =
+    await Promise.all([
+      serviceClient
+        .from("organization_memberships")
+        .select("org_role, admin_permissions")
+        .eq("user_id", auth.user.id)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .maybeSingle(),
+      serviceClient
+        .from("profiles")
+        .select("platform_role, deactivated_at, terminated_at")
+        .eq("id", auth.user.id)
+        .maybeSingle(),
+      serviceClient
+        .from("organizations")
+        .select(
+          `archived_at, suspended_at, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, ${BILLING_ACCESS_SELECT}`,
+        )
+        .eq("id", orgId)
+        .maybeSingle(),
+      serviceClient
+        .from("employees")
+        .select("suspended_at")
+        .eq("user_id", auth.user.id)
+        .eq("org_id", orgId)
+        .maybeSingle(),
+    ]);
 
   // The JWT hook refuses these accounts at the next token issue; this covers
   // the token they already hold. Without it a deactivated user kept every
@@ -503,6 +516,18 @@ export async function requireOrgPermissions(
   const isGridmaster = profile?.platform_role === "gridmaster";
   if (!isGridmaster && !membership) {
     return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
+  }
+
+  // A membership alone isn't enough: `orgId` comes from the client, and only
+  // the session's own organization has passed the token hook's checks (F-194).
+  if (!isGridmaster) {
+    const sessionOrgId = options?.actor ? await readSessionOrgId(req) : auth.sessionOrgId;
+    if (!redirectedToSandbox && sessionOrgId && sessionOrgId !== orgId) {
+      return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
+    }
+    if (employee?.suspended_at != null) {
+      return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
+    }
   }
 
   if (options?.gridmasterNeedsImpersonation && isGridmaster && !membership) {

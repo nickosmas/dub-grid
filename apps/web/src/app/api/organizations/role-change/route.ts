@@ -8,7 +8,7 @@ import {
 } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
-import { isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
+import { isActingInSessionOrg, isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
@@ -98,6 +98,13 @@ export async function POST(req: NextRequest) {
       if (!allowed) {
         return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
       }
+    }
+
+    if (
+      effectiveOrgId &&
+      !(await isActingInSessionOrg(req, getServiceClient(), auth.user.id, effectiveOrgId))
+    ) {
+      return NextResponse.json({ error: API_ERRORS.NOT_ORG_MEMBER }, { status: 403 });
     }
 
     const supabase = createRequestSupabaseClient(req);
