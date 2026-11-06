@@ -717,15 +717,15 @@
 **Suggested fix:** A forward migration in stages: add `UNIQUE (org_id, id)` on each parent, then composite foreign keys `(org_id, x_id)` for the 33 links, `NOT VALID` first and validated after a data check; add `org_id` to `schedule_cells`' unique index; add a shared trigger refusing a change to `org_id`; validate shift, job and absence ids in the cell write functions; bind `requester_employee_id` to the requester in the insert policy.
 **Resolution:**
 
-### F-193 [P1] open - Editing a pending invitation's email keeps its token, so an Admin can create a confirmed account at someone else's address
+### F-193 [P1] fixed - Editing a pending invitation's email keeps its token, so an Admin can create a confirmed account at someone else's address
 
 **File:** `apps/web/src/app/api/organizations/invitations/route.ts:391` (PATCH changes `email`, not `token`); `apps/web/src/app/api/invitations/register/route.ts:129` (`email_confirm: true`), `:167`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** The token is treated as proof of the inbox, but PATCH moves it to a new address. An Admin invites their own mailbox, reads the token, changes the email to `victim@otherhospital.org`, and registers with that token and a chosen password. The result is a confirmed account at the victim's address with a password the attacker knows. If another organization later invites that person, the invitation finds it as an existing account, and the attacker's live session can then follow them into that organization. If an unconfirmed account with no memberships already holds the address, its password is overwritten instead. Traced, not run.
 **Suggested fix:** Rotate the token (and resend) whenever the email changes, using `replace_pending_invitation_access`, and refuse a register whose token predates the email change.
-**Resolution:**
+**Resolution:** Fixed on fix/invitation-email-rotates-token (2026-11-06): PATCH replaces the token and expiry with the address and mails the new link to the new address only, so the old token no longer exists and nothing further is needed at register. A failed send restores the invitation, and the new address's send limit is checked first. It was the only route that changed an invitation's address; 049 already keeps the column from browsers. Route tests use a client double. Not done: a link already moved to another address before this fix stays live until it expires, and production's audit rows weren't checked for one.
 
-### F-194 [P1] open - API requests aren't bound to the session's organization, so a person suspended in one organization keeps access to it through another
+### F-194 [P1] fixed - API requests aren't bound to the session's organization, so a person suspended in one organization keeps access to it through another
 
 **File:** `apps/web/src/app/api/shared/permissions.ts:471` (`requireOrgPermissions`), `apps/web/src/app/api/employees/shared.ts` (`canManageEmployees`); `apps/web/src/proxy.ts:825` (the matcher excludes `/api`)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)

@@ -292,10 +292,11 @@ export async function PATCH(req: NextRequest) {
     const allowed = await requirePrivilegedActor(req, orgId);
     if (!allowed.ok) return allowed.response;
 
-    const currentInvitation = await fetchInvitation(orgId, invitationId);
-    if (!currentInvitation) {
+    const currentSnapshot = await fetchInvitationWithToken(orgId, invitationId);
+    if (!currentSnapshot) {
       return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
     }
+    const { invitation: currentInvitation, token: previousToken } = currentSnapshot;
 
     if (currentInvitation.revokedAt || currentInvitation.acceptedAt) {
       return NextResponse.json(
@@ -381,16 +382,46 @@ export async function PATCH(req: NextRequest) {
       if ("response" in assurance) return assurance.response;
     }
 
+    if (nextEmail !== undefined && emailChanged) {
+      const targetLimit = await checkInvitationEmailLimit(nextEmail);
+      if (targetLimit.misconfigured) {
+        return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
+      }
+      if (targetLimit.limited) {
+        return NextResponse.json(
+          {
+            error:
+              "We've sent several invites to that address already. Wait a few minutes and try again.",
+          },
+          {
+            status: 429,
+            headers: { "Retry-After": String(retryAfterSeconds(targetLimit.reset)) },
+          },
+        );
+      }
+    }
+
     const deptSet = new Set(fields.departmentIds ?? currentInvitation.departmentIds ?? []);
     const nextDeptAdminIds =
       fields.deptAdminIds !== undefined
         ? fields.deptAdminIds.filter((id) => deptSet.has(id))
         : (currentInvitation.deptAdminIds ?? []);
 
+    // A token proves its holder reads the inbox it was mailed to, and
+    // registering trusts that to confirm the account (F-193). So a new address
+    // gets a new token, which only that inbox receives.
+    const reissue = emailChanged
+      ? {
+          token: crypto.randomUUID(),
+          expires_at: new Date(Date.now() + INVITATION_LIFETIME_MS).toISOString(),
+        }
+      : null;
+
     const serviceClient = getServiceClient();
     const { data: updatedInvitation, error } = await serviceClient
       .from("invitations")
       .update({
+        ...reissue,
         email: fields.email?.toLowerCase() ?? currentInvitation.email,
         role_to_assign: fields.roleToAssign ?? currentInvitation.roleToAssign,
         first_name: fields.firstName ?? currentInvitation.firstName ?? null,
@@ -430,6 +461,57 @@ export async function PATCH(req: NextRequest) {
     }
 
     const latestInvitation = rowToInvitation(updatedInvitation as DbInvitation);
+
+    if (reissue) {
+      try {
+        await sendPendingInvitationEmail({
+          orgId,
+          token: reissue.token,
+          email: latestInvitation.email,
+          expiresAt: reissue.expires_at,
+          kind: "new",
+        });
+      } catch (emailError) {
+        const { data: restoredInvitation, error: rollbackError } = await serviceClient
+          .from("invitations")
+          .update({
+            token: previousToken,
+            expires_at: currentInvitation.expiresAt,
+            email: currentInvitation.email,
+            role_to_assign: currentInvitation.roleToAssign,
+            first_name: currentInvitation.firstName ?? null,
+            last_name: currentInvitation.lastName ?? null,
+            phone: currentInvitation.phone ?? null,
+            department_ids: currentInvitation.departmentIds ?? [],
+            dept_admin_ids: currentInvitation.deptAdminIds ?? [],
+            invited_by: currentInvitation.invitedBy,
+          })
+          .eq("org_id", orgId)
+          .eq("id", invitationId)
+          .eq("updated_at", latestInvitation.updatedAt)
+          .eq("token", reissue.token)
+          .is("accepted_at", null)
+          .select("id")
+          .maybeSingle();
+        if (rollbackError || !restoredInvitation) {
+          logger.error(
+            { error: rollbackError, orgId, invitationId },
+            "Failed to restore invitation after an address change email failure",
+          );
+        }
+        Sentry.captureException(emailError, {
+          extra: { context: "invitation-address-change-email", orgId, invitationId },
+        });
+        return NextResponse.json(
+          {
+            error: isEmailNotConfigured(emailError)
+              ? "Email service not configured"
+              : "We couldn't send the invitation to that address. Nothing was changed.",
+          },
+          { status: isEmailNotConfigured(emailError) ? 503 : 502 },
+        );
+      }
+    }
 
     await writeAuditEntry({
       orgId,
