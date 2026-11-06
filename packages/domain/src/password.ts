@@ -10,6 +10,10 @@
  * Deliberately dependency-free string logic so it stays platform-neutral.
  */
 
+// Supabase's `lower_upper_letters_digits_symbols` requirement refuses a password
+// missing any of these, so the app asks for each rather than accept what the
+// server then rejects. Its symbols are ASCII punctuation: a space, an accented
+// letter or an emoji doesn't count.
 export const PASSWORD_STRENGTH_RULES = [
   {
     id: "length",
@@ -17,25 +21,28 @@ export const PASSWORD_STRENGTH_RULES = [
     isMet: (password: string) => password.length >= 10,
   },
   {
+    id: "lowercase",
+    label: "Lowercase letter",
+    isMet: (password: string) => /[a-z]/.test(password),
+  },
+  {
     id: "uppercase",
     label: "Uppercase letter",
     isMet: (password: string) => /[A-Z]/.test(password),
   },
   {
-    // Supabase's `letters_digits` requirement refuses a password without both,
-    // so the app asks for them rather than accept what sign-up then rejects.
     id: "number",
-    label: "Letter and number",
-    isMet: (password: string) => /[A-Za-z]/.test(password) && /[0-9]/.test(password),
+    label: "Number",
+    isMet: (password: string) => /[0-9]/.test(password),
   },
   {
     id: "symbol",
     label: "Symbol",
-    isMet: (password: string) => /[^A-Za-z0-9]/.test(password),
+    isMet: (password: string) => /[!-/:-@[-`{-~]/.test(password),
   },
 ] as const;
 
-export const PASSWORD_STRENGTH_LABELS = ["Too short", "Weak", "Fair", "Strong"] as const;
+export const PASSWORD_STRENGTH_LABELS = ["Too short", "Weak", "Strong"] as const;
 
 /**
  * Supabase Auth refuses a password over 72 bytes (bcrypt's limit, counted as
@@ -78,39 +85,21 @@ export function getPasswordStrengthHints(password: string): PasswordStrengthHint
 }
 
 /**
- * 0-3, indexing `PASSWORD_STRENGTH_LABELS`.
+ * 0-2, indexing `PASSWORD_STRENGTH_LABELS`.
  *
  * Length gates everything: a short password is "too short" no matter how many
  * character classes it uses, because length is what actually resists a brute
  * force.
  */
 export function getPasswordStrengthLevel(password: string): number {
-  const hints = getPasswordStrengthHints(password);
-  const metCount = hints.filter((hint) => hint.met).length;
-
-  if (!hints[0]?.met) return 0;
-  // Never "Fair" or better for a password the forms refuse (41d3, F-47).
-  if (!isPasswordAcceptable(password)) return 1;
-  if (metCount === hints.length) return 3;
-  if (metCount >= 3) return 2;
-  return 1;
+  if (!getPasswordStrengthHints(password)[0]?.met) return 0;
+  // Never "Strong" for a password the forms refuse (41d3, F-47).
+  return isPasswordAcceptable(password) ? 2 : 1;
 }
 
-/**
- * The bar a new password has to clear before any form will submit: the length,
- * a letter and a number (which Supabase also requires), and an uppercase
- * letter or a symbol.
- */
+/** The bar a new password has to clear before any form will submit: every rule. */
 export function isPasswordAcceptable(password: string): boolean {
-  const met = Object.fromEntries(
-    getPasswordStrengthHints(password).map((hint) => [hint.id, hint.met]),
-  );
-  return Boolean(
-    met.length &&
-    met.number &&
-    (met.uppercase || met.symbol) &&
-    passwordByteLength(password) <= PASSWORD_MAX_BYTES,
-  );
+  return getPasswordStrengthHints(password).every((hint) => hint.met);
 }
 
 /** One wording everywhere. Mobile reset previously said "Those passwords don't match." */

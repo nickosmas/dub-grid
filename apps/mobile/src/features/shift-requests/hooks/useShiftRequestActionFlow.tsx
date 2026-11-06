@@ -9,6 +9,7 @@ import {
   getMobileRequestActionFeedback,
   getMobileRequestActionSuccessToast,
   type MobileRequestActionFeedback,
+  type MobileRequestActionSubject,
 } from "../lib/request-action-feedback";
 
 export type RequestActionBody =
@@ -30,6 +31,7 @@ type RequestActionConfirmation = {
   requestId: string;
   body: RequestActionBody;
   feedback: MobileRequestActionFeedback;
+  requestType: MobileRequestActionSubject["type"] | null;
 } | null;
 
 /**
@@ -39,10 +41,13 @@ type RequestActionConfirmation = {
 export function useShiftRequestActionFlow({
   accessToken,
   viewerCanApprove,
+  requests,
   onSucceeded,
 }: {
   accessToken: string | null;
   viewerCanApprove: boolean;
+  /** The loaded requests, so the confirm and toast can name what was acted on. */
+  requests?: ReadonlyArray<MobileRequestActionSubject & { id: string }>;
   onSucceeded: () => Promise<unknown>;
 }) {
   const queryClient = useQueryClient();
@@ -50,8 +55,11 @@ export function useShiftRequestActionFlow({
   const [pendingAction, setPendingAction] = useState<PendingRequestAction>(null);
   const [confirmation, setConfirmation] = useState<RequestActionConfirmation>(null);
   const mutation = useMutation({
-    mutationFn: async (input: { requestId: string; body: RequestActionBody }) =>
-      updateShiftRequest(accessToken!, input.requestId, input.body),
+    mutationFn: async (input: {
+      requestId: string;
+      body: RequestActionBody;
+      requestType: MobileRequestActionSubject["type"] | null;
+    }) => updateShiftRequest(accessToken!, input.requestId, input.body),
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
         error,
@@ -68,7 +76,7 @@ export function useShiftRequestActionFlow({
       ]);
       pushToast({
         tone: "success",
-        ...getMobileRequestActionSuccessToast(variables.body, data),
+        ...getMobileRequestActionSuccessToast(variables.body, data, variables.requestType),
       });
     },
   });
@@ -79,16 +87,22 @@ export function useShiftRequestActionFlow({
         return;
       }
 
-      const feedback = getMobileRequestActionFeedback({ requestId, body, viewerCanApprove });
-      setConfirmation({ requestId, body, feedback });
+      const request = requests?.find((candidate) => candidate.id === requestId);
+      const feedback = getMobileRequestActionFeedback({
+        requestId,
+        body,
+        request,
+        viewerCanApprove,
+      });
+      setConfirmation({ requestId, body, feedback, requestType: request?.type ?? null });
     },
-    [viewerCanApprove, pendingAction, mutation.isPending],
+    [viewerCanApprove, pendingAction, mutation.isPending, requests],
   );
 
   const confirmRequestAction = useCallback(() => {
     if (!confirmation) return;
 
-    const { requestId, body, feedback } = confirmation;
+    const { requestId, body, feedback, requestType } = confirmation;
     setConfirmation(null);
     setPendingAction({ key: feedback.key });
     // Returned so `ConfirmationModal` can latch on it. The guard above reads
@@ -97,7 +111,7 @@ export function useShiftRequestActionFlow({
     // rather than rejects: the mutation's own `onError` already toasts.
     return new Promise<void>((resolve) => {
       mutation.mutate(
-        { requestId, body },
+        { requestId, body, requestType },
         {
           onSettled: () => {
             setPendingAction(null);

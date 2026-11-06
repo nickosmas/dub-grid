@@ -8,6 +8,7 @@ import {
   type BulkStatusPerson,
 } from "./bulk-status";
 import {
+  AWAY_WHILE_SUSPENDED_MESSAGE,
   NO_ACCOUNT_MESSAGE,
   NOT_ON_SCHEDULE_MESSAGE,
   NOT_SUSPENDABLE_MESSAGE,
@@ -39,7 +40,10 @@ describe("bulkStatusSkipReason", () => {
     expect(bulkStatusSkipReason("reinstate", suspended)).toBeNull();
     expect(bulkStatusSkipReason("restore", offboarded)).toBeNull();
     expect(bulkStatusSkipReason("archive", suspended)).toBeNull();
-    expect(bulkStatusSkipReason("markAway", suspended)).toBeNull();
+  });
+
+  it("skips a suspended person for Mark away until they're reinstated", () => {
+    expect(bulkStatusSkipReason("markAway", suspended)).toBe(AWAY_WHILE_SUSPENDED_MESSAGE);
   });
 
   it("skips someone with a return planned, whose plan is edited on their page (51l)", () => {
@@ -185,6 +189,55 @@ describe("describeBulkStatusAction", () => {
     expect(copy.title).toBe("Offboard Jamie Rivera?");
     expect(copy.points).toContain("The time away planned from Jan 5 is canceled.");
     expect(copy.done).toBe("Offboarded");
+  });
+
+  it("says Mark active puts back only the days an away absence held", () => {
+    const withAbsence = person({
+      status: "inactive",
+      awayUntil: "2027-01-04",
+      awayAbsenceTypeId: 3,
+    });
+    expect(describeBulkStatusAction("markActive", [away, away]).message).toBe(
+      "Shifts taken off while they were away stay off.",
+    );
+    expect(describeBulkStatusAction("markActive", [withAbsence, withAbsence]).message).toBe(
+      "Days left in their time away go back to what was published, without their absence.",
+    );
+    expect(describeBulkStatusAction("markActive", [away, withAbsence]).message).toBe(
+      "Days an away absence held go back to what was published. Other shifts taken off while they were away stay off.",
+    );
+    expect(describeBulkStatusAction("markActive", [withAbsence]).message).toBe(
+      "Days left in their time away go back to what was published, without their absence.",
+    );
+  });
+
+  it("says what the plans it cancels leave behind", () => {
+    const leaving = person({ plannedStatus: "removed", plannedFrom: "2026-11-09" });
+    const plannedAway = person({
+      plannedStatus: "away",
+      plannedFrom: "2026-11-10",
+      plannedUntil: "2026-11-20",
+      plannedAbsenceTypeId: 3,
+    });
+    const suspend = describeBulkStatusAction("suspend", [leaving, plannedAway, active]);
+    expect(suspend.points).toContain(
+      "Days a canceled plan filled with an absence go back to what was published.",
+    );
+    expect(suspend.unchanged).toEqual([
+      "Their shifts stay, and you can keep scheduling them.",
+      "Shifts their plans already took off stay off.",
+    ]);
+    expect(
+      describeBulkStatusAction("markAway", [leaving, leaving], { returnDate: "2027-01-04" })
+        .unchanged,
+    ).toEqual([
+      "They can still sign in and keep their roles.",
+      "Shifts their plans already took off stay off.",
+      "Requests their plans closed stay closed.",
+    ]);
+    expect(describeBulkStatusAction("archive", [leaving, plannedAway]).unchanged).toEqual([
+      "Their history stays, and you can restore them later.",
+    ]);
   });
 });
 

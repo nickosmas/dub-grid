@@ -43,15 +43,15 @@ test.describe("role variance: qa-admin route entry contract", () => {
         marker: (p) => p.getByRole("button", { name: "Add", exact: true }),
       },
       {
-        // canEditDetails: the person page offers Edit details in its header.
+        // canEditDetails: the person page opens on their details, ready to edit.
         path: employeeHref,
         finalUrl: new RegExp(`${employeeHref.replace(/\//g, "\\/")}$`),
-        marker: (p) => p.getByRole("button", { name: "Edit details", exact: true }),
+        marker: (p) => p.getByRole("textbox", { name: /First name/ }),
       },
       {
         path: "/profile",
         finalUrl: /\/profile/,
-        marker: (p) => p.getByRole("button", { name: "Edit details", exact: true }),
+        marker: (p) => p.getByRole("heading", { name: "Your details", exact: true }),
       },
       {
         // canViewReports is in ADMIN_DEFAULT_PERMS: the page renders.

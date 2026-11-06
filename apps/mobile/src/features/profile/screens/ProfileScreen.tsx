@@ -19,7 +19,7 @@ import { IS_ANDROID_LIST, IS_NATIVE_LIST } from "../../../shared/lib/native-list
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
-import { createHeaderTextAction } from "../../../shared/navigation/HeaderTextAction";
+import { HeaderTextBarAction } from "../../../shared/navigation/HeaderTextAction";
 import {
   getProfile,
   getProfileChangeRequests,
@@ -462,14 +462,16 @@ export default function ProfileScreen() {
                 color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
                 fontFamily: mobileTypography.fontFamily.bold,
               },
-              // The same bar action the person page has. It opens "Profile
-              // details", which is this profile's editor; the Settings row of
-              // that name below stays as the list's way in.
-              ...createHeaderTextAction({
-                label: "Edit",
-                accessibilityHint: "Opens your profile details",
-                onPress: () => router.push("/(tabs)/profile/work"),
-              }),
+            }}
+          />
+          {/* The same bar action the person page has. It opens "Profile
+              details", which is this profile's editor; the Settings row of
+              that name below stays as the list's way in. */}
+          <HeaderTextBarAction
+            action={{
+              label: "Edit",
+              accessibilityHint: "Opens your profile details",
+              onPress: () => router.push("/(tabs)/profile/work"),
             }}
           />
           {/* Centered, the same way both person pages are: this page's subject is

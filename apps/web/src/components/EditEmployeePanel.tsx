@@ -8,6 +8,7 @@ import {
   useId,
   forwardRef,
   useImperativeHandle,
+  useRef,
 } from "react";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { Button } from "@/components/Button";
@@ -15,7 +16,6 @@ import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE, useIsInSandbox } from "@/hooks";
 import { useStepUpAction, type StepUpRun } from "@/hooks/useStepUpAction";
 import { useLatestRef } from "@/hooks/useLatestRef";
-import { requireCredentialAssurance } from "@/features/account/client";
 import {
   validateEmail,
   validateNotes,
@@ -87,6 +87,8 @@ export interface EditEmployeePanelProps {
   onEmailConflictChange?: (hasConflict: boolean) => void;
   onInvite?: (emp: Employee) => void;
   pendingInvitation?: Invitation;
+  /** Offered beside a joined person's locked email, when this viewer may move them. */
+  onMoveToNewEmail?: () => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onResend?: (invitationId: string) => Promise<boolean> | boolean | void;
   /** Called instead of `onSave` when the admin confirms changing the email
@@ -105,6 +107,8 @@ export interface EditEmployeePanelProps {
   hideActions?: boolean;
   /** Persistent page editors have no meaningful pristine Close action. */
   persistent?: boolean;
+  /** Draws Details and Work as the page's own cards, for editing in place. */
+  sectioned?: boolean;
   /** Drops the editor's own side padding so an embedding card owns the inner
    *  padding and the fields line up with that card's heading. */
   flushHorizontal?: boolean;
@@ -167,11 +171,13 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onEmailConflictChange,
       onInvite,
       pendingInvitation,
+      onMoveToNewEmail,
       onRevoke,
       onResend,
       onSaveWithReinvite,
       hideActions,
       persistent = false,
+      sectioned = false,
       flushHorizontal = false,
     }: EditEmployeePanelProps,
     ref,
@@ -271,11 +277,18 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
     }, []);
 
+    // Editing in place outlives a background refetch, which hands back the same
+    // record as a new object: only a real change replaces what's being typed.
+    const loadedRecordRef = useRef({ id: employee.id, version: employee.version });
     useEffect(() => {
+      const loaded = loadedRecordRef.current;
+      const unchanged = loaded.id === employee.id && loaded.version === employee.version;
+      loadedRecordRef.current = { id: employee.id, version: employee.version };
+      if (persistent && unchanged) return;
       setForm(buildEditForm(employee));
       setTouched({});
       setAddingFirstDay(false);
-    }, [employee]);
+    }, [employee, persistent]);
 
     // A first day can still be given to someone Active who hasn't worked a shift yet.
     const mayStillStart = Boolean(orgId) && employee.status === "active" && !employee.firstDay;
@@ -398,19 +411,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         return false;
       }
 
-      // The email is the login email: changing it for a linked account is a
-      // sensitive action, so confirm the manager's identity the way the
-      // profile's own email change does before the save goes out.
-      if (emailChanged && employee.userId) {
-        let saved = false;
-        const completed = await stepUpRef.current.run(async (accessToken) => {
-          await requireCredentialAssurance(accessToken);
-          saved = (await onSave(nextEmployee)) !== false;
-        });
-        if (completed && saved) onSaveCompleted?.();
-        return completed && saved;
-      }
-
       const saved = (await onSave(nextEmployee)) !== false;
       if (!saved) return false;
       onSaveCompleted?.();
@@ -527,14 +527,31 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             style={{
               display: "flex",
               flexDirection: "column",
+              gap: sectioned ? 16 : undefined,
             }}
           >
             {/* ── Details section ── */}
-            <div style={{ paddingTop: 20, paddingBottom: 20 }}>
-              <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
-                Details
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div
+              className={sectioned ? "dg-card" : undefined}
+              style={
+                sectioned
+                  ? undefined
+                  : { paddingTop: hideIdentityFields ? 0 : 20, paddingBottom: 20 }
+              }
+            >
+              {sectioned ? (
+                <div className="dg-card-header">
+                  <div className="dg-card-title">Details</div>
+                </div>
+              ) : hideIdentityFields ? null : (
+                <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
+                  Details
+                </div>
+              )}
+              <div
+                className={sectioned ? "dg-card-body" : undefined}
+                style={{ display: "flex", flexDirection: "column", gap: 14 }}
+              >
                 {!hideIdentityFields && (
                   <div
                     style={{
@@ -723,11 +740,39 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                         onBlur={() => markTouched("email")}
                         placeholder="name@example.com"
-                        readOnly={readOnly}
-                        style={
-                          fieldErrors.email ? { borderColor: "var(--dg-color-danger)" } : undefined
-                        }
+                        readOnly={readOnly || Boolean(employee.userId)}
+                        style={{
+                          ...(fieldErrors.email
+                            ? { borderColor: "var(--dg-color-danger)" }
+                            : undefined),
+                          ...(employee.userId
+                            ? { color: "var(--dg-color-text-muted)", cursor: "default" }
+                            : undefined),
+                        }}
                       />
+                      {employee.userId && !fieldErrors.email && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-text-subtle)",
+                            marginTop: 4,
+                          }}
+                        >
+                          Only they can change this, on their own profile.
+                          {onMoveToNewEmail ? (
+                            <>
+                              {" "}
+                              <button
+                                type="button"
+                                onClick={onMoveToNewEmail}
+                                className="cursor-pointer border-0 bg-transparent p-0 font-semibold text-[var(--dg-color-link)] hover:underline"
+                              >
+                                Move to a new email
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                      )}
                       {fieldErrors.email && (
                         <div
                           style={{
@@ -791,16 +836,30 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
             {showScheduleAssignments && (
               <div
-                style={{
-                  borderTop: "1px solid var(--dg-color-border-light)",
-                  paddingTop: 20,
-                  paddingBottom: 20,
-                }}
+                className={sectioned ? "dg-card" : undefined}
+                style={
+                  sectioned
+                    ? undefined
+                    : {
+                        borderTop: "1px solid var(--dg-color-border-light)",
+                        paddingTop: 20,
+                        paddingBottom: 20,
+                      }
+                }
               >
-                <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
-                  Assignments
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {sectioned ? (
+                  <div className="dg-card-header">
+                    <div className="dg-card-title">Work</div>
+                  </div>
+                ) : hideIdentityFields ? null : (
+                  <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
+                    Assignments
+                  </div>
+                )}
+                <div
+                  className={sectioned ? "dg-card-body" : undefined}
+                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
+                >
                   <SectionNotice messages={assignmentNotices} />
                   <div>
                     <label style={fieldLabel}>{certificationLabel}</label>

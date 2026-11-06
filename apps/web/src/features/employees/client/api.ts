@@ -188,6 +188,42 @@ export async function checkEmployeeEmailConflict(
   });
 }
 
+/** Points a joined person's staff record at a new address and invites it. */
+export function moveEmployeeToNewEmail(input: {
+  orgId: string;
+  empId: string;
+  email: string;
+  expectedVersion: number;
+}): Promise<{ employee: Employee; invited: boolean }> {
+  return requestEmployeesJson("/api/employees/move-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+/** Whether a Super Admin can delete this person's account from here. */
+export function fetchAccountDeletionState(
+  orgId: string,
+  empId: string,
+): Promise<{ usedElsewhere: boolean }> {
+  const query = new URLSearchParams({ orgId, empId });
+  return requestEmployeesJson(`/api/employees/delete-account?${query}`);
+}
+
+/** Permanently deletes an offboarded person's sign-in. Their staff record stays. */
+export function deleteEmployeeAccount(input: {
+  orgId: string;
+  empId: string;
+  confirmation: string;
+}): Promise<{ employee: Employee }> {
+  return requestEmployeesJson("/api/employees/delete-account", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export interface EmployeePhoneConflictResult {
   conflict: boolean;
   conflictingEmployeeId: string | null;

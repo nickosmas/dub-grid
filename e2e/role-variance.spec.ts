@@ -43,10 +43,10 @@ test.describe("role variance: route entry contract", () => {
         marker: (p) => p.getByText("Directory"),
       },
       {
-        // On schedule, so the Overview tab is offered.
+        // On schedule, so the Schedule tab is offered.
         path: "/profile",
         finalUrl: /\/profile/,
-        marker: (p) => p.getByRole("button", { name: "Overview", exact: true }),
+        marker: (p) => p.getByRole("button", { name: "Schedule", exact: true }),
       },
       // canViewReports is false for the user role: ReportsPageContent
       // replaces the route with /dashboard.
@@ -63,7 +63,7 @@ test.describe("role variance: route entry contract", () => {
   // The seed puts every login-linked employee on the schedule (a donor's
   // focus areas and cells are cloned onto it), so this fixture is a scheduled
   // user with management access, not a management-only member. The
-  // management-only variant (Dashboard bounce, no Overview) has no fixture.
+  // management-only variant (Dashboard bounce, no Schedule tab) has no fixture.
   test("qa-management (user with management access, on schedule)", async ({ page }) => {
     test.setTimeout(180_000);
     const employeeHref = await warmUpAndCaptureEmployeeHref(page);
@@ -95,7 +95,7 @@ test.describe("role variance: route entry contract", () => {
       {
         path: "/profile",
         finalUrl: /\/profile/,
-        marker: (p) => p.getByRole("button", { name: "Overview", exact: true }),
+        marker: (p) => p.getByRole("button", { name: "Schedule", exact: true }),
       },
       { path: "/reports", finalUrl: /\/dashboard$/ },
       { path: "/alerts", finalUrl: /\/alerts$/, marker: (p) => p.getByText("Inbox") },
@@ -227,7 +227,7 @@ test.describe("role variance: interaction contract", () => {
     await expectNoManageControls(page, page);
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile`);
-    await expect(page.getByRole("button", { name: "Overview", exact: true })).toBeVisible({
+    await expect(page.getByRole("button", { name: "Schedule", exact: true })).toBeVisible({
       timeout: 20_000,
     });
 
@@ -296,7 +296,7 @@ test.describe("role variance: interaction contract", () => {
     await expectNoManageControls(page, page);
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile`);
-    await expect(page.getByRole("button", { name: "Overview", exact: true })).toBeVisible({
+    await expect(page.getByRole("button", { name: "Schedule", exact: true })).toBeVisible({
       timeout: 20_000,
     });
 

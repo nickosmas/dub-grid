@@ -6,6 +6,7 @@ const useBootstrap = vi.fn();
 const useMobileRealtimeInvalidation = vi.fn();
 const useMobileAccountRealtimeInvalidation = vi.fn();
 const useMobilePermissionsRealtime = vi.fn();
+const useOwnRoleChangeNotice = vi.fn();
 const mockQueryClient = { invalidateQueries: vi.fn() };
 
 vi.mock("../../../shared/providers/AuthSessionProvider", () => ({
@@ -26,6 +27,10 @@ vi.mock("../../../shared/hooks/useMobileAccountRealtimeInvalidation", () => ({
 
 vi.mock("../hooks/useMobilePermissionsRealtime", () => ({
   useMobilePermissionsRealtime,
+}));
+
+vi.mock("../hooks/useOwnRoleChangeNotice", () => ({
+  useOwnRoleChangeNotice,
 }));
 
 vi.mock("../../../shared/lib/query-client", () => ({

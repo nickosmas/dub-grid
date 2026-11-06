@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 
@@ -22,8 +22,10 @@ import { ProfilePanel } from "@/components/account/ProfilePanel";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 import { NotificationsPanel } from "@/components/account/NotificationsPanel";
 import { DataPrivacyPanel } from "@/components/account/DataPrivacyPanel";
+import DeleteAccountCard from "@/components/account/DeleteAccountCard";
+import { RequestDeletionCard } from "@/components/account/RequestDeletionCard";
 import { EmployeeStatusCard } from "@/components/staff-detail/EmployeeStatusCard";
-import { AccessCard, RecordCard, WorkCard } from "@/components/staff-detail/PersonInfoCards";
+import { RecordCard, WorkCard } from "@/components/staff-detail/PersonInfoCards";
 import { StaffOverviewTab } from "@/components/staff-detail/tabs/StaffOverviewTab";
 import { ScheduleTab } from "@/components/staff-detail/tabs/ScheduleTab";
 import { CalendarSubscriptionCard } from "./CalendarSubscriptionCard";
@@ -36,17 +38,9 @@ import {
 } from "./profile-tabs";
 
 const TAB_LABELS: Record<ProfileTab, string> = {
-  overview: "Overview",
-  schedule: "Schedule",
   account: "Account",
+  schedule: "Schedule",
 };
-
-const ACCOUNT_HEADINGS: Array<{ id: ProfileAccountSection; title: string }> = [
-  { id: "details", title: "Your details" },
-  { id: "security", title: "Sign-in and security" },
-  { id: "notifications", title: "Alerts" },
-  { id: "data-privacy", title: "Data and privacy" },
-];
 
 const PERIOD_PHRASE = "in the last 12 weeks";
 
@@ -55,15 +49,41 @@ const toLocalDate = (iso: string) => {
   return new Date(year, month - 1, day);
 };
 
+/** A card on the Account tab, its title in the header bar, its parts ruled apart. */
+function AccountSection({
+  id,
+  title,
+  children,
+}: {
+  id: ProfileAccountSection;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      id={`profile-${id}`}
+      aria-labelledby={`profile-${id}-title`}
+      className="dg-card scroll-mt-6"
+    >
+      <div className="dg-card-header">
+        <h2 id={`profile-${id}-title`} className="dg-card-title">
+          {title}
+        </h2>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 /**
- * /profile: your own staff page. Overview and Schedule show your record the
- * way a manager sees it; Account holds your details, sign-in, alerts and
- * privacy settings.
+ * /profile: your own page. Account holds your details, sign-in, alerts and
+ * privacy settings, and Schedule shows your record the way a manager sees it.
  */
 export function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scrollerRef = useClipTrailingWhitespace();
+  const [saveBarSlot, setSaveBarSlot] = useState<HTMLDivElement | null>(null);
   const {
     orgId,
     role,
@@ -123,7 +143,6 @@ export function ProfilePage() {
   const canEditProfileDirectly =
     Boolean(canManageEmployees) || Boolean(isSuperAdmin) || Boolean(isGridmaster);
   const canManageManagementAccess = Boolean(isSuperAdmin) || Boolean(isGridmaster);
-  const canDeleteAccountDirectly = Boolean(isSuperAdmin) || Boolean(isGridmaster);
   const canManageScheduleEmployees = Boolean(canManageEmployees);
   const orgRole: OrganizationRole | null =
     !isGridmaster && (role === "user" || role === "admin" || role === "super_admin") ? role : null;
@@ -164,7 +183,7 @@ export function ProfilePage() {
     return (
       <>
         <ProgressBar loading={permsLoading || profileLoading} />
-        {showSkeleton ? <PersonPageSkeleton variant="profile" tabCount={3} /> : null}
+        {showSkeleton ? <PersonPageSkeleton variant="profile" tabCount={2} /> : null}
       </>
     );
   }
@@ -200,7 +219,6 @@ export function ProfilePage() {
           .filter(Boolean)
           .join(" · ")
       : namesOf(managementDepartmentIds, departments ?? []).join(", ");
-  const managed = namesOf(managementDepartmentIds, departments ?? []);
 
   return (
     <div
@@ -216,18 +234,11 @@ export function ProfilePage() {
           summary={summary}
           email={employee?.email || user?.email || null}
           phone={employee?.phone || null}
-          actions={
-            <Button
-              type="button"
-              className="dg-btn dg-btn-secondary"
-              onClick={() => openTab("account", "details")}
-            >
-              Edit details
-            </Button>
-          }
         />
 
-        {employee ? <EmployeeStatusCard employee={employee} absenceTypes={absenceTypes} /> : null}
+        {employee ? (
+          <EmployeeStatusCard employee={employee} absenceTypes={absenceTypes} hideWhenActive />
+        ) : null}
 
         <div className="flex min-w-0 flex-col gap-5">
           {tabs.length > 1 ? (
@@ -239,7 +250,7 @@ export function ProfilePage() {
                 value={activeTab}
                 onChange={(tab) => openTab(tab)}
               />
-              {activeTab !== "account" && isOnSchedule ? (
+              {activeTab === "schedule" ? (
                 <span className="text-[13px] text-[var(--dg-color-text-subtle)]">
                   The last 12 weeks
                 </span>
@@ -248,130 +259,115 @@ export function ProfilePage() {
           ) : null}
 
           <section aria-label={TAB_LABELS[activeTab]}>
-            {activeTab === "overview" && employee && (
-              <StaffOverviewTab
-                employee={employee}
-                periodShifts={isOnSchedule ? shifts : {}}
-                range={range}
-                periodPhrase={PERIOD_PHRASE}
-                assignments={assignments}
-                shiftCategories={shiftCategories}
-                jobs={jobs}
-                absenceTypes={absenceTypes}
-                focusAreas={focusAreas}
-                nextDays={isOnSchedule ? { dates: thisWeek, shifts } : null}
-                nextDaysCopy={{
-                  title: "This week",
-                  periodLabel: "Your published shifts",
-                  emptyTitle: "You're not scheduled this week",
-                  emptyDescription: "When your shifts get published, they'll show up right here.",
-                }}
-                aboutTitle="About you"
-                mixTitle="What you work"
-                about={
-                  <div className="flex flex-col gap-4">
-                    <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
-                      <WorkCard
-                        employee={employee}
-                        focusAreas={focusAreas}
-                        certifications={certifications}
-                        roles={orgRoles}
-                        focusAreaLabel={org?.focusAreaLabel}
-                        certificationLabel={org?.certificationLabel}
-                        roleLabel={org?.roleLabel}
-                        showScheduleDetails={isOnSchedule}
-                      />
-                      <AccessCard
-                        orgRole={orgRole}
-                        invited={false}
-                        managedDepartments={managed.length > 0 ? managed : null}
-                        accountState={{ kind: "linked" }}
-                      />
-                      <RecordCard employee={employee} />
-                    </div>
-                  </div>
-                }
-              />
-            )}
-
             {activeTab === "schedule" && employee && isOnSchedule && (
-              <ScheduleTab
-                employee={employee}
-                shifts={shifts}
-                loading={false}
-                range={range}
-                today={today}
-                periodPhrase={PERIOD_PHRASE}
-                lookups={lookups}
-                absenceTypes={absenceTypes}
-                dayOffAbsenceTypeId={org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null}
-                recurringSchedule={{
-                  orgId: null,
-                  editHref: null,
-                  recurringShifts,
-                  assignments,
-                  shiftCategories,
-                  jobs,
-                  focusAreas,
-                  absenceTypes,
-                }}
-                afterRecurringSchedule={<CalendarSubscriptionCard />}
-              />
+              <>
+                <StaffOverviewTab
+                  employee={employee}
+                  periodShifts={shifts}
+                  range={range}
+                  periodPhrase={PERIOD_PHRASE}
+                  assignments={assignments}
+                  shiftCategories={shiftCategories}
+                  jobs={jobs}
+                  absenceTypes={absenceTypes}
+                  focusAreas={focusAreas}
+                  nextDays={{ dates: thisWeek, shifts }}
+                  nextDaysCopy={{
+                    title: "This week",
+                    periodLabel: "Your published shifts",
+                    emptyTitle: "You're not scheduled this week",
+                    emptyDescription: "When your shifts get published, they'll show up right here.",
+                  }}
+                  mixTitle="What you work"
+                />
+                <div className="mt-6">
+                  <ScheduleTab
+                    employee={employee}
+                    shifts={shifts}
+                    loading={false}
+                    range={range}
+                    today={today}
+                    periodPhrase={PERIOD_PHRASE}
+                    lookups={lookups}
+                    absenceTypes={absenceTypes}
+                    dayOffAbsenceTypeId={org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null}
+                    recurringSchedule={{
+                      orgId: null,
+                      editHref: null,
+                      recurringShifts,
+                      assignments,
+                      shiftCategories,
+                      jobs,
+                      focusAreas,
+                      absenceTypes,
+                    }}
+                    afterRecurringSchedule={<CalendarSubscriptionCard />}
+                  />
+                </div>
+              </>
             )}
 
             {activeTab === "account" && (
-              <div className="flex flex-col gap-10">
-                {ACCOUNT_HEADINGS.map(({ id, title }) => (
-                  <section
-                    key={id}
-                    id={`profile-${id}`}
-                    aria-labelledby={`profile-${id}-title`}
-                    // The settings cards cap themselves at 1120px; here they
-                    // line up with the page's 1200px column instead.
-                    className="flex scroll-mt-6 flex-col gap-3 [&_.dg-page-enter]:!max-w-none"
-                  >
-                    <h2 id={`profile-${id}-title`} className="dg-section-heading">
-                      {title}
-                    </h2>
-                    {id === "details" && (
-                      <ProfilePanel
-                        user={user}
-                        profile={profile}
-                        employee={employee}
-                        managementDepartmentIds={managementDepartmentIds}
-                        isOrgMember={isOrgMember}
-                        orgId={orgId}
-                        canEditProfileDirectly={canEditProfileDirectly}
-                        isGridmaster={Boolean(isGridmaster)}
-                        canDeleteAccountDirectly={canDeleteAccountDirectly}
-                        role={role}
-                        departments={departments}
-                        isOnSchedule={isOnSchedule}
-                        canManageManagementAccess={canManageManagementAccess}
-                        canManageScheduleEmployees={canManageScheduleEmployees}
-                        focusAreas={focusAreas}
-                        certifications={certifications}
-                        roles={orgRoles}
-                        focusAreaLabel={org?.focusAreaLabel}
-                        certificationLabel={org?.certificationLabel}
-                        roleLabel={org?.roleLabel}
-                        setProfile={setProfile}
-                        setEmployee={setEmployee}
-                        refetchProfile={refetchProfile}
-                      />
-                    )}
-                    {id === "security" && (
-                      <SecurityPanel user={user} profile={profile} setProfile={setProfile} />
-                    )}
-                    {id === "notifications" && (
-                      <NotificationsPanel
-                        isGridmaster={Boolean(isGridmaster)}
-                        isSuperAdmin={Boolean(isSuperAdmin)}
-                      />
-                    )}
-                    {id === "data-privacy" && <DataPrivacyPanel />}
-                  </section>
-                ))}
+              <div className="flex flex-col gap-4">
+                <div id="profile-details" className="flex scroll-mt-6 flex-col gap-4">
+                  <ProfilePanel
+                    user={user}
+                    profile={profile}
+                    employee={employee}
+                    managementDepartmentIds={managementDepartmentIds}
+                    isOrgMember={isOrgMember}
+                    orgId={orgId}
+                    canEditProfileDirectly={canEditProfileDirectly}
+                    isGridmaster={Boolean(isGridmaster)}
+                    role={role}
+                    departments={departments}
+                    isOnSchedule={isOnSchedule}
+                    canManageManagementAccess={canManageManagementAccess}
+                    canManageScheduleEmployees={canManageScheduleEmployees}
+                    focusAreas={focusAreas}
+                    certifications={certifications}
+                    roles={orgRoles}
+                    focusAreaLabel={org?.focusAreaLabel}
+                    certificationLabel={org?.certificationLabel}
+                    roleLabel={org?.roleLabel}
+                    setProfile={setProfile}
+                    setEmployee={setEmployee}
+                    refetchProfile={refetchProfile}
+                    saveBarSlot={saveBarSlot}
+                  />
+                </div>
+                {employee && !canEditProfileDirectly ? (
+                  <WorkCard
+                    employee={employee}
+                    focusAreas={focusAreas}
+                    certifications={certifications}
+                    roles={orgRoles}
+                    focusAreaLabel={org?.focusAreaLabel}
+                    certificationLabel={org?.certificationLabel}
+                    roleLabel={org?.roleLabel}
+                    showScheduleDetails={isOnSchedule}
+                    hideInternalNotes
+                  />
+                ) : null}
+                {employee ? <RecordCard employee={employee} /> : null}
+                <AccountSection id="security" title="Sign-in and security">
+                  <SecurityPanel user={user} profile={profile} setProfile={setProfile} />
+                </AccountSection>
+                <AccountSection id="notifications" title="Alerts">
+                  <NotificationsPanel
+                    isGridmaster={Boolean(isGridmaster)}
+                    isSuperAdmin={Boolean(isSuperAdmin)}
+                  />
+                </AccountSection>
+                <AccountSection id="data-privacy" title="Data and privacy">
+                  <DataPrivacyPanel />
+                </AccountSection>
+                {isGridmaster ? null : isSuperAdmin ? (
+                  <DeleteAccountCard />
+                ) : (
+                  <RequestDeletionCard orgId={orgId} isOrgMember={isOrgMember} />
+                )}
+                <div ref={setSaveBarSlot} className="sticky bottom-4 z-10 empty:hidden" />
               </div>
             )}
           </section>

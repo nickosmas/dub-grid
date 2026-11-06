@@ -219,7 +219,7 @@ describe("StaffDetailPage", () => {
 
     const record = await screen.findByTestId("person-record");
     expect(within(record).getByText("Joined").nextElementSibling).toHaveTextContent(JOINED_DAY);
-    expect(screen.getByText("Account").nextElementSibling).toHaveTextContent("Linked account");
+    expect(screen.getByText("Sign-in").nextElementSibling).toHaveTextContent("Linked account");
   });
 
   it("keeps the joined date on screen after a save whose response carries none", async () => {
@@ -231,7 +231,6 @@ describe("StaffDetailPage", () => {
     } as never);
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Edit details" }));
     fireEvent.click(await screen.findByRole("button", { name: "Save details" }));
 
     await waitFor(() => expect(updateEmployee).toHaveBeenCalledTimes(1));
@@ -281,7 +280,7 @@ describe("StaffDetailPage", () => {
       expect(card).toHaveAttribute("data-invitation", "expired");
       expect(within(card).getByText(/^Invite expired /)).toBeInTheDocument();
       await screen.findByText("Account");
-      expect(screen.getByText("Account").nextElementSibling).toHaveTextContent(
+      expect(screen.getByText("Sign-in").nextElementSibling).toHaveTextContent(
         "Invitation expired",
       );
       expect(screen.queryByRole("button", { name: "Send invitation" })).not.toBeInTheDocument();
@@ -304,7 +303,7 @@ describe("StaffDetailPage", () => {
       expect(within(card).getByRole("button", { name: "Resend" })).toBeInTheDocument();
       expect(within(card).getByRole("button", { name: "Revoke" })).toBeInTheDocument();
       await screen.findByText("Account");
-      expect(screen.getByText("Account").nextElementSibling).toHaveTextContent(
+      expect(screen.getByText("Sign-in").nextElementSibling).toHaveTextContent(
         "Invitation pending",
       );
     });

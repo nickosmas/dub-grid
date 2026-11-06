@@ -1,8 +1,14 @@
-import { mobileSoftGradientStops } from "../../../shared/theme/tokens";
+/**
+ * Home's alphas, front-loaded and running out to clear: the brand aurora's
+ * shape (0.14 / 0.22 at the top) run about 1.6 times stronger, so the wash
+ * reads as colour behind Home's cards (owner, 2026-11-04: more vibrant). The
+ * sign-in and onboarding aurora keep the token's own.
+ */
+const LIGHT_ALPHAS = [0.22, 0.08, 0] as const;
+const DARK_ALPHAS = [0.34, 0.13, 0] as const;
 
-/** The aurora's own alphas, front-loaded and running out to clear. */
-const LIGHT_ALPHAS = [0.14, 0.05, 0] as const;
-const DARK_ALPHAS = [0.22, 0.08, 0] as const;
+/** The brand blues the aurora is drawn from, light and dark. */
+const BRAND_HUES = { light: "#2563EB", dark: "#2075FF" } as const;
 
 /**
  * Wash hues for the two states that need a hand, one step deeper down each
@@ -33,17 +39,17 @@ function washHue(pct: number, isDark: boolean): string | null {
 }
 
 /**
- * The dashboard's wash. Normal coverage is the brand aurora itself, blue for
- * "nothing to see"; below that, one status hue at the aurora's three alphas,
- * so it fades to clear exactly the way the brand halo does. Unconfigured
- * coverage has nothing to warn about either, so it shares the aurora.
+ * Home's wash. Normal coverage is the brand blue, for "nothing to see";
+ * below that, one status hue at the same three alphas, so it fades to clear
+ * the same way. Unconfigured coverage has nothing to warn about either, and
+ * the staff Home has no coverage, so both take the blue.
  */
 export function buildCoverageWash(
   pct: number | null,
   isDark: boolean,
 ): readonly [string, string, string] {
-  const hex = pct == null ? null : washHue(pct, isDark);
-  if (hex == null) return mobileSoftGradientStops("aurora", isDark);
+  const hex =
+    (pct == null ? null : washHue(pct, isDark)) ?? (isDark ? BRAND_HUES.dark : BRAND_HUES.light);
   const alphas = isDark ? DARK_ALPHAS : LIGHT_ALPHAS;
   return [withAlpha(hex, alphas[0]), withAlpha(hex, alphas[1]), withAlpha(hex, alphas[2])];
 }

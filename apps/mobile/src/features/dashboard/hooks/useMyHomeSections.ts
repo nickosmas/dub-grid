@@ -71,6 +71,7 @@ export function useMyHomeSections({
   const { pendingAction, runRequestAction, confirmationModal } = useShiftRequestActionFlow({
     accessToken,
     viewerCanApprove: Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests),
+    requests: requestsQuery.data?.requests,
     // A claim changes the team's numbers too, so the dashboard reloads with it.
     onSucceeded: () =>
       Promise.all([

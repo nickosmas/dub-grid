@@ -92,7 +92,12 @@ import {
 } from "@/components/shift-panel/ShiftPanelView";
 import { SeriesSummaryCard } from "@/components/shift-panel/SeriesSummaryCard";
 import { SeriesScopeChoices } from "@/components/shift-panel/SeriesScopeChoices";
-import { describeSeriesPattern, formatSeriesSpan, seriesScopeOptions } from "@/lib/series-summary";
+import {
+  describeSeriesPattern,
+  formatSeriesSpan,
+  seriesHasPastDays,
+  seriesScopeOptions,
+} from "@/lib/series-summary";
 import {
   buildShiftChangeResolvers,
   describeCellStateChange,
@@ -196,6 +201,8 @@ interface ShiftEditPanelProps {
   correctedLabel?: string | null;
   /** The corrected day as published before its first correction, and as corrected now. */
   correctedChange?: { before: ScheduleCellState | null; after: ScheduleCellState | null } | null;
+  /** The organization's today (YYYY-MM-DD); a series edit or removal leaves days before it alone. */
+  todayKey?: string;
   /** True when the underlying cell changed externally while the panel was open. */
   isStale?: boolean;
   /** All focus areas — used to resolve focusAreaId to names */
@@ -440,6 +447,7 @@ export default function ShiftEditPanel({
   pastDayNotice = null,
   correctedLabel = null,
   correctedChange = null,
+  todayKey = todayIso(),
   isStale = false,
   focusAreas = [],
   certifications = [],
@@ -4153,7 +4161,11 @@ export default function ShiftEditPanel({
   const holdsSeveralItems = currentSegments.length > 1 || hasRestOfDayAbsence;
   const initialHadContent = !!initialShift && initialShift !== "OFF";
   const canReturnToView = allowShiftEdits && !!seriesId && initialHadContent;
-  const scopeOptions = seriesScopeOptions(seriesSummary?.pattern?.occurrenceDates ?? null, dateKey);
+  const seriesOccurrenceDates = seriesSummary?.pattern?.occurrenceDates ?? null;
+  const scopeOptions = seriesScopeOptions(seriesOccurrenceDates, dateKey, todayKey);
+  const pastSeriesDaysNote = seriesHasPastDays(seriesOccurrenceDates, todayKey)
+    ? "Days before today stay as they are."
+    : null;
   const chosenScopeOption = scopeOptions.find((option) => option.scope === seriesScope);
   const repeatingNoun = isAbsence ? "repeating absence" : "repeating shift";
   // A range edit reaches only the shift itself; times and notes stay per day.
@@ -5126,7 +5138,7 @@ export default function ShiftEditPanel({
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <span>
                 Choose the days to remove. Published days are removed in the draft and leave the
-                schedule when you publish.
+                schedule when you publish.{pastSeriesDaysNote ? ` ${pastSeriesDaysNote}` : ""}
               </span>
               <SeriesScopeChoices
                 label="Days to remove"
@@ -5157,7 +5169,10 @@ export default function ShiftEditPanel({
           title={`Edit ${repeatingNoun}`}
           message={
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <span>Choose which days this change applies to.</span>
+              <span>
+                Choose which days this change applies to.
+                {pastSeriesDaysNote ? ` ${pastSeriesDaysNote}` : ""}
+              </span>
               <SeriesScopeChoices
                 label="Days to edit"
                 options={scopeOptions}

@@ -44,7 +44,7 @@ function summary(overrides: Partial<OrganizationBillingSummary>): Summary {
 describe("describeSeatGap", () => {
   it("says what the difference between seats in use and paid seats means", () => {
     expect(describeSeatGap(32, 30)).toBe(
-      "2 seats in use aren't paid for yet. We update your paid seats to match the seats in use, and the change is prorated on your next invoice.",
+      "2 seats in use aren't paid for yet. Paid seats don't change on their own. When we update them to match the seats in use, the change is prorated on your next invoice.",
     );
     expect(describeSeatGap(29, 30)).toMatch(/^You're paying for 1 seat that nobody is using\./);
     expect(describeSeatGap(30, 30)).toBe(
@@ -96,7 +96,7 @@ describe("describeBillingOverview", () => {
   it("warns once the trial ends within a week, saying what happens without a subscription", () => {
     const overview = describeBillingOverview(
       summary({
-        trialEndsAt: at(9, 28),
+        trialEndsAt: at(9, 30),
         billingAccess: { ...summary({}).billingAccess, state: "trial_ending_soon" },
       }),
       now,
@@ -106,15 +106,15 @@ describe("describeBillingOverview", () => {
     expect(overview.lead).toBe(
       "You won't be charged until the trial ends. Without a subscription, your organization locks once the grace period ends.",
     );
-    expect(overview.visual).toMatchObject({ value: 1, unit: "day", tone: "warning" });
+    expect(overview.visual).toMatchObject({ value: 3, unit: "days", tone: "warning" });
     expect(overview.timeline.at(-1)).toMatchObject({ label: "Grace period ends", alert: true });
-    expectNoDatesInWords(overview, at(9, 28));
+    expectNoDatesInWords(overview, at(9, 30));
   });
 
   it("says the organization locks when the trial ends if there is no grace period", () => {
     const overview = describeBillingOverview(
       summary({
-        trialEndsAt: at(9, 28),
+        trialEndsAt: at(9, 30),
         billingPolicy: { trialDays: 14, trialGraceDays: 0, paymentGraceDays: 7 },
         billingAccess: { ...summary({}).billingAccess, state: "trial_ending_soon" },
       }),
@@ -123,6 +123,47 @@ describe("describeBillingOverview", () => {
     expect(overview.lead).toBe(
       "You won't be charged until the trial ends. Without a subscription, your organization locks when it does.",
     );
+  });
+
+  it("says a subscription started in the last two days of the trial is charged right away", () => {
+    const overview = describeBillingOverview(
+      summary({
+        trialEndsAt: at(9, 28),
+        billingAccess: { ...summary({}).billingAccess, state: "trial_ending_soon" },
+      }),
+      now,
+    );
+    expect(overview.lead).toBe(
+      "Less than two days of the trial are left, so a subscription started now is charged right away. Without a subscription, your organization locks once the grace period ends.",
+    );
+  });
+
+  it("says a subscription started during the trial starts billing when the trial ends", () => {
+    const overview = describeBillingOverview(
+      summary({
+        trialStartedAt: at(9, 21),
+        trialEndsAt: at(9, 30),
+        hasStripeCustomer: true,
+        hasStripeSubscription: true,
+        subscriptionSeats: 32,
+        billingAccess: { ...summary({}).billingAccess, state: "trial_ending_soon" },
+      }),
+      now,
+    );
+    expect(overview.status).toEqual({ label: "Subscribed", tone: "success" });
+    expect(overview.title).toBe("Your subscription starts when the free trial ends.");
+    expect(overview.lead).toBe(
+      "You won't be charged until then. After that, payments are collected automatically each month for your paid seats.",
+    );
+    expect(overview.visual).toMatchObject({ kind: "ring", value: 3, tone: "info" });
+    expect(overview.timeline.map((step) => [step.label, step.when])).toEqual([
+      ["Trial started", formatShortDate(at(9, 21))],
+      ["Today", formatShortDate(now.toISOString())],
+      ["Billing starts", formatShortDate(at(9, 30))],
+    ]);
+    expect(overview.action).toEqual({ kind: "portal", label: "Manage billing" });
+    expect(overview.pricingNote).toBe(false);
+    expectNoDatesInWords(overview, at(9, 30));
   });
 
   it("counts down to renewal for an active subscription without repeating the date", () => {

@@ -121,7 +121,11 @@ export function MemberAccessControls({
                   ? `Change the invitation for ${pendingInvitationEmail} to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
                   : `Change their access role to ${ROLE_LABELS[pendingRole] ?? pendingRole}?`
               }
-              message={pendingInvitationEmail ? undefined : "Their access updates immediately."}
+              message={
+                pendingInvitationEmail
+                  ? undefined
+                  : "Their access changes now. If they have the app open, it updates and tells them."
+              }
               summary={
                 pendingInvitationEmail
                   ? {

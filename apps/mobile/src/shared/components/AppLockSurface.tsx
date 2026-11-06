@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppLockSurface } from "../lib/app-lock";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileSpace, type MobileColors } from "../theme/tokens";
 import { AppSplashScreen } from "./AppSplashScreen";
+import { Button } from "./Button";
 import { ContentUnavailable } from "./ContentUnavailable";
 
 interface AppLockSurfaceProps {
@@ -38,16 +40,30 @@ export function AppLockOverlay() {
 function AppLockedPage({ retrying, onRetry, onSignOut }: Omit<AppLockSurfaceProps, "failed">) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const insets = useSafeAreaInsets();
 
+  // The message in the middle, the two ways out stacked full width at the
+  // foot, in thumb reach: Unlock first, Sign out the quiet one under it.
   return (
     <View accessibilityRole="alert" style={styles.page}>
-      <ContentUnavailable
-        body="Verify it's you to continue, or sign out."
-        iconName="lock-closed-outline"
-        primaryAction={{ label: "Unlock", loading: retrying, onPress: onRetry }}
-        secondaryAction={{ label: "Sign out", disabled: retrying, onPress: onSignOut }}
-        title="The app is locked"
-      />
+      <View style={styles.message}>
+        <ContentUnavailable
+          body="Verify it's you to continue, or sign out."
+          iconName="lock-closed-outline"
+          title="The app is locked"
+        />
+      </View>
+      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, mobileSpace.lg) }]}>
+        <Button fullWidth label="Unlock" loading={retrying} onPress={onRetry} size="lg" />
+        <Button
+          disabled={retrying}
+          fullWidth
+          label="Sign out"
+          onPress={onSignOut}
+          size="lg"
+          tone="neutral"
+        />
+      </View>
     </View>
   );
 }
@@ -55,10 +71,16 @@ function AppLockedPage({ retrying, onRetry, onSignOut }: Omit<AppLockSurfaceProp
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     page: {
-      alignItems: "center",
       backgroundColor: mobileColors.background,
       flex: 1,
+      paddingHorizontal: mobileSpace["2xl"],
+    },
+    message: {
+      alignItems: "center",
+      flex: 1,
       justifyContent: "center",
-      paddingHorizontal: mobileSpace["3xl"],
+    },
+    actions: {
+      gap: mobileSpace.md,
     },
   });

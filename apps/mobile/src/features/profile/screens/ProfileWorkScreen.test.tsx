@@ -23,6 +23,9 @@ const stepUpRun = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
+// The bar's actions wait for the push to finish; these tests start settled.
+vi.mock("../../../shared/navigation/usePushSettled", () => ({ usePushSettled: () => true }));
+
 vi.mock("expo-router", () => ({
   useNavigation: () => ({ setOptions: () => undefined }),
   router: {

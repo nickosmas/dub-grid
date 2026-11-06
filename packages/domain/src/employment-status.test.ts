@@ -27,6 +27,7 @@ import {
   NO_ACCOUNT_MESSAGE,
   NOT_ON_SCHEDULE_MESSAGE,
   NOT_SUSPENDABLE_MESSAGE,
+  AWAY_WHILE_SUSPENDED_MESSAGE,
   formatReturnDate,
   isPlannedAwayOn,
   isAfterPlannedLastDay,
@@ -166,7 +167,10 @@ describe("describeStatusAction", () => {
     expect(suspend.unchanged).toEqual(["Their shifts stay, and you can keep scheduling them."]);
     expect(describeStatusAction("cancelPlannedChange", "Ana")).toMatchObject({
       points: ["They stay Active and can be scheduled on those days again."],
-      unchanged: ["Shifts already taken off those days stay off."],
+      unchanged: [
+        "Shifts already taken off those days stay off.",
+        "Requests the plan closed stay closed.",
+      ],
     });
   });
 
@@ -196,16 +200,13 @@ describe("describeStatusAction", () => {
   });
 
   it("adds no caption that repeats the title or the choice (owner, 2026-10-27)", () => {
-    for (const action of [
-      "archive",
-      "markAway",
-      "markActive",
-      "restore",
-      "reinstate",
-      "suspend",
-    ] as const) {
+    for (const action of ["archive", "markAway", "restore", "reinstate", "suspend"] as const) {
       expect(describeStatusAction(action, "Ana").message).toBe("");
     }
+    // Mark active's choice already says they can be scheduled again; the message says what doesn't come back.
+    expect(describeStatusAction("markActive", "Ana").message).toBe(
+      "Shifts taken off while they were away stay off.",
+    );
     // A return date is news the title doesn't carry.
     expect(describeStatusAction("markAway", "Ana", { returnDate: "2027-01-04" }).message).toMatch(
       /^They won't be scheduled before Mon, Jan 4/,
@@ -266,14 +267,43 @@ describe("describeStatusAction with a return date", () => {
     expect(copy.points).toEqual([
       "Shifts before Jan 11 come off the schedule in the draft.",
       "Recurring schedules pause and fill again from Jan 11.",
+      "Open requests for days before Jan 11 are closed.",
     ]);
+    expect(copy.unchanged).toEqual([]);
+  });
+
+  it("moves a return date earlier without putting back what was taken off", () => {
+    const copy = describeStatusAction("setReturnDate", "Ana", {
+      returnDate: "2026-12-28",
+      currentReturnDate: RETURN,
+    });
+    expect(copy.points).toEqual([
+      "Shifts before Dec 28 come off the schedule in the draft.",
+      "Recurring schedules pause and fill again from Dec 28.",
+    ]);
+    expect(copy.unchanged).toEqual(["Shifts already taken off from Dec 28 on stay off."]);
+    // Their absence comes off the days it no longer covers (100).
+    const withAbsence = describeStatusAction("setReturnDate", "Ana", {
+      returnDate: "2026-12-28",
+      currentReturnDate: RETURN,
+      absenceName: "Vacation",
+      currentAbsenceName: "Vacation",
+    });
+    expect(withAbsence.points).toContain(
+      "Days from Dec 28 go back to what was published, without Vacation.",
+    );
+    expect(withAbsence.unchanged).toEqual([]);
   });
 
   it("clears a return date with what indefinite Away removes", () => {
     const copy = describeStatusAction("setReturnDate", "Ana", { currentReturnDate: RETURN });
 
     expect(copy.message).toBe("They stay away until someone marks them active.");
-    expect(copy.points).toHaveLength(2);
+    expect(copy.points).toEqual([
+      "Their shifts from today on come off the published schedule now, except a day that has already started.",
+      "Recurring schedules set up for them are removed.",
+      "Open requests they're part of are closed.",
+    ]);
     expect(copy.done).toBe("Return date cleared");
   });
 
@@ -402,10 +432,15 @@ describe("statusChoices", () => {
     expect(reasons(state).away).toBe(NOT_ON_SCHEDULE_MESSAGE);
   });
 
-  it("brings a suspended person back with Reinstate", () => {
-    expect(kinds({ status: "active", suspendedAt: "2026-10-26T12:00:00Z", ...onSchedule })).toEqual(
-      ["Active:reinstate", "Away:markAway", "Offboarded:archive"],
-    );
+  it("brings a suspended person back with Reinstate, and asks for it before Away", () => {
+    const state = { status: "active" as const, suspendedAt: "2026-10-26T12:00:00Z", ...onSchedule };
+    expect(kinds(state)).toEqual([
+      "Active:reinstate",
+      "Away:markAway (disabled)",
+      "Offboarded:archive",
+    ]);
+    expect(reasons(state).away).toBe(AWAY_WHILE_SUSPENDED_MESSAGE);
+    expect(AWAY_WHILE_SUSPENDED_MESSAGE).toBe("Reinstate them first, then mark them away.");
   });
 
   it("brings an Away person back with Mark active, and says why they can't be suspended", () => {
@@ -416,6 +451,21 @@ describe("statusChoices", () => {
       "Offboarded:archive",
     ]);
     expect(reasons(state).suspended).toBe(NOT_SUSPENDABLE_MESSAGE);
+    expect(statusChoices(state)[0]).toMatchObject({
+      detail: "Can be scheduled again from today.",
+      outcome: "They'll be Active again and can be scheduled from today.",
+    });
+  });
+
+  it("says Mark active puts back only what an away absence held", () => {
+    expect(describeStatusAction("markActive", "Ana")).toMatchObject({
+      message: "Shifts taken off while they were away stay off.",
+      points: [],
+      unchanged: [],
+    });
+    expect(
+      describeStatusAction("markActive", "Ana", { currentAbsenceName: "Vacation" }).message,
+    ).toBe("Days left in their time away go back to what was published, without Vacation.");
   });
 
   it("lists Away disabled, pointing at Edit plan, for someone with an away planned", () => {
@@ -629,11 +679,47 @@ describe("planned away (51g1)", () => {
       absenceName: "Vacation",
     });
     expect(cancel.label).toBe("Cancel planned time away");
+    expect(cancel.points).toEqual([
+      "They stay Active and can be scheduled on those days again.",
+      "Days with Vacation only in the draft go back to what was published.",
+      "Days where Vacation is already published are cleared in the draft, and staff see it until you publish.",
+    ]);
+    expect(cancel.unchanged).toEqual(["Requests the plan closed stay closed."]);
     for (const copy of [edit, cancel]) {
       expect(copy.points.length).toBeGreaterThanOrEqual(2);
       for (const point of copy.points) expect(point).toMatch(/^[A-Z].*\.$/);
       expect([copy.message, ...copy.points].join(" ")).not.toContain("Ana");
     }
+  });
+
+  it("says a shortened plan puts back only its absence", () => {
+    const current = { plannedFrom: "2026-11-10", currentReturnDate: "2027-01-04" };
+    const later = describeStatusAction("setPlannedChange", "Ana", {
+      ...current,
+      startDate: "2026-11-12",
+      returnDate: "2027-01-04",
+    });
+    expect(later.unchanged).toEqual([
+      "Shifts already taken off days it no longer covers stay off.",
+      "Requests the plan closed stay closed.",
+    ]);
+    const sooner = describeStatusAction("setPlannedChange", "Ana", {
+      ...current,
+      startDate: "2026-11-10",
+      returnDate: "2026-12-20",
+      absenceName: "Vacation",
+      currentAbsenceName: "Vacation",
+    });
+    expect(sooner.points).toContain(
+      "Days it no longer covers go back to what was published, without Vacation.",
+    );
+    expect(sooner.unchanged).toEqual(["Requests the plan closed stay closed."]);
+    const longer = describeStatusAction("setPlannedChange", "Ana", {
+      ...current,
+      startDate: "2026-11-09",
+      returnDate: "2027-01-11",
+    });
+    expect(longer.unchanged).toEqual([]);
   });
 });
 
@@ -748,8 +834,45 @@ describe("last day (51g2)", () => {
       title: "Cancel Ana's last day?",
       message: "They stay Active and can be scheduled after that day again.",
       points: [],
+      unchanged: [
+        "Shifts already taken off after that day stay off.",
+        "Requests the plan closed stay closed.",
+      ],
       done: "Last day canceled",
     });
+  });
+
+  it("says what a replaced last day leaves behind", () => {
+    const copy = describeStatusAction("markAway", "Ana", {
+      returnDate: "2026-11-20",
+      plannedFrom: "2026-11-09",
+      plannedStatus: "removed",
+    });
+    expect(copy.unchanged).toEqual([
+      "They can still sign in and keep their role.",
+      "Shifts the plan already took off stay off.",
+      "Requests the plan closed stay closed.",
+    ]);
+    // Away with no date publishes every removal and closes every request (114).
+    expect(
+      describeStatusAction("markAway", "Ana", {
+        plannedFrom: "2026-11-09",
+        plannedStatus: "removed",
+      }).unchanged,
+    ).toEqual(["They can still sign in and keep their role."]);
+  });
+
+  it("replaces a planned away's absence with a last day through that day only", () => {
+    const copy = describeStatusAction("archive", "Ana", {
+      lastDay: "2026-11-08",
+      plannedFrom: "2026-11-02",
+      plannedStatus: "away",
+      currentAbsenceName: "Vacation",
+    });
+    expect(copy.points).toContain(
+      "Days through Nov 8 it filled with Vacation go back to what was published.",
+    );
+    expect(copy.unchanged).toEqual(["Requests the plan closed stay closed."]);
   });
 
   it("lists Offboard disabled, pointing at Edit plan, while a last day is planned", () => {
@@ -845,7 +968,37 @@ describe("suspended until (51g3)", () => {
       "They get access back on Nov 20.",
       "The time away planned from Nov 2 is canceled.",
     ]);
-    expect(copy.unchanged).toEqual(["Their shifts stay, and you can keep scheduling them."]);
+    expect(copy.unchanged).toEqual([
+      "Their other shifts stay, and you can keep scheduling them.",
+      "Shifts the plan already took off stay off.",
+      "Requests the plan closed stay closed.",
+    ]);
+    // Suspending now closes every open request, so only the shifts are left to mention.
+    expect(
+      describeStatusAction("suspend", "Ana", { plannedFrom: "2026-11-02", plannedStatus: "away" })
+        .unchanged,
+    ).toEqual([
+      "Their other shifts stay, and you can keep scheduling them.",
+      "Shifts the plan already took off stay off.",
+    ]);
+    // A planned absence comes off the days it filled (104).
+    const withAbsence = describeStatusAction("suspend", "Ana", {
+      plannedFrom: "2026-11-02",
+      plannedStatus: "away",
+      currentAbsenceName: "Vacation",
+    });
+    expect(withAbsence.points).toContain(
+      "Days it filled with Vacation go back to what was published.",
+    );
+    expect(withAbsence.unchanged).toEqual(["Their shifts stay, and you can keep scheduling them."]);
+    // A planned suspension clears nothing, so nothing is left behind.
+    expect(
+      describeStatusAction("markAway", "Ana", {
+        returnDate: "2026-11-20",
+        plannedFrom: "2026-11-10",
+        plannedStatus: "suspended",
+      }).unchanged,
+    ).toEqual(["They can still sign in and keep their role."]);
   });
 
   it("sets, changes and clears a suspension's end", () => {

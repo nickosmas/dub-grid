@@ -146,6 +146,8 @@ interface StaffViewProps {
   onBulkStatusChange?: BulkStatusChangeHandler;
   onAdd: () => void;
   orgId?: string;
+  /** The organization's timezone, whose today the status dialogs use. */
+  timeZone?: string | null;
   assignments?: AssignmentDefinition[];
   shiftCategories?: ShiftCategory[];
   jobs?: JobDefinition[];
@@ -192,6 +194,7 @@ export default function StaffView({
   onBulkStatusChange,
   onAdd,
   orgId,
+  timeZone = null,
   assignments,
   shiftCategories,
   jobs,
@@ -398,6 +401,7 @@ export default function StaffView({
             certificationLabel={certificationLabel}
             roleLabel={roleLabel}
             orgId={orgId}
+            timeZone={timeZone}
             isSuperAdmin={isSuperAdmin}
             isGridmaster={isGridmaster}
             isManagementUser={isManagementUser}

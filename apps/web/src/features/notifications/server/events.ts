@@ -243,8 +243,12 @@ async function getRequestInfo(requestId: string): Promise<{
   requesterName: string;
   targetUserId: string | null;
   targetName: string;
+  /** Someone is named on it, with or without an account. */
+  hasTarget: boolean;
   requestType: "pickup" | "swap" | "calloff" | null;
   status: string | null;
+  /** Set on the open pickup a call-off leaves; its requester is the absent person. */
+  parentRequestId: string | null;
 }> {
   const db = getServiceClient();
   const { data } = await db
@@ -252,6 +256,7 @@ async function getRequestInfo(requestId: string): Promise<{
     .select(
       `status,
        type,
+       parent_request_id,
        requester:employees!shift_requests_requester_emp_id_fkey(user_id, first_name, last_name),
        target:employees!shift_requests_target_emp_id_fkey(user_id, first_name, last_name)`,
     )
@@ -266,11 +271,13 @@ async function getRequestInfo(requestId: string): Promise<{
     requesterName: requester ? `${requester.first_name} ${requester.last_name}` : "An employee",
     targetUserId: target?.user_id ?? null,
     targetName: target ? `${target.first_name} ${target.last_name}` : "An employee",
+    hasTarget: target != null,
     requestType:
       data?.type === "pickup" || data?.type === "swap" || data?.type === "calloff"
         ? data.type
         : null,
     status: (data?.status as string | null | undefined) ?? null,
+    parentRequestId: (data?.parent_request_id as string | null | undefined) ?? null,
   };
 }
 
@@ -717,7 +724,9 @@ async function dispatchNotificationEventInternal(
         // other party's acceptance settled it, so say that rather than
         // quoting the requester their own name from the note.
         const message = event.autoApproved
-          ? `${requestInfo.targetName} accepted your ${typeLabel} request. It's approved and on the schedule.`
+          ? requestType === "pickup" && requestInfo.parentRequestId != null
+            ? `${requestInfo.targetName} picked up the shift you called off.`
+            : `${requestInfo.targetName} accepted your ${typeLabel} request. It's approved and on the schedule.`
           : `${event.approved ? "The schedule now shows the change." : "Your schedule stays as it was."}${noteText}`;
 
         await sendNotification(
@@ -1242,7 +1251,9 @@ async function dispatchNotificationEventInternal(
     // ── Expiry sweepers (cron-driven) ──────────────────────────────────
 
     case "shift_request_expired": {
-      const { requesterUserId } = await getRequestInfo(event.requestId);
+      const { requesterUserId, targetName, hasTarget, parentRequestId } = await getRequestInfo(
+        event.requestId,
+      );
       // Dedupe — the cron may re-run; once a row exists for this request the
       // sweeper won't re-fire because it filters on status='expired' already,
       // but keep this guard so a transient SQL error mid-run can't double-fire.
@@ -1253,12 +1264,18 @@ async function dispatchNotificationEventInternal(
       });
       if (alreadySent || !requesterUserId) return;
       const typeLabel = getShiftRequestTypeLabel(event.requestType);
+      // A call-off's open shift was never the absent person's own request.
+      const calloffMessage = hasTarget
+        ? `The shift you called off closed before ${targetName}'s pickup was approved.`
+        : "Nobody picked up the shift you called off before it closed.";
       await sendNotification(
         requesterUserId,
         event.orgId,
         "shift_request_expired" as NotificationType,
         `${capitalize(typeLabel)} request expired`,
-        `Your ${typeLabel} request expired before anyone decided on it. Submit a new one if you still need it.`,
+        event.requestType === "pickup" && parentRequestId != null
+          ? calloffMessage
+          : `Your ${typeLabel} request expired before anyone decided on it. Submit a new one if you still need it.`,
         {
           requestId: event.requestId,
           requestType: event.requestType,

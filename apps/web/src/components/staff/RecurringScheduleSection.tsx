@@ -1050,13 +1050,13 @@ export function RecurringScheduleSection({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <PencilLine size={16} color="var(--dg-color-banner-info-text)" aria-hidden="true" />
+            <PencilLine size={16} color="var(--dg-color-banner-info-icon)" aria-hidden="true" />
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               <span
                 style={{
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 600,
-                  color: "var(--dg-color-banner-info-text)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 {dirtyCount} unsaved change{dirtyCount !== 1 ? "s" : ""}
@@ -1065,7 +1065,7 @@ export function RecurringScheduleSection({
                 <span
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--dg-color-banner-info-text)",
+                    color: "var(--dg-color-text-primary)",
                   }}
                 >
                   Draft saved {formatDateTimeLabel(savedDraftTimestamp)}

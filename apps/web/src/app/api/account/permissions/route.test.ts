@@ -94,10 +94,13 @@ describe("GET /api/account/permissions", () => {
     return GET(new NextRequest("http://localhost/api/account/permissions"));
   }
 
-  it("resolves super_admin permissions straight from the sandbox-rewritten claims", async () => {
+  it("resolves super_admin permissions from the membership row of the claimed org", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(
       makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
     );
+    enqueue("organization_memberships", {
+      data: { org_role: "super_admin", admin_permissions: null },
+    });
 
     const response = await request();
 
@@ -106,16 +109,51 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.role).toBe("super_admin");
     expect(body.permissions.orgId).toBe(ORG_ID);
     expect(body.permissions.isSuperAdmin).toBe(true);
-    // Permissions are trusted from claims; no membership lookup. Self-employment
-    // flags (isOnSchedule/isManagementUser) still require an employees read.
-    expect(serviceFrom).not.toHaveBeenCalledWith("organization_memberships");
+    expect(serviceFrom).toHaveBeenCalledWith("organization_memberships");
     expect(serviceFrom).toHaveBeenCalledWith("employees");
+  });
+
+  it("gives a demoted Super Admin their new role while the claim still says super_admin", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
+    );
+    enqueue("organization_memberships", {
+      data: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
+    });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.permissions.role).toBe("admin");
+    expect(body.permissions.isSuperAdmin).toBe(false);
+    expect(body.permissions.canManageUsers).toBe(false);
+    expect(body.permissions.canManageEmployees).toBe(true);
+  });
+
+  it("drops a demoted Admin to user while the claim still says admin", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "admin" }),
+    );
+    enqueue("organization_memberships", {
+      data: { org_role: "user", admin_permissions: null },
+    });
+
+    const response = await request();
+
+    const body = await response.json();
+    expect(body.permissions.role).toBe("user");
+    expect(body.permissions.level).toBe(0);
+    expect(body.permissions.canAccessSettings).toBe(false);
   });
 
   it("uses claims.org_id (the sandbox-redirected org), not the profile default, when they diverge", async () => {
     requireAuthenticatedUserWithClaims.mockResolvedValue(
       makeAuth({ orgId: SECOND_ORG_ID, orgRole: "super_admin" }),
     );
+    enqueue("organization_memberships", {
+      data: { org_role: "super_admin", admin_permissions: null },
+    });
 
     const response = await request();
 
@@ -263,6 +301,10 @@ describe("GET /api/account/permissions", () => {
       { data: { focus_area_ids: [], department_ids: [9] } },
     );
 
+    enqueue("organization_memberships", {
+      data: { org_role: "super_admin", admin_permissions: null },
+    });
+
     const response = await request();
 
     expect(response.status).toBe(200);
@@ -283,6 +325,10 @@ describe("GET /api/account/permissions", () => {
       { data: { focus_area_ids: [5], department_ids: [] } },
     );
 
+    enqueue("organization_memberships", {
+      data: { org_role: "super_admin", admin_permissions: null },
+    });
+
     const response = await request();
 
     const body = await response.json();
@@ -300,6 +346,10 @@ describe("GET /api/account/permissions", () => {
       { data: { status: "active" } },
       { data: { focus_area_ids: [5], department_ids: [9] } },
     );
+
+    enqueue("organization_memberships", {
+      data: { org_role: "super_admin", admin_permissions: null },
+    });
 
     const response = await request();
 
@@ -371,6 +421,10 @@ describe("GET /api/account/permissions", () => {
       makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
     );
     enqueue("employees", { data: null });
+
+    enqueue("organization_memberships", {
+      data: { org_role: "super_admin", admin_permissions: null },
+    });
 
     const response = await request();
 

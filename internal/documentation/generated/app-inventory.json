@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:a8ddc37e4323a234ddb410e5cb78fc4eb1037ec132c17474933de7b735617c6d",
+  "sourceDigest": "sha256:3ed74a72195bad8827e7b236ac8283ab43b914edf6217845b5c84e9f78c50ed5",
   "webRoutes": [
     {
       "id": "web:/",
@@ -1264,6 +1264,15 @@
       }
     },
     {
+      "id": "http:GET:/api/employees/delete-account",
+      "method": "GET",
+      "path": "/api/employees/delete-account",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/employees/delete-account/route.ts"
+      }
+    },
+    {
       "id": "http:GET:/api/export",
       "method": "GET",
       "path": "/api/export",
@@ -2419,12 +2428,30 @@
       }
     },
     {
+      "id": "http:POST:/api/employees/delete-account",
+      "method": "POST",
+      "path": "/api/employees/delete-account",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/employees/delete-account/route.ts"
+      }
+    },
+    {
       "id": "http:POST:/api/employees/manage",
       "method": "POST",
       "path": "/api/employees/manage",
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/employees/manage/route.ts"
+      }
+    },
+    {
+      "id": "http:POST:/api/employees/move-email",
+      "method": "POST",
+      "path": "/api/employees/move-email",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/employees/move-email/route.ts"
       }
     },
     {
@@ -4945,6 +4972,56 @@
       "sha256": "93ab9edbcdc799ccd40f38f44e02bb009c8c2cee78209803937e158427c03cdc",
       "source": {
         "path": "supabase/migrations/115_label_defaults.sql"
+      }
+    },
+    {
+      "id": "migration:116_leaving_grid_keeps_started_today.sql",
+      "version": "116",
+      "name": "leaving_grid_keeps_started_today",
+      "file": "116_leaving_grid_keeps_started_today.sql",
+      "sha256": "cfbbd1fcf87ded8d005f13e2a6f5e061e58fa12f7f803411dd5f70ade551b639",
+      "source": {
+        "path": "supabase/migrations/116_leaving_grid_keeps_started_today.sql"
+      }
+    },
+    {
+      "id": "migration:117_archived_items_stay_scheduled.sql",
+      "version": "117",
+      "name": "archived_items_stay_scheduled",
+      "file": "117_archived_items_stay_scheduled.sql",
+      "sha256": "fbd8c93b1763d09fcb09d21e72fac5aa83540194a8259c907c2777b976e6e366",
+      "source": {
+        "path": "supabase/migrations/117_archived_items_stay_scheduled.sql"
+      }
+    },
+    {
+      "id": "migration:118_past_days_kept_from_series_and_import.sql",
+      "version": "118",
+      "name": "past_days_kept_from_series_and_import",
+      "file": "118_past_days_kept_from_series_and_import.sql",
+      "sha256": "3b617cb54b8cd0ed63470ab32ccbd7f76dab10745a581a6f264f3096aa0d3fda",
+      "source": {
+        "path": "supabase/migrations/118_past_days_kept_from_series_and_import.sql"
+      }
+    },
+    {
+      "id": "migration:119_approval_warns_about_draft_notes.sql",
+      "version": "119",
+      "name": "approval_warns_about_draft_notes",
+      "file": "119_approval_warns_about_draft_notes.sql",
+      "sha256": "72459a64418699d7509b7d07c5c61aaa294eeaeec1bcd5a6b97365d3a27de147",
+      "source": {
+        "path": "supabase/migrations/119_approval_warns_about_draft_notes.sql"
+      }
+    },
+    {
+      "id": "migration:120_suspended_not_marked_away.sql",
+      "version": "120",
+      "name": "suspended_not_marked_away",
+      "file": "120_suspended_not_marked_away.sql",
+      "sha256": "9ec0a0634ee797f948c5126dd2cc687600afb4f40e8bf0b31d3029af1c58cd44",
+      "source": {
+        "path": "supabase/migrations/120_suspended_not_marked_away.sql"
       }
     }
   ],

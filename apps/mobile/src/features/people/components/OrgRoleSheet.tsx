@@ -88,7 +88,7 @@ export function OrgRoleSheet({
     }
     return {
       title: `Change access role to ${ORG_ROLE_LABELS[next]}?`,
-      body: "Their access updates right away.",
+      body: "Their access changes now. If they have the app open, it updates and tells them.",
       points: [],
       confirmLabel: "Change access role",
       confirmTone: "primary" as const,

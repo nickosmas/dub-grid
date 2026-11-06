@@ -11,7 +11,7 @@ export interface DeleteUserAccountInput {
   userId: string;
   actorId: string;
   actorEmail: string | null;
-  reason: "self_service" | "admin_approved_request";
+  reason: "self_service" | "admin_approved_request" | "super_admin_deleted";
   requestId?: string | null;
 }
 
@@ -61,7 +61,8 @@ export async function deleteUserAccountWithCleanup({
   const { data: memberships } = await serviceClient
     .from("organization_memberships")
     .select("org_id, org_role")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .is("archived_at", null);
 
   for (const membership of memberships ?? []) {
     if ((membership as Record<string, unknown>).org_role !== "super_admin") {

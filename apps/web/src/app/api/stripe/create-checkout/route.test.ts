@@ -198,6 +198,7 @@ describe("POST /api/stripe/create-checkout", () => {
       ORG_ID,
       7,
       "http://localhost:3000/settings?section=org-billing",
+      null,
     );
   });
 
@@ -267,6 +268,7 @@ describe("POST /api/stripe/create-checkout", () => {
       ORG_ID,
       7,
       "http://localhost:3000/settings?section=org-billing",
+      null,
     );
   });
 
@@ -298,6 +300,7 @@ describe("POST /api/stripe/create-checkout", () => {
       ORG_ID,
       7,
       "http://localhost:3000/settings?section=org-billing",
+      null,
     );
   });
 
@@ -333,6 +336,93 @@ describe("POST /api/stripe/create-checkout", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
+  it("keeps the rest of a running trial as Stripe's trial", async () => {
+    const trialEndsAt = new Date(Date.now() + 10 * 86_400_000).toISOString();
+    organizationSingle.mockResolvedValueOnce({
+      data: {
+        id: ORG_ID,
+        name: "Acme Health",
+        stripe_customer_id: "cus_123",
+        subscription_status: "trialing",
+        trial_ends_at: trialEndsAt,
+        billing_paused_at: null,
+      },
+      error: null,
+    });
+
+    const response = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        returnUrl: "http://localhost:3000/settings?section=org-billing",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(createCheckoutSession).toHaveBeenCalledWith(
+      "cus_123",
+      ORG_ID,
+      7,
+      "http://localhost:3000/settings?section=org-billing",
+      Math.ceil(Date.parse(trialEndsAt) / 1000),
+    );
+  });
+
+  it("charges at once when less than two days of the trial are left", async () => {
+    organizationSingle.mockResolvedValueOnce({
+      data: {
+        id: ORG_ID,
+        name: "Acme Health",
+        stripe_customer_id: "cus_123",
+        subscription_status: "trialing",
+        trial_ends_at: new Date(Date.now() + 47 * 3_600_000).toISOString(),
+        billing_paused_at: null,
+      },
+      error: null,
+    });
+
+    await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        returnUrl: "http://localhost:3000/settings?section=org-billing",
+      }),
+    );
+
+    expect(createCheckoutSession).toHaveBeenCalledWith(
+      "cus_123",
+      ORG_ID,
+      7,
+      "http://localhost:3000/settings?section=org-billing",
+      null,
+    );
+  });
+
+  it("refuses checkout while billing is paused", async () => {
+    organizationSingle.mockResolvedValueOnce({
+      data: {
+        id: ORG_ID,
+        name: "Acme Health",
+        stripe_customer_id: "cus_123",
+        subscription_status: "trialing",
+        trial_ends_at: new Date(Date.now() + 10 * 86_400_000).toISOString(),
+        billing_paused_at: "2026-10-01T00:00:00Z",
+      },
+      error: null,
+    });
+
+    const response = await POST(
+      makeRequest({
+        orgId: ORG_ID,
+        returnUrl: "http://localhost:3000/settings?section=org-billing",
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "Billing is paused. You can start a subscription once it resumes.",
+    });
+    expect(createCheckoutSession).not.toHaveBeenCalled();
+  });
+
   it("lets an organization whose subscription ended subscribe again", async () => {
     subscriptionMaybeSingle.mockResolvedValueOnce({ data: { status: "canceled" }, error: null });
 
@@ -349,6 +439,7 @@ describe("POST /api/stripe/create-checkout", () => {
       ORG_ID,
       7,
       "http://localhost:3000/settings?section=org-billing",
+      null,
     );
   });
 });

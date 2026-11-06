@@ -9,6 +9,7 @@ import { ImpersonationNoticeEmail } from "./ImpersonationNoticeEmail";
 import { InviteEmail } from "./InviteEmail";
 import { LoginEmailChangedEmail } from "./LoginEmailChangedEmail";
 import { NotificationEmail } from "./NotificationEmail";
+import { SignInMovedEmail } from "./SignInMovedEmail";
 import { TwoFactorResetEmail } from "./TwoFactorResetEmail";
 import { SUPABASE_AUTH_TEMPLATES } from "./auth/supabase-templates";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
@@ -35,6 +36,12 @@ const logoUrl = "https://app.test";
  * (41c3). Add a new sign-in email here.
  */
 const APP_AUTH_EMAILS: AppAuthEmail[] = [
+  {
+    name: "sign-in moved",
+    Component: SignInMovedEmail as ComponentType<never>,
+    props: { orgName: "Acme Health", logoUrl },
+    notice: true,
+  },
   {
     name: "invitation",
     Component: InviteEmail as ComponentType<never>,
@@ -72,6 +79,32 @@ const APP_AUTH_EMAILS: AppAuthEmail[] = [
     Component: LoginEmailChangedEmail as ComponentType<never>,
     props: { orgName: "Calm Haven", recipient: "new", newEmail: "new@example.com", logoUrl },
     notice: false,
+  },
+  {
+    name: "sign-in email changed by themselves (previous address)",
+    Component: LoginEmailChangedEmail as ComponentType<never>,
+    props: {
+      orgName: "Calm Haven",
+      recipient: "previous",
+      newEmail: "new@example.com",
+      logoUrl,
+      changedBy: "self",
+      signOut: "other-devices",
+    },
+    notice: true,
+  },
+  {
+    name: "sign-in email changed by support, sign-out unconfirmed (previous address)",
+    Component: LoginEmailChangedEmail as ComponentType<never>,
+    props: {
+      orgName: "your organization",
+      recipient: "previous",
+      newEmail: "new@example.com",
+      logoUrl,
+      changedBy: "support",
+      signOut: "not-confirmed",
+    },
+    notice: true,
   },
   {
     name: "account deleted",

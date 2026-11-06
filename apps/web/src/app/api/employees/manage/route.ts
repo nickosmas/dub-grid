@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import {
+  AWAY_WHILE_SUSPENDED_CODE,
+  AWAY_WHILE_SUSPENDED_MESSAGE,
   changedElsewhereMessage,
   canMarkInactive,
   FIRST_DAY_INVALID_CODE,
@@ -21,25 +23,18 @@ import {
   resolveEffectiveOrgId,
 } from "@/app/api/shared/permissions";
 import { withoutHiddenStaff } from "@dubgrid/data-access";
-import {
-  forbidIfSandboxCookie,
-  requireAuthenticatedUser,
-  requireSensitiveActionAuth,
-} from "@/lib/api-auth";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import { employeeToRow, rowToEmployee, rowToInvitation } from "@/lib/db/mappers";
 import { EMPLOYEE_COLS, fetchAllRows } from "@/lib/db/shared";
-import { emailContactConflict, getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
-import { checkEmployeeEmailConflict } from "@/features/employees/server/contact-conflicts";
+import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import {
   getLoginEmailChange,
+  LINKED_EMAIL_OWNER_ONLY_MESSAGE,
   LINKED_EMAIL_REQUIRED_MESSAGE,
-  LoginEmailConflictError,
-  syncLinkedLoginEmail,
 } from "@/features/employees/server/login-email";
-import { followUpLinkedLoginEmailChange } from "@/features/employees/server/login-email-follow-up";
 import { fetchOrgToday } from "@/features/employees/server/org-today";
 import {
   clearFocusAreaShiftsAfterSave,
@@ -829,6 +824,18 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        // Leaving Active ends a suspension in the database (109), as on the status route.
+        if (
+          nextEmployee.status === "inactive" &&
+          previousRow?.status === "active" &&
+          previousRow.suspendedAt
+        ) {
+          return NextResponse.json(
+            { error: AWAY_WHILE_SUSPENDED_MESSAGE, code: AWAY_WHILE_SUSPENDED_CODE },
+            { status: 400 },
+          );
+        }
+
         // Asked before anything is written, the login email change included.
         const focusAreaShiftsPlan: FocusAreaShiftsPlan = previousRow
           ? await planFocusAreaShifts(auth.serviceClient, {
@@ -843,70 +850,23 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(focusAreaShiftsPlan.refuse, { status: 409 });
         }
 
-        // The staff email is the login email. Changing it for a linked
-        // account is a sensitive action: step-up first, never from a sandbox
-        // (its clone keeps the owner's own user_id), and never to nothing.
+        // The staff email is the sign-in email, and whoever sets it can reset
+        // the password. So it changes only on the person's own profile, where
+        // both addresses confirm, or through support: never from a staff record.
         const linkedUserId = previousRow?.userId ?? null;
         if (linkedUserId && !nextEmployee.email?.trim()) {
           return buildStaffValidationErrorResponse({ email: LINKED_EMAIL_REQUIRED_MESSAGE });
         }
-        const loginEmailChange = getLoginEmailChange({
-          userId: linkedUserId,
-          previousEmail: previousRow?.email,
-          nextEmail: nextEmployee.email,
-        });
-        const expectedVersion = data.expectedVersion ?? nextEmployee.version;
-        if (loginEmailChange && linkedUserId) {
-          const sandboxResponse = forbidIfSandboxCookie(req);
-          if (sandboxResponse) return sandboxResponse;
-          // The sign-in changes, sessions end and notices go out before the row
-          // is written, so a save that the row would refuse must be refused
-          // here first: a stale version or a contact email in use (41b2).
-          if (previousRow && previousRow.version !== expectedVersion) {
-            return NextResponse.json(
-              {
-                error: changedElsewhereMessage("their details"),
-                code: "EMPLOYEE_CONFLICT",
-                employee: previousRow,
-              },
-              { status: 409 },
-            );
-          }
-          const emailConflict = await checkEmployeeEmailConflict(auth.serviceClient, {
-            orgId: data.orgId,
-            email: loginEmailChange,
-            excludeEmployeeId: nextEmployee.id,
-            currentUserId: linkedUserId,
-          });
-          if (emailConflict.conflict) {
-            return NextResponse.json(
-              emailContactConflict(emailConflict.reason ?? "employee_duplicate"),
-              { status: 409 },
-            );
-          }
-          const assurance = await requireSensitiveActionAuth(req);
-          if ("response" in assurance) return assurance.response;
-          try {
-            await syncLinkedLoginEmail(auth.serviceClient, {
-              userId: linkedUserId,
-              email: loginEmailChange,
-            });
-          } catch (error) {
-            if (error instanceof LoginEmailConflictError) {
-              return NextResponse.json(error.conflict, { status: 409 });
-            }
-            throw error;
-          }
-          await followUpLinkedLoginEmailChange({
-            serviceClient: auth.serviceClient,
+        if (
+          getLoginEmailChange({
             userId: linkedUserId,
-            previousEmail: previousRow?.email ?? null,
-            newEmail: loginEmailChange,
-            orgId: data.orgId,
-            actorId: assurance.user.id,
-            actorSessionId: assurance.sessionId,
-          });
+            previousEmail: previousRow?.email,
+            nextEmail: nextEmployee.email,
+          })
+        ) {
+          return buildStaffValidationErrorResponse({ email: LINKED_EMAIL_OWNER_ONLY_MESSAGE });
         }
+        const expectedVersion = data.expectedVersion ?? nextEmployee.version;
         const referenceAuditValues =
           previousRow && changedProfileFields.length > 0
             ? employeeAuditReferenceValues(
@@ -1007,7 +967,6 @@ export async function POST(req: NextRequest) {
             if (changedFields.includes("email")) {
               from.email = previousRow.email;
               to.email = nextEmployee.email;
-              if (loginEmailChange) to.loginEmail = loginEmailChange;
             }
             if (changedFields.includes("phone")) {
               from.phone = previousRow.phone;

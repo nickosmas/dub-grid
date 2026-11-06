@@ -65,6 +65,7 @@ function renderBoard({
   currentEmpId = "emp-2",
   canApprove = false,
   canViewAllRequests = false,
+  isImpersonating = false,
 }: {
   openPickups?: ShiftRequest[];
   myRequests?: ShiftRequest[];
@@ -73,6 +74,7 @@ function renderBoard({
   currentEmpId?: string | null;
   canApprove?: boolean;
   canViewAllRequests?: boolean;
+  isImpersonating?: boolean;
 } = {}) {
   const onClaim = vi.fn();
   const onRespond = vi.fn();
@@ -90,6 +92,7 @@ function renderBoard({
       loading={false}
       currentEmpId={currentEmpId}
       canApprove={canApprove}
+      isImpersonating={isImpersonating}
       onClaim={onClaim}
       onRespond={onRespond}
       onResolve={onResolve}
@@ -182,12 +185,24 @@ describe("ShiftRequestBoard", () => {
     expect(onClaim).toHaveBeenCalledWith("req-1");
   });
 
-  it("tells a claimant their claim goes to a manager", async () => {
+  it("allows for a poster who can approve an ordinary pickup", async () => {
     const user = userEvent.setup();
     renderBoard({ openPickups: [makeRequest()] });
 
     await user.click(screen.getByRole("button", { name: "Claim" }));
-    expect(screen.getByText("It's sent for manager approval.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "It goes on the schedule once it's approved, right away if whoever posted it can approve requests.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("tells a claimant a call-off's open shift goes for approval", async () => {
+    const user = userEvent.setup();
+    renderBoard({ openPickups: [makeRequest({ parentRequestId: "calloff-1" })] });
+
+    await user.click(screen.getByRole("button", { name: "Claim" }));
+    expect(screen.getByText("It's sent for approval.")).toBeInTheDocument();
   });
 
   it("tells an approver their claim goes straight on the schedule", async () => {
@@ -195,8 +210,18 @@ describe("ShiftRequestBoard", () => {
     renderBoard({ openPickups: [makeRequest()], canApprove: true });
 
     await user.click(screen.getByRole("button", { name: "Claim" }));
-    expect(screen.getByText("It goes on the schedule right away.")).toBeInTheDocument();
-    expect(screen.queryByText(/manager approval/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText("You can approve requests, so it goes on the schedule right away."),
+    ).toBeInTheDocument();
+  });
+
+  it("never promises right away while a Gridmaster impersonates", async () => {
+    const user = userEvent.setup();
+    renderBoard({ openPickups: [makeRequest()], canApprove: true, isImpersonating: true });
+
+    await user.click(screen.getByRole("button", { name: "Claim" }));
+    expect(screen.getByText("It's sent for approval.")).toBeInTheDocument();
+    expect(screen.queryByText(/right away/)).not.toBeInTheDocument();
   });
 
   it("lets the targeted employee accept or decline a swap request", async () => {
@@ -228,6 +253,9 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: "Accept" }));
     await confirmDialogAction(user, "Accept");
     await user.click(screen.getByRole("button", { name: "Decline" }));
+    expect(
+      screen.getByText("The request closes and the requester keeps their shift."),
+    ).toBeInTheDocument();
     await confirmDialogAction(user, "Decline");
 
     expect(onRespond).toHaveBeenNthCalledWith(1, "swap-1", true);
@@ -295,9 +323,7 @@ describe("ShiftRequestBoard", () => {
       expect(fetchShiftRequestDraftCells).toHaveBeenCalledWith("approve-2", "org-1");
       const note = screen.getByRole("note");
       expect(note).toHaveTextContent("Alice Smith has unpublished changes on Thu, Apr 16.");
-      expect(note).toHaveTextContent(
-        "Approving publishes this request now and replaces those changes.",
-      );
+      expect(note).toHaveTextContent("Approving publishes this request now and replaces them.");
       expect(onResolve).not.toHaveBeenCalled();
 
       await confirmDialogAction(user, "Approve");
@@ -309,7 +335,7 @@ describe("ShiftRequestBoard", () => {
       await openApprove();
 
       expect(screen.getByRole("note")).toHaveTextContent(
-        "These days couldn't be checked for unpublished changes.",
+        "These days couldn't be checked for unpublished changes or notes.",
       );
     });
 

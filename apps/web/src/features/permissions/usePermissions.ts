@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { getOwnOrgRoleChangedMessage } from "@dubgrid/domain";
 import { useAuth } from "@/lib/auth-context";
-import { fetchAccountPermissions } from "@/features/account/client";
+import { fetchAccountPermissions, refreshBrowserSession } from "@/features/account/client";
 import { queryKeys } from "@/lib/query-keys";
 import { READ_ONLY_PERMS, ROLE_LEVEL } from "./core";
+import { catchUpOwnRoleChange } from "./ownRoleChange";
 import { acquirePermissionsSubscription } from "./permissionsRealtime";
 import { buildPerms, extractJwtClaims } from "./shared";
 import type { Permissions } from "./shared";
@@ -178,6 +181,27 @@ export function usePermissions(): WebPermissions {
     if (!userId) return;
     return acquirePermissionsSubscription(userId, queryClient);
   }, [userId, claimOrgId, queryClient]);
+
+  // The server reads the role from the membership row, so a role change shows
+  // here first; the token's claim (and the proxy's Settings gate) follow once
+  // the session is refreshed. Realtime brings the change to an open tab, and a
+  // tab opened later finds it on its first permissions read.
+  const serverPermissions = query.data?.permissions;
+  useEffect(() => {
+    if (!userId || !serverPermissions || serverPermissions.isImpersonating) return;
+    void catchUpOwnRoleChange(
+      userId,
+      { orgId: serverPermissions.orgId, role: serverPermissions.role },
+      { orgId: claims.orgId, role: claims.effectiveRole },
+      {
+        refreshSession: async () => (await refreshBrowserSession())?.access_token ?? null,
+        onCaughtUp: (role) => {
+          toast.info(getOwnOrgRoleChangedMessage(role));
+          void queryClient.invalidateQueries({ queryKey: queryKeys.org.bootstrap() });
+        },
+      },
+    );
+  }, [userId, serverPermissions, claims, queryClient]);
   // ── User View override ──────────────────────────────────────────────
   // When active, return read-only permissions so admins see the user experience.
   // Preserve orgId so data fetching still works (user is still authenticated).

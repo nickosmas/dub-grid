@@ -212,7 +212,10 @@ export default function ScheduleRules({
         >
           <div>
             <div style={ruleTitleStyle}>Block overlapping shifts</div>
-            <div style={ruleDescriptionStyle}>Nobody can be given two shifts that overlap.</div>
+            <div style={ruleDescriptionStyle}>
+              Two shifts on the same day can't overlap. The shift editor also checks the day before
+              and after.
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <Switch

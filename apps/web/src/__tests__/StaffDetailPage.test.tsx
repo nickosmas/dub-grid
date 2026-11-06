@@ -194,7 +194,12 @@ vi.mock("@/components/EditEmployeePanel", () => ({
     lastEditEmployeePanelSaveWithReinvite = props.onSaveWithReinvite ?? null;
     lastEditEmployeePanelPendingInvitation = props.pendingInvitation;
     lastEditEmployeePanelHideActions = props.hideActions ?? false;
-    return <div>Edit details form</div>;
+    return (
+      <>
+        <div>Edit details form</div>
+        <div>Internal notes</div>
+      </>
+    );
   },
 }));
 
@@ -252,8 +257,7 @@ function makeDirectoryPerson(overrides: Partial<DirectoryPerson> = {}): Director
 }
 
 async function openDetailsEditor() {
-  fireEvent.click(await screen.findByRole("button", { name: "Edit details" }));
-  return screen.findByRole("dialog", { name: "Edit details" });
+  return (await screen.findByText("Edit details form")).parentElement as HTMLElement;
 }
 
 const mockEmployee = makeEmployee({
@@ -435,19 +439,21 @@ describe("StaffDetailPage", () => {
     expect(mockedFetchEmployeeInvitations).not.toHaveBeenCalled();
   });
 
-  it("opens on the Overview tab beside the person's cards", async () => {
+  it("opens on the Account tab, with no period to choose", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
     expect(
       await screen.findByRole("heading", { level: 1, name: "Margaret Sullivan" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Internal notes")).toBeInTheDocument();
-    expect(screen.getByText("Overview content")).toBeInTheDocument();
+    expect(screen.queryByText("Overview content")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Previous month" })).not.toBeInTheDocument();
     expect(screen.queryByText("Activity panel")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
   });
 
-  it("loads the current week for the Overview strip", async () => {
+  it("loads the current week for the Schedule strip", async () => {
+    mockSearchParams = new URLSearchParams("tab=schedule");
     render(<StaffDetailPage employeeId="emp-1" />);
 
     await screen.findByText("Internal notes");
@@ -464,7 +470,8 @@ describe("StaffDetailPage", () => {
     );
   });
 
-  it("opens on the current month and steps the Overview's shifts a month at a time", async () => {
+  it("opens Schedule on the current month and steps its shifts a month at a time", async () => {
+    mockSearchParams = new URLSearchParams("tab=schedule");
     const month = monthPeriod(localIsoToday());
     const previous = stepPersonPeriod(month, -1).range;
 
@@ -523,16 +530,16 @@ describe("StaffDetailPage", () => {
 
     const tabs = within(await screen.findByRole("group", { name: "Person sections" }));
     expect(tabs.getAllByRole("button").map((tab) => tab.textContent)).toEqual([
-      "Overview",
+      "Account",
       "Schedule",
       "Requests",
       "Activity",
     ]);
-    expect(tabs.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-pressed", "true");
+    expect(tabs.getByRole("button", { name: "Account" })).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.click(tabs.getByRole("button", { name: "Activity" }));
     expect(mockReplace).toHaveBeenCalledWith("/people/emp-1?tab=activity", { scroll: false });
-    fireEvent.click(tabs.getByRole("button", { name: "Overview" }));
+    fireEvent.click(tabs.getByRole("button", { name: "Account" }));
     expect(mockReplace).toHaveBeenCalledWith("/people/emp-1", { scroll: false });
   });
 
@@ -558,15 +565,16 @@ describe("StaffDetailPage", () => {
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(href));
   });
 
-  it("falls back to Overview for a tab it doesn't know", async () => {
+  it("falls back to Account for a tab it doesn't know", async () => {
     mockSearchParams = new URLSearchParams("tab=billing");
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    expect(await screen.findByText("Overview content")).toBeInTheDocument();
+    expect(await screen.findByText("Internal notes")).toBeInTheDocument();
   });
 
   it.each([
+    ["overview", "/people/emp-1?tab=schedule"],
     ["shifts", "/people/emp-1?tab=schedule"],
     ["timeoff", "/people/emp-1?tab=schedule"],
     ["recurring", "/people/emp-1?tab=schedule"],
@@ -594,7 +602,7 @@ describe("StaffDetailPage", () => {
 
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    expect(await screen.findByText("Overview content")).toBeInTheDocument();
+    expect(await screen.findByText("Internal notes")).toBeInTheDocument();
     const tabs = within(screen.getByRole("group", { name: "Person sections" }));
     expect(tabs.queryByRole("button", { name: "Activity" })).not.toBeInTheDocument();
   });
@@ -674,12 +682,13 @@ describe("StaffDetailPage", () => {
     expect(screen.queryByRole("region", { name: "Recurring schedule" })).not.toBeInTheDocument();
   });
 
-  it("keeps the editor in a popup and the status and invitation on the page", async () => {
+  it("edits on the page, with the status and invitation above it", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
     await screen.findByText("Internal notes");
 
     expect(screen.queryByRole("button", { name: "Actions" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
+    expect(screen.getByText("Edit details form")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
     // The invite card beside the status says where it stands; the Access card names the state.
     expect(screen.getByText(/^Invited .+, hasn't joined$/)).toBeInTheDocument();
     expect(screen.getAllByText("Invitation pending")).toHaveLength(1);
@@ -820,7 +829,7 @@ describe("StaffDetailPage", () => {
     const dialog = await openDetailsEditor();
 
     expect(within(dialog).getByText("Edit details form")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
     expect(lastEditEmployeePanelHideActions).toBe(true);
     expect(screen.queryByRole("button", { name: "Invite control" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Pending invitation:/)).not.toBeInTheDocument();

@@ -53,7 +53,10 @@ export function EditBarActions({
   // Android tints the icon itself, dimming it while disabled.
   const saveSymbol = useToolbarIcon("checkmark", save.label.startsWith("Send") ? "send" : "check");
   const saveImage = useIosToolbarImage("checkmark", mobileColors.onBrandText);
-  const saveIcon = IS_IOS ? saveImage : saveSymbol;
+  // Until the drawn checkmark exists, the system's symbol: a bar item with no
+  // icon is laid out as a wide empty capsule, which iOS animated into from the
+  // last screen's Edit and then shrank to the round checkmark.
+  const saveIcon = IS_IOS ? (saveImage ?? saveSymbol) : saveSymbol;
   // A save is a checkmark; Send or Finish keep their words. Android's toolbar
   // draws only icons, so there a send is its arrow and the rest a checkmark.
   const saveAsCheckmark = !IS_IOS || barActionIsCheckmark(save.label);

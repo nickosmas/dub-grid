@@ -661,7 +661,7 @@ export function ScheduleBuildSection({
               </Button>
             </div>
             <p className="dg-cc-detail-line dg-cc-detail-line--muted">
-              Changes the draft only; Undo puts it all back.
+              Changes the draft only. Undo puts back every day not changed since.
             </p>
           </>
         ) : (

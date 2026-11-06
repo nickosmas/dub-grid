@@ -324,6 +324,19 @@ describe("POST /api/employees/status/bulk", () => {
     });
   });
 
+  it("skips a suspended person for Mark away, so the suspension isn't ended", async () => {
+    tables.employees = [employee(1, { suspended_at: "2026-10-20T00:00:00Z" }), employee(2)];
+
+    const list = await results(await POST(request({ action: "markAway", people: people(1, 2) })));
+
+    expect(list.map((r) => [r.ok, r.code ?? null])).toEqual([
+      [false, "STATUS_NOT_APPLICABLE"],
+      [true, null],
+    ]);
+    expect(list[0].error).toBe("Reinstate them first, then mark them away.");
+    expect(tables.employees[0]).toMatchObject({ status: "active" });
+  });
+
   it("lets an Admin offboard Users and Admins but not a Super Admin (51k)", async () => {
     tables.organization_memberships = [
       { user_id: ME, org_id: ORG, org_role: "admin", archived_at: null },
