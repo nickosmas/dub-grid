@@ -2,7 +2,6 @@ import { describeEmploymentStatus, resolveOrganizationLabel } from "@dubgrid/dom
 import { getServiceClient } from "@/lib/supabase-service";
 import { summarizePermissionChanges } from "@/lib/permission-labels";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
-import { fetchPublishedShiftRows } from "@/lib/published-shifts";
 import logger from "@/lib/logger";
 import { TRIAL_GRACE_DAYS } from "@dubgrid/domain";
 import { BILLING_POLICY_OVERRIDE_SELECT, getOrgBillingPolicy } from "@/lib/billing-policy";
@@ -49,12 +48,6 @@ export type NotificationEvent =
        * is the only way to still notify them once the RPC has run.
        */
       previousTargetEmpId?: string | null;
-    }
-  | {
-      action: "schedule_published";
-      orgId: string;
-      startDate: string;
-      endDate: string;
     }
   | {
       action: "role_changed";
@@ -245,31 +238,6 @@ async function getAdminsWithPermission(orgId: string, permission: string): Promi
   return [...ids];
 }
 
-async function getAffectedEmployeeUserIds(
-  orgId: string,
-  startDate: string,
-  endDate: string,
-): Promise<string[]> {
-  const db = getServiceClient();
-
-  const shifts = await fetchPublishedShiftRows(db, {
-    orgId,
-    startDate,
-    endDate,
-  });
-
-  if (!shifts.length) return [];
-
-  const empIds = [...new Set(shifts.map((shift) => shift.emp_id))];
-  const { data: employees } = await db
-    .from("employees")
-    .select("user_id")
-    .in("id", empIds)
-    .not("user_id", "is", null);
-
-  return (employees ?? []).map((employee) => employee.user_id as string).filter(Boolean);
-}
-
 async function getRequestInfo(requestId: string): Promise<{
   requesterUserId: string | null;
   requesterName: string;
@@ -434,20 +402,6 @@ function formatNotificationDate(value: string): string {
     day: "numeric",
     year: "numeric",
   });
-}
-
-/**
- * "May 4 – May 17, 2026". Collapses a same-day range to a single date, and
- * names the year once when both ends share it rather than twice.
- */
-function formatNotificationDateRange(start: string, end: string): string {
-  const from = formatNotificationDate(start);
-  const to = formatNotificationDate(end);
-  if (from === to) return from;
-
-  const startYear = start.slice(0, 4);
-  const openEnd = startYear === end.slice(0, 4) ? from.replace(`, ${startYear}`, "") : from;
-  return `${openEnd} - ${to}`;
 }
 
 /** Never throws: a failed lookup must not cost a security or billing alert its delivery. */
@@ -844,31 +798,6 @@ async function dispatchNotificationEventInternal(
           );
         }
       }
-      return;
-    }
-
-    case "schedule_published": {
-      const userIds = await getAffectedEmployeeUserIds(event.orgId, event.startDate, event.endDate);
-      const publisherName = await getActorName(actorUserId);
-      const publishedRange = formatNotificationDateRange(event.startDate, event.endDate);
-
-      await Promise.all(
-        userIds
-          .filter((id) => id !== actorUserId)
-          .map((userId) =>
-            sendNotification(
-              userId,
-              event.orgId,
-              "schedule_published" as NotificationType,
-              "Schedule updated",
-              `${publisherName} published the schedule for ${publishedRange}. Open the schedule to see your shifts.`,
-              {
-                startDate: event.startDate,
-                endDate: event.endDate,
-              },
-            ),
-          ),
-      );
       return;
     }
 
