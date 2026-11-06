@@ -3,6 +3,7 @@ import { createElement } from "react";
 import { render } from "@react-email/components";
 import { InviteEmail, type InvitationEmailKind } from "@/emails/InviteEmail";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
+import { findAuthUserByEmail } from "@/lib/supabase-admin-users";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import { serverEnv } from "@/lib/env.server";
@@ -61,6 +62,7 @@ export async function sendInvitationEmail(input: {
       expiresAt: input.expiresAt,
       timeZone: input.timeZone,
       kind: input.kind,
+      hasAccount: Boolean((await findAuthUserByEmail(input.email))?.emailConfirmed),
     }),
   );
 

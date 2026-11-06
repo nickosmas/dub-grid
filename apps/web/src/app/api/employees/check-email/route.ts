@@ -19,10 +19,6 @@ const bodySchema = z.object({
   email: z.string().trim().email(),
   orgId: z.string().uuid(),
   excludeEmployeeId: z.string().uuid().optional(),
-  /** The employee-being-edited's own linked account, if any — lets someone
-   *  keep typing their own login email without tripping the "belongs to a
-   *  different account" case in the shared checker. */
-  currentUserId: z.string().uuid().nullable().optional(),
 });
 
 /**
@@ -59,7 +55,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
-  const { email, orgId, excludeEmployeeId, currentUserId } = parsed.data;
+  const { email, orgId, excludeEmployeeId } = parsed.data;
 
   const serviceClient = getServiceClient();
   const hasPermission = await canManageEmployees(req, serviceClient, user.id, orgId);
@@ -72,7 +68,6 @@ export async function POST(req: NextRequest) {
       orgId,
       email,
       excludeEmployeeId,
-      currentUserId,
     });
     return NextResponse.json(result);
   } catch (error) {

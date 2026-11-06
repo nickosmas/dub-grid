@@ -28,6 +28,15 @@ describe("InviteEmail", () => {
     expect(body).not.toMatch(/has invited you/i);
   });
 
+  it("tells someone with an account there's nothing to set up", async () => {
+    const body = await text({ hasAccount: true });
+
+    expect(body).toContain(
+      "You already have a DubGrid account with this email address, so there's nothing to set up. Sign in with your password to accept.",
+    );
+    expect(body).not.toContain("set your password");
+  });
+
   it("states the exact deadline in the organization's zone, and that it is fixed", async () => {
     const body = await text();
 
