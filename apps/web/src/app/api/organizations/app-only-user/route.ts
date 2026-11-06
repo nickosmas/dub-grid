@@ -56,7 +56,7 @@ export async function PATCH(req: NextRequest) {
     // (otherwise a sandbox user could mutate the real org). See H-1.
     orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
 
-    const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
+    const hasPermission = await canManageEmployees(req, serviceClient, user.id, orgId);
     if (!hasPermission) {
       return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }

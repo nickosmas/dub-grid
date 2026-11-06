@@ -1,5 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { canManageEmployees, isGridmasterActor, type ServiceClient } from "./shared";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+import {
+  canManageEmployees,
+  isActingInSessionOrg,
+  isGridmasterActor,
+  type ServiceClient,
+} from "./shared";
+
+const requireAuthenticatedUserWithClaims = vi.fn();
+
+vi.mock("@/lib/api-auth", () => ({
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
+}));
 
 type MockRows = {
   membership?: {
@@ -12,7 +24,7 @@ type MockRows = {
     subscription_status: string | null;
     trial_ends_at: string | null;
   } | null;
-  employee?: { status: string | null } | null;
+  employee?: { status?: string | null; suspended_at?: string | null } | null;
 };
 
 function makeServiceClient(rows: MockRows) {
@@ -30,7 +42,9 @@ function makeServiceClient(rows: MockRows) {
                 ? (rows.organization ?? null)
                 : table === "employees"
                   ? (rows.employee ?? null)
-                  : null,
+                  : table === "profiles"
+                    ? (rows.profile ?? null)
+                    : null,
           error: null,
         }),
         single: async () => ({
@@ -45,6 +59,53 @@ function makeServiceClient(rows: MockRows) {
 
 const ACTOR_ID = "11111111-1111-4111-8111-111111111111";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
+const OTHER_ORG_ID = "33333333-3333-4333-8333-333333333333";
+const req = new NextRequest("https://app.test/api/employees/identity");
+
+function signedInTo(orgId: string | null) {
+  requireAuthenticatedUserWithClaims.mockResolvedValue({
+    user: { id: ACTOR_ID },
+    claims: { org_id: orgId },
+  });
+}
+
+beforeEach(() => {
+  signedInTo(ORG_ID);
+});
+
+describe("isActingInSessionOrg (F-194)", () => {
+  const client = (employee?: MockRows["employee"], platformRole = "none") =>
+    makeServiceClient({ profile: { platform_role: platformRole }, employee });
+
+  it("refuses another organization than the session's", async () => {
+    await expect(isActingInSessionOrg(req, client(), ACTOR_ID, OTHER_ORG_ID)).resolves.toBe(false);
+  });
+
+  it("allows the session's own organization, and a token naming none", async () => {
+    await expect(isActingInSessionOrg(req, client(), ACTOR_ID, ORG_ID)).resolves.toBe(true);
+    signedInTo(null);
+    await expect(isActingInSessionOrg(req, client(), ACTOR_ID, ORG_ID)).resolves.toBe(true);
+  });
+
+  it("refuses someone suspended from the organization", async () => {
+    const suspended = client({ suspended_at: "2026-11-01T00:00:00.000Z" });
+    await expect(isActingInSessionOrg(req, suspended, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+  });
+
+  it("refuses a request that isn't the actor's own", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
+      user: { id: "someone-else" },
+      claims: { org_id: ORG_ID },
+    });
+    await expect(isActingInSessionOrg(req, client(), ACTOR_ID, ORG_ID)).resolves.toBe(false);
+  });
+
+  it("leaves a Gridmaster free to manage other organizations", async () => {
+    await expect(
+      isActingInSessionOrg(req, client(null, "gridmaster"), ACTOR_ID, OTHER_ORG_ID),
+    ).resolves.toBe(true);
+  });
+});
 
 describe("canManageEmployees", () => {
   it("allows an inactive admin whose admin_permissions grant canManageEmployees", async () => {
@@ -55,7 +116,7 @@ describe("canManageEmployees", () => {
       employee: { status: "inactive" },
     });
 
-    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
 
   it("allows an inactive super_admin", async () => {
@@ -66,7 +127,7 @@ describe("canManageEmployees", () => {
       employee: { status: "inactive" },
     });
 
-    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
 
   it("allows a gridmaster", async () => {
@@ -77,7 +138,7 @@ describe("canManageEmployees", () => {
       employee: { status: "inactive" },
     });
 
-    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
 
   it("allows an active admin with canManageEmployees", async () => {
@@ -88,7 +149,7 @@ describe("canManageEmployees", () => {
       employee: { status: "active" },
     });
 
-    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
 
   it("allows an active admin with no employees row (unlinked)", async () => {
@@ -99,7 +160,7 @@ describe("canManageEmployees", () => {
       employee: null,
     });
 
-    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
 
   it("denies a removed or archived membership", async () => {
@@ -110,7 +171,7 @@ describe("canManageEmployees", () => {
       employee: { status: "active" },
     });
 
-    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
   });
 
   it("denies an active admin without the granular employee permission", async () => {
@@ -121,7 +182,7 @@ describe("canManageEmployees", () => {
       employee: { status: "active" },
     });
 
-    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
   });
 
   it("denies a member when the organization is archived or missing", async () => {
@@ -132,7 +193,7 @@ describe("canManageEmployees", () => {
       employee: { status: "active" },
     });
 
-    await expect(canManageEmployees(serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
   });
 });
 

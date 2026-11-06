@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
     orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
     const serviceClient = getServiceClient();
     const [canManage, { isGridmaster, isSuperAdmin }] = await Promise.all([
-      canManageEmployees(serviceClient, user.id, orgId),
+      canManageEmployees(req, serviceClient, user.id, orgId),
       loadStatusTier(serviceClient, user.id, orgId),
     ]);
     if (!canManage) {
