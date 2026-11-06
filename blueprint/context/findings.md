@@ -797,6 +797,7 @@
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** RLS is the boundary for browser reads, but most server work uses the service client, which bypasses it, so each query depends on someone remembering `.eq("org_id", ...)`. F-190 is exactly that miss, in 2 of 21 updates in one file, and earlier audits found the same class (F-8 to F-16, 2026-07). `org-isolation.integration.test.ts` is good but tests policies, not routes, and no check covers a foreign id sent to a route.
 **Suggested fix:** Add a tenant-scoped helper (`orgDb(orgId).from(table)` that applies the filter), a lint rule refusing a bare `.eq("id", ...)` on a tenant table in a mutation, and a generated CI test that signs in as org A and sends org B's ids to every mutation route. Turn the probes from this audit into a live test over every table in the inventory.
+**Update 2026-11-06 (fix/tenant-mutation-guard):** the lint rule is in. `design/no-unscoped-tenant-write` fails an update or delete on an organization's table in `app/api` and `features/**/server` unless it filters on `org_id` or one account. It flagged 16 existing writes. None was exploitable, since each id came from the server or was tied to a person, and each now carries the filter. Still open: the `orgDb` helper, the generated CI test that sends org B's ids to every mutation route, and writes built across several statements, which the rule can't see.
 **Resolution:**
 
 ### F-203 [P2] open - Deleted organizations' data is kept indefinitely and the retention jobs never run

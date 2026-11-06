@@ -10,6 +10,7 @@ import { noFloatingAsyncHandler } from "./eslint-rules/no-floating-async-handler
 import { noMisplacedUseClient } from "./eslint-rules/no-misplaced-use-client.mjs";
 import { noRawMobileMetrics } from "./eslint-rules/no-raw-mobile-metrics.mjs";
 import { noFloatingServerWork } from "./eslint-rules/no-floating-server-work.mjs";
+import { noUnscopedTenantWrite } from "./eslint-rules/no-unscoped-tenant-write.mjs";
 import { noRawErrorInToast, noTechnicalUserCopy } from "./eslint-rules/no-technical-user-copy.mjs";
 import { noCopyStyleDrift } from "./eslint-rules/no-copy-style-drift.mjs";
 
@@ -28,6 +29,7 @@ const designPlugin = {
     "no-misplaced-use-client": noMisplacedUseClient,
     "no-raw-mobile-metrics": noRawMobileMetrics,
     "no-floating-server-work": noFloatingServerWork,
+    "no-unscoped-tenant-write": noUnscopedTenantWrite,
   },
 };
 
@@ -419,6 +421,7 @@ const eslintConfig = defineConfig([
     rules: {
       "no-console": "error",
       "design/no-floating-server-work": "error",
+      "design/no-unscoped-tenant-write": "error",
     },
   },
   {

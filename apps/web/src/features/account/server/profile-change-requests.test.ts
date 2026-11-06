@@ -136,8 +136,10 @@ function makeRequestResolveBuilder(row: Record<string, unknown>) {
     update: vi.fn(() => ({
       eq: vi.fn(() => ({
         eq: vi.fn(() => ({
-          select: vi.fn(() => ({
-            maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
+          eq: vi.fn(() => ({
+            select: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
+            })),
           })),
         })),
       })),

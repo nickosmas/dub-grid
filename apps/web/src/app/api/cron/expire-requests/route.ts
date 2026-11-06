@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
     const { error: updateError } = await db
       .from("shift_requests")
       .update({ status: "expired" })
+      .eq("org_id", row.org_id)
       .eq("id", row.id)
       .in("status", ["open", "pending_approval"]); // re-check to avoid races
     if (updateError) {
