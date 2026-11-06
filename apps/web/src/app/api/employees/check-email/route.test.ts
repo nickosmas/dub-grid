@@ -134,7 +134,7 @@ describe("POST /api/employees/check-email", () => {
 
   // ── The auth.users-based cases: mirrors check_employee_email_belongs_to_user ──
 
-  it("flags a Gridmaster's login email even though no employee row matches it", async () => {
+  it("flags a Gridmaster's login email the same way as any other account's", async () => {
     findAuthUserByEmail.mockResolvedValue({
       id: OTHER_USER_ID,
       email: "gridmaster@test.com",
@@ -149,54 +149,47 @@ describe("POST /api/employees/check-email", () => {
     await expect(res.json()).resolves.toEqual({
       conflict: true,
       conflictingEmployeeId: null,
-      reason: "gridmaster",
+      reason: "other_account",
     });
   });
 
-  it("does not flag an employee's own linked login email", async () => {
+  it("does not flag an employee's own login email", async () => {
     findAuthUserByEmail.mockResolvedValue({
       id: CURRENT_USER_ID,
       email: "self@test.com",
       emailConfirmed: true,
     });
-    profilesMaybeSingle.mockResolvedValue({ data: { platform_role: "admin" }, error: null });
+    profilesMaybeSingle.mockResolvedValue({ data: { platform_role: "none" }, error: null });
 
     const { POST } = await importRoute();
     const res = await POST(
-      makeRequest({
-        email: "self@test.com",
-        orgId: ORG_ID,
-        currentUserId: CURRENT_USER_ID,
-      }),
+      makeRequest({ email: "self@test.com", orgId: ORG_ID, excludeEmployeeId: OTHER_EMPLOYEE_ID }),
     );
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ conflict: false, conflictingEmployeeId: null });
   });
 
-  it("flags an email belonging to a different account than the employee being edited is linked to", async () => {
+  it("says nothing of an account outside this organization, whatever the client claims (F-196)", async () => {
     findAuthUserByEmail.mockResolvedValue({
       id: OTHER_USER_ID,
-      email: "someone-elses-login@test.com",
+      email: "elsewhere@test.com",
       emailConfirmed: true,
     });
-    profilesMaybeSingle.mockResolvedValue({ data: { platform_role: "admin" }, error: null });
+    profilesMaybeSingle.mockResolvedValue({ data: { platform_role: "none" }, error: null });
 
     const { POST } = await importRoute();
     const res = await POST(
       makeRequest({
-        email: "someone-elses-login@test.com",
+        email: "elsewhere@test.com",
         orgId: ORG_ID,
+        excludeEmployeeId: OTHER_EMPLOYEE_ID,
         currentUserId: CURRENT_USER_ID,
       }),
     );
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      conflict: true,
-      conflictingEmployeeId: null,
-      reason: "other_account",
-    });
+    await expect(res.json()).resolves.toEqual({ conflict: false, conflictingEmployeeId: null });
   });
 
   it("flags an unlinked employee's typed email when its account owner already has an active employee row in this org", async () => {
@@ -217,7 +210,7 @@ describe("POST /api/employees/check-email", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       conflict: true,
-      conflictingEmployeeId: OWNER_EMPLOYEE_ID,
+      conflictingEmployeeId: null,
       reason: "other_account",
     });
   });

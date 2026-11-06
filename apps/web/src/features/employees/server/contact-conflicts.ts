@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findAuthUserByEmail } from "@/lib/supabase-admin-users";
 
-export type EmployeeEmailConflictReason = "employee_duplicate" | "gridmaster" | "other_account";
+export type EmployeeEmailConflictReason = "employee_duplicate" | "other_account";
 
 export type EmployeeContactConflict = {
   conflict: boolean;
@@ -109,8 +109,10 @@ export async function checkEmployeeEmailConflict(
       profileError,
     );
   }
+  // Reads as any other account's address, so the answer never singles out
+  // platform staff (F-196).
   if (ownerProfile?.platform_role === "gridmaster") {
-    return { conflict: true, conflictingEmployeeId: null, reason: "gridmaster" };
+    return { conflict: true, conflictingEmployeeId: null, reason: "other_account" };
   }
 
   // This employee is linked to a different account than the email's owner.
@@ -142,7 +144,7 @@ export async function checkEmployeeEmailConflict(
   if (ownerEmployee) {
     return {
       conflict: true,
-      conflictingEmployeeId: ownerEmployee.id as string,
+      conflictingEmployeeId: null,
       reason: "other_account",
     };
   }

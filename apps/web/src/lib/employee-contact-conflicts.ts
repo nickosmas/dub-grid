@@ -13,16 +13,14 @@ export const EMAIL_BELONGS_TO_SOMEONE_ELSE = "That email belongs to someone else
 export const PHONE_BELONGS_TO_SOMEONE_ELSE = "That phone number belongs to someone else.";
 
 /** Why an email cannot be a person's contact or sign-in email. */
-export type EmailConflictReason = "employee_duplicate" | "gridmaster" | "other_account";
+export type EmailConflictReason = "employee_duplicate" | "other_account";
 
 /** The one conflict answer for an email, whether a pre-check or the database found it. */
 export function emailContactConflict(reason: EmailConflictReason): EmployeeContactConflict {
   const message =
     reason === "employee_duplicate"
       ? "That email is already used by another person."
-      : reason === "gridmaster"
-        ? "That email address is reserved."
-        : "Someone else already signs in with that email. Use a different one.";
+      : "Someone else already signs in with that email. Use a different one.";
   return { code: EMPLOYEE_CONTACT_CONFLICT_CODE, error: message, field: "email", message };
 }
 
@@ -77,9 +75,7 @@ export function getEmployeeContactConflict(error: unknown): EmployeeContactConfl
     text.includes("employee_email_belongs_to_other_user") ||
     text.includes("employee_email_belongs_to_gridmaster")
   ) {
-    return emailContactConflict(
-      text.includes("employee_email_belongs_to_gridmaster") ? "gridmaster" : "other_account",
-    );
+    return emailContactConflict("other_account");
   }
 
   return null;

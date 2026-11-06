@@ -7,7 +7,6 @@ import type { MobileContactConflictReason } from "../../../shared/lib/api";
  */
 export const EMAIL_CONFLICT_MESSAGES: Record<MobileContactConflictReason, string> = {
   employee_duplicate: "That email is already used by another person on your team.",
-  gridmaster: "That email address is reserved.",
   other_account: "That email belongs to a different user account.",
 };
 

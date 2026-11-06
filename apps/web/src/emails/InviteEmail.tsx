@@ -19,6 +19,8 @@ export type InviteEmailProps = {
   timeZone: string | null;
   /** A reissue replaces an earlier invitation, whose link no longer works. */
   kind: InvitationEmailKind;
+  /** This address already has an account, so there's no password to set. */
+  hasAccount?: boolean;
 };
 
 /**
@@ -35,6 +37,7 @@ export function InviteEmail({
   expiresAt,
   timeZone,
   kind,
+  hasAccount = false,
 }: InviteEmailProps) {
   const deadline = formatInvitationExpiry(expiresAt, timeZone);
   const reissue = kind === "reissue";
@@ -64,7 +67,9 @@ export function InviteEmail({
         )}
       </Text>
       <Text style={{ ...styles.paragraph, fontSize: "15px" }}>
-        To get started, set your password and accept your invitation.
+        {hasAccount
+          ? "You already have a DubGrid account with this email address, so there's nothing to set up. Sign in with your password to accept."
+          : "To get started, set your password and accept your invitation."}
       </Text>
       <EmailButton href={acceptUrl}>Accept invitation</EmailButton>
       {kind === "moved" ? (
