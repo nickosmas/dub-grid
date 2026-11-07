@@ -4,6 +4,7 @@ import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
+import { canUseTestSandbox } from "@/lib/sandbox-access";
 import { getServiceClient } from "@/lib/supabase-service";
 import { SANDBOX_COOKIE_NAME, encodeSandboxCookieValue } from "@/lib/sandbox-cookie";
 import {
@@ -89,12 +90,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: profile } = await serviceClient
-      .from("profiles")
-      .select("org_id, platform_role")
-      .eq("id", auth.user.id)
-      .maybeSingle();
-
     const isReset = parsed.data.action === "reset";
     const existing = await findActiveSandboxForUser(serviceClient, auth.user.id, auth.sessionId);
 
@@ -109,34 +104,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Sandbox mode is admin+ only (mirrors Header.tsx's client-side
-    // canOpenSandbox gate) — enforce it server-side too. auth.claims.org_role
+    // Mirrors Header.tsx's client-side canOpenSandbox gate. auth.claims.org_role
     // can't be used for this: requireAuthenticatedUserWithClaims already
     // widens it to "super_admin" once a sandbox cookie exists, which would
-    // let a user demoted after entering keep resetting their sandbox. Look
-    // the caller's real role in the source org up directly instead. This
-    // also replaces the old membership-existence-only check, since verifying
-    // org_role in ('admin','super_admin') already implies active membership.
-    const isGridmaster = profile?.platform_role === "gridmaster";
-    let sourceMembership: { org_role?: string } | null = null;
-    if (!isGridmaster) {
-      const { data } = await serviceClient
-        .from("organization_memberships")
-        .select("org_role")
-        .eq("user_id", auth.user.id)
-        .eq("org_id", sourceOrgId)
-        .is("archived_at", null)
-        .maybeSingle();
-      sourceMembership = data;
-      const role = sourceMembership?.org_role as string | undefined;
-      if (role !== "admin" && role !== "super_admin") {
-        return NextResponse.json(
-          { error: "You don't have permission to use sandbox mode." },
-          { status: 403 },
-        );
-      }
+    // let a user demoted after entering keep resetting their sandbox. Read the
+    // caller's real role in the source org instead.
+    if (!(await canUseTestSandbox(serviceClient, auth.user.id, sourceOrgId))) {
+      return NextResponse.json(
+        { error: "You don't have permission to use sandbox mode." },
+        { status: 403 },
+      );
     }
-
     // For "enter": reuse the existing sandbox if there is one (typical case is
     // the user re-clicking enter from another tab and expecting their
     // in-progress work back). For "reset": ignore it — we recreate below.

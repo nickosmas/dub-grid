@@ -156,6 +156,7 @@ export default function Header({ orgName }: HeaderProps) {
     canViewStaff,
     canAccessSettings,
     canViewReports,
+    canManageEmployees,
     isSuperAdmin,
     isImpersonating,
     isUserViewActive,
@@ -229,7 +230,12 @@ export default function Header({ orgName }: HeaderProps) {
   });
   const isInSandbox = sandboxBootstrapQuery.data?.org?.workspaceKind === "sandbox";
   const canOpenSandbox =
-    Boolean(authUser) && !isImpersonating && !isUserViewActive && !isInSandbox && actualLevel >= 2;
+    Boolean(authUser) &&
+    !isImpersonating &&
+    !isUserViewActive &&
+    !isInSandbox &&
+    actualLevel >= 2 &&
+    canManageEmployees;
 
   // Hydrate cached name from sessionStorage after mount
   useEffect(() => {
