@@ -1,9 +1,10 @@
 // @vitest-environment node
 
 /**
- * Migrations 121 to 124 (F-192, F-195, F-197, F-198): a row's links, a request
- * action and a schedule write all stay inside one organization. Each case runs
- * in a transaction that is rolled back.
+ * Migrations 121 to 125 (F-192, F-195, F-197, F-198, F-210): a row's links, a
+ * request action and a schedule write all stay inside one organization, while a
+ * phone's push token can follow its person. Each case runs in a transaction that
+ * is rolled back.
  *
  * Skipped when the local Postgres is unreachable or behind migration 124.
  */
@@ -146,7 +147,24 @@ describe.skipIf(!reachable)("organization-bound references", () => {
     ).toContain("cannot move to another organization");
   });
 
-  it("guards org_id on every table that always has one", async () => {
+  it("lets a push token move to another organization (F-210)", async () => {
+    const userId = await one<string>(`SELECT id FROM auth.users LIMIT 1`);
+    const register = `INSERT INTO public.mobile_device_tokens (user_id, org_id, platform, expo_push_token)
+      VALUES ($1, $2, 'ios', 'ExponentPushToken[org-bound-test]')
+      ON CONFLICT (expo_push_token) DO UPDATE SET org_id = EXCLUDED.org_id`;
+
+    await db.query(register, [userId, orgA]);
+    expect(await refusal(register, [userId, orgB])).toBeNull();
+
+    expect(
+      await one<string>(
+        `SELECT org_id FROM public.mobile_device_tokens
+          WHERE expo_push_token = 'ExponentPushToken[org-bound-test]'`,
+      ),
+    ).toBe(orgB);
+  });
+
+  it("guards org_id on every table that always has one, except push tokens", async () => {
     const { rows } = await db.query<{ relname: string }>(
       `SELECT c.relname
          FROM pg_class c
@@ -159,7 +177,7 @@ describe.skipIf(!reachable)("organization-bound references", () => {
           )`,
     );
 
-    expect(rows).toEqual([]);
+    expect(rows).toEqual([{ relname: "mobile_device_tokens" }]);
   });
 
   it("leaves no link between organization tables without org_id", async () => {
