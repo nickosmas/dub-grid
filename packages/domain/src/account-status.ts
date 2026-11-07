@@ -13,7 +13,7 @@ export const ACCESS_SUSPENDED_TITLE = "Access suspended";
 
 /** What a suspended person sees at sign-in: their state only, and who can help. */
 export const ACCESS_SUSPENDED_BODY =
-  "Your organization has suspended your access to the app. Contact an administrator there if you have questions.";
+  "Your access to the app is suspended, so you can't sign in right now. Contact your administrator for help.";
 
 /**
  * The hook (migration 105) adds a suspension's end to its sentinel as
@@ -31,11 +31,19 @@ const UNTIL_DAY = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
-/** What a suspended person sees at sign-in, with the day they get access back when there is one. */
-export function accessSuspendedBody(until?: string | null): string {
+/**
+ * What a suspended person sees at sign-in, naming the organization when the
+ * caller knows it and the day they get access back when there is one.
+ */
+export function accessSuspendedBody(until?: string | null, orgName?: string | null): string {
   const day = until ? new Date(`${until}T00:00:00Z`) : null;
-  if (!day || Number.isNaN(day.getTime())) return ACCESS_SUSPENDED_BODY;
-  return `Your organization has suspended your access to the app until ${UNTIL_DAY.format(day)}. Contact an administrator there if you have questions.`;
+  const dated = day !== null && !Number.isNaN(day.getTime());
+  if (!dated && !orgName) return ACCESS_SUSPENDED_BODY;
+  const access = `Your access to ${orgName ?? "the app"} is suspended`;
+  const help = "Contact your administrator for help.";
+  return dated
+    ? `${access}. You can sign in again on ${UNTIL_DAY.format(day)}. ${help}`
+    : `${access}, so you can't sign in right now. ${help}`;
 }
 
 export function isAccountSuspendedMessage(message: string | null | undefined): boolean {

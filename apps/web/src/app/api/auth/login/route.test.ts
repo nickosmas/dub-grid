@@ -181,13 +181,13 @@ describe("POST /api/auth/login", () => {
       acceptedCurrentTerms: true,
       acceptedVersion: "v1",
     });
-    serviceFrom.mockImplementation(() => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({ data: { platform_role: null }, error: null }),
-        }),
-      }),
-    }));
+    serviceFrom.mockImplementation(() => {
+      const row = {
+        maybeSingle: async () => ({ data: { platform_role: null }, error: null }),
+        eq: () => row,
+      };
+      return { select: () => ({ eq: () => row }) };
+    });
     rpc.mockResolvedValue({ data: null, error: null });
     refreshSession.mockResolvedValue({ data: { session: null }, error: null });
     endUserSession.mockResolvedValue(undefined);
@@ -312,6 +312,51 @@ describe("POST /api/auth/login", () => {
 
     expect(res.status).toBe(503);
     expect(body.error).toBe("DubGrid is unavailable right now. Try again in a moment.");
+  });
+
+  it("answers Access suspended before asking a two-factor user for a code (F-228)", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [{ factor_type: "totp", status: "verified" }],
+        },
+      },
+      error: null,
+    });
+    stubOrgLookup(ORG_ID);
+    const stubbed = serviceFrom.getMockImplementation();
+    serviceFrom.mockImplementation((table: string) =>
+      table === "employees"
+        ? {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  maybeSingle: async () => ({
+                    data: {
+                      suspended_at: "2026-11-01T00:00:00Z",
+                      suspended_until: "2026-12-01",
+                    },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          }
+        : stubbed?.(table),
+    );
+
+    const res = await POST(makeRequest("acme.localhost"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body).toMatchObject({ code: "ACCOUNT_SUSPENDED", suspendedUntil: "2026-12-01" });
+    expect(body).not.toHaveProperty("session");
+    expect(body).not.toHaveProperty("mfa_required");
+    expectRefusal("rejected", "account_suspended", ORG_ID);
   });
 
   it("skips org orchestration and returns mfa_required for MFA-enrolled users", async () => {

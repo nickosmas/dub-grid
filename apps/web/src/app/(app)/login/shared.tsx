@@ -106,44 +106,52 @@ export function useSessionInvalidToast() {
 // translates into this structured response. A modal (not a toast) so the user
 // has to acknowledge it and there's no ambiguity with the generic 401 toast.
 
+export function GotItFooter({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex justify-end">
+      <Button type="button" className="dg-btn dg-btn-primary" onClick={onClose}>
+        Got it
+      </Button>
+    </div>
+  );
+}
+
 // Shown for code ACCOUNT_SUSPENDED (51c): the hook refuses a suspended
 // employee in this organization. Calm, since nothing is wrong with the account.
 export function AccessSuspendedModal({
   until = null,
+  orgName = null,
   onClose,
 }: {
   /** The first day they have access again (51g3), when the suspension has an end. */
   until?: string | null;
+  orgName?: string | null;
   onClose: () => void;
 }) {
   return (
-    <Modal alert={{ icon: Lock, tone: "warning" }} title={ACCESS_SUSPENDED_TITLE} onClose={onClose}>
-      <p className="dg-auth-modal-copy">{accessSuspendedBody(until)}</p>
-      <Button
-        type="button"
-        onClick={onClose}
-        className="dg-btn dg-btn-primary dg-auth-state-primary"
-      >
-        OK
-      </Button>
+    <Modal
+      alert={{ icon: Lock, tone: "warning" }}
+      title={ACCESS_SUSPENDED_TITLE}
+      onClose={onClose}
+      footer={<GotItFooter onClose={onClose} />}
+    >
+      <p className="dg-auth-modal-copy">{accessSuspendedBody(until, orgName)}</p>
     </Modal>
   );
 }
 
 export function AccountDisabledModal({ onClose }: { onClose: () => void }) {
   return (
-    <Modal alert={{ icon: UserX, tone: "warning" }} title="Account disabled" onClose={onClose}>
+    <Modal
+      alert={{ icon: UserX, tone: "warning" }}
+      title="Account disabled"
+      onClose={onClose}
+      footer={<GotItFooter onClose={onClose} />}
+    >
       <p className="dg-auth-modal-copy">
         Your organization disabled this account. Contact your administrator if you think that's a
         mistake.
       </p>
-      <Button
-        type="button"
-        onClick={onClose}
-        className="dg-btn dg-btn-primary dg-auth-state-primary"
-      >
-        OK
-      </Button>
     </Modal>
   );
 }
