@@ -5,9 +5,16 @@ import { useIdleTimer } from "./useIdleTimer";
 vi.mock("@/lib/idle-broadcast", () => ({
   broadcastIdleActivity: vi.fn(),
   listenForIdleActivity: vi.fn(() => () => {}),
+  readIdleActivity: vi.fn(() => null),
+  writeIdleActivity: vi.fn(),
 }));
 
-import { broadcastIdleActivity, listenForIdleActivity } from "@/lib/idle-broadcast";
+import {
+  broadcastIdleActivity,
+  listenForIdleActivity,
+  readIdleActivity,
+  writeIdleActivity,
+} from "@/lib/idle-broadcast";
 
 const TIMEOUT_MS = 30_000;
 const WARNING_MS = 5_000;
@@ -31,6 +38,7 @@ describe("useIdleTimer", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
+    vi.mocked(readIdleActivity).mockImplementation(() => null);
   });
 
   afterEach(() => {
@@ -111,7 +119,7 @@ describe("useIdleTimer", () => {
 
   it("ignores cross-tab messages older than the local activity timestamp", () => {
     let deliver: (at: number) => void = () => {};
-    vi.mocked(listenForIdleActivity).mockImplementation((cb) => {
+    vi.mocked(listenForIdleActivity).mockImplementation((_session, cb) => {
       deliver = cb;
       return () => {};
     });
@@ -160,5 +168,112 @@ describe("useIdleTimer", () => {
 
     expect(result.current.phase).toBe("expired");
     expect(onExpire).toHaveBeenCalledTimes(1);
+  });
+
+  it("signs out on the first activity after the deadline, even when the timer hasn't fired", () => {
+    const onExpire = vi.fn();
+    const { result } = renderHook(() => useIdleTimer(baseOptions(onExpire)));
+
+    // The laptop slept with the window on screen: the clock moved, the
+    // scheduled timer didn't, and no visibilitychange or pageshow fired.
+    act(() => {
+      vi.setSystemTime(TIMEOUT_MS + 60_000);
+      fireActivity();
+    });
+
+    expect(result.current.phase).toBe("expired");
+    expect(onExpire).toHaveBeenCalledTimes(1);
+    expect(broadcastIdleActivity).not.toHaveBeenCalled();
+  });
+
+  it("keeps the warning up through mouse and keyboard activity", () => {
+    const onExpire = vi.fn();
+    const { result } = renderHook(() => useIdleTimer(baseOptions(onExpire)));
+
+    act(() => {
+      vi.advanceTimersByTime(TIMEOUT_MS - WARNING_MS + 1000);
+    });
+    expect(result.current.phase).toBe("warning");
+
+    act(() => {
+      fireActivity();
+      vi.advanceTimersByTime(THROTTLE_MS);
+      window.dispatchEvent(new Event("keydown"));
+    });
+    expect(result.current.phase).toBe("warning");
+    expect(broadcastIdleActivity).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(WARNING_MS);
+    });
+    expect(onExpire).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let Stay signed in revive a session past its deadline", () => {
+    const onExpire = vi.fn();
+    const { result } = renderHook(() => useIdleTimer(baseOptions(onExpire)));
+
+    act(() => {
+      vi.setSystemTime(TIMEOUT_MS);
+      result.current.stayActive();
+    });
+
+    expect(result.current.phase).toBe("expired");
+    expect(onExpire).toHaveBeenCalledTimes(1);
+  });
+
+  it("signs out at once when a reload finds the session's last activity past the deadline", () => {
+    vi.setSystemTime(TIMEOUT_MS * 3);
+    vi.mocked(readIdleActivity).mockImplementation((session) => (session === "s1" ? 0 : null));
+    const onExpire = vi.fn();
+
+    const { result } = renderHook(() =>
+      useIdleTimer({ ...baseOptions(onExpire), sessionKey: "s1" }),
+    );
+
+    expect(result.current.phase).toBe("expired");
+    expect(onExpire).toHaveBeenCalledTimes(1);
+    expect(writeIdleActivity).not.toHaveBeenCalled();
+  });
+
+  it("continues the same clock after a reload inside the deadline", () => {
+    vi.setSystemTime(20_000);
+    vi.mocked(readIdleActivity).mockImplementation(() => 10_000);
+    const onExpire = vi.fn();
+
+    renderHook(() => useIdleTimer({ ...baseOptions(onExpire), sessionKey: "s1" }));
+
+    act(() => {
+      vi.advanceTimersByTime(TIMEOUT_MS - 10_000 - 1);
+    });
+    expect(onExpire).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(onExpire).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts and records a fresh clock for a session with nothing stored", () => {
+    vi.setSystemTime(5_000);
+    renderHook(() => useIdleTimer({ ...baseOptions(), sessionKey: "s2" }));
+
+    expect(readIdleActivity).toHaveBeenCalledWith("s2");
+    expect(writeIdleActivity).toHaveBeenCalledWith(5_000, "s2");
+  });
+
+  it("follows activity another tab recorded while this one's timer was late", () => {
+    const onExpire = vi.fn();
+    const { result } = renderHook(() =>
+      useIdleTimer({ ...baseOptions(onExpire), sessionKey: "s1" }),
+    );
+
+    vi.mocked(readIdleActivity).mockImplementation(() => TIMEOUT_MS);
+    act(() => {
+      vi.setSystemTime(TIMEOUT_MS + 2_000);
+      window.dispatchEvent(new Event("pageshow"));
+    });
+
+    expect(result.current.phase).toBe("active");
+    expect(onExpire).not.toHaveBeenCalled();
   });
 });
