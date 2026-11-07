@@ -482,7 +482,7 @@ export async function requireOrgPermissions(
       serviceClient
         .from("organizations")
         .select(
-          `archived_at, suspended_at, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, ${BILLING_ACCESS_SELECT}`,
+          `archived_at, suspended_at, workspace_kind, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, ${BILLING_ACCESS_SELECT}`,
         )
         .eq("id", orgId)
         .maybeSingle(),
@@ -519,6 +519,11 @@ export async function requireOrgPermissions(
       return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
     }
     if (employee?.suspended_at != null) {
+      return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
+    }
+    // A sandbox membership outlives the access it was entered with, so a sandbox
+    // opens only through the cookie that re-checks that access (F-198).
+    if (organization?.workspace_kind === "sandbox" && !redirectedToSandbox) {
       return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
     }
   }

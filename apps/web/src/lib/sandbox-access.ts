@@ -9,17 +9,33 @@ export async function canUseTestSandbox(
   userId: string,
   sourceOrgId: string,
 ): Promise<boolean> {
-  const [{ data: membership }, { data: profile }] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("org_role, admin_permissions")
-      .eq("user_id", userId)
-      .eq("org_id", sourceOrgId)
-      .is("archived_at", null)
-      .maybeSingle(),
-    serviceClient.from("profiles").select("platform_role").eq("id", userId).maybeSingle(),
-  ]);
+  const [{ data: membership }, { data: profile }, { data: organization }, employee] =
+    await Promise.all([
+      serviceClient
+        .from("organization_memberships")
+        .select("org_role, admin_permissions")
+        .eq("user_id", userId)
+        .eq("org_id", sourceOrgId)
+        .is("archived_at", null)
+        .maybeSingle(),
+      serviceClient.from("profiles").select("platform_role").eq("id", userId).maybeSingle(),
+      serviceClient
+        .from("organizations")
+        .select("archived_at, suspended_at")
+        .eq("id", sourceOrgId)
+        .maybeSingle(),
+      serviceClient
+        .from("employees")
+        .select("suspended_at")
+        .eq("user_id", userId)
+        .eq("org_id", sourceOrgId)
+        .maybeSingle(),
+    ]);
   if (profile?.platform_role === "gridmaster") return true;
+  if (!organization || organization.archived_at != null || organization.suspended_at != null) {
+    return false;
+  }
+  if (employee.error || employee.data?.suspended_at != null) return false;
   if (membership?.org_role === "super_admin") return true;
   const permissions = membership?.admin_permissions as Record<string, boolean> | null | undefined;
   return membership?.org_role === "admin" && permissions?.canManageEmployees === true;

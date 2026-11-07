@@ -74,16 +74,24 @@ export async function isActingInSessionOrg(
 
   const auth = await requireAuthenticatedUserWithClaims(req);
   if ("response" in auth || auth.user.id !== actorId) return false;
-  const { org_id: sessionOrgId } = auth.claims;
+  const { org_id: sessionOrgId, in_sandbox: inSandbox } = auth.claims;
   if (typeof sessionOrgId === "string" && sessionOrgId && sessionOrgId !== orgId) return false;
 
-  const { data: employee, error } = await serviceClient
-    .from("employees")
-    .select("suspended_at")
-    .eq("user_id", actorId)
-    .eq("org_id", orgId)
-    .maybeSingle();
+  const [{ data: employee, error }, { data: organization, error: organizationError }] =
+    await Promise.all([
+      serviceClient
+        .from("employees")
+        .select("suspended_at")
+        .eq("user_id", actorId)
+        .eq("org_id", orgId)
+        .maybeSingle(),
+      serviceClient.from("organizations").select("workspace_kind").eq("id", orgId).maybeSingle(),
+    ]);
   if (error) throw error;
+  if (organizationError) throw organizationError;
+  // A sandbox membership outlives the access it was entered with, so a sandbox
+  // opens only through the cookie that re-checks that access (F-198).
+  if (organization?.workspace_kind === "sandbox" && inSandbox !== true) return false;
   return employee?.suspended_at == null;
 }
 

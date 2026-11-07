@@ -29,7 +29,8 @@ describe("EmailLayout", () => {
       page.indexOf('class="dg-sheet"'),
     );
     expect(emailDarkCss).toContain(`.${emailClass.page}{background-color:#000000!important}`);
-    expect(emailDarkCss).toContain(`.${emailClass.sheet}{background-color:#18181B!important}`);
+    expect(emailDarkCss).toContain(`.${emailClass.sheet}{background-color:#000000!important}`);
+    expect(emailDarkCss).toContain(`.${emailClass.card}{background-color:#000000!important}`);
   });
 
   it("swaps the logo for every kind of dark mode", () => {
