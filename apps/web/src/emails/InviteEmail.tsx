@@ -1,10 +1,10 @@
 import * as React from "react";
-import { Hr, Text } from "@react-email/components";
+import { Text } from "@react-email/components";
 import { INVITATION_LIFETIME_HOURS } from "@dubgrid/domain";
 import { EmailLayout } from "./components/EmailLayout";
 import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
 import { EmailButton } from "./components/EmailButton";
-import { styles, PREVIEW_LOGO_URL } from "./components/theme";
+import { styles, text, PREVIEW_LOGO_URL } from "./components/theme";
 import { formatInvitationExpiry } from "./invitation-expiry";
 
 export type InvitationEmailKind = "new" | "reissue" | "moved";
@@ -49,12 +49,21 @@ export function InviteEmail({
           ? `Your new invitation to join ${orgName} on DubGrid`
           : `You're invited to join ${orgName} on DubGrid`
       }
+      organization={orgName}
+      fine={
+        <>
+          {deadline
+            ? `That's ${INVITATION_LIFETIME_HOURS} hours after it was sent, and it doesn't extend.`
+            : null}{" "}
+          If we send you another invitation, only the link in the newest email will work.
+        </>
+      }
     >
-      <Text style={styles.heading}>
+      <Text {...text.heading}>
         {reissue ? "Here's your new invitation" : "You're invited to DubGrid"}
       </Text>
       <EmailGreeting />
-      <Text style={styles.paragraph}>
+      <Text {...text.paragraph}>
         {reissue ? (
           <>
             Here&apos;s a new invitation to join <strong>{orgName}</strong> on DubGrid. It replaces
@@ -66,35 +75,37 @@ export function InviteEmail({
           </>
         )}
       </Text>
-      <Text style={{ ...styles.paragraph, fontSize: "15px" }}>
+      <Text {...text.paragraph}>
         {hasAccount
           ? "You already have a DubGrid account with this email address, so there's nothing to set up. Sign in with your password to accept."
           : "To get started, set your password and accept your invitation."}
       </Text>
       <EmailButton href={acceptUrl}>Accept invitation</EmailButton>
+      <Text {...text.paragraph}>
+        {deadline ? (
+          <>
+            This invitation expires on <strong>{deadline}</strong>.
+          </>
+        ) : (
+          `This invitation expires ${INVITATION_LIFETIME_HOURS} hours after it was sent, and it doesn't extend.`
+        )}
+      </Text>
       {kind === "moved" ? (
-        <Text style={styles.paragraph}>
+        <Text {...text.paragraph}>
           Already use DubGrid with another organization? Contact support@dubgrid.com and we&apos;ll
           keep you on one account.
         </Text>
       ) : null}
-      <Text style={{ ...styles.fine, margin: "0 0 8px" }}>
+      <Text {...text.fine} style={{ ...styles.fine, margin: "0 0 4px" }}>
         If the button doesn&apos;t work, copy and paste this link into your browser:
       </Text>
-      <Text style={{ ...styles.fine, wordBreak: "break-all", margin: "0 0 24px" }}>
+      <Text {...text.fine} style={{ ...styles.fine, wordBreak: "break-all", margin: "0 0 20px" }}>
         {acceptUrl}
       </Text>
-      <Text style={styles.paragraph}>
+      <Text {...text.paragraph}>
         If you didn&apos;t expect this email, you can safely ignore it.
       </Text>
       <EmailSignOff />
-      <Hr style={styles.divider} />
-      <Text style={styles.fine}>
-        {deadline
-          ? `This invitation expires on ${deadline}. That's ${INVITATION_LIFETIME_HOURS} hours after it was sent, and it doesn't extend.`
-          : `This invitation expires ${INVITATION_LIFETIME_HOURS} hours after it was sent, and it doesn't extend.`}{" "}
-        If we send you another invitation, only the link in the newest email will work.
-      </Text>
     </EmailLayout>
   );
 }

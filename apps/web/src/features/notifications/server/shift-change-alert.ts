@@ -1,3 +1,4 @@
+import { resolveAlertDestination } from "@dubgrid/domain";
 import {
   formatShiftChangeCompact,
   formatShiftChangePlain,
@@ -16,7 +17,12 @@ export interface ShiftChangeAlert {
   /** The inbox row and the push body: the compact form, one line per day. */
   message: string;
   metadata: { date: string; dates: string[]; publishHistoryId: string };
-  email: { intro: string; details: NotificationEmailDetail[]; closing: string };
+  email: {
+    intro: string;
+    details: NotificationEmailDetail[];
+    closing: string;
+    action: { label: string; href: string } | undefined;
+  };
 }
 
 const DAY_LABEL = new Intl.DateTimeFormat("en-US", {
@@ -89,20 +95,24 @@ export function buildShiftChangeAlert(input: {
         .join("\n")
     : summary;
 
+  const metadata = {
+    date: days[0]!.date,
+    dates: days.map((day) => day.date),
+    publishHistoryId: input.publishHistoryId,
+  };
+  const action = resolveAlertDestination({ type: "shift_change", metadata }) ?? undefined;
+
   return {
     title,
     message,
-    metadata: {
-      date: days[0]!.date,
-      dates: days.map((day) => day.date),
-      publishHistoryId: input.publishHistoryId,
-    },
+    metadata,
     email: input.showDetails
       ? {
           intro: "The latest published schedule changed these days for you.",
           details: days.flatMap(emailDetails),
           closing: "Open the schedule in DubGrid to see your whole week.",
+          action,
         }
-      : { intro: summary, details: [], closing: "" },
+      : { intro: summary, details: [], closing: "", action },
   };
 }

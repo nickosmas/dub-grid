@@ -7,10 +7,10 @@ export type EmailButtonProps = {
   children: React.ReactNode;
 };
 
-/** Brand-blue primary CTA, centered, matching the app's button styling. */
+/** Brand-blue primary CTA, which stays blue in dark mode too. */
 export function EmailButton({ href, children }: EmailButtonProps) {
   return (
-    <Section style={{ textAlign: "center", margin: "0 0 32px" }}>
+    <Section style={{ margin: "4px 0 28px" }}>
       <Button
         href={href}
         style={{
@@ -18,10 +18,11 @@ export function EmailButton({ href, children }: EmailButtonProps) {
           backgroundColor: emailTheme.brand,
           color: emailTheme.textInverse,
           fontFamily: fontStack,
-          fontSize: "16px",
-          fontWeight: 700,
+          fontSize: "15px",
+          lineHeight: "20px",
+          fontWeight: 600,
           textDecoration: "none",
-          padding: "14px 40px",
+          padding: "13px 22px",
           borderRadius: "8px",
         }}
       >

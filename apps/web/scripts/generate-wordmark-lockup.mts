@@ -1,8 +1,10 @@
 /**
  * Renders the brand images from the shared stacked two-card geometry in
  * @dubgrid/design-tokens, so no raster copy of the mark can drift:
- *   - public/email-lockup.png   - email header: symbol + lowercase "dubgrid" (dark)
- *   - public/email-wordmark.png - email footer: lowercase "dubgrid" only (muted)
+ *   - public/email-logo-light.png - email header: dark wordmark on an opaque white plate
+ *   - public/email-logo-dark.png  - email header in dark mode: white wordmark, same size
+ *   - public/email-lockup.png, email-wordmark.png - the old header and footer,
+ *     which emails already delivered still load
  *   - public/lockup.png         - print view and report PDF header: symbol + wordmark
  *   - public/logo.png, logo-white.png, logo.svg - the symbol on its own
  *   - src/app/icon.png, apple-icon.png, docs/favicon.png - favicons
@@ -99,18 +101,36 @@ const wordStyle = (fontSize: number, color: string) =>
 
 // The symbol spanning the word's height, then the dark wordmark, spaced by
 // the shared lockup rule.
-function lockupHtml(fontSize: number, padding: string, lineHeight: string) {
+function lockupHtml(
+  fontSize: number,
+  padding: string,
+  lineHeight: string,
+  { ink = "#0F172A", colors = BRAND_SYMBOL_COLORS.light as SymbolColors, plate = "" } = {},
+) {
   const layout = getBrandSymbolLockupLayout(fontSize);
   return `<!doctype html><html><head><meta charset="utf-8">${FONT_LINKS}
 <style>html,body{margin:0;padding:0;background:transparent;}
-  #target{display:inline-block;padding:${padding};white-space:nowrap;${wordStyle(fontSize, "#0F172A")}line-height:${lineHeight};}
+  #target{display:inline-block;padding:${padding};white-space:nowrap;${plate}${wordStyle(fontSize, ink)}line-height:${lineHeight};}
   #target svg{display:inline-block;vertical-align:${-layout.belowBaseline}px;margin-right:${layout.marginRight}px;}
 </style></head>
-<body><div id="target">${symbolSvg(INK_VIEWBOX, layout.width, layout.height, layout.height, BRAND_SYMBOL_COLORS.light)}dubgrid</div></body></html>`;
+<body><div id="target">${symbolSvg(INK_VIEWBOX, layout.width, layout.height, layout.height, colors)}dubgrid</div></body></html>`;
 }
 
-// Email header, padded for the card.
+// Delivered emails still load this one.
 const LOCKUP_HTML = lockupHtml(30, "4px 6px", "1.25");
+
+// The email header. No client recolors an image, and Gmail's phone apps darken
+// a message without saying so, so the image they keep has to carry its own
+// background: white, which disappears on the white page everywhere else. The
+// dark one replaces it where a client honors the dark styles, at the same size.
+const EMAIL_LOGO_PADDING = "8px 12px";
+const EMAIL_LOGO_LIGHT_HTML = lockupHtml(24, EMAIL_LOGO_PADDING, "1.25", {
+  plate: "background:#FFFFFF;border-radius:10px;",
+});
+const EMAIL_LOGO_DARK_HTML = lockupHtml(24, EMAIL_LOGO_PADDING, "1.25", {
+  ink: "#FFFFFF",
+  colors: BRAND_SYMBOL_COLORS.dark,
+});
 // Print view and report PDFs: padded only so the box's center is the
 // wordmark's optical center, so callers center it like any other row item.
 const PRINT_LOCKUP_FONT_SIZE = 16;
@@ -134,6 +154,8 @@ const WORDMARK_WHITE_HTML = `<!doctype html><html><head><meta charset="utf-8">${
 
 // previewCopy: also copy into src/emails/static for the `email dev` preview.
 const JOBS = [
+  { dir: publicDir, name: "email-logo-light.png", html: EMAIL_LOGO_LIGHT_HTML, previewCopy: true },
+  { dir: publicDir, name: "email-logo-dark.png", html: EMAIL_LOGO_DARK_HTML, previewCopy: true },
   { dir: publicDir, name: "email-lockup.png", html: LOCKUP_HTML, previewCopy: true },
   { dir: publicDir, name: "email-wordmark.png", html: WORDMARK_HTML, previewCopy: true },
   { dir: publicDir, name: "wordmark-white.png", html: WORDMARK_WHITE_HTML, previewCopy: false },

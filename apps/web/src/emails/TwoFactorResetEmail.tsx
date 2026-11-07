@@ -2,7 +2,7 @@ import * as React from "react";
 import { Text } from "@react-email/components";
 import { EmailLayout } from "./components/EmailLayout";
 import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
-import { styles, PREVIEW_LOGO_URL } from "./components/theme";
+import { text, PREVIEW_LOGO_URL } from "./components/theme";
 
 export type TwoFactorResetEmailProps = {
   logoUrl: string;
@@ -20,22 +20,22 @@ export function TwoFactorResetEmail({ logoUrl, partial = false }: TwoFactorReset
   const heading = "Your two-factor sign-in was reset";
   return (
     <EmailLayout logoUrl={logoUrl} preview={heading}>
-      <Text style={styles.heading}>{heading}</Text>
+      <Text {...text.heading}>{heading}</Text>
       <EmailGreeting />
       {partial ? (
-        <Text style={styles.paragraph}>
+        <Text {...text.paragraph}>
           We removed the authenticator app from your account. Some devices may still be signed in,
           so sign out of any you don&apos;t recognize. The next time you sign in with your password,
           you&apos;ll set up an authenticator app again before you continue.
         </Text>
       ) : (
-        <Text style={styles.paragraph}>
+        <Text {...text.paragraph}>
           We removed the authenticator app from your account and signed you out everywhere. The next
           time you sign in with your password, you&apos;ll set up an authenticator app again before
           you continue.
         </Text>
       )}
-      <Text style={styles.paragraph}>
+      <Text {...text.paragraph}>
         If you didn&apos;t ask for this, contact support@dubgrid.com right away.
       </Text>
       <EmailSignOff />

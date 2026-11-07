@@ -244,6 +244,33 @@ describe("app-sent sign-in emails", () => {
     );
   });
 
+  it("names the organization under the logo only when an administrator moved the email", async () => {
+    const html = (changedBy: "administrator" | "self" | "support") =>
+      render(
+        createElement(LoginEmailChangedEmail, {
+          orgName: "Calm Haven",
+          recipient: "new",
+          newEmail: "new@example.com",
+          logoUrl,
+          changedBy,
+        }),
+      );
+
+    expect(await html("administrator")).toMatch(/class="dg-ink"[^>]*>Calm Haven</);
+    expect(await html("self")).not.toContain("Calm Haven");
+    expect(await html("support")).not.toContain("Calm Haven");
+  });
+
+  it.each(APP_AUTH_EMAILS)("$name uses one card at most", async (email) => {
+    const html = await render(createElement(email.Component, email.props as never));
+    expect(html.match(/class="dg-card"/g)?.length ?? 0).toBeLessThanOrEqual(1);
+  });
+
+  it.each(SUPABASE_AUTH_TEMPLATES)("the $key template uses one card at most", ({ key }) => {
+    const html = readFileSync(path.join(templatesDir, `${key}.html`), "utf8");
+    expect(html.match(/class="dg-card"/g)?.length ?? 0).toBeLessThanOrEqual(1);
+  });
+
   it.each(APP_AUTH_EMAILS)("$name names nobody who acted", async (email) => {
     expect(await text(email)).not.toMatch(/\b(invited by|on behalf of|has invited you)\b/i);
   });

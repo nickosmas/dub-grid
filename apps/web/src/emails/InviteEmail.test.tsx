@@ -65,6 +65,27 @@ describe("InviteEmail", () => {
     expect(await text()).not.toContain("one account");
   });
 
+  it("shows the organization under the logo", async () => {
+    expect(await render(createElement(InviteEmail, base))).toMatch(
+      /class="dg-ink"[^>]*>Calm Haven</,
+    );
+  });
+
+  it("keeps its sentences out of cards", async () => {
+    const html = await render(
+      createElement(InviteEmail, {
+        orgName: "Calm Haven",
+        acceptUrl: "https://app.test/accept-invite?token=t",
+        logoUrl: "https://app.test",
+        expiresAt: "2026-09-28T22:04:00.000Z",
+        timeZone: "America/Los_Angeles",
+        kind: "moved",
+      }),
+    );
+
+    expect(html).not.toContain('class="dg-card"');
+  });
+
   it("still describes the 72 hours when the deadline is unknown", async () => {
     const body = await text({ expiresAt: null });
 

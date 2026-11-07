@@ -36,3 +36,22 @@ describe("emailBaseUrl", () => {
     expect(() => emailBaseUrl()).toThrow(/NEXT_PUBLIC_SITE_URL/);
   });
 });
+
+describe("emailOrgUrl", () => {
+  afterEach(() => {
+    vi.resetModules();
+    delete clientEnv.NEXT_PUBLIC_SITE_URL;
+  });
+
+  it("swaps the site's host for the organization's subdomain", async () => {
+    clientEnv.NEXT_PUBLIC_SITE_URL = "https://www.dubgrid.com";
+    const { emailOrgUrl } = await import("./email");
+    expect(emailOrgUrl("calmhaven")).toBe("https://calmhaven.dubgrid.com");
+  });
+
+  it("keeps the local port", async () => {
+    clientEnv.NEXT_PUBLIC_SITE_URL = "http://localhost:3000";
+    const { emailOrgUrl } = await import("./email");
+    expect(emailOrgUrl("calmhaven")).toBe("http://calmhaven.localhost:3000");
+  });
+});
