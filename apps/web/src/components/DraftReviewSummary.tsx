@@ -44,7 +44,7 @@ export default function DraftReviewSummary({
   title,
   description,
   breakdown,
-  emptyMessage = "No unpublished changes found.",
+  emptyMessage = "No unpublished changes found",
 }: DraftReviewSummaryProps) {
   const items = getBreakdownItems(breakdown);
 

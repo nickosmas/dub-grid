@@ -10023,13 +10023,13 @@ function SchedulerContent({
                     <DraftReviewSummary
                       title="Your drafts"
                       breakdown={mineBreakdown}
-                      emptyMessage="No drafts to discard."
+                      emptyMessage="No drafts to discard"
                     />
                     {showOrganizationDiscardScope ? (
                       <DraftReviewSummary
                         title="All drafts"
                         breakdown={draftBreakdown}
-                        emptyMessage="No organization drafts."
+                        emptyMessage="No organization drafts"
                       />
                     ) : null}
                   </div>

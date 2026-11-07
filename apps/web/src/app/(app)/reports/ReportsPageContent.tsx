@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { capitalizeFirst, pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import type { CSSProperties, ReactNode } from "react";
-import { ChevronDown, FileText, FileUp, RefreshCw, Upload, X } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -261,7 +261,6 @@ function ExportMenu({
         aria-label="Export"
         className="dg-btn dg-btn-primary"
         disabled={disabled}
-        icon={<Upload size={16} />}
         // Selecting a format closes the popover, so the spinner on the menu
         // items below never gets to render. The trigger is what stays on
         // screen for the export, so it carries the pending state.
@@ -287,7 +286,6 @@ function ExportMenu({
           <Button
             className="dg-menu-item"
             disabled={exportingFormat != null}
-            icon={<FileUp size={16} />}
             loading={exportingFormat === "pdf"}
             onClick={() => selectFormat("pdf")}
             role="menuitem"
@@ -298,7 +296,6 @@ function ExportMenu({
           <Button
             className="dg-menu-item"
             disabled={exportingFormat != null}
-            icon={<Upload size={16} />}
             loading={exportingFormat === "csv"}
             onClick={() => selectFormat("csv")}
             role="menuitem"
@@ -650,27 +647,26 @@ function ReportsContent() {
             }}
           >
             <div data-testid="reports-run-actions" style={reportsRunActionsStyle}>
-              <Button
-                className="dg-btn dg-btn-secondary"
-                disabled={!appliedRequest}
-                onClick={() => reportsQuery.refetch()}
-                type="button"
-              >
-                <RefreshCw size={16} />
-                Refresh
-              </Button>
-              <Button
-                className="dg-btn dg-btn-secondary"
-                disabled={!appliedRequest}
-                onClick={resetAppliedReport}
-                type="button"
-              >
-                <X size={16} />
-                Close
-              </Button>
+              {appliedRequest ? (
+                <>
+                  <Button
+                    className="dg-btn dg-btn-secondary"
+                    onClick={() => reportsQuery.refetch()}
+                    type="button"
+                  >
+                    Refresh
+                  </Button>
+                  <Button
+                    className="dg-btn dg-btn-secondary"
+                    onClick={resetAppliedReport}
+                    type="button"
+                  >
+                    Close
+                  </Button>
+                </>
+              ) : null}
               <Button
                 className="dg-btn dg-btn-primary"
-                icon={<FileText size={16} />}
                 onClick={handleGenerateReport}
                 type="button"
               >
@@ -707,7 +703,6 @@ function ReportsContent() {
               Report
               <CustomSelect
                 ariaLabel="Report"
-                height={40}
                 onChange={handleReportChange}
                 options={reportOptions}
                 style={fullWidthControlStyle}
@@ -719,7 +714,6 @@ function ReportsContent() {
                 Range
                 <CustomSelect
                   ariaLabel="Range"
-                  height={40}
                   onChange={updateQuickRange}
                   options={quickRangeOptions}
                   style={fullWidthControlStyle}
@@ -1027,7 +1021,7 @@ function ReportsContent() {
                 data-testid="reports-empty-state"
                 description="Try a different date range or adjust the selected filters."
                 heading={preview?.emptyText}
-                icon={<FileText size={28} />}
+                size="compact"
               />
             )}
           </section>
@@ -1139,7 +1133,7 @@ const targetDropdownTitleStyle: CSSProperties = {
 const targetDropdownSummaryStyle: CSSProperties = {
   color: "var(--dg-color-text-secondary)",
   flex: 1,
-  fontSize: "var(--dg-fs-body)",
+  fontSize: "var(--dg-type-control-size)",
   fontWeight: 500,
   whiteSpace: "nowrap",
 };

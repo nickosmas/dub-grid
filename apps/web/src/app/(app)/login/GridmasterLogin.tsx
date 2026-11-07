@@ -203,7 +203,7 @@ export default function GridmasterLogin({
             <span className="dg-auth-portal-label">Gridmaster portal</span>
           </a>
 
-          <h1 className="dg-auth-heading">Platform admin sign in</h1>
+          <h1 className="dg-auth-heading">Sign in</h1>
 
           <EmailPasswordForm
             email={email}

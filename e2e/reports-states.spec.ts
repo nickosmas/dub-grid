@@ -120,7 +120,7 @@ test.describe("reports states", () => {
     // features/reports/shared/table.ts.
     const emptyState = page.getByTestId("reports-empty-state");
     await expect(emptyState).toBeVisible({ timeout: 15_000 });
-    await expect(emptyState).toContainText("No published schedule for this range.");
+    await expect(emptyState).toContainText("No published schedule for this range");
     await expect(page.locator("table")).toHaveCount(0);
   });
 });

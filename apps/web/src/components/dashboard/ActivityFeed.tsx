@@ -73,7 +73,7 @@ export default function ActivityFeed({
           </div>
           {!collapsed && <div className="dg-card-subtitle">Latest events</div>}
         </div>
-        {!collapsed && onExpand && (
+        {!collapsed && onExpand && items.length > 0 && (
           <div onClick={(e) => e.stopPropagation()}>
             <ExpandButton onClick={onExpand} label="Expand activity" />
           </div>

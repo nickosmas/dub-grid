@@ -74,7 +74,7 @@ export default function AuthTransitionScreen({
   const detail = offline
     ? "You’re offline. We’ll continue when you’re connected again."
     : isSlow
-      ? "This is taking a little longer than usual. It’s still loading."
+      ? "This is taking longer than usual. You can keep waiting or try again."
       : copy.detail;
 
   // Hidden rather than unrendered, so the screen keeps its accessible name and

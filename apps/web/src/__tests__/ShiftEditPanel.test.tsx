@@ -3165,7 +3165,7 @@ describe("ShiftEditPanel", () => {
       );
 
       expect(screen.queryByRole("button", { name: /Bob Jones/i })).not.toBeInTheDocument();
-      expect(screen.getByText("No eligible employees on this date.")).toBeInTheDocument();
+      expect(screen.getByText("No eligible employees on this date")).toBeInTheDocument();
     });
 
     it("does not offer past target shifts in the swap picker", () => {
@@ -3178,7 +3178,7 @@ describe("ShiftEditPanel", () => {
       });
 
       expect(screen.queryByRole("button", { name: /Bob Jones/i })).not.toBeInTheDocument();
-      expect(screen.getByText("No eligible employees on this date.")).toBeInTheDocument();
+      expect(screen.getByText("No eligible employees on this date")).toBeInTheDocument();
     });
 
     it("does not offer target shifts that are already in progress", () => {
@@ -3192,7 +3192,7 @@ describe("ShiftEditPanel", () => {
       });
 
       expect(screen.queryByRole("button", { name: /Bob Jones/i })).not.toBeInTheDocument();
-      expect(screen.getByText("No eligible employees on this date.")).toBeInTheDocument();
+      expect(screen.getByText("No eligible employees on this date")).toBeInTheDocument();
     });
   });
 

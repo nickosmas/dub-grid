@@ -70,7 +70,7 @@ describe("dashboard empty states", () => {
   it("renders the open shifts empty state message", () => {
     render(<OpenShiftsCard openShifts={[]} />);
 
-    expect(screen.getByText("All shifts covered this week")).toBeInTheDocument();
+    expect(screen.getByText("No open shifts this week")).toBeInTheDocument();
   });
 
   it("renders open shift counts with the selected period label", () => {
@@ -122,7 +122,7 @@ describe("dashboard empty states", () => {
 
     expect(
       screen.getByText(
-        "Set up coverage requirements in Settings to track how well each wings is staffed.",
+        "Set up coverage requirements in Settings to track how well each wing is staffed.",
       ),
     ).toBeInTheDocument();
   });

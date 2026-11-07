@@ -46,6 +46,8 @@ interface PersonActivityTimelineProps {
    * shows that period and leaves out its own period navigation.
    */
   range?: { startDate: string; endDate: string; phrase: string };
+  /** Moves the host page's period to the month holding this date. */
+  onJumpToDate?: (date: string) => void;
 }
 
 /** One person's activity: period navigation, search, filters and the day-grouped table. */
@@ -58,6 +60,7 @@ export function PersonActivityTimeline({
   emptyDescription,
   organizations,
   range,
+  onJumpToDate,
 }: PersonActivityTimelineProps) {
   const [selectedItem, setSelectedItem] = useState<ActivityListItem<EmployeeActivityEntry> | null>(
     null,
@@ -124,15 +127,18 @@ export function PersonActivityTimeline({
   // Stepping back before someone's first event is as easy to do as stepping
   // into a quiet month, and both need a way out.
   const nearestActivity = useMemo(() => {
-    if (range || dated.length === 0) return null;
-    const earlier = dated.find((item) => item.dateKey < period.period.startDate);
+    if (dated.length === 0 || (range && !onJumpToDate)) return null;
+    const earlier = dated.find((item) => item.dateKey < shownPeriod.startDate);
     const target = earlier ?? dated[dated.length - 1];
     const isEarlier = Boolean(earlier);
     return {
       label: `the ${isEarlier ? "previous" : "earliest"} activity, ${formatActivityDayDate(target.dateKey)}`,
-      onJump: () => period.jumpTo(target.dateKey),
+      onJump: () => (onJumpToDate ?? period.jumpTo)(target.dateKey),
     };
-  }, [dated, period.period.startDate, range]);
+  }, [dated, onJumpToDate, period.jumpTo, range, shownPeriod.startDate]);
+
+  // Nothing recorded in the period leaves nothing to narrow down.
+  const canFilter = inPeriod.length > 0 || hasFilters;
 
   if (loading) {
     return <ActivitySkeleton rows={5} />;
@@ -151,64 +157,68 @@ export function PersonActivityTimeline({
 
   return (
     <div>
-      <div className="dg-activity-toolbar dg-field-raised">
-        {range ? null : (
-          <PeriodNavigator
-            unit={period.unit}
-            label={period.label}
-            anchorDate={period.anchorDate}
-            isCurrent={period.isCurrent}
-            nextDisabled={period.nextDisabled}
-            onUnitChange={period.setUnit}
-            onPrev={period.goPrev}
-            onNext={period.goNext}
-            onToday={period.goToday}
-            onJumpToDate={period.jumpTo}
-          />
-        )}
+      {range && !canFilter ? null : (
+        <div className="dg-activity-toolbar dg-field-raised">
+          {range ? null : (
+            <PeriodNavigator
+              unit={period.unit}
+              label={period.label}
+              anchorDate={period.anchorDate}
+              isCurrent={period.isCurrent}
+              nextDisabled={period.nextDisabled}
+              onUnitChange={period.setUnit}
+              onPrev={period.goPrev}
+              onNext={period.goNext}
+              onToday={period.goToday}
+              onJumpToDate={period.jumpTo}
+            />
+          )}
 
-        <div className="dg-activity-toolbar-filters">
-          <div className="dg-activity-search">
-            <span className="dg-activity-search-icon">
-              <Search size={14} />
-            </span>
-            <input
-              type="text"
-              className="dg-input"
-              placeholder="Search activity"
-              aria-label="Search activity"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              onKeyDown={clearSearchOnEscape(() => setSearchQuery(""))}
-            />
-            {searchQuery && <SearchClearButton onClear={() => setSearchQuery("")} />}
-          </div>
-          <CustomSelect
-            style={{ flex: "1 1 auto" }}
-            value={categoryFilter}
-            options={categoryOptions}
-            onChange={setCategoryFilter}
-            ariaLabel="Filter by activity type"
-            fontSize="var(--dg-fs-navigation-item)"
-            fontWeight="var(--dg-type-control-weight)"
-            activeFontWeight="var(--dg-type-control-weight)"
-            letterSpacing="normal"
-          />
-          {organizations ? (
-            <CustomSelect
-              style={{ flex: "1 1 auto" }}
-              value={organizationFilter}
-              options={[{ value: "all", label: "All organizations" }, ...organizations]}
-              onChange={setOrganizationFilter}
-              ariaLabel="Filter by organization"
-              fontSize="var(--dg-fs-navigation-item)"
-              fontWeight="var(--dg-type-control-weight)"
-              activeFontWeight="var(--dg-type-control-weight)"
-              letterSpacing="normal"
-            />
+          {canFilter ? (
+            <div className="dg-activity-toolbar-filters">
+              <div className="dg-activity-search">
+                <span className="dg-activity-search-icon">
+                  <Search size={14} />
+                </span>
+                <input
+                  type="text"
+                  className="dg-input"
+                  placeholder="Search activity"
+                  aria-label="Search activity"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={clearSearchOnEscape(() => setSearchQuery(""))}
+                />
+                {searchQuery && <SearchClearButton onClear={() => setSearchQuery("")} />}
+              </div>
+              <CustomSelect
+                style={{ flex: "1 1 auto" }}
+                value={categoryFilter}
+                options={categoryOptions}
+                onChange={setCategoryFilter}
+                ariaLabel="Filter by activity type"
+                fontSize="var(--dg-fs-navigation-item)"
+                fontWeight="var(--dg-type-control-weight)"
+                activeFontWeight="var(--dg-type-control-weight)"
+                letterSpacing="normal"
+              />
+              {organizations ? (
+                <CustomSelect
+                  style={{ flex: "1 1 auto" }}
+                  value={organizationFilter}
+                  options={[{ value: "all", label: "All organizations" }, ...organizations]}
+                  onChange={setOrganizationFilter}
+                  ariaLabel="Filter by organization"
+                  fontSize="var(--dg-fs-navigation-item)"
+                  fontWeight="var(--dg-type-control-weight)"
+                  activeFontWeight="var(--dg-type-control-weight)"
+                  letterSpacing="normal"
+                />
+              ) : null}
+            </div>
           ) : null}
         </div>
-      </div>
+      )}
 
       {visible.length === 0 ? (
         <ActivityEmptyPeriod

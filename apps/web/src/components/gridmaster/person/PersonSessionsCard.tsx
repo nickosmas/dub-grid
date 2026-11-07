@@ -71,7 +71,7 @@ export function PersonSessionsCard({
       description="Where they are signed in, the phones that get their alerts, and their calendar feeds."
     >
       <PersonSubheading>Sessions</PersonSubheading>
-      <List empty="No sessions.">
+      <List empty="No sessions">
         {sessions.sessions.map((session) => (
           <Row
             key={session.id}
@@ -101,7 +101,7 @@ export function PersonSessionsCard({
       </List>
 
       <PersonSubheading>Push devices</PersonSubheading>
-      <List empty="No push devices.">
+      <List empty="No push devices">
         {sessions.pushDevices.map((device) => (
           <Row
             key={device.id}
@@ -126,7 +126,7 @@ export function PersonSessionsCard({
       </List>
 
       <PersonSubheading>Calendar feeds</PersonSubheading>
-      <List empty="No calendar feeds.">
+      <List empty="No calendar feeds">
         {sessions.calendarFeeds.map((feed) => (
           <Row
             key={feed.id}

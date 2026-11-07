@@ -172,7 +172,7 @@ function ProfileUpdateDetails({
     return (
       <EmptyState
         size="inline"
-        title="No structured profile fields were included with this request."
+        title="No structured profile fields were included with this request"
       />
     );
   }
@@ -375,7 +375,7 @@ export function ProfileChangeRequestQueue({
         <RequestQueueSkeleton />
       ) : requests.length === 0 ? (
         <EmptyState
-          icon={<Inbox size={28} />}
+          size="compact"
           heading="No pending people requests"
           description="Profile updates and account deletion requests from members will appear here for review."
         />

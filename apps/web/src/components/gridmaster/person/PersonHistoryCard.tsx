@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -89,7 +88,7 @@ export function PersonHistoryCard({
             onClick={() => setExportConfirm(true)}
             disabled={exporting}
           >
-            <ButtonLoading loading={exporting} spinnerSize={16} icon={<Upload size={16} />}>
+            <ButtonLoading loading={exporting} spinnerSize={16}>
               Export history
             </ButtonLoading>
           </Button>

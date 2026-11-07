@@ -387,7 +387,7 @@ function StaffRowCells({
           return (
             <MaybeHint content={certName}>
               <span className="text-[12px] whitespace-nowrap text-[var(--dg-color-text-primary)]">
-                {certAbbr || "None"}
+                {certAbbr || "-"}
               </span>
             </MaybeHint>
           );
@@ -400,11 +400,15 @@ function StaffRowCells({
         tableClassName="table-cell py-4 border-r border-[var(--dg-color-border-light)]"
         gridClassName="dg-staff-directory-cell flex py-4"
       >
-        <span className="text-[12px] text-[var(--dg-color-text-primary)]">
-          {emp.roleIds.length > 0
-            ? getRoleAbbrs(emp.roleIds, roles, useCompactRoleCertificationLabels).join(", ")
-            : "-"}
-        </span>
+        <MaybeHint
+          content={getRoleAbbrs(emp.roleIds, roles, useCompactRoleCertificationLabels).join(", ")}
+        >
+          <span className="block max-w-[200px] truncate text-[12px] text-[var(--dg-color-text-primary)]">
+            {emp.roleIds.length > 0
+              ? getRoleAbbrs(emp.roleIds, roles, useCompactRoleCertificationLabels).join(", ")
+              : "-"}
+          </span>
+        </MaybeHint>
       </StaffCell>
 
       {/* Account status — admin/HR detail (invitation linkage). */}

@@ -88,7 +88,7 @@ function ScheduleDetail({ schedule }: { schedule: GridmasterPersonSchedule }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <Group title="Recurring schedule" empty="No recurring shifts or series.">
+      <Group title="Recurring schedule" empty="No recurring shifts or series">
         {[
           ...schedule.recurring.map((shift) => (
             <Row
@@ -149,7 +149,7 @@ function ScheduleDetail({ schedule }: { schedule: GridmasterPersonSchedule }) {
         })}
       </Group>
 
-      <Group title="Publish changes, last 90 days" empty="No published changes.">
+      <Group title="Publish changes, last 90 days" empty="No published changes">
         {schedule.publishChanges.map((change, index) => (
           <Row
             key={`${change.publishedAt}-${change.date}-${index}`}
@@ -175,7 +175,7 @@ function ScheduleDetail({ schedule }: { schedule: GridmasterPersonSchedule }) {
         ))}
       </Group>
 
-      <Group title="Shift requests, open and last 90 days" empty="No shift requests.">
+      <Group title="Shift requests, open and last 90 days" empty="No shift requests">
         {schedule.shiftRequests.map((request) => (
           <Row
             key={request.id}
@@ -205,7 +205,7 @@ function ScheduleDetail({ schedule }: { schedule: GridmasterPersonSchedule }) {
 
       <Group
         title="Profile change requests, open and last 90 days"
-        empty="No profile change requests."
+        empty="No profile change requests"
       >
         {schedule.profileChangeRequests.map((request) => (
           <Row

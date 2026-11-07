@@ -183,7 +183,7 @@ export default function ImpersonationHistory() {
           {entries.length > 0 ? (
             <div style={sectionStyle}>
               <div style={{ overflowX: "auto" }}>
-                <table style={gmTableStyle}>
+                <table style={{ ...gmTableStyle, minWidth: 1560 }}>
                   <thead>
                     <tr>
                       <th style={gmHeaderStyle("Status")}>Status</th>
@@ -251,7 +251,7 @@ export default function ImpersonationHistory() {
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
                               whiteSpace: "nowrap",
-                              fontFamily: "var(--font-dm-mono), monospace",
+                              fontVariantNumeric: "tabular-nums",
                             }}
                           >
                             {startDate.toLocaleDateString("en-US", {
@@ -270,7 +270,7 @@ export default function ImpersonationHistory() {
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
                               whiteSpace: "nowrap",
-                              fontFamily: "var(--font-dm-mono), monospace",
+                              fontVariantNumeric: "tabular-nums",
                             }}
                           >
                             {endDate ? (
@@ -294,7 +294,7 @@ export default function ImpersonationHistory() {
                               ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
-                              fontFamily: "var(--font-dm-mono, monospace)",
+                              fontVariantNumeric: "tabular-nums",
                             }}
                           >
                             {formatDuration(e.createdAt, e.endedAt, e.expiresAt, now)}
@@ -313,7 +313,7 @@ export default function ImpersonationHistory() {
                               ...gmTdStyle,
                               fontSize: "var(--dg-fs-caption)",
                               color: "var(--dg-color-text-muted)",
-                              fontFamily: "var(--font-dm-mono, monospace)",
+                              fontVariantNumeric: "tabular-nums",
                             }}
                           >
                             {e.ipAddress ?? "-"}

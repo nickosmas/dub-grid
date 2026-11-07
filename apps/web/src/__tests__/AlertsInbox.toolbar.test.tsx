@@ -49,6 +49,16 @@ const FACETS = {
   byPriority: {},
 };
 
+const NOTIFICATION = {
+  id: "alert-1",
+  title: "Schedule updated",
+  body: "Your shifts changed.",
+  createdAt: "2026-11-01T12:00:00.000Z",
+  readAt: null,
+  archivedAt: null,
+  metadata: {},
+};
+
 async function renderInbox() {
   const { InboxView } = await import("@/app/(app)/alerts/AlertsInboxPage");
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -64,7 +74,11 @@ describe("InboxView toolbar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fetchNotificationFacets.mockResolvedValue(FACETS);
-    searchNotifications.mockResolvedValue({ notifications: [], nextCursor: null, facets: FACETS });
+    searchNotifications.mockResolvedValue({
+      notifications: [NOTIFICATION],
+      nextCursor: null,
+      facets: FACETS,
+    });
   });
 
   it("holds every control in one toolbar and no sidebar", async () => {
@@ -77,7 +91,7 @@ describe("InboxView toolbar", () => {
     expect(t.getByRole("textbox", { name: "Search alerts" })).toBeTruthy();
     expect(t.getByRole("button", { name: "Filter by category" })).toBeTruthy();
     expect(t.getByRole("button", { name: "Filter by priority" })).toBeTruthy();
-    expect(t.getByRole("button", { name: /^Sort/ })).toBeTruthy();
+    expect(await t.findByRole("button", { name: /^Sort/ })).toBeTruthy();
     expect(t.getByLabelText(/Select/)).toBeTruthy();
     expect(t.getByRole("button", { name: "Mark all alerts as read" })).toBeTruthy();
 
@@ -125,7 +139,7 @@ describe("InboxView toolbar", () => {
     expect(toolbar.getByRole("textbox", { name: "Search alerts" })).toBeTruthy();
     expect(toolbar.getByRole("button", { name: "Filter by category" })).toBeTruthy();
     expect(toolbar.getByRole("button", { name: "Filter by priority" })).toBeTruthy();
-    expect(toolbar.getByRole("button", { name: /^Sort/ })).toBeTruthy();
+    expect(await toolbar.findByRole("button", { name: /^Sort/ })).toBeTruthy();
     expect(toolbar.getByLabelText(/Select/)).toBeTruthy();
 
     fireEvent.click(toolbar.getByRole("button", { name: /^Inbox/ }));

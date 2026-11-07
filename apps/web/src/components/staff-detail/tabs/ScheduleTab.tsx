@@ -144,7 +144,7 @@ export function ScheduleTab({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 className="dg-section-heading">Shifts and time off</h2>
-          {loading ? null : (
+          {loading || (records.length === 0 && timeOff.length === 0) ? null : (
             <span className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-subtle)]">
               {records.length} {records.length === 1 ? "shift" : "shifts"}, {totalHours} hours,{" "}
               {timeOff.length} time off {periodPhrase}
@@ -152,7 +152,7 @@ export function ScheduleTab({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {asCalendar ? null : (
+          {asCalendar || (records.length === 0 && timeOff.length === 0) ? null : (
             <CustomSelect<Filter>
               ariaLabel="Show"
               value={filter}
@@ -182,14 +182,11 @@ export function ScheduleTab({
           >
             {asList ? "Show as calendar" : "Show as list"}
           </Button>
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary dg-btn-sm"
-            onClick={exportCsv}
-            disabled={records.length === 0}
-          >
-            Export CSV
-          </Button>
+          {records.length > 0 ? (
+            <Button type="button" className="dg-btn dg-btn-secondary dg-btn-sm" onClick={exportCsv}>
+              Export CSV
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -216,7 +213,13 @@ export function ScheduleTab({
       ) : weeks.length === 0 ? (
         <EmptyState
           size="compact"
-          title={`Nothing ${periodPhrase}`}
+          title={
+            filter === "shift"
+              ? `No shifts ${periodPhrase}`
+              : filter === "timeoff"
+                ? `No time off ${periodPhrase}`
+                : `No shifts or time off ${periodPhrase}`
+          }
           action={
             filter === "all" ? undefined : (
               <ClearFiltersButton activeFilterCount={1} onClear={() => setFilter("all")} small />

@@ -196,7 +196,7 @@ export function ConfigTab({
                         }}
                       >
                         {hasTime
-                          ? `${shift.startTime ? fmt12h(shift.startTime) : "—"} - ${shift.endTime ? fmt12h(shift.endTime) : "—"}`
+                          ? `${shift.startTime ? fmt12h(shift.startTime) : "-"} - ${shift.endTime ? fmt12h(shift.endTime) : "-"}`
                           : "-"}
                       </td>
                       <td

@@ -52,7 +52,7 @@ describe("BillingHistoryCard", () => {
 
     wrap(<BillingHistoryCard />);
 
-    expect(await screen.findByText("No history recorded yet.")).toBeTruthy();
+    expect(await screen.findByText("No history recorded yet")).toBeTruthy();
     expect(screen.getByText("Seat changes and invoices are recorded from now on.")).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
   });
@@ -90,6 +90,6 @@ describe("OrgSeatHistoryCard", () => {
 
     wrap(<OrgSeatHistoryCard orgId="org-1" />);
 
-    expect(await screen.findByText("No seat changes recorded yet.")).toBeTruthy();
+    expect(await screen.findByText("No seat changes recorded yet")).toBeTruthy();
   });
 });

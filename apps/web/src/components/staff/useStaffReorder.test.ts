@@ -66,4 +66,16 @@ describe("useStaffReorder", () => {
     expect(result.current.isReordering).toBe(true);
     expect(result.current.displayList.map((employee) => employee.id)).toEqual(["a", "b", "c"]);
   });
+
+  it("stays clean when a search narrows the list behind it", () => {
+    const { result, rerender } = renderHook(
+      ({ sorted }) => useStaffReorder({ sorted, onSaveOrder: vi.fn() }),
+      { initialProps: { sorted: people } },
+    );
+
+    act(() => result.current.enterReorder());
+    rerender({ sorted: [] });
+
+    expect(result.current.isDirty).toBe(false);
+  });
 });

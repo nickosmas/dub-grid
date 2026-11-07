@@ -59,7 +59,9 @@ export default function StaffHoursCard({
           <div className="dg-card-title">{heading}</div>
           <div className="dg-card-subtitle">{subtitle ?? `This week · ${otThreshold}h limit`}</div>
         </div>
-        {onExpand && <ExpandButton onClick={onExpand} label="Expand staff hours" />}
+        {onExpand && visible.length > 0 && (
+          <ExpandButton onClick={onExpand} label="Expand staff hours" />
+        )}
       </div>
 
       {visible.length === 0 ? (

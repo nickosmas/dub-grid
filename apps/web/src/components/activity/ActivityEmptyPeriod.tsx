@@ -1,6 +1,5 @@
 "use client";
 
-import { CalendarDays } from "lucide-react";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -44,7 +43,6 @@ export function ActivityEmptyPeriod({
   return (
     <EmptyState
       size="compact"
-      icon={<CalendarDays size={20} />}
       title={
         description && !hasFilters
           ? "No activity yet"

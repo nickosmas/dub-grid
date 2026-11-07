@@ -36,7 +36,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
         style={{
           fontSize: "var(--dg-type-page-title-size)",
           fontWeight: 700,
-          fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+          fontVariantNumeric: "tabular-nums",
           color: "var(--dg-color-text-primary)",
           marginBottom: 4,
         }}
@@ -87,7 +87,7 @@ function OversightCard({
           fontSize: "var(--dg-fs-card-title)",
           fontWeight: 700,
           color,
-          fontFamily: "var(--font-dm-mono), monospace",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
@@ -187,7 +187,7 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
           color: "var(--dg-color-text-subtle)",
           flexShrink: 0,
           whiteSpace: "nowrap",
-          fontFamily: "var(--font-dm-mono), monospace",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{" "}
@@ -252,7 +252,7 @@ export default function GridmasterDashboard({
           Dashboard
         </h2>
         <Button className="dg-btn dg-btn-primary" onClick={onCreateOrg}>
-          + New Organization
+          New Organization
         </Button>
       </div>
 

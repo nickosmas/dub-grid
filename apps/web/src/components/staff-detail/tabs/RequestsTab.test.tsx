@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RequestsTab } from "./RequestsTab";
 import type { PersonRequestRow } from "@/lib/person-requests";
 
@@ -29,7 +29,11 @@ const PICKUP: PersonRequestRow = {
 };
 const RANGE = { startDate: "2026-01-01", endDate: "2026-03-31" };
 
-function renderTab(rows: PersonRequestRow[] | undefined = [SWAP, PICKUP], loading = false) {
+function renderTab(
+  rows: PersonRequestRow[] | undefined = [SWAP, PICKUP],
+  loading = false,
+  onJumpToDate?: (date: string) => void,
+) {
   return render(
     <RequestsTab
       rows={rows}
@@ -37,6 +41,7 @@ function renderTab(rows: PersonRequestRow[] | undefined = [SWAP, PICKUP], loadin
       error={null}
       range={RANGE}
       periodPhrase="this quarter"
+      onJumpToDate={onJumpToDate}
     />,
   );
 }
@@ -65,8 +70,28 @@ describe("RequestsTab", () => {
     expect(screen.getByText("Pickup · Fri, Jan 9 · Night Shift")).toBeInTheDocument();
   });
 
-  it("shows the dashed empty state when nothing was sent", () => {
+  it("says once that nothing was sent, with no count or filter beside it", () => {
     renderTab([]);
-    expect(screen.getByText("No requests sent this quarter")).toBeInTheDocument();
+
+    expect(screen.getByText("No requests this quarter")).toBeInTheDocument();
+    expect(screen.queryByText(/0 requests/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Filter requests" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Jump to/ })).toBeNull();
+  });
+
+  it("offers the nearest month with requests when this period has none", () => {
+    const onJump = vi.fn();
+    renderTab(
+      [
+        { ...PICKUP, key: "far", sentDate: "2025-06-02" },
+        { ...PICKUP, key: "near", sentDate: "2025-11-20" },
+      ],
+      false,
+      onJump,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Jump to November 2025" }));
+
+    expect(onJump).toHaveBeenCalledWith("2025-11-20");
   });
 });

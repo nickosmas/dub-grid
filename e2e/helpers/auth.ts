@@ -176,7 +176,7 @@ export async function loginAsQaAccount(page: Page, email: string, origin: string
 
 /**
  * Signs the seeded QA gridmaster into the platform portal. The portal's form
- * ("Platform admin sign in", submit "Open portal") differs from the org
+ * ("Sign in", submit "Open portal") differs from the org
  * login, and a gridmaster has no org membership, so the signed-in signal is
  * the portal's own navigation rather than the org shell's Dashboard link.
  */

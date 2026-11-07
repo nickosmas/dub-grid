@@ -196,6 +196,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     today: periodToday,
     step: stepPeriod,
     goToToday: goToPeriodToday,
+    goToMonthOf: goToPeriodMonthOf,
     setCustomRange: setPeriodRange,
   } = usePersonPeriod();
   const periodRange = useMemo(
@@ -942,6 +943,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const today = useMemo(() => getIsoDateInTimeZone(new Date(), org?.timezone), [org?.timezone]);
   const dayOffAbsenceTypeId = org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null;
   const stripRange = useMemo(() => resolvePeriodPreset("current-week", null)!, []);
+  // Looking at another month, this week would be off the subject.
+  const periodIncludesToday =
+    period.range.startDate <= periodToday && periodToday <= period.range.endDate;
   const upcomingShiftsQuery = useQuery<ShiftMap>({
     queryKey: orgId
       ? [
@@ -961,7 +965,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         stripRange.startDate,
         stripRange.endDate,
       ),
-    enabled: Boolean(orgId) && Boolean(employee) && activeTab === "schedule",
+    enabled: Boolean(orgId) && Boolean(employee) && activeTab === "schedule" && periodIncludesToday,
   });
   const stripDates = useMemo(() => rangeDates(stripRange), [stripRange]);
   const shiftRequestsQuery = useQuery({
@@ -1572,7 +1576,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     absenceTypes={absenceTypes}
                     focusAreas={focusAreas}
                     nextDays={
-                      showScheduleDetails && upcomingShiftsQuery.data
+                      showScheduleDetails && periodIncludesToday && upcomingShiftsQuery.data
                         ? { dates: stripDates, shifts: upcomingShiftsQuery.data }
                         : null
                     }
@@ -1650,6 +1654,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     }
                     range={period.range}
                     periodPhrase={periodRange.phrase}
+                    onJumpToDate={goToPeriodMonthOf}
                   />
                 )}
                 {activeTab === "activity" && (
@@ -1658,6 +1663,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     entries={activityQuery.data ?? []}
                     timeZone={org?.timezone ?? null}
                     range={periodRange}
+                    onJumpToDate={goToPeriodMonthOf}
                     loading={activityQuery.isPending}
                     error={
                       activityQuery.error
