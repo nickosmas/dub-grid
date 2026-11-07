@@ -78,6 +78,7 @@ type Refusal = {
   outcome: Extract<SecurityEventOutcome, "rejected" | "failed">;
   reason: SecurityEventReason;
   orgId: string | null;
+  suspendedUntil?: string;
 };
 
 /** Returned when the user cannot access the organization named by the host. */
@@ -176,6 +177,19 @@ async function switchSessionToHostOrganization(
   const { error: switchError } = await client.rpc("switch_org", {
     target_org_id: orgLookup.org.id,
   });
+  if (isAccountSuspendedMessage(switchError?.message)) {
+    const suspendedUntil = suspendedUntilFromMessage(switchError?.message);
+    return {
+      ok: false,
+      status: 403,
+      code: ACCOUNT_SUSPENDED_CODE,
+      error: ACCOUNT_SUSPENDED_MESSAGE,
+      outcome: "rejected",
+      reason: "account_suspended",
+      orgId: orgLookup.org.id,
+      ...(suspendedUntil ? { suspendedUntil } : {}),
+    };
+  }
   if (switchError) {
     return {
       ok: false,
@@ -600,7 +614,12 @@ export async function POST(req: NextRequest) {
     if (!outcome.ok) {
       await refuseSignIn({ userId: data.user.id, sessionId, refusal: outcome, emailHash });
       const res = NextResponse.json(
-        { success: false, code: outcome.code, error: outcome.error },
+        {
+          success: false,
+          code: outcome.code,
+          error: outcome.error,
+          ...(outcome.suspendedUntil ? { suspendedUntil: outcome.suspendedUntil } : {}),
+        },
         { status: outcome.status },
       );
       timer.applyTo(res.headers);

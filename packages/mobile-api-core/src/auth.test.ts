@@ -228,6 +228,27 @@ describe("loginMobileUser read order", () => {
     });
   });
 
+  it("answers Access suspended when the organization has suspended them (F-224)", async () => {
+    const { client, rpc } = buildSessionClient(ORG_A, false);
+    const memberships = rpc.getMockImplementation();
+    rpc.mockImplementation((async (name: string) =>
+      name === "switch_org"
+        ? {
+            data: null,
+            error: {
+              message:
+                "Your access has been suspended. Contact your organization admin. Until 2026-12-01.",
+            },
+          }
+        : memberships?.(name)) as never);
+
+    await expect(loginMobileUser(buildServiceClient(), client, LOGIN_INPUT)).rejects.toMatchObject({
+      status: 403,
+      code: "ACCOUNT_SUSPENDED",
+      details: { suspendedUntil: "2026-12-01" },
+    });
+  });
+
   it("refuses a non-member before a failed billing policy load is ever awaited", async () => {
     const { client, rpc } = buildSessionClient(ORG_B, false);
     rpc.mockImplementation((async () => ({

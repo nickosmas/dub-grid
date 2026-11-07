@@ -96,7 +96,11 @@ describe.skipIf(!reachable)("organization-bound references", () => {
   });
 
   const employeeIn = (orgId: string) =>
-    one<string>(`SELECT id FROM public.employees WHERE org_id = $1 LIMIT 1`, [orgId]);
+    one<string>(
+      `SELECT id FROM public.employees
+        WHERE org_id = $1 AND status = 'active' AND archived_at IS NULL LIMIT 1`,
+      [orgId],
+    );
   const focusAreaIn = (orgId: string) =>
     one<number>(`SELECT id FROM public.focus_areas WHERE org_id = $1 LIMIT 1`, [orgId]);
 
