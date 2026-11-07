@@ -18,14 +18,15 @@ export const emailTheme = {
   border: colorTokens.borderSubtle, // #E2E8F0
 } as const;
 
-// The app's dark ramp is zinc, on a black page.
+// All black, with zinc only in the text and borders. Outlook for Mac repaints any
+// near-black background a mid gray but leaves pure black alone.
 const emailDarkTheme = {
   pageBg: "#000000",
-  sheetBg: "#18181B",
-  cardBg: "#27272A",
+  sheetBg: "#000000",
+  cardBg: "#000000",
   textPrimary: "#FAFAFA",
   textBody: "#D4D4D8",
-  textMuted: "#A1A1AA",
+  textMuted: "#D4D4D8",
   border: "#3F3F46",
 } as const;
 
