@@ -34,8 +34,8 @@ clients that drop the body's background left their own color there.
 - **Buttons.** Every alert with an organization now has a button, by default
   to where the alert goes in the app. The email-needs-a-fix alert opens the
   record that holds the address, and alerts about the reader open their profile.
-- **Layout.** The whole email now sits in one white card on a light gray page
-  (`#F5F5F5`), which replaces the 2026-11-06 choice of no outer card (owner,
+- **Layout.** The whole email now sits in one white card, with no border or
+  shadow, on a light gray page (`#F5F5F5`), which replaces the 2026-11-06 choice of no outer card (owner,
   2026-11-07, after first asking for pure white and black). Dark mode is a zinc
   card on a black page. The logo sits inside the card, so its white plate stays
   hidden, and a full-width table carries the page color with `bgcolor`, so it

@@ -59,7 +59,6 @@ function darkRules(prefix: string, backgrounds: boolean, text: boolean): string 
     backgrounds ? `${prefix}.${emailClass.page}{background-color:${dark.pageBg}!important}` : "",
     backgrounds ? `${prefix}.${emailClass.sheet}{background-color:${dark.sheetBg}!important}` : "",
     backgrounds ? `${prefix}.${emailClass.card}{background-color:${dark.cardBg}!important}` : "",
-    text ? `${prefix}.${emailClass.sheet}{border-color:${dark.border}!important}` : "",
     text ? `${prefix}.${emailClass.card}{border-color:${dark.border}!important}` : "",
     text ? `${prefix}.${emailClass.rule}{border-color:${dark.border}!important}` : "",
     text ? `${prefix}.${emailClass.ink}{color:${dark.textPrimary}!important}` : "",
@@ -104,7 +103,6 @@ export const styles = {
     maxWidth: "560px",
     margin: "0 auto",
     backgroundColor: emailTheme.sheetBg,
-    border: `1px solid ${emailTheme.border}`,
     borderRadius: "16px",
   },
   // The logo images carry 12px of padding, so their ink lines up with the text.
