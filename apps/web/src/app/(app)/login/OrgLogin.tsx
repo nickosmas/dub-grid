@@ -663,6 +663,7 @@ export default function OrgLogin({
         {accessSuspended && (
           <AccessSuspendedModal
             until={accessSuspended.until}
+            orgName={orgName}
             onClose={() => setAccessSuspended(null)}
           />
         )}

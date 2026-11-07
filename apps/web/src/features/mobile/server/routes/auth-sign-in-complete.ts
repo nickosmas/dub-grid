@@ -3,11 +3,12 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { hasFreshSecondFactor, recordCompletedSignIn } from "@/lib/auth/sign-in-completion";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
+import logger from "@/lib/logger";
 import { requireMobileAuth } from "../auth";
 
 /**
- * Records a mobile two-factor sign-in as succeeded once the code is verified.
- * Only a freshly verified second factor counts.
+ * Records a mobile two-factor sign-in as succeeded once the code is verified,
+ * and starts a Super Admin's trial. Only a freshly verified second factor counts.
  */
 export async function POST(req: NextRequest) {
   const auth = await requireMobileAuth(req);
@@ -26,6 +27,16 @@ export async function POST(req: NextRequest) {
 
   if (!hasFreshSecondFactor(auth.claims)) {
     return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+  }
+
+  // The login route's attempt ran on the token before its second factor, which
+  // the function refuses, so this is where a two-factor Super Admin's trial starts.
+  if (auth.claims.org_role === "super_admin") {
+    await auth.userClient
+      .rpc("start_trial_for_org", { p_org_id: auth.currentOrg.id })
+      .then(({ error }) => {
+        if (error) logger.warn({ error }, "mobile trial start after second factor failed");
+      });
   }
 
   await recordCompletedSignIn({

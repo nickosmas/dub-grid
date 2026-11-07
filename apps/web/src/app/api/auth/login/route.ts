@@ -227,6 +227,36 @@ async function switchSessionToHostOrganization(
   return { ok: true, session: next, claims: decodeJwt(next.access_token) };
 }
 
+/**
+ * Whether the organization at this address has suspended them. A two-factor
+ * sign-in stops at the code, before any switch would refuse them, so this answers
+ * first rather than asking for a code that can't get them in.
+ */
+async function suspendedFromHostOrganization(
+  userId: string,
+  hostSlug: string,
+): Promise<Refusal | null> {
+  const orgLookup = await lookupOrgBySlug(hostSlug);
+  if (orgLookup.status !== "found") return null;
+  const { data: employee } = await getServiceClient()
+    .from("employees")
+    .select("suspended_at, suspended_until")
+    .eq("user_id", userId)
+    .eq("org_id", orgLookup.org.id)
+    .maybeSingle();
+  if (employee?.suspended_at == null) return null;
+  return {
+    ok: false,
+    status: 403,
+    code: ACCOUNT_SUSPENDED_CODE,
+    error: ACCOUNT_SUSPENDED_MESSAGE,
+    outcome: "rejected",
+    reason: "account_suspended",
+    orgId: orgLookup.org.id,
+    ...(employee.suspended_until ? { suspendedUntil: employee.suspended_until as string } : {}),
+  };
+}
+
 async function refreshGridmasterSession(
   session: SessionTokens,
 ): Promise<{ ok: true; session: SessionTokens } | Refusal> {
@@ -607,24 +637,31 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
+  const refuse = async (refusal: Refusal) => {
+    await refuseSignIn({ userId: data.user.id, sessionId, refusal, emailHash });
+    const res = NextResponse.json(
+      {
+        success: false,
+        code: refusal.code,
+        error: refusal.error,
+        ...(refusal.suspendedUntil ? { suspendedUntil: refusal.suspendedUntil } : {}),
+      },
+      { status: refusal.status },
+    );
+    timer.applyTo(res.headers);
+    return res;
+  };
+
+  if (mfaRequired && emailConfirmed && loginHost && !isGridmaster) {
+    const suspended = await suspendedFromHostOrganization(data.user.id, loginHost);
+    if (suspended) return refuse(suspended);
+  }
+
   if (!mfaRequired && emailConfirmed) {
     const outcome = await timer.time("post_signin_orchestration", () =>
       orchestratePostSignIn(session, claims, req, isGridmaster),
     );
-    if (!outcome.ok) {
-      await refuseSignIn({ userId: data.user.id, sessionId, refusal: outcome, emailHash });
-      const res = NextResponse.json(
-        {
-          success: false,
-          code: outcome.code,
-          error: outcome.error,
-          ...(outcome.suspendedUntil ? { suspendedUntil: outcome.suspendedUntil } : {}),
-        },
-        { status: outcome.status },
-      );
-      timer.applyTo(res.headers);
-      return res;
-    }
+    if (!outcome.ok) return refuse(outcome);
     session = outcome.session;
     destination = outcome.destination;
     didSwitchOrg = outcome.didSwitchOrg;
