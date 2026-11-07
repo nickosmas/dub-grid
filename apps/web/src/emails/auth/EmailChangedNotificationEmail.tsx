@@ -11,12 +11,11 @@ export function EmailChangedNotificationEmail({ logoUrl }: { logoUrl?: string } 
   return (
     <SecurityNotificationEmail
       heading="Your email address was changed"
-      body={
-        <>
-          The email for your DubGrid account was changed from {SUPABASE.oldEmail} to{" "}
-          {SUPABASE.newEmail}.
-        </>
-      }
+      body="The email for your DubGrid account was changed."
+      details={[
+        { label: "Old address", value: SUPABASE.oldEmail },
+        { label: "New address", value: SUPABASE.newEmail },
+      ]}
       footer="If it was you, you don't need to do anything. If it wasn't you, contact support@dubgrid.com right away, since whoever made the change can now sign in with the new address."
       logoUrl={logoUrl}
     />

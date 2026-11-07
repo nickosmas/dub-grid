@@ -34,12 +34,14 @@ function buildTrialStartedEmail(
   orgName: string,
   trialEndsAt: string | null,
   timeZone: string | null,
+  firstName: string | null,
 ): Promise<string> {
   return render(
     createElement(TrialWelcomeEmail, {
       orgName,
       trialEndDate: formatTrialEndDate(trialEndsAt, timeZone),
       logoUrl: emailBaseUrl(),
+      firstName,
     }),
   );
 }
@@ -57,6 +59,7 @@ async function sendTrialWelcomeOnce(input: {
   orgId: string;
   apiKey: string;
   to: string;
+  userId: string;
   org: { name: string; trialEndsAt: string | null; timezone: string | null };
 }): Promise<void> {
   const { service, orgId, org } = input;
@@ -73,12 +76,22 @@ async function sendTrialWelcomeOnce(input: {
 
   // We won the claim, so send exactly once.
   try {
+    const { data: profile } = await service
+      .from("profiles")
+      .select("first_name")
+      .eq("id", input.userId)
+      .maybeSingle();
     await sendResendEmail({
       apiKey: input.apiKey,
       from: fromEmail,
       to: input.to,
       subject: sanitizeHeaderValue(`Your DubGrid trial for ${org.name} has started`),
-      html: await buildTrialStartedEmail(org.name, org.trialEndsAt, org.timezone),
+      html: await buildTrialStartedEmail(
+        org.name,
+        org.trialEndsAt,
+        org.timezone,
+        (profile?.first_name as string | null | undefined) ?? null,
+      ),
     });
   } catch (err) {
     // Roll the claim back (only if it's still ours) so a retry can send.
@@ -169,6 +182,7 @@ export async function GET(req: NextRequest) {
           orgId,
           apiKey,
           to,
+          userId: user.id,
           org: { name: org.name, trialEndsAt: org.trial_ends_at, timezone: org.timezone ?? null },
         }),
       );

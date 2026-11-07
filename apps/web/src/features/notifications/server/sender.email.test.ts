@@ -47,7 +47,7 @@ function resolve(table: string, ops: Op[]) {
     return { data: state.prefs ? { prefs: state.prefs } : null, error: null };
   }
   if (table === "organizations") {
-    return { data: state.orgName ? { name: state.orgName } : null, error: null };
+    return { data: state.orgName ? { name: state.orgName, slug: "calmhaven" } : null, error: null };
   }
   if (table === "notifications" && has(ops, "eq", "metadata->>dedupe_key")) {
     return { data: Array.from({ length: state.dedupeHits }, (_, id) => ({ id })) };
@@ -81,7 +81,10 @@ vi.mock("@/lib/supabase-keys", () => ({
   getSupabaseSecretKey: () => "secret",
 }));
 vi.mock("@/lib/env.server", () => ({ serverEnv: { RESEND_API_KEY: "key" } }));
-vi.mock("@/lib/email", () => ({ emailBaseUrl: () => "https://app.test" }));
+vi.mock("@/lib/email", () => ({
+  emailBaseUrl: () => "https://app.test",
+  emailOrgUrl: (slug: string) => `https://${slug}.app.test`,
+}));
 vi.mock("@/lib/resend", () => ({
   sendResendEmail: (...args: unknown[]) => sendResendEmail(...args),
 }));
@@ -134,6 +137,64 @@ describe("sendNotification email", () => {
     expect(sendResendEmail).toHaveBeenCalledTimes(1);
   });
 
+  it("greets a member by first name, and anyone else without a name", async () => {
+    state.profile = { ...state.profile, first_name: " Maria " };
+    await send("security_new_device");
+    state.profile = { ...state.profile, first_name: null };
+    await send("security_new_device");
+
+    const [first, second] = sendResendEmail.mock.calls.map(([mail]) => mail as { html: string });
+    expect(first?.html).toMatch(/Hi (<!-- -->)?Maria(<!-- -->)?,/);
+    expect(second?.html).toMatch(/Hi (<!-- -->)?there(<!-- -->)?,/);
+  });
+
+  it("links an alert's button into the organization's own subdomain", async () => {
+    state.orgName = "Calm Haven";
+    const action = { label: "Open schedule", href: "/schedule?date=2026-10-22" };
+    const email = { intro: "Changed.", details: [], closing: "", action };
+    state.prefs = { schedule: { email: true } };
+
+    await sendNotification(
+      "user-1",
+      "org-1",
+      "shift_change",
+      "Title",
+      "Message",
+      {},
+      {
+        writeInApp: false,
+        email,
+      },
+    );
+
+    const { html } = sendResendEmail.mock.calls[0]?.[0] as { html: string };
+    expect(html).toContain("https://calmhaven.app.test/schedule?date=2026-10-22");
+    expect(html).toContain("Open schedule");
+  });
+
+  it("leaves the button out when there's no organization to link into", async () => {
+    const action = { label: "Open schedule", href: "/schedule" };
+    const email = { intro: "Changed.", details: [], closing: "", action };
+    state.prefs = { schedule: { email: true } };
+
+    await sendNotification(
+      "user-1",
+      null,
+      "shift_change",
+      "Title",
+      "Message",
+      {},
+      {
+        writeInApp: false,
+        email,
+      },
+    );
+
+    expect((sendResendEmail.mock.calls[0]?.[0] as { html: string }).html).not.toContain(
+      "Open schedule",
+    );
+  });
+
   it("emails the labeled layout while push keeps the one-sentence message", async () => {
     pushEligible.mockReturnValue(true);
 
@@ -156,7 +217,8 @@ describe("sendNotification email", () => {
 
     const { html } = sendResendEmail.mock.calls[0]?.[0] as { html: string };
     expect(html).toContain("We noticed a new sign-in.");
-    expect(html).toMatch(/Device<\/strong>(<!-- -->)?: (<!-- -->)?Chrome on Macintosh/);
+    expect(html).toMatch(/>Device<\/p>/);
+    expect(html).toContain("Chrome on Macintosh");
     expect(html).toContain("If it wasn&#x27;t you");
     expect(html).not.toContain(">Message<");
     expect(sendMobilePushNotifications).toHaveBeenCalledWith(
@@ -252,14 +314,15 @@ describe("sendNotification email", () => {
   });
 
   // A security alert is about the sign-in, which the organization does not own.
-  it("names the organization only as where a security alert's user was signed in", async () => {
+  it("names the organization in a security alert but not in its subject", async () => {
     state.orgName = "Calm Haven";
 
     await send("security_new_device");
 
     const message = sendResendEmail.mock.calls[0]?.[0] as { subject: string; html: string };
     expect(message.subject).toBe("Title");
-    expect(message.html).toContain("While signed in to Calm Haven");
+    expect(message.html).toContain("Calm Haven");
+    expect(message.html).not.toContain("While signed in");
   });
 });
 

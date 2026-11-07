@@ -25,7 +25,7 @@ async function emailSuspendedPerson(orgId: string, empId: string): Promise<void>
   const [{ data: employee }, { data: org }] = await Promise.all([
     db
       .from("employees")
-      .select("user_id, suspended_until")
+      .select("user_id, suspended_until, first_name")
       .eq("id", empId)
       .eq("org_id", orgId)
       .maybeSingle(),
@@ -48,6 +48,7 @@ async function emailSuspendedPerson(orgId: string, empId: string): Promise<void>
         logoUrl: emailBaseUrl(),
         organizationName,
         suspendedUntil: (employee?.suspended_until as string | null | undefined) ?? null,
+        firstName: (employee?.first_name as string | null | undefined) ?? null,
       }),
     ),
   });

@@ -1,9 +1,10 @@
 import * as React from "react";
-import { Section, Text } from "@react-email/components";
+import { Text } from "@react-email/components";
 import { EmailLayout } from "../components/EmailLayout";
 import { EmailGreeting, EmailSignOff } from "../components/EmailSalutation";
 import { EmailButton } from "../components/EmailButton";
-import { emailTheme, fontStack, styles } from "../components/theme";
+import { EmailCode } from "../components/EmailCard";
+import { text } from "../components/theme";
 import { SUPABASE } from "./placeholders";
 
 export type AuthActionEmailProps = {
@@ -42,35 +43,12 @@ export function AuthActionEmail({
 }: AuthActionEmailProps) {
   return (
     <EmailLayout logoUrl={logoUrl} preview={heading}>
-      <Text style={styles.heading}>{heading}</Text>
+      <Text {...text.heading}>{heading}</Text>
       <EmailGreeting />
-      <Text style={styles.paragraph}>{intro}</Text>
+      <Text {...text.paragraph}>{intro}</Text>
       <EmailButton href={actionHref}>{ctaLabel}</EmailButton>
-      {code ? (
-        <Section style={{ textAlign: "center", margin: "0 0 32px" }}>
-          <Text style={{ ...styles.fine, textAlign: "center", margin: "0 0 12px" }}>
-            {code.label}
-          </Text>
-          <Text
-            style={{
-              display: "inline-block",
-              fontFamily: fontStack,
-              fontSize: "32px",
-              fontWeight: 700,
-              letterSpacing: "0.2em",
-              color: emailTheme.brand,
-              backgroundColor: emailTheme.pageBg,
-              border: `1px solid ${emailTheme.border}`,
-              borderRadius: "8px",
-              padding: "16px 28px",
-              margin: 0,
-            }}
-          >
-            {SUPABASE.token}
-          </Text>
-        </Section>
-      ) : null}
-      <Text style={styles.paragraph}>{footer}</Text>
+      {code ? <EmailCode label={code.label} code={SUPABASE.token} /> : null}
+      <Text {...text.paragraph}>{footer}</Text>
       <EmailSignOff />
     </EmailLayout>
   );

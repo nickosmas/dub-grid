@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { render } from "@react-email/components";
 import { createClient } from "@supabase/supabase-js";
-import { emailBaseUrl } from "@/lib/email";
+import { emailBaseUrl, emailOrgUrl } from "@/lib/email";
 import { NotificationEmail, type NotificationEmailDetail } from "@/emails/NotificationEmail";
 import {
   isAccountWidePushType,
@@ -128,6 +128,8 @@ export interface SendNotificationOptions {
     intro: string;
     details: NotificationEmailDetail[];
     closing: string;
+    /** A button into the app, with a path inside the organization. */
+    action?: { label: string; href: string };
   };
 }
 
@@ -248,7 +250,10 @@ export async function sendNotification(
   }
 
   // 4. Get user email
-  const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+  const [{ data: authUser }, { data: profile }] = await Promise.all([
+    supabase.auth.admin.getUserById(userId),
+    supabase.from("profiles").select("first_name").eq("id", userId).maybeSingle(),
+  ]);
   const email = authUser?.user?.email;
   if (!email) return;
 
@@ -261,6 +266,7 @@ export async function sendNotification(
 
   try {
     const context = await getEmailContext(supabase, orgId, category);
+    const action = options.email?.action;
     const html = await render(
       createElement(NotificationEmail, {
         title,
@@ -270,6 +276,11 @@ export async function sendNotification(
         logoUrl: emailBaseUrl(),
         context: context?.line,
         alwaysOn: category === "security",
+        action:
+          action && context?.slug
+            ? { label: action.label, href: `${emailOrgUrl(context.slug)}${action.href}` }
+            : undefined,
+        firstName: (profile?.first_name as string | null | undefined) ?? null,
       }),
     );
 
@@ -316,16 +327,15 @@ async function getEmailContext(
   supabase: ReturnType<typeof getServiceClient>,
   orgId: string | null,
   category: string,
-): Promise<{ line: string; subjectPrefix: string | null } | null> {
+): Promise<{ line: string; subjectPrefix: string | null; slug: string | null } | null> {
   if (!orgId) return null;
   const { data } = await supabase
     .from("organizations")
-    .select("name")
+    .select("name, slug")
     .eq("id", orgId)
     .maybeSingle();
+  const slug = typeof data?.slug === "string" && data.slug ? data.slug : null;
   const orgName = typeof data?.name === "string" && data.name.trim() ? data.name.trim() : null;
   if (!orgName) return null;
-  return category === "security"
-    ? { line: `While signed in to ${orgName}`, subjectPrefix: null }
-    : { line: orgName, subjectPrefix: orgName };
+  return { line: orgName, subjectPrefix: category === "security" ? null : orgName, slug };
 }

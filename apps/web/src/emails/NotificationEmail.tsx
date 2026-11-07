@@ -1,8 +1,10 @@
 import * as React from "react";
-import { Hr, Section, Text } from "@react-email/components";
+import { Text } from "@react-email/components";
 import { EmailLayout } from "./components/EmailLayout";
 import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
-import { styles, PREVIEW_LOGO_URL } from "./components/theme";
+import { EmailButton } from "./components/EmailButton";
+import { EmailDetails } from "./components/EmailCard";
+import { text, PREVIEW_LOGO_URL } from "./components/theme";
 
 export type NotificationEmailDetail = { label: string; value: string };
 
@@ -14,10 +16,13 @@ export type NotificationEmailProps = {
   /** A paragraph after the details, such as what to do if it wasn't the reader. */
   closing?: string;
   logoUrl: string;
-  /** The organization the notification came from, shown above the heading. */
+  /** The organization the notification came from, shown under the logo. */
   context?: string;
   /** A security alert, which no preference turns off. */
   alwaysOn?: boolean;
+  /** Where the reader goes next, when the alert has one link. */
+  action?: { label: string; href: string };
+  firstName?: string | null;
 };
 
 /** Generic in-app notification delivered over email. */
@@ -29,30 +34,27 @@ export function NotificationEmail({
   logoUrl,
   context,
   alwaysOn = false,
+  action,
+  firstName,
 }: NotificationEmailProps) {
   return (
-    <EmailLayout logoUrl={logoUrl} preview={context ? `${context}: ${title}` : title}>
-      {context ? <Text style={{ ...styles.fine, margin: "0 0 8px" }}>{context}</Text> : null}
-      <Text style={styles.heading}>{title}</Text>
-      <EmailGreeting />
-      <Text style={styles.paragraph}>{message}</Text>
-      {details.length > 0 ? (
-        <Section style={styles.detailList}>
-          {details.map(({ label, value }) => (
-            <Text key={label} style={styles.detail}>
-              <strong style={styles.detailLabel}>{label}</strong>: {value}
-            </Text>
-          ))}
-        </Section>
-      ) : null}
-      {closing ? <Text style={styles.paragraph}>{closing}</Text> : null}
-      <EmailSignOff />
-      <Hr style={styles.divider} />
-      <Text style={styles.fine}>
-        {alwaysOn
+    <EmailLayout
+      logoUrl={logoUrl}
+      preview={context ? `${context}: ${title}` : title}
+      organization={context}
+      fine={
+        alwaysOn
           ? "Security alerts are always on, so they reach you whatever your notification settings."
-          : "You can manage your notification preferences in your DubGrid profile settings."}
-      </Text>
+          : "You can manage your notification preferences in your DubGrid profile settings."
+      }
+    >
+      <Text {...text.heading}>{title}</Text>
+      <EmailGreeting firstName={firstName} />
+      <Text {...text.paragraph}>{message}</Text>
+      {details.length > 0 ? <EmailDetails details={details} /> : null}
+      {closing ? <Text {...text.paragraph}>{closing}</Text> : null}
+      {action ? <EmailButton href={action.href}>{action.label}</EmailButton> : null}
+      <EmailSignOff />
     </EmailLayout>
   );
 }
@@ -62,6 +64,8 @@ NotificationEmail.PreviewProps = {
   message: "Your Tuesday shift now starts at 7:00 AM instead of 8:00 AM.",
   logoUrl: PREVIEW_LOGO_URL,
   context: "Calm Haven",
+  action: { label: "Open schedule", href: "https://calmhaven.dubgrid.com/schedule" },
+  firstName: "Maria",
 } satisfies NotificationEmailProps;
 
 export default NotificationEmail;

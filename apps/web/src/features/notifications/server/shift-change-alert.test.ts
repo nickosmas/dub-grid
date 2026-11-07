@@ -70,6 +70,7 @@ describe("buildShiftChangeAlert", () => {
           },
         ],
         closing: "Open the schedule in DubGrid to see your whole week.",
+        action: { label: "Open schedule", href: "/schedule?date=2026-10-22" },
       },
     });
   });
@@ -143,7 +144,12 @@ describe("buildShiftChangeAlert", () => {
       "On Tue, Oct 20, Thu, Oct 22 and Sat, Oct 24. Open the schedule to see what changed.";
 
     expect(alert?.message).toBe(summary);
-    expect(alert?.email).toEqual({ intro: summary, details: [], closing: "" });
+    expect(alert?.email).toEqual({
+      intro: summary,
+      details: [],
+      closing: "",
+      action: { label: "Open schedule", href: "/schedule?date=2026-10-20" },
+    });
     expect(JSON.stringify(alert)).not.toMatch(/Day Shift|Skilled Nursing/);
   });
 

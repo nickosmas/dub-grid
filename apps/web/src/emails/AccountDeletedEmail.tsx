@@ -2,7 +2,7 @@ import * as React from "react";
 import { Text } from "@react-email/components";
 import { EmailLayout } from "./components/EmailLayout";
 import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
-import { styles, PREVIEW_LOGO_URL } from "./components/theme";
+import { text, PREVIEW_LOGO_URL } from "./components/theme";
 
 export type AccountDeletedEmailProps = {
   logoUrl: string;
@@ -17,13 +17,13 @@ export type AccountDeletedEmailProps = {
 export function AccountDeletedEmail({ logoUrl }: AccountDeletedEmailProps) {
   return (
     <EmailLayout logoUrl={logoUrl} preview="Your DubGrid account has been deleted">
-      <Text style={styles.heading}>Your DubGrid account has been deleted</Text>
+      <Text {...text.heading}>Your DubGrid account has been deleted</Text>
       <EmailGreeting />
-      <Text style={styles.paragraph}>
+      <Text {...text.paragraph}>
         The DubGrid account for this email address has been deleted. It can no longer be used to
         sign in, and we&apos;ve signed it out on every device.
       </Text>
-      <Text style={styles.paragraph}>
+      <Text {...text.paragraph}>
         If you didn&apos;t ask for this, contact support@dubgrid.com right away and we&apos;ll help.
       </Text>
       <EmailSignOff />

@@ -2,7 +2,7 @@ import * as React from "react";
 import { Text } from "@react-email/components";
 import { EmailLayout } from "./components/EmailLayout";
 import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
-import { styles, PREVIEW_LOGO_URL } from "./components/theme";
+import { text, PREVIEW_LOGO_URL } from "./components/theme";
 
 /** Who made the change: an organization administrator, the person themselves, or DubGrid support. */
 export type LoginEmailChangedBy = "administrator" | "self" | "support";
@@ -85,10 +85,16 @@ export function LoginEmailChangedEmail({
   const contact =
     changedBy === "administrator" ? `${orgName} or support@dubgrid.com` : "support@dubgrid.com";
   return (
-    <EmailLayout logoUrl={logoUrl} preview={heading}>
-      <Text style={styles.heading}>{heading}</Text>
+    <EmailLayout
+      logoUrl={logoUrl}
+      preview={heading}
+      // Only an administrator's change is about the organization. The other two
+      // are about the account, and these may reach a mistyped address.
+      organization={changedBy === "administrator" ? orgName : undefined}
+    >
+      <Text {...text.heading}>{heading}</Text>
       <EmailGreeting />
-      <Text style={styles.paragraph}>
+      <Text {...text.paragraph}>
         {recipient === "previous" ? (
           <>
             {changeSentence(changedBy, orgName, newEmail)} {SIGN_OUT_SENTENCE[signOut]} Sign in with
@@ -98,7 +104,7 @@ export function LoginEmailChangedEmail({
           newAddressSentence(changedBy, orgName)
         )}
       </Text>
-      <Text style={styles.paragraph}>
+      <Text {...text.paragraph}>
         {recipient === "previous"
           ? changedBy === "self"
             ? "If this wasn't you, change your password and contact support@dubgrid.com right away."

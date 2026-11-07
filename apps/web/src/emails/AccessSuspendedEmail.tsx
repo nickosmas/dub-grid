@@ -2,13 +2,14 @@ import * as React from "react";
 import { Text } from "@react-email/components";
 import { EmailLayout } from "./components/EmailLayout";
 import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
-import { styles, PREVIEW_LOGO_URL } from "./components/theme";
+import { text, PREVIEW_LOGO_URL } from "./components/theme";
 
 export type AccessSuspendedEmailProps = {
   logoUrl: string;
   organizationName: string;
   /** The first day they have access again (YYYY-MM-DD, 51g3), when the suspension has an end. */
   suspendedUntil?: string | null;
+  firstName?: string | null;
 };
 
 const UNTIL_DAY = new Intl.DateTimeFormat("en-US", {
@@ -31,20 +32,21 @@ export function AccessSuspendedEmail({
   logoUrl,
   organizationName,
   suspendedUntil = null,
+  firstName,
 }: AccessSuspendedEmailProps) {
   const subject = accessSuspendedSubject(organizationName);
   const until = suspendedUntil ? new Date(`${suspendedUntil}T00:00:00Z`) : null;
   const untilText =
     until && !Number.isNaN(until.getTime()) ? ` until ${UNTIL_DAY.format(until)}` : " right now";
   return (
-    <EmailLayout logoUrl={logoUrl} preview={subject}>
-      <Text style={styles.heading}>{subject}</Text>
-      <EmailGreeting />
-      <Text style={styles.paragraph}>
+    <EmailLayout logoUrl={logoUrl} preview={subject} organization={organizationName}>
+      <Text {...text.heading}>{subject}</Text>
+      <EmailGreeting firstName={firstName} />
+      <Text {...text.paragraph}>
         You can&apos;t sign in to {organizationName}
         {untilText}.
       </Text>
-      <Text style={styles.paragraph}>If you have questions, contact your administrator.</Text>
+      <Text {...text.paragraph}>If you have questions, contact your administrator.</Text>
       <EmailSignOff />
     </EmailLayout>
   );

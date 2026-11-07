@@ -1,4 +1,5 @@
 import { clientEnv } from "@/lib/env";
+import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 /** Shared email helpers. Templates live in src/emails/ (react-email). */
 
 /** Strip control characters (including CRLF, null bytes) to prevent email header injection. */
@@ -20,4 +21,10 @@ export function emailBaseUrl(): string {
     throw new Error("NEXT_PUBLIC_SITE_URL is not set; refusing to send email with localhost links");
   }
   return "http://localhost:3000";
+}
+
+/** An organization's own origin, which a link into the app has to use. */
+export function emailOrgUrl(slug: string): string {
+  const base = new URL(emailBaseUrl());
+  return `${base.protocol}//${buildSubdomainHost(slug, parseHost(base.host))}`;
 }
