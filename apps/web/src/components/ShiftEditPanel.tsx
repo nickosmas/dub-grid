@@ -2209,10 +2209,7 @@ export default function ShiftEditPanel({
                 </div>
               </div>
               {targetedPickupTargets.length === 0 ? (
-                <EmptyState
-                  size="compact"
-                  title="No absent teammates are available on this date."
-                />
+                <EmptyState size="compact" title="No absent teammates are available on this date" />
               ) : (
                 <div
                   style={{
@@ -2784,7 +2781,7 @@ export default function ShiftEditPanel({
             {eligibleSwapEmployees.length === 0 ? (
               <EmptyState
                 size="compact"
-                title="No eligible employees on this date."
+                title="No eligible employees on this date"
                 description="Try another day."
               />
             ) : (
@@ -4886,7 +4883,7 @@ export default function ShiftEditPanel({
 
               {/* Shift Picker Component */}
               {isAddingSecondShift && pickerAssignmentDefinitions.length === 0 ? (
-                <EmptyState size="compact" title="No other shifts to add." />
+                <EmptyState size="compact" title="No other shifts to add" />
               ) : (
                 <div data-tour="shift-picker">
                   <ShiftPicker

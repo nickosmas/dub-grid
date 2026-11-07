@@ -146,3 +146,19 @@ export function requestRowsInRange(
 ): PersonRequestRow[] {
   return rows.filter((row) => row.sentDate >= range.startDate && row.sentDate <= range.endDate);
 }
+
+/** The day of the request closest to a period it isn't in, for a way out of an empty one. */
+export function nearestRequestDate(
+  rows: readonly PersonRequestRow[],
+  range: { startDate: string; endDate: string },
+): string | null {
+  const distance = (date: string) =>
+    Math.abs(
+      Date.parse(date) - Date.parse(date < range.startDate ? range.startDate : range.endDate),
+    );
+  return rows.reduce<string | null>(
+    (nearest, row) =>
+      nearest === null || distance(row.sentDate) < distance(nearest) ? row.sentDate : nearest,
+    null,
+  );
+}

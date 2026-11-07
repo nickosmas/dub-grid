@@ -1,3 +1,4 @@
+import { capitalizeFirst } from "@dubgrid/domain";
 import { layoutEntryAbsence } from "@/lib/absence-pill";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -971,14 +972,13 @@ export default function MyScheduleRow({
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">{copy?.title ?? "Your schedule"}</div>
-          <div className="dg-card-subtitle">{periodLabel}</div>
+          <div className="dg-card-subtitle">{capitalizeFirst(periodLabel)}</div>
         </div>
       </div>
       <div className="dg-card-body" style={hasAnySchedule ? { padding: "16px 0" } : undefined}>
         {!hasAnySchedule ? (
           <EmptyState
             size="inline"
-            icon={<CalendarDays size={20} />}
             title={copy?.emptyTitle ?? `You're not scheduled ${periodLabel}`}
             description={
               copy?.emptyDescription ??

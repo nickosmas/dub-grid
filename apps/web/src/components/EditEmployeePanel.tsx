@@ -35,7 +35,6 @@ import { SelectableTag } from "@/components/ui/selectable-tag";
 import { SectionNotice } from "@/components/ui/SectionNotice";
 import { FirstDayField } from "@/components/staff/FirstDayField";
 import { upcomingFirstDay, DEFAULT_ORGANIZATION_LABELS, singularLabelNoun } from "@dubgrid/domain";
-import { CalendarPlus } from "lucide-react";
 import { formatDateKey } from "@/lib/utils";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { hasSavedScheduleAssignment } from "@/components/staff/capability-state";
@@ -704,7 +703,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                           className="dg-btn dg-btn-ghost dg-btn-sm"
                           onClick={() => setAddingFirstDay(true)}
                         >
-                          <CalendarPlus size={14} aria-hidden />
                           Set first day
                         </Button>
                       </div>

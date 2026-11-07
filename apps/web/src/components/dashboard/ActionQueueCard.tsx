@@ -435,12 +435,12 @@ export default function ActionQueueCard({
       </svg>
     );
     if (isHero) {
-      return <EmptyState size="compact" icon={icon} title="Nothing to review" />;
+      return <EmptyState size="compact" title="Nothing to review" />;
     }
     return (
       <div className="dg-card">
         <div className="dg-card-body">
-          <EmptyState size="inline" icon={icon} title="Nothing to review" />
+          <EmptyState size="inline" title="Nothing to review" />
         </div>
       </div>
     );

@@ -39,7 +39,7 @@ function SecurityCard({ label, value, detail }: { label: string; value: number; 
           fontSize: "var(--dg-fs-card-title)",
           fontWeight: 700,
           color: "var(--dg-color-text-primary)",
-          fontFamily: "var(--font-dm-mono), monospace",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
@@ -274,26 +274,7 @@ function SessionsTable({
   if (!isLoading && sessions.length === 0) {
     return (
       <div style={{ padding: 16 }}>
-        <EmptyState
-          size="compact"
-          icon={
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-              <line x1="8" y1="21" x2="16" y2="21" />
-              <line x1="12" y1="17" x2="12" y2="21" />
-            </svg>
-          }
-          title={emptyMessage}
-        />
+        <EmptyState size="compact" title={emptyMessage} />
       </div>
     );
   }
@@ -492,12 +473,14 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               fontSize: "var(--dg-fs-caption)",
               color: "var(--dg-color-text-muted)",
               whiteSpace: "nowrap",
-              fontFamily: "var(--font-dm-mono), monospace",
+              fontVariantNumeric: "tabular-nums",
             }}
           >
-            {sessions.length === 0
-              ? "0 sessions"
-              : `${page * SESSIONS_PAGE_SIZE + 1} - ${page * SESSIONS_PAGE_SIZE + sessions.length}`}
+            {sessionsQuery.isLoading
+              ? null
+              : sessions.length === 0
+                ? "0 sessions"
+                : `${page * SESSIONS_PAGE_SIZE + 1} - ${page * SESSIONS_PAGE_SIZE + sessions.length}`}
           </span>
         </div>
 
@@ -620,7 +603,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               whiteSpace: "nowrap",
             }}
           >
-            {gridmasterSessions.length} tracked
+            {sessionsQuery.isLoading ? null : `${gridmasterSessions.length} sessions`}
           </span>
         </div>
 
@@ -705,7 +688,6 @@ export default function GridmasterSecurityView({
               <div style={{ padding: 16 }}>
                 <EmptyState
                   size="compact"
-                  icon={<User size={24} />}
                   title="No impersonation sessions"
                   description="Recent gridmaster impersonations appear here."
                 />

@@ -255,7 +255,6 @@ describe("shared chrome theming", () => {
 
     expect(toolbarControlRule).not.toContain("color:");
     expect(globalsCss).toMatch(/\.dg-toolbar-type \.dg-input\s*\{[\s\S]*color: inherit;[\s\S]*\}/);
-    expect(membersSection).toContain("<Plus size={14} />");
     expect(membersSection).not.toContain("+ Add");
   });
 

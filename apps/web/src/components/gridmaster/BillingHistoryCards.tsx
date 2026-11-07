@@ -82,7 +82,7 @@ export function BillingHistoryCard() {
         <div style={sectionBodyStyle}>
           <EmptyState
             size="compact"
-            title="No history recorded yet."
+            title="No history recorded yet"
             description="Seat changes and invoices are recorded from now on."
           />
         </div>
@@ -140,7 +140,7 @@ export function OrgSeatHistoryCard({ orgId }: { orgId: string }) {
         </div>
       ) : rows.length === 0 ? (
         <div style={sectionBodyStyle}>
-          <EmptyState size="compact" title="No seat changes recorded yet." />
+          <EmptyState size="compact" title="No seat changes recorded yet" />
         </div>
       ) : (
         <table style={gmTableStyle}>

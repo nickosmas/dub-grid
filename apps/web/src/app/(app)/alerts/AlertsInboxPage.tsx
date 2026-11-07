@@ -21,7 +21,6 @@ import {
   Bell,
   Building2,
   Calendar,
-  CheckCheck,
   ChevronDown,
   ChevronRight,
   CreditCard,
@@ -664,25 +663,26 @@ export function InboxView({
         {loadingPage ? (
           <ListPlaceholder />
         ) : error ? (
-          <EmptyState
-            icon={<Bell size={28} />}
-            heading="Couldn't load alerts"
-            description={error}
-          />
+          <EmptyState heading="Couldn't load alerts" description={error} />
         ) : notifications.length === 0 ? (
           <EmptyState
-            icon={<Inbox size={28} />}
-            heading={activeFilterCount > 0 ? "No alerts match" : "No alerts"}
-            description={
+            heading={
               activeFilterCount > 0
                 ? activeFilterCount === 1
-                  ? "Nothing here matches this filter."
-                  : "Nothing here matches these filters."
+                  ? "No alerts match this filter"
+                  : "No alerts match these filters"
                 : debouncedSearch
-                  ? "Nothing here matches your search."
+                  ? "No alerts match your search"
                   : filters.includeArchived
-                    ? "Alerts you archive show up here."
-                    : "You're all caught up."
+                    ? "No archived alerts"
+                    : "No alerts"
+            }
+            description={
+              activeFilterCount > 0 || debouncedSearch
+                ? undefined
+                : filters.includeArchived
+                  ? "Alerts you archive show up here."
+                  : "You're all caught up."
             }
             action={
               activeFilterCount > 0 ? (
@@ -1018,58 +1018,62 @@ function Toolbar({
         letterSpacing="normal"
       />
 
-      <Button
-        type="button"
-        className="dg-btn dg-btn-ghost"
-        onClick={onSortToggle}
-        aria-label={`Sort ${sort === "desc" ? "newest" : "oldest"} first`}
-      >
-        {sort === "desc" ? "Newest first" : "Oldest first"}
-      </Button>
+      {hasNotifications ? (
+        <div style={{ display: "flex", flex: "1 1 100%", alignItems: "center", gap: 12 }}>
+          <Button
+            type="button"
+            className="dg-btn dg-btn-ghost"
+            onClick={onSortToggle}
+            aria-label={`Sort ${sort === "desc" ? "newest" : "oldest"} first`}
+          >
+            {sort === "desc" ? "Newest first" : "Oldest first"}
+          </Button>
 
-      <label
-        htmlFor="alerts-select-all"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "0 6px",
-          color: "var(--dg-color-text-muted)",
-          cursor: hasNotifications ? "pointer" : "default",
-        }}
-      >
-        <input
-          id="alerts-select-all"
-          type="checkbox"
-          checked={isAllSelected}
-          onChange={onToggleSelectAll}
-          disabled={!hasNotifications}
-        />
-        {totalSelected > 0 ? `${totalSelected} selected` : "Select"}
-      </label>
+          {hasNotifications ? (
+            <label
+              htmlFor="alerts-select-all"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "0 6px",
+                color: "var(--dg-color-text-muted)",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                id="alerts-select-all"
+                type="checkbox"
+                checked={isAllSelected}
+                onChange={onToggleSelectAll}
+              />
+              {totalSelected > 0 ? `${totalSelected} selected` : "Select"}
+            </label>
+          ) : null}
 
-      {totalSelected > 0 && (
-        <BulkActions
-          selectedIds={selectedIds}
-          busy={busy}
-          includeArchived={includeArchived}
-          onBulk={onBulk}
-        />
-      )}
+          {totalSelected > 0 && (
+            <BulkActions
+              selectedIds={selectedIds}
+              busy={busy}
+              includeArchived={includeArchived}
+              onBulk={onBulk}
+            />
+          )}
 
-      {includeArchived ? null : (
-        <Button
-          type="button"
-          className="dg-btn dg-btn-secondary"
-          onClick={onMarkAllRead}
-          disabled={!canMarkAllRead}
-          aria-label="Mark all alerts as read"
-          style={{ marginLeft: "auto" }}
-        >
-          <CheckCheck size={14} style={{ marginRight: 6 }} />
-          Mark all read
-        </Button>
-      )}
+          {includeArchived || !hasNotifications ? null : (
+            <Button
+              type="button"
+              className="dg-btn dg-btn-secondary"
+              onClick={onMarkAllRead}
+              disabled={!canMarkAllRead}
+              aria-label="Mark all alerts as read"
+              style={{ marginLeft: "auto" }}
+            >
+              Mark all read
+            </Button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1104,7 +1108,7 @@ function BulkActions({
         onClick={() => onBulk("read", selectedIds)}
         disabled={busy}
       >
-        <CheckCheck size={14} /> Read
+        Read
       </Button>
       <Button
         type="button"
@@ -1112,7 +1116,7 @@ function BulkActions({
         onClick={() => onBulk("unread", selectedIds)}
         disabled={busy}
       >
-        <Mail size={14} /> Unread
+        Unread
       </Button>
       {includeArchived ? (
         <Button
@@ -1121,7 +1125,7 @@ function BulkActions({
           onClick={() => onBulk("unarchive", selectedIds)}
           disabled={busy}
         >
-          <ArchiveRestore size={14} /> Unarchive
+          Unarchive
         </Button>
       ) : (
         <Button
@@ -1130,7 +1134,7 @@ function BulkActions({
           onClick={() => onBulk("archive", selectedIds)}
           disabled={busy}
         >
-          <Archive size={14} /> Archive
+          Archive
         </Button>
       )}
     </div>
@@ -1335,7 +1339,6 @@ function NotificationRow({
           {notification.channel === "email" ? " • Sent via email" : ""}
           {disclosure.length > 0 && (
             <>
-              <span aria-hidden> • </span>
               {expanded ? (
                 <ChevronDown size={12} aria-hidden />
               ) : (

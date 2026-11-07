@@ -49,7 +49,7 @@ describe("buildActivityFeed", () => {
     expect(feed[0]).toMatchObject({
       type: "publish",
       description: "Jordan Lee published the schedule · 7 shifts added, 7 updated",
-      href: "/schedule",
+      href: "/schedule?date=2026-05-11",
     });
     expect(feed.some((item) => item.type === "shift_change")).toBe(false);
     expect(feed.some((item) => item.description.includes("2026-05-12"))).toBe(false);

@@ -44,7 +44,7 @@ export function PersonSecurityCard({
         />
       </PersonFieldGrid>
       {twoFactor.factors.length === 0 ? (
-        <EmptyState size="inline" title="No factors enrolled." />
+        <EmptyState size="inline" title="No factors enrolled" />
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--dg-color-border-light)]">
           {twoFactor.factors.map((factor) => (
@@ -72,7 +72,7 @@ export function PersonSecurityCard({
       {knownDevices.length === 0 ? (
         <EmptyState
           size="inline"
-          title="No devices remembered."
+          title="No devices remembered"
           description="Their next sign-in anywhere sends a new-device alert."
         />
       ) : (

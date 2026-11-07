@@ -42,15 +42,15 @@ function CountTile({
  * The certified-staff total followed by a tile per certification, so a
  * scheduler sees both the headline number and the mix behind it in one row.
  *
- * Abbreviations lead because full credential names run long ("Journal Listed
- * Christian Science Nurse"); the full name is the tooltip. `auto-fit` sizing
+ * Abbreviations lead whatever the organization's label setting, because full
+ * credential names run long and truncate to the same words ("Christian
+ * Scien..."); the full name is the tooltip. `auto-fit` sizing
  * keeps the row tidy whether an org has three certifications or a dozen.
  */
 export function DirectoryCertificationCards({
   counts,
   certifications,
   certificationLabel,
-  useCompactRoleCertificationLabels = false,
   certifiedCount,
   uncertifiedCount,
   selectedCertification,
@@ -59,7 +59,6 @@ export function DirectoryCertificationCards({
   counts: StaffCertificationCount[];
   certifications: NamedItem[];
   certificationLabel: string;
-  useCompactRoleCertificationLabels?: boolean;
   certifiedCount: number;
   uncertifiedCount: number;
   selectedCertification: CertificationFilter;
@@ -94,11 +93,7 @@ export function DirectoryCertificationCards({
         // A dangling reference to a certification that has since been archived.
         // Shown so the tiles still sum to the certified total beside them.
         const isArchived = certificationId === "archived";
-        const label = isArchived
-          ? "Archived"
-          : ((useCompactRoleCertificationLabels
-              ? certification?.abbr || certification?.name
-              : certification?.name) ?? "-");
+        const label = isArchived ? "Archived" : certification?.abbr || certification?.name || "-";
         const fullName = isArchived
           ? `Holders of an archived ${certificationLabel.toLowerCase()} entry`
           : (certification?.name ?? null);

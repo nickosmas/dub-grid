@@ -44,7 +44,7 @@ export function PersonAccountCard({
       <PersonSection title="Account">
         <EmptyState
           size="inline"
-          title="No account."
+          title="No account"
           description="This person has a staff record but has never signed in."
         />
       </PersonSection>
@@ -130,7 +130,7 @@ export function PersonAccountCard({
 
       <PersonSubheading>Terms and consent</PersonSubheading>
       {record.termsAcceptances.length === 0 && record.cookieConsents.length === 0 ? (
-        <EmptyState size="inline" title="No terms acceptance or cookie choice recorded." />
+        <EmptyState size="inline" title="No terms acceptance or cookie choice recorded" />
       ) : (
         <ul className="flex flex-col gap-2 text-[13px]">
           {terms.map((acceptance) => (

@@ -364,7 +364,7 @@ describe("ReportsPageContent", () => {
     });
     expect(
       Array.from(runActions.querySelectorAll("button")).map((button) => button.textContent?.trim()),
-    ).toEqual(["Refresh", "Close", "Generate report"]);
+    ).toEqual(["Generate report"]);
     expect(screen.getByLabelText("Report")).toBeInTheDocument();
     expect(screen.getByLabelText("Range")).toHaveTextContent(currentWeekOptionLabel);
     fireEvent.click(screen.getByLabelText("Range"));
@@ -464,7 +464,7 @@ describe("ReportsPageContent", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
 
     await waitFor(() => {
-      expect(screen.getByText("No matching requests for this range.")).toBeInTheDocument();
+      expect(screen.getByText("No matching requests for this range")).toBeInTheDocument();
     });
 
     expect(screen.getByTestId("reports-empty-state")).toBeInTheDocument();

@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 import { EmptyState } from "@/components/EmptyState";
 import { ListRowsSkeleton } from "@/components/LoadingSkeletons";
 import { StatusPill } from "@/components/ui/status-pill";
-import { requestRowsInRange, type PersonRequestRow } from "@/lib/person-requests";
+import { formatPersonPeriodLabel, monthPeriod } from "@/lib/person-period";
+import {
+  nearestRequestDate,
+  requestRowsInRange,
+  type PersonRequestRow,
+} from "@/lib/person-requests";
 
 type Filter = "all" | "waiting" | "decided";
 
@@ -20,10 +26,19 @@ interface RequestsTabProps {
   range: { startDate: string; endDate: string };
   /** "this pay period", "between Sep 1 and Oct 15". */
   periodPhrase: string;
+  /** Moves the page's period to the month holding this date. */
+  onJumpToDate?: (date: string) => void;
 }
 
 /** Pickups, swaps, call-offs and profile change requests involving them, newest first. */
-export function RequestsTab({ rows, loading, error, range, periodPhrase }: RequestsTabProps) {
+export function RequestsTab({
+  rows,
+  loading,
+  error,
+  range,
+  periodPhrase,
+  onJumpToDate,
+}: RequestsTabProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const inPeriod = useMemo(() => requestRowsInRange(rows ?? [], range), [range, rows]);
   const shown = useMemo(
@@ -34,16 +49,61 @@ export function RequestsTab({ rows, loading, error, range, periodPhrase }: Reque
     [filter, inPeriod],
   );
 
+  if (error) {
+    return (
+      <section aria-label="Requests">
+        <p
+          role="alert"
+          className="dg-card m-0 px-5 py-8 text-center text-[13px] text-[var(--dg-color-danger)]"
+        >
+          {error}
+        </p>
+      </section>
+    );
+  }
+  if (loading) {
+    return (
+      <section aria-label="Requests">
+        <ListRowsSkeleton rows={4} label="Loading requests" />
+      </section>
+    );
+  }
+  if (inPeriod.length === 0) {
+    const elsewhere = nearestRequestDate(rows ?? [], range);
+    return (
+      <section aria-label="Requests">
+        <EmptyState
+          size="compact"
+          title={`No requests ${periodPhrase}`}
+          description={
+            elsewhere
+              ? undefined
+              : "Pickups, swaps, call-offs and profile changes they send show up here."
+          }
+          action={
+            elsewhere && onJumpToDate ? (
+              <Button
+                type="button"
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                onClick={() => onJumpToDate(elsewhere)}
+              >
+                Jump to {formatPersonPeriodLabel(monthPeriod(elsewhere))}
+              </Button>
+            ) : undefined
+          }
+        />
+      </section>
+    );
+  }
+
   return (
     <section aria-label="Requests" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3">
           <h2 className="dg-section-heading">Requests</h2>
-          {loading || error ? null : (
-            <span className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-subtle)]">
-              {inPeriod.length} {inPeriod.length === 1 ? "request" : "requests"} sent {periodPhrase}
-            </span>
-          )}
+          <span className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-subtle)]">
+            {inPeriod.length} {inPeriod.length === 1 ? "request" : "requests"} sent {periodPhrase}
+          </span>
         </div>
         <CustomSelect<Filter>
           value={filter}
@@ -57,27 +117,12 @@ export function RequestsTab({ rows, loading, error, range, periodPhrase }: Reque
         />
       </div>
 
-      {error ? (
-        <p
-          role="alert"
-          className="m-0 rounded-[var(--dg-radius-lg)] border border-dashed border-[var(--dg-color-border)] px-5 py-8 text-center text-[13px] text-[var(--dg-color-danger)]"
-        >
-          {error}
-        </p>
-      ) : loading ? (
-        <ListRowsSkeleton rows={4} label="Loading requests" />
-      ) : shown.length === 0 ? (
+      {shown.length === 0 ? (
         <EmptyState
           size="compact"
-          title={
-            inPeriod.length === 0
-              ? `No requests sent ${periodPhrase}`
-              : "No requests match this filter"
-          }
+          title="No requests match this filter"
           action={
-            inPeriod.length > 0 && filter !== "all" ? (
-              <ClearFiltersButton activeFilterCount={1} onClear={() => setFilter("all")} small />
-            ) : undefined
+            <ClearFiltersButton activeFilterCount={1} onClear={() => setFilter("all")} small />
           }
         />
       ) : (

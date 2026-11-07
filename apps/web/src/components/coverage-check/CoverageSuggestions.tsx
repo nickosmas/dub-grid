@@ -201,7 +201,7 @@ export function CoverageDayDetail({
       ) : staffShort > 0 ? (
         <EmptyState
           size="inline"
-          title="No fixes found for this day."
+          title="No fixes found for this day"
           description="Select a short cell to see why each qualified person isn't suggested."
         />
       ) : null}

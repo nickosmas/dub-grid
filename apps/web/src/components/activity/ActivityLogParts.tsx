@@ -239,7 +239,7 @@ export function ActivityDetailsDialog({
           ) : details.length > 0 ? (
             <DetailRows items={details} />
           ) : (
-            <EmptyState size="inline" title="No additional details were recorded." />
+            <EmptyState size="inline" title="No additional details were recorded" />
           )}
         </section>
         {shiftChange && details.length > 0 ? (

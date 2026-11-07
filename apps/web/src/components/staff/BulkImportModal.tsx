@@ -1,7 +1,7 @@
 "use client";
 
 import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, FileWarning, Import as ImportIcon, Users, XCircle } from "lucide-react";
 import { Banner } from "@/components/ui/Banner";
@@ -370,6 +370,14 @@ export function BulkImportModal({
     }
   }, [importing, onClose, requestClose]);
 
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") handleRequestClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [handleRequestClose]);
+
   const handleFile = useCallback((file: File) => {
     if (!file.name.endsWith(".csv")) {
       toast.error("Choose a CSV file");
@@ -449,6 +457,9 @@ export function BulkImportModal({
     >
       <div
         className="dg-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Import staff"
         style={{
           padding: 0,
           // Sized so each step's table fits without an inner horizontal

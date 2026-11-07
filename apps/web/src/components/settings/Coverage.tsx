@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import type {
   AssignableShiftOption,
@@ -465,16 +466,16 @@ function CoverageOptionRow({
             <CoveragePreview draft={draft} />
           </div>
         </div>
-        <span
+        <ChevronDown
+          size={16}
+          aria-hidden
           style={{
-            fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--dg-color-text-primary)",
+            flexShrink: 0,
+            color: "var(--dg-color-text-faint)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}
-        >
-          ▾
-        </span>
+        />
       </Button>
 
       {expanded && (

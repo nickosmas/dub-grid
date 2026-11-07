@@ -80,7 +80,7 @@ export function BillingMetric({
           fontSize: "var(--dg-fs-card-title)",
           fontWeight: 700,
           color,
-          fontFamily: "var(--font-dm-mono), monospace",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}

@@ -193,7 +193,6 @@ export function OpenShiftStaffingModal({
         <div role="status">
           <EmptyState
             size="compact"
-            icon={<UserRound aria-hidden="true" size={22} />}
             title="No eligible staff"
             description="Nobody qualified is free that day."
           />

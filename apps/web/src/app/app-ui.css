@@ -3298,6 +3298,15 @@ button.dg-cc-sg-main {
   --dg-bleed-bottom: 16px;
   padding: 16px var(--dg-card-padding-x);
 }
+/* An empty state fills its card, so cards sharing a row keep matching boxes. */
+.dg-card:has(> .dg-card-body > .dg-empty-state) {
+  display: flex;
+  flex-direction: column;
+}
+.dg-card-body:has(> .dg-empty-state) {
+  display: flex;
+  flex: 1 1 auto;
+}
 /* Side padding only, for an embedded editor that brings its own vertical rhythm. */
 .dg-card-body-sides {
   padding-left: var(--dg-card-padding-x);

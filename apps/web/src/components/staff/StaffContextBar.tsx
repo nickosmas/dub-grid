@@ -194,7 +194,7 @@ export function StaffContextBar({
   return (
     <div
       className={`overflow-hidden transition-all duration-150 ease-out ${
-        isVisible ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
+        isVisible ? "max-h-40 opacity-100" : "max-h-0 opacity-0 !mb-0"
       }`}
     >
       {/* Filter pills */}

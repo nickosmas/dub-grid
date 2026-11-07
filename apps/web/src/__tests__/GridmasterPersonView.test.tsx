@@ -287,7 +287,7 @@ describe("GridmasterPersonView", () => {
     expect(
       await screen.findByText(/has a staff record but has never signed in/),
     ).toBeInTheDocument();
-    expect(screen.getByText("No account")).toBeInTheDocument();
+    expect(screen.getAllByText("No account").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Force logout" })).not.toBeInTheDocument();
     expect(fetchGridmasterPerson).toHaveBeenCalledWith({
       kind: "staff",
@@ -442,7 +442,7 @@ describe("GridmasterPersonView", () => {
       .getByRole("heading", { name: "Birch Court" })
       .closest("section") as HTMLElement;
     expect(within(birchCard).getByText(/by admin@example\.com/)).toBeInTheDocument();
-    expect(within(birchCard).getByText("No staff record.")).toBeInTheDocument();
+    expect(within(birchCard).getByText("No staff record")).toBeInTheDocument();
 
     fireEvent.click(card.getByRole("button", { name: "Open organization employees" }));
     expect(onOpenOrganization).toHaveBeenCalledWith(ORG);
@@ -468,7 +468,7 @@ describe("GridmasterPersonView", () => {
 
     expect(await screen.findByText(/No membership/)).toBeInTheDocument();
     expect(screen.getAllByText("Grace Lovelace").length).toBeGreaterThan(1);
-    expect(screen.getByText("No invitations sent.")).toBeInTheDocument();
+    expect(screen.getByText("No invitations sent")).toBeInTheDocument();
   });
 
   it("saves the account name through step-up", async () => {
@@ -655,9 +655,9 @@ describe("GridmasterPersonView", () => {
 
   it("shows empty states, and no security or sessions for a staff record", async () => {
     renderView(linkedRecord());
-    expect(await screen.findByText("No factors enrolled.")).toBeInTheDocument();
+    expect(await screen.findByText("No factors enrolled")).toBeInTheDocument();
     expect(screen.getByText(/No devices remembered/)).toBeInTheDocument();
-    expect(screen.getByText("No sessions.")).toBeInTheDocument();
+    expect(screen.getByText("No sessions")).toBeInTheDocument();
     expect(screen.getByText(/Not tracked here/)).toBeInTheDocument();
   });
 
@@ -678,7 +678,7 @@ describe("GridmasterPersonView", () => {
   it("loads the account's notifications into their own card", async () => {
     renderView(linkedRecord());
     expect(await screen.findByRole("heading", { name: "Notifications" })).toBeInTheDocument();
-    expect(await screen.findByText("No notifications.")).toBeInTheDocument();
+    expect(await screen.findByText("No notifications")).toBeInTheDocument();
     expect(fetchGridmasterPersonNotifications).toHaveBeenCalledWith(USER);
   });
 

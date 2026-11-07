@@ -26,6 +26,14 @@ const PADDING: Record<EmptyStateSize, string> = {
   inline: "24px 16px",
 };
 
+// An empty state stands in for the list it replaces, so it holds about that
+// much room. A tighter parent can still shrink it through `style`.
+const MIN_HEIGHT: Record<EmptyStateSize, number> = {
+  default: 360,
+  compact: 240,
+  inline: 140,
+};
+
 const OUTER_GAP: Record<EmptyStateSize, number> = {
   default: 16,
   compact: 10,
@@ -61,8 +69,15 @@ export function EmptyState({
   return (
     <div
       data-testid={dataTestId}
+      className="dg-empty-state"
       style={{
+        boxSizing: "border-box",
+        flex: "1 1 auto",
+        alignSelf: "stretch",
+        minHeight: MIN_HEIGHT[size],
         padding: PADDING[size],
+        border: "1px dashed var(--dg-color-border)",
+        borderRadius: "var(--dg-radius-md)",
         textAlign: "center",
         color: "var(--dg-color-text-muted)",
         display: "flex",
@@ -106,6 +121,7 @@ export function EmptyState({
               fontSize: "var(--dg-fs-label)",
               color: "var(--dg-color-text-muted)",
               maxWidth: 400,
+              textWrap: "balance",
             }}
           >
             {description}

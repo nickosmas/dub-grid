@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { formatPublishedAt, formatPublishedSummary } from "@dubgrid/schedule-core";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import { Button } from "@/components/Button";
+import { formatDateKey } from "@/lib/utils";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { PublishHistoryEntryWithName } from "@/types";
 import ExpandButton from "./ExpandButton";
@@ -60,10 +61,12 @@ export default function OpenShiftsCard({
   const isUnpublished = publishedWindowState === "unpublished";
   const isPartial = publishedWindowState === "partial";
   const subtitle = isUnpublished
-    ? "Not published yet"
+    ? null
     : isPartial
       ? `${openSlotCount} unfilled across published dates`
-      : `${openSlotCount} unfilled ${periodLabel}`;
+      : openSlotCount > 0
+        ? `${openSlotCount} unfilled ${periodLabel}`
+        : null;
   const publishSummary =
     !isUnpublished && publishHistory
       ? formatPublishedSummary(
@@ -78,7 +81,7 @@ export default function OpenShiftsCard({
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">Open shifts</div>
-          <div className="dg-card-subtitle">{subtitle}</div>
+          {subtitle ? <div className="dg-card-subtitle">{subtitle}</div> : null}
           {publishSummary && (
             <div
               style={{
@@ -91,7 +94,9 @@ export default function OpenShiftsCard({
             </div>
           )}
         </div>
-        {onExpand && <ExpandButton onClick={onExpand} label="Expand open shifts" />}
+        {onExpand && openShifts.length > 0 && (
+          <ExpandButton onClick={onExpand} label="Expand open shifts" />
+        )}
       </div>
 
       <div
@@ -105,7 +110,7 @@ export default function OpenShiftsCard({
                 ? "Not published yet"
                 : isPartial
                   ? "No open shifts on published dates"
-                  : `All shifts covered ${periodLabel}`
+                  : `No open shifts ${periodLabel}`
             }
             description={
               isUnpublished
@@ -246,7 +251,7 @@ export default function OpenShiftsCard({
               ) : (
                 <Link
                   key={shift.id}
-                  href="/schedule"
+                  href={`/schedule?date=${formatDateKey(shift.date)}`}
                   style={{
                     display: "block",
                     textDecoration: "none",
