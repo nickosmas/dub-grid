@@ -693,21 +693,23 @@
 **Suggested fix:** Upgrade to zod 4 across web, mobile and the packages in one change (Dependabot #190 has the version bump; the schema API changes need the code), keeping one zod copy so `instanceof` checks hold (see the identical-specifier note). The allowlist entry holds until 2026-12-01.
 **Resolution:**
 
-### F-190 [P0] fixed - One organization's settings save can take over another organization's absence types and schedule note types
+### F-190 [P0] closed - One organization's settings save can take over another organization's absence types and schedule note types
 
 **File:** `apps/web/src/app/api/settings/config/route.ts:2775` (`upsertAbsenceType`), `:2872` (`upsertIndicatorType`)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** Both updates run on the service client with `.update(row).eq("id", id)` and no `org_id` filter, and `row.org_id` is the caller's organization. The ids are `BIGINT IDENTITY`, so they can be counted through. An Admin with `canManageScheduleDefinitions` or `canManageIndicatorTypes` in org A sends another organization's id: that row is rewritten and moved to org A. Reproduced at the database on a throwaway stack at migration 120 with a service-role update: org B dropped from 11 to 10 absence types and 173 of its schedule snapshots then pointed at a type owned by org A. Nothing stops it: no trigger guards `org_id`, and the foreign keys are single-column. Every other upsert in this route filters on `org_id`. The HTTP route itself was traced, not run.
 **Suggested fix:** Add `.eq("org_id", effectiveOrgId)` to both updates and answer 404 on no row. Add a route test that a foreign id is refused. F-192's `org_id` immutability trigger is the backstop.
 **Resolution:** Fixed on fix/tenant-write-guards (2026-11-06): both updates now filter on the effective organization and answer 404 when no row matches. Route tests send a foreign id and fail on the old code. The route was tested with a client double, not run against a live database.
+Re-reviewed 2026-11-07 against f3264f7ed, on a seeded throwaway stack at 124 through real HTTP: a foreign absence type id answered 404, the foreign organization's id answered 403, the row was unchanged, and a direct move of the row was refused by `refuse_org_id_change`. Every other write path in the route was traced and is scoped. The schedule note type path was traced only, because the seed has no such row in the second organization.
 
-### F-191 [P0] fixed - A manager can rename any account on the platform through a client-supplied `userId`
+### F-191 [P0] closed - A manager can rename any account on the platform through a client-supplied `userId`
 
 **File:** `apps/web/src/app/api/employees/identity/route.ts:158`; `apps/web/src/app/api/employees/manage/route.ts:917` (`syncLinkedProfileName(nextEmployee.userId)`)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** Both routes authorize on the caller's organization and load the employee row with an org filter, then update `profiles` with the service client using the `userId` from the request body, never comparing it to that row's `user_id`. A manager in org A sends one of their own employee ids plus any other person's user id, and that person's name changes everywhere they appear, in any organization, Gridmasters included. The precondition is the victim's UUID: not enumerable, but known for anyone who has shared or left an organization, since it stays in that organization's audit rows. Traced, not run.
 **Suggested fix:** Use the stored row's `user_id` (`currentEmployee.userId`, `previousRow.userId`), and drop `userId` from the request schema for this purpose.
 **Resolution:** Fixed on fix/tenant-write-guards (2026-11-06): `employees/identity` no longer accepts `userId` and renames only the stored row's account. `employees/manage` loads the stored row first and uses its account for the rename and the management-access check, so a client value is overwritten. Route tests send another account's id and fail on the old code. Client doubles, not a live run.
+Re-reviewed 2026-11-07 against f3264f7ed, through real HTTP: `employees/identity` with another account's `userId` answered 200 and left that account's name unchanged. No path plants a foreign `user_id` on a staff row. `organizations/app-only-user` still takes a client `userId`, but only for an active member of the organization, so it adds nothing to this rename.
 
 ### F-192 [P1] fixed - The database lets one organization's rows point at another organization's rows
 
@@ -716,22 +718,25 @@
 **Why it matters:** `org_id` is present and RLS-checked on the row itself, but nothing ties the row's links to the same organization. Run as org A's Super Admin on a throwaway stack at 120, all of these were accepted: a schedule cell for org B's employee, a cell with org B's focus area, a recurring shift and a shift series for org B's employee, a coverage requirement with org B's focus area and job, a shift with org B's focus area, and a profile change request naming org B's employee. `write_schedule_cell_snapshot` also accepted org B's shift, job and absence ids on an org A cell; `schedule_cell_segments.shift_id` and `job_id` have no foreign key at all. The effect is real: with a cell planted for org B's employee, org B's own save for that person and date failed on `schedule_cells_emp_id_date_key`, because that unique index omits `org_id`. It needs the employee's UUID. A plain staff member can also insert a change request naming a coworker's employee id. Approval filters by org, so the foreign case fails safely, but the same-org case changes the coworker. No read leak was found through these links. The department id checks in `validate_department_ids` confirm existence, not organization.
 **Suggested fix:** A forward migration in stages: add `UNIQUE (org_id, id)` on each parent, then composite foreign keys `(org_id, x_id)` for the 33 links, `NOT VALID` first and validated after a data check; add `org_id` to `schedule_cells`' unique index; add a shared trigger refusing a change to `org_id`; validate shift, job and absence ids in the cell write functions; bind `requester_employee_id` to the requester in the insert policy.
 **Resolution:** Fixed on fix/org-bound-database (2026-11-06), migration 124: `UNIQUE (org_id, id)` on 11 parents and composite foreign keys for all 30 links, validated in the migration, so an existing cross-organization row aborts it rather than staying; a trigger refuses any change to `org_id` on the 34 tables that always have one (`profiles` and the nullable log tables are left out); another trigger refuses a segment's shift or job owned by another organization, since neither has a foreign key; `validate_department_ids` checks the organization; the change request policy binds `requester_employee_id`. `schedule_cells_emp_id_date_key` is unchanged on purpose: its `ON CONFLICT` callers need it, and with the employee link composite it can no longer collide across organizations. Rehearsed from 120 on a seeded stack, where every planted link from this finding was refused and deleting a whole organization still cascaded; `org-bound-references.integration.test.ts` keeps those checks. Not applied to production's real data, so whether production holds a cross-organization row is unknown until the migration runs; if it does, the migration stops with no change.
+Re-reviewed 2026-11-07 against f3264f7ed: not closed. All 30 keys are validated and carry `org_id`, and every planted link and direct row move from this finding was refused on the stack. But this repair's trigger broke push registration (F-210), so it stays `fixed` until that is repaired. Id arrays were never bound: see F-222.
 
-### F-193 [P1] fixed - Editing a pending invitation's email keeps its token, so an Admin can create a confirmed account at someone else's address
+### F-193 [P1] closed - Editing a pending invitation's email keeps its token, so an Admin can create a confirmed account at someone else's address
 
 **File:** `apps/web/src/app/api/organizations/invitations/route.ts:391` (PATCH changes `email`, not `token`); `apps/web/src/app/api/invitations/register/route.ts:129` (`email_confirm: true`), `:167`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** The token is treated as proof of the inbox, but PATCH moves it to a new address. An Admin invites their own mailbox, reads the token, changes the email to `victim@otherhospital.org`, and registers with that token and a chosen password. The result is a confirmed account at the victim's address with a password the attacker knows. If another organization later invites that person, the invitation finds it as an existing account, and the attacker's live session can then follow them into that organization. If an unconfirmed account with no memberships already holds the address, its password is overwritten instead. Traced, not run.
 **Suggested fix:** Rotate the token (and resend) whenever the email changes, using `replace_pending_invitation_access`, and refuse a register whose token predates the email change.
 **Resolution:** Fixed on fix/invitation-email-rotates-token (2026-11-06): PATCH replaces the token and expiry with the address and mails the new link to the new address only, so the old token no longer exists and nothing further is needed at register. A failed send restores the invitation, and the new address's send limit is checked first. It was the only route that changed an invitation's address; 049 already keeps the column from browsers. Route tests use a client double. Not done: a link already moved to another address before this fix stays live until it expires, and production's audit rows weren't checked for one.
+Re-reviewed 2026-11-07 against f3264f7ed, through real HTTP with a stub mail server: moving the address rotated the token, the new token went only to the new address, the old token was refused at both addresses, a failed send restored the old address and token as a pair, and `invitations.token` can't be read through the data API. The same attack has a separate path through `invitations/create`, recorded as F-211. Links moved before the fix are still unchecked in production.
 
-### F-194 [P1] fixed - API requests aren't bound to the session's organization, so a person suspended in one organization keeps access to it through another
+### F-194 [P1] open - API requests aren't bound to the session's organization, so a person suspended in one organization keeps access to it through another
 
 **File:** `apps/web/src/app/api/shared/permissions.ts:471` (`requireOrgPermissions`), `apps/web/src/app/api/employees/shared.ts` (`canManageEmployees`); `apps/web/src/proxy.ts:825` (the matcher excludes `/api`)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** The API authorizes on the client-supplied `orgId` plus a live membership, and never compares it to the token's `org_id` or the host. Suspension leaves the membership live and only sets `employees.suspended_at`, which the token hook checks for the session's active organization and these helpers never read. Someone suspended in org A who also belongs to org B signs in to B and posts `orgId: A`: service-client routes accept it, including schedule and staff management. Non-members are still refused, so this is limited to people with memberships in both. Per-session organization isolation holds on pages and RLS, not in `/api`. Mobile is safe because it uses only the token's org. Traced, not run.
 **Suggested fix:** Refuse in `requireOrgPermissions` and `canManageEmployees` when `orgId` differs from the verified token's org (Gridmaster impersonation and the sandbox excepted), and read the employee's suspension there. Also refuse a failed `endUserSessions` rather than only logging it.
 **Resolution:** Fixed on fix/api-bound-to-session-org (2026-11-06): `requireOrgPermissions`, `canManageEmployees` and the role-change route refuse a request for an organization other than the session's, and anyone suspended from the organization asked for, so a live token is cut off even when ending its session failed. A Gridmaster is exempt, a sandbox counts as the session's organization, and a token naming no organization falls back to the membership check, since it can reach only an organization where the person holds a live, unsuspended membership. A failed `endUserSessions` is still only logged, because the suspension check now covers what it left open. Unit tests with client doubles; E2E exercises the real routes in CI.
+Re-reviewed 2026-11-07 against f3264f7ed: reopened. The route helpers hold through real HTTP: from another organization's session, and while suspended, `export`, `settings/config` and `employees/identity` were refused, including a live token minted before the suspension. But the scenario still works through the database: signed in to A and suspended in B, a real token called `publish_schedule` for B through the data API and it published, and `change_user_role` for B and it changed the role. `publish_schedule` (`092:930-963`) and `change_user_role` (`053:119-156`) check membership only, and the role-change route skips its check when `orgId` is omitted. A Test Sandbox cookie also passes the suspension check, see F-198. The repair also refused sandbox billing (F-220). **Suggested fix now:** bind both functions to the session organization and the employee's suspension, and make `orgId` required on role change.
 
 ### F-195 [P1] fixed - Acting on a request from another organization's session alerts the wrong organization
 
@@ -740,6 +745,7 @@
 **Why it matters:** Someone employed in orgs A and B, on a B session, sends `PATCH /shift-requests/<A request>`. The function changes A's request, then the route dispatches under B, so B's approvers get an alert carrying A's staff names and A's approvers get nothing. It needs dual employment. Function bodies were read; the dispatch was traced, not run.
 **Suggested fix:** Require `shift_request_org_id(p_request_id) = caller_org_id()` in the three functions, and dispatch with the request's own `org_id`.
 **Resolution:** Fixed on fix/org-bound-database (2026-11-06), migration 121: claim, respond and cancel refuse a request outside the session's organization, so the dispatch's organization is now always the request's and the dispatch code needn't change. A Gridmaster stays held by `refuse_gridmaster_outside_org`.
+Re-reviewed 2026-11-07 against f3264f7ed: not closed. Claim, respond and cancel refuse another organization's request, and the `_unguarded` bodies can't be called directly. But 121 has no sandbox exception, unlike `099:1949` and `029:50`, and 123 stops a sandbox ever being the session organization, so cancel and claim in Test Sandbox should now answer "Request not found." That is traced, not run: the clone has no open request to try. It stays `fixed` until that is repaired. The rest of the request functions are F-212 and F-213.
 
 ### F-196 [P1] accepted - Managers and staff can look up accounts across every organization by email
 
@@ -751,21 +757,23 @@
 **Update 2026-11-06 (fix/account-lookups-stay-in-org):** the manager side is fixed. `users/check-email` reads an account outside the organization the same as no account, with no name, and the Add-Employee banner about it is gone. `employees/check-email` and the mobile contact check no longer accept a client's `currentUserId`, so neither can test an address through a linked person. A Gridmaster's address gets the same answer as any other account's, with no `gridmaster` reason, no "reserved" wording and no employee id. An invitation to an address with a confirmed account uses the approved "nothing to set up" wording. Still open: `account/profile/contact-check` still answers `emailTaken` for any address, and removing it wouldn't close the gap. Tested on the local stack, Supabase itself answers 422 `email_exists` when any signed-in user changes their email to a taken address (`PUT /auth/v1/user`), so any staff member can ask it directly and no app route sees the attempt. That also means the approved "Someone tried to use your email address" notice can't fire for a direct call, so it isn't built. This needs the owner's decision: accept that remaining check as a provider limit, or take email changes off the client entirely, which Supabase doesn't let us enforce without a proxy in front of Auth.
 **Resolution:** Accepted by the owner on 2026-11-06. The manager side is fixed and in production (#380). What remains is a yes-or-no answer, one address at a time, to someone signed in: Supabase Auth answers 422 `email_exists` when a user changes their email to a taken address, and it gives no name or organization. Supabase has no hook before a user update, and the Auth endpoint stays reachable with a publishable key and a user's own token, so a proxy alone would not close it, as the earlier update implied; closing it would mean taking every client off Supabase Auth directly. The notice email isn't built and My profile's inline check stays, since neither changes that answer.
 
-### F-197 [P1] fixed - An Admin who can only edit shifts can rewrite the published schedule directly, unlogged
+### F-197 [P1] closed - An Admin who can only edit shifts can rewrite the published schedule directly, unlogged
 
 **File:** `supabase/migrations` policies `admin_write_schedule_cells`, `admin_write_schedule_cell_snapshots`, `admin_write_schedule_cell_segments` (FOR ALL on `canEditShifts`, any `snapshot_kind`)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security)
 **Why it matters:** Run on the throwaway stack as an Admin with `canEditShifts` and no publish permission: `publish_schedule` refused, but deleting a published snapshot's segments and updating a published snapshot directly both succeeded. A browser session can do the same through PostgREST, bypassing publish, past-day locks, corrections, the snapshot history and the audit log. This is inside one organization, not cross-tenant. By a grep of direct `.from(...)` writes in web and mobile, the only browser write to these tables is `deleteShiftSeries` clearing `series_id` (`apps/web/src/lib/db/schedule.ts:499`); the rest go through server functions.
 **Suggested fix:** Move that one write into `delete_shift_series`, then revoke INSERT, UPDATE and DELETE on the three tables from `authenticated` and leave writes to the SECURITY DEFINER functions. Review the same for other tables written only by the server.
 **Resolution:** Fixed on fix/org-bound-database (2026-11-06), migration 122 revokes INSERT, UPDATE, DELETE and TRUNCATE on the three tables from `authenticated`. The browser write this finding named was dead code (`lib/db/schedule.ts` `deleteShiftSeries`; the page uses the route), so it is removed rather than moved. No SECURITY INVOKER function writes these tables. The other server-only tables weren't reviewed.
+Re-reviewed 2026-11-07 against f3264f7ed: on the stack, direct deletes and edits of published segments, snapshots and cells were refused with permission errors, and `authenticated` holds no write on the three tables. All 15 functions that write them are SECURITY DEFINER. The `admin_write_*` policies were left in place, which is weaker than 065 and 069 (F-221). `schedule_notes` has the same hole (F-214), and foreign key actions reach published rows another way (F-215).
 
-### F-198 [P1] fixed - Any Admin can give themselves Super Admin over a copy of all staff records, and keep it after being demoted
+### F-198 [P1] open - Any Admin can give themselves Super Admin over a copy of all staff records, and keep it after being demoted
 
 **File:** `apps/web/src/app/api/test-sandbox/route.ts:132`; `apps/web/src/features/test-sandbox/server.ts:41` (`select("*")`, no archived filter), `:304`; `switch_org`, `get_my_organizations`; `apps/web/src/app/api/shared/permissions.ts:425`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security)
 **Why it matters:** The route checks `org_role` only, not `admin_permissions`, and has no feature flag. An Admin with only `canEditShifts` enters the sandbox, becomes `super_admin` there, and reads every cloned person's email, phone and contact notes, offboarded people included, for example through `GET /api/export?type=staff`, which the sandbox redirect serves. `switch_org` has no `workspace_kind` filter or session binding, and nothing re-checks the source role, so a demoted Admin keeps the clone for up to 14 days. Mobile sign-in doesn't clear sandboxes as web sign-in does. Traced, not run. Stays inside one organization's data; sandbox isolation between organizations held.
 **Suggested fix:** Require `canViewStaff` and `canManageEmployees` (or restrict to Super Admins), clone only what a tester needs or mask contact fields, exclude archived staff, re-check the source role on every sandbox request, and exclude sandboxes from `switch_org` and `get_my_organizations`.
 **Resolution:** Fixed on fix/org-bound-database (2026-11-06): entering needs a Super Admin, or an Admin who can manage staff, who can already read these records, and the Header hides the option otherwise. `findUsableSandbox` re-checks that on each request that resolves the sandbox, so a demotion takes effect at once. The clone skips archived and offboarded staff, and remaps the two absence ids it used to copy from the source organization. Migration 123 keeps sandboxes out of `switch_org` and `get_my_organizations`. Contact fields aren't masked, because the people allowed in can already see them. The clone itself was not run with the new foreign keys outside CI.
+Re-reviewed 2026-11-07 against f3264f7ed: reopened. Holding: entry by a shift-only Admin is refused, a demoted Admin's cookie is refused, a forged cookie is refused, offboarded people aren't cloned, and `switch_org` and `get_my_organizations` exclude sandboxes (all run, and the clone itself ran with the composite keys). Not holding, both run through real HTTP: an Admin with no staff record whose source membership ended signed in again with no organization in the token, and read the clone's staff contacts through `GET /api/export?type=staff&orgId=<sandbox>` with no cookie, because the sandbox membership stays and `findUsableSandbox` only runs with a cookie. And someone suspended in the source organization kept reading the clone with their cookie, because `canUseTestSandbox` reads no suspension and the check in `requireOrgPermissions` looks at the sandbox. **Suggested fix now:** refuse a sandbox `orgId` unless the cookie resolved it, read suspension and organization state in `canUseTestSandbox`, and delete owned sandboxes when access to the source ends.
 
 ### F-199 [P2] open - Realtime sends every signed-in user the ids of rows deleted in other organizations
 
@@ -799,6 +807,7 @@
 **Suggested fix:** Add a tenant-scoped helper (`orgDb(orgId).from(table)` that applies the filter), a lint rule refusing a bare `.eq("id", ...)` on a tenant table in a mutation, and a generated CI test that signs in as org A and sends org B's ids to every mutation route. Turn the probes from this audit into a live test over every table in the inventory.
 **Update 2026-11-06 (fix/tenant-mutation-guard):** the lint rule is in. `design/no-unscoped-tenant-write` fails an update or delete on an organization's table in `app/api` and `features/**/server` unless it filters on `org_id` or one account. It flagged 16 existing writes. None was exploitable, since each id came from the server or was tied to a person, and each now carries the filter. Still open: the `orgDb` helper, the generated CI test that sends org B's ids to every mutation route, and writes built across several statements, which the rule can't see.
 **Resolution:**
+**Update 2026-11-07 (review):** the lint rule passes `.upsert`, `.insert`, `.rpc`, a table name in a variable or template, a query split across statements, any `user_id` filter beside `.eq("id", id)`, and `.eq("org_id", body.orgId)`. It leaves out `organizations`, `notifications`, `audit_log`, `user_sessions`, `mobile_device_tokens` and others, and doesn't cover `apps/web/src/lib` or `packages/*`. A scan of all 285 write chains found no service-client update or delete whose only filter is a client-supplied id.
 
 ### F-203 [P2] open - Deleted organizations' data is kept indefinitely and the retention jobs never run
 
@@ -872,4 +881,122 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 - `graphql_public` is exposed though the app doesn't use it.
 
 **Suggested fix:** Fix alongside the larger findings; scope the idempotency lookups and the email throttle by organization first.
+**Resolution:**
+
+### F-210 [P1] open - Migration 124 stops a phone's push token moving between organizations
+
+**File:** `supabase/migrations/124_org_bound_references.sql:42-54` (`refuse_org_id_change` on `mobile_device_tokens`); `packages/data-access/src/mobile.ts:2332-2344`; `001:823` (`expo_push_token` is globally unique)
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, multi-tenancy)
+**Why it matters:** This is a regression from F-192's repair, and it is in production. Registration upserts on `expo_push_token` and sends `org_id`, so moving an existing token raises "A row cannot move to another organization." On the stack the same upsert failed with that error. Someone who switches organization in the app stays registered under the old one and gets no pushes for the new one. `{ disabled: true }` from the other organization fails too, so the phone keeps the old organization's alerts. If someone from another organization signs in on the same install, the row keeps the previous person, so their alerts can reach this phone unless sign-out already disabled it. The upsert was run in SQL; the app's route wasn't. How many production phones are affected is unknown.
+**Suggested fix:** Take this table out of the trigger with a forward migration, since a device token follows the person rather than the organization, and add an integration test that moves a token.
+**Resolution:**
+
+### F-211 [P1] open - Re-inviting can mail another pending invitation's token to the wrong address
+
+**File:** `apps/web/src/app/api/organizations/invitations/create/route.ts:118` (`.ilike("email", email)` unescaped), `:461` (mails the requested address, not the row's)
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, multi-tenancy)
+**Why it matters:** This reaches the same result as F-193 by a different path. `_` is a one-character wildcard in ILIKE and is legal in an email address. Run end to end through real HTTP on the stack: with a pending invitation for `john.smith...`, an Admin who can manage staff held a pending invitation for `john_smith...` tied to a staff record, then re-invited `john_smith...` with no staff record. The lookup matched the victim's row, rotated its token and mailed it to the attacker's address. Registering with that token and the victim's address created a confirmed account with the attacker's password. It needs an existing pending invitation and a mailbox on the victim's domain that differs only at `_` positions.
+**Suggested fix:** Match the address exactly (lowercased) and send to the row's own email. Check every other `.ilike` on an address, as `contact-conflicts.ts:66` already escapes.
+**Resolution:**
+
+### F-212 [P1] open - An approver with no live session organization can settle requests
+
+**File:** `resolve_shift_request` (`117:517`), `auto_approve_shift_request` (`030:1474`)
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, multi-tenancy)
+**Why it matters:** `v_request.org_id != public.caller_org_id()` is NULL when `caller_org_id()` is NULL, so the check is skipped, and `user_can_approve_shift_requests` reads memberships only. That covers a pending two-factor challenge, an archived or suspended session organization, and a token with no organization. On the stack an aal1 token for a two-factor approver rejected a request through `resolve_shift_request`, with `caller_org_id()` NULL. A token with no organization did the same. So a stolen password alone can settle requests, and approval writes the published schedule. `auto_approve_shift_request` has the same check, traced only. This predates the repairs.
+**Suggested fix:** Use `IS DISTINCT FROM` in both, and sweep the other functions for `!= public.caller_org_id()`.
+**Resolution:**
+
+### F-213 [P2] open - Creating a request and volunteering aren't bound to the session
+
+**File:** `create_shift_request` (`099:1444-1450`), `volunteer_for_open_shift` (`099:2126-2133`)
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, multi-tenancy)
+**Why it matters:** When `employee.user_id = auth.uid()`, nothing compares the organization to the session, so someone employed in A and B, on a B session or an aal1 token, or suspended in A, can file requests in A through direct RPC. The web route refuses this and mobile passes the token's organization, so only the data API reaches it. Traced, not run.
+**Suggested fix:** Apply 121's guard to both, with the sandbox exception F-195 needs.
+**Resolution:**
+
+### F-214 [P2] open - An Admin who can edit notes can publish or delete published notes directly
+
+**File:** `003:391-403` (policies on `canEditNotes`, any status), `004:59`; `apps/web/src/app/api/schedule/manage/route.ts:2528` (published status taken from the client's `existingStatus`)
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security)
+**Why it matters:** F-197's hole on `schedule_notes`. On the stack an Admin with only `canEditNotes` inserted a `published` note directly, past publish, the audit log and alerts. Sending `draft_deleted` to the route reaches the same result, traced only. `authenticated` also holds TRUNCATE on the table, which PostgREST can't reach.
+**Suggested fix:** Revoke writes as 122 does, after confirming no client writes remain, and read the note's status from the database in the route.
+**Resolution:**
+
+### F-215 [P2] open - Deleting a focus area, shift or job directly rewrites published schedule rows
+
+**File:** `003:210, 306, 330` (delete policies), `004:59`; `001` (`ON DELETE SET NULL` on `schedule_cells.focus_area_id`); `schedule_cell_segments` (no foreign key)
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security)
+**Why it matters:** Referential actions run as the owner, so 122 doesn't stop them. On the stack a Super Admin's direct `DELETE` on `focus_areas` cleared the focus area from its published cells, past days included, past the settings route's in-use checks. Direct deletes on `shift_categories` or `jobs` should leave segments pointing at nothing, traced only.
+**Suggested fix:** Revoke DELETE on these tables from `authenticated`, since the settings route archives or checks use through the service client.
+**Resolution:**
+
+### F-216 [P2] open - Archiving a focus area leaves it on every person
+
+**File:** `apps/web/src/app/api/settings/config/route.ts:651`; `remove_focus_area_from_employees` (`002:7533-7536`)
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: quality)
+**Why it matters:** The route calls the function with the service client, and the function filters on `caller_org_id()`, which is NULL there. On the stack it ran with no error and all 15 people stayed on the area. The route's test mocks the RPC. `validateStaffOrgReferences` should then reject the archived id on that person's next save, traced only. It fails closed, so it isn't a tenant leak.
+**Suggested fix:** Pass the organization into the function, and filter on it.
+**Resolution:**
+
+### F-217 [P2] open - Self-service routes have no session or suspension check
+
+**File:** `apps/web/src/app/api/account/profile/phone/route.ts:44-53` with `features/account/server/profile.ts:484-501`; `account/change-requests/route.ts:63-71`; `account/profile/route.ts:46-65`; `account/self/route.ts:28-32`
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, multi-tenancy)
+**Why it matters:** These take a client organization and are limited to the caller's own record, but read no suspension or session organization, and the phone route reads no membership. An Offboarded person keeps `user_id` on their row, so they can write their phone to that organization's record and add an audit row from another session, and someone suspended can file change requests that alert reviewers. Traced, not run.
+**Suggested fix:** Use the session organization, or `requireOrgPermissions` with an own-record rule.
+**Resolution:**
+
+### F-218 [P2] open - Moving a pending Admin invitation keeps its stored permissions
+
+**File:** `apps/web/src/app/api/organizations/invitations/route.ts:320-323`, `:423-435`; `accept_invitation` (`113:172`)
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security)
+**Why it matters:** PATCH checks only the Super Admin tier. On the stack an Admin who can manage staff moved an Admin invitation holding `canManageBilling` to their own second address, and the permissions stayed for `accept_invitation` to apply. Rotating the token doesn't help, because the new mailbox is theirs. `employees/move-email/route.ts:155` already refuses this case.
+**Suggested fix:** Apply move-email's rule, or clear `admin_permissions` when the address changes.
+**Resolution:**
+
+### F-219 [P2] open - Losing sandbox rights locks the session out, and Exit can't fix it
+
+**File:** `apps/web/src/app/api/test-sandbox/route.ts:45`; `apps/web/src/lib/api-auth.ts:414`; `apps/web/src/app/api/shared/permissions.ts:453`
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: quality)
+**Why it matters:** A regression from F-198's repair. On the stack, after a demotion, `POST /api/test-sandbox { action: "exit" }` answered 403, and so did a read of the source organization, because the HttpOnly cookie stays and refuses every request. Only signing out clears it. The route's own comment says someone must always be able to leave. The exit test mocks this path. Another session's Enter deleting the sandbox should do the same, traced only.
+**Suggested fix:** Authenticate `exit` without the sandbox rewrite, and clear the cookie when `findUsableSandbox` refuses it.
+**Resolution:**
+
+### F-220 [P3] open - Smaller regressions and fail-open checks from the session binding
+
+**File:** see each item
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, quality)
+**Why it matters:**
+
+- Sandbox billing: `ignoreSandbox` leaves `redirectedToSandbox` false while the token names the source, so `GET /api/billing?orgId=<sandbox>` answered 403 on the stack and the header's billing notice goes.
+- `permissions.ts:468` ignores the `employees` read error, so a failed read skips the suspension check. `canManageEmployees` throws instead.
+- `readSessionOrgId` returns null on a failed re-verify (`api-auth.ts:262`), which skips the compare on the actor path.
+- `employees/identity/route.ts:120-126` writes `email` on a linked row without `employees/manage`'s guard, so the staff row drifts until the daily repair job.
+
+**Suggested fix:** Treat the sandbox as the session organization for billing, and fail closed on both reads.
+**Resolution:**
+
+### F-221 [P3] open - Smaller gaps left around the repairs
+
+**File:** see each item
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, multi-tenancy)
+**Why it matters:**
+
+- 122 leaves the `admin_write_*` FOR ALL policies, so one broad grant reopens F-197. `supabase/AGENTS.md:141` still recommends that grant, and 069 dropped its policies for this reason. Its comment at `122:9-11` is wrong: `members_select_*` in 035 already lets editors read drafts.
+- `is_own_sandbox_org` (`017:42-58`) has no role re-check, so a demoted Admin's session can still call schedule functions on the clone. None of them touch contact data.
+- Sessions moved into a sandbox before 123 stay there until cleanup, because 123 swept nothing and the token hook has no `workspace_kind` filter. Self-limiting within 14 days.
+- Clones show internal QA staff, because `user_id` is stripped and `withoutHiddenStaff` no longer matches them (`features/test-sandbox/server.ts:150-158`).
+- `account-deletion.ts:114,118`: with someone offboarded in two organizations, one Super Admin's delete removes the other organization's membership and clears its staff link. A leftover sandbox membership also wrongly blocks a delete.
+- `validate_job_shift_override` sets `NEW.org_id` from the job (`002:7941`), so changing `job_id` as the service role moves a row past `refuse_org_id_change`. The composite keys still hold.
+
+**Suggested fix:** Fix alongside F-198 and F-214.
+**Resolution:**
+
+### F-222 [P2] unverified - Id arrays aren't bound to the organization
+
+**File:** `jobs.focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids`; `organization_roles.department_ids, required_certification_ids`; `certifications.department_ids`; `employees.role_ids, focus_area_ids`
+**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, multi-tenancy)
+**Why it matters:** Arrays can't carry a foreign key, so F-192's repair doesn't cover them, and an Admin can write the `jobs` arrays through PostgREST. The eligibility SQL that was read ignores foreign ids, but other readers weren't traced. `employees/manage/route.ts:115-117` showed no organization check by grep. Whether production holds a cross-organization value is unknown.
+**Suggested fix:** Check production with a read-only query, then validate these on write as `validate_department_ids` does.
 **Resolution:**
