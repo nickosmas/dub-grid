@@ -1,10 +1,16 @@
 import { describeEmploymentStatus, resolveOrganizationLabel } from "@dubgrid/domain";
 import { getServiceClient } from "@/lib/supabase-service";
-import { summarizePermissionChanges } from "@/lib/permission-labels";
+import { listPermissionChanges, summarizePermissionChanges } from "@/lib/permission-labels";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
 import logger from "@/lib/logger";
 import { TRIAL_GRACE_DAYS } from "@dubgrid/domain";
-import { BILLING_POLICY_OVERRIDE_SELECT, getOrgBillingPolicy } from "@/lib/billing-policy";
+import {
+  BILLING_POLICY_OVERRIDE_SELECT,
+  evaluateOrgBillingAccess,
+  getOrgBillingPolicy,
+} from "@/lib/billing-policy";
+import { fetchShiftChangeResolvers } from "@/lib/server/schedule-context";
+import { requestEmailDetails, type RequestEmailFacts } from "./request-email";
 import { sendNotification } from "./sender";
 import type { NotificationType } from "@/types";
 import type { NotificationEmailDetail } from "@/emails/NotificationEmail";
@@ -65,6 +71,7 @@ export type NotificationEvent =
       mode: "upsert" | "delete";
       /** Resulting note status — only notifies when 'published'. */
       status: "draft" | "published" | "draft_deleted";
+      noteTypeId?: number;
     }
   // ── Membership lifecycle ────────────────────────────────────────────────
   | {
@@ -257,6 +264,12 @@ async function getRequestInfo(requestId: string): Promise<{
   status: string | null;
   /** Set on the open pickup a call-off leaves; its requester is the absent person. */
   parentRequestId: string | null;
+  requesterDate: string | null;
+  requesterState: unknown;
+  targetDate: string | null;
+  targetState: unknown;
+  absenceTypeId: number | null;
+  expiresAt: string | null;
 }> {
   const db = getServiceClient();
   const { data } = await db
@@ -265,6 +278,12 @@ async function getRequestInfo(requestId: string): Promise<{
       `status,
        type,
        parent_request_id,
+       requester_shift_date,
+       requester_state,
+       target_shift_date,
+       target_state,
+       absence_type_id,
+       expires_at,
        requester:employees!shift_requests_requester_emp_id_fkey(user_id, first_name, last_name),
        target:employees!shift_requests_target_emp_id_fkey(user_id, first_name, last_name)`,
     )
@@ -286,6 +305,50 @@ async function getRequestInfo(requestId: string): Promise<{
         : null,
     status: (data?.status as string | null | undefined) ?? null,
     parentRequestId: (data?.parent_request_id as string | null | undefined) ?? null,
+    requesterDate: (data?.requester_shift_date as string | null | undefined) ?? null,
+    requesterState: data?.requester_state ?? null,
+    targetDate: (data?.target_shift_date as string | null | undefined) ?? null,
+    targetState: data?.target_state ?? null,
+    absenceTypeId: (data?.absence_type_id as number | null | undefined) ?? null,
+    expiresAt: (data?.expires_at as string | null | undefined) ?? null,
+  };
+}
+
+type RequestInfo = Awaited<ReturnType<typeof getRequestInfo>>;
+
+/**
+ * Everything a request's email shows. Never throws: without the organization's
+ * names the email still gives the dates, and the alert still goes out.
+ */
+async function getRequestEmailFacts(
+  orgId: string,
+  info: RequestInfo,
+  requestType: RequestEmailFacts["type"],
+): Promise<RequestEmailFacts> {
+  const [timeZone, resolvers] = await Promise.all([
+    getOrgTimeZone(orgId),
+    fetchShiftChangeResolvers(getServiceClient(), orgId).catch((error: unknown) => {
+      logger.error({ error, orgId }, "Failed to read shift names for a request email");
+      return null;
+    }),
+  ]);
+  return {
+    type: requestType,
+    requesterName: info.requesterName,
+    requesterUserId: info.requesterUserId,
+    targetName: info.hasTarget ? info.targetName : null,
+    targetUserId: info.targetUserId,
+    requesterDate: info.requesterDate,
+    requesterState: info.requesterState,
+    targetDate: info.targetDate,
+    targetState: info.targetState,
+    absenceName:
+      info.absenceTypeId != null
+        ? (resolvers?.absenceType(info.absenceTypeId)?.name ?? null)
+        : null,
+    expiresAt: info.expiresAt,
+    timeZone,
+    resolvers,
   };
 }
 
@@ -359,11 +422,12 @@ async function getInvitation(invitationId: string): Promise<{
   email: string | null;
   orgId: string | null;
   roleToAssign: string | null;
+  expiresAt: string | null;
 } | null> {
   const db = getServiceClient();
   const { data } = await db
     .from("invitations")
-    .select("invited_by, email, org_id, role_to_assign")
+    .select("invited_by, email, org_id, role_to_assign, expires_at")
     .eq("id", invitationId)
     .maybeSingle();
   if (!data) return null;
@@ -372,7 +436,123 @@ async function getInvitation(invitationId: string): Promise<{
     email: (data.email as string | null) ?? null,
     orgId: (data.org_id as string | null) ?? null,
     roleToAssign: (data.role_to_assign as string | null) ?? null,
+    expiresAt: (data.expires_at as string | null) ?? null,
   };
+}
+
+/** Never throws: a failed lookup leaves the email with fewer facts, not undelivered. */
+async function getEmployeeEmailDetails(
+  orgId: string,
+  empId: string,
+): Promise<{
+  contact: NotificationEmailDetail[];
+  placement: NotificationEmailDetail[];
+  awayUntil: string | null;
+  suspendedUntil: string | null;
+}> {
+  const empty = { contact: [], placement: [], awayUntil: null, suspendedUntil: null };
+  try {
+    const db = getServiceClient();
+    const [{ data: employee }, labels] = await Promise.all([
+      db
+        .from("employees")
+        .select(
+          "email, phone, employment_type, first_day, focus_area_ids, certification_id, away_until, suspended_until",
+        )
+        .eq("id", empId)
+        .eq("org_id", orgId)
+        .maybeSingle(),
+      getOrgCopyLabels(orgId),
+    ]);
+    if (!employee) return empty;
+    const focusAreaIds = (employee.focus_area_ids as number[] | null) ?? [];
+    const [{ data: focusAreas }, { data: certification }] = await Promise.all([
+      focusAreaIds.length > 0
+        ? db.from("focus_areas").select("name").eq("org_id", orgId).in("id", focusAreaIds)
+        : Promise.resolve({ data: [] as { name: string }[] }),
+      employee.certification_id != null
+        ? db
+            .from("certifications")
+            .select("name")
+            .eq("org_id", orgId)
+            .eq("id", employee.certification_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null as { name: string } | null }),
+    ]);
+    const focusAreaNames = (focusAreas ?? []).map((row) => row.name as string);
+    const line = (label: string, value: unknown): NotificationEmailDetail[] =>
+      typeof value === "string" && value.trim() ? [{ label, value: value.trim() }] : [];
+    return {
+      contact: [...line("Email", employee.email), ...line("Phone", employee.phone)],
+      placement: [
+        ...line("Employment", EMPLOYMENT_LABELS[employee.employment_type as string]),
+        ...line(labels.focusAreaLabel, focusAreaNames.join(", ")),
+        ...line(labels.certificationLabel, certification?.name),
+        ...line(
+          "First day",
+          employee.first_day ? formatNotificationDate(employee.first_day as string) : null,
+        ),
+      ],
+      awayUntil: (employee.away_until as string | null) ?? null,
+      suspendedUntil: (employee.suspended_until as string | null) ?? null,
+    };
+  } catch (error) {
+    logger.error({ error, orgId, empId }, "Failed to read staff details for an email");
+    return empty;
+  }
+}
+
+const EMPLOYMENT_LABELS: Record<string, string> = {
+  full_time: "Full time",
+  part_time: "Part time",
+};
+
+/** Never throws: the note's name is a nicety on an alert that must still go out. */
+async function getNoteTypeName(orgId: string, noteTypeId: number | undefined) {
+  if (noteTypeId == null) return null;
+  try {
+    const { data } = await getServiceClient()
+      .from("indicator_types")
+      .select("name")
+      .eq("org_id", orgId)
+      .eq("id", noteTypeId)
+      .maybeSingle();
+    return (data?.name as string | null | undefined) ?? null;
+  } catch (error) {
+    logger.error({ error, orgId }, "Failed to read a schedule note's name");
+    return null;
+  }
+}
+
+/** "$49.00", from Stripe's amount in the currency's smallest unit. */
+function formatInvoiceAmount(amountDue: number, currency: string | null | undefined): string {
+  const code = (currency ?? "usd").toUpperCase();
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: code }).format(
+      amountDue / 100,
+    );
+  } catch {
+    return `${(amountDue / 100).toFixed(2)} ${code}`;
+  }
+}
+
+/** When an overdue payment locks the organization. Null once unknown; never throws. */
+async function getPaymentDeadline(orgId: string): Promise<string | null> {
+  try {
+    const db = getServiceClient();
+    const { data } = await db
+      .from("organizations")
+      .select(
+        `subscription_status, trial_ends_at, suspended_at, billing_paused_at, payment_grace_started_at, ${BILLING_POLICY_OVERRIDE_SELECT}`,
+      )
+      .eq("id", orgId)
+      .maybeSingle();
+    const access = await evaluateOrgBillingAccess(db, data as Record<string, unknown> | null);
+    return access.paymentGraceEndsAt ?? null;
+  } catch (error) {
+    logger.error({ error, orgId }, "Failed to read the payment deadline for an email");
+    return null;
+  }
 }
 
 /**
@@ -526,6 +706,21 @@ function capitalizeFirst(value: string): string {
   return value.length > 0 ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
 }
 
+const OWN_PROFILE = { label: "Open profile", href: "/profile" };
+
+const INVITE_AGAIN = "Send a new invitation from People if they still need access.";
+
+function invitationEmailDetails(
+  invitation: Awaited<ReturnType<typeof getInvitation>>,
+): NotificationEmailDetail[] {
+  return [
+    ...(invitation?.email ? [{ label: "Email", value: invitation.email }] : []),
+    ...(invitation?.roleToAssign
+      ? [{ label: "Role", value: formatOrganizationRoleLabel(invitation.roleToAssign) }]
+      : []),
+  ];
+}
+
 async function notifyShiftRequestApprovers(input: {
   actorUserId: string;
   orgId: string;
@@ -533,6 +728,7 @@ async function notifyShiftRequestApprovers(input: {
   requestType: "pickup" | "swap" | "calloff";
   title: string;
   message: string;
+  facts: RequestEmailFacts;
 }) {
   const adminIds = await getAdminsWithPermission(input.orgId, "canApproveShiftRequests");
 
@@ -551,6 +747,16 @@ async function notifyShiftRequestApprovers(input: {
             requestType: input.requestType,
             action: "approve_request",
             tab: "approval",
+          },
+          {
+            email: {
+              details: requestEmailDetails(input.facts, {
+                viewer: "approver",
+                readerUserId: adminId,
+                waiting: true,
+              }),
+              closing: "Go to the app to approve or reject it.",
+            },
           },
         ),
       ),
@@ -593,6 +799,7 @@ async function dispatchNotificationEventInternal(
       const requestInfo = await getRequestInfo(event.requestId);
       const requestType = requestInfo.requestType ?? event.requestType;
       const typeLabel = getShiftRequestTypeLabel(requestType);
+      const facts = await getRequestEmailFacts(event.orgId, requestInfo, requestType);
 
       if (
         requestInfo.status === "open" &&
@@ -611,6 +818,12 @@ async function dispatchNotificationEventInternal(
             action: "respond_to_request",
             tab: "mine",
           },
+          {
+            email: {
+              details: requestEmailDetails(facts, { viewer: "target", waiting: true }),
+              closing: "Go to the app to accept or decline it.",
+            },
+          },
         );
         return;
       }
@@ -623,13 +836,15 @@ async function dispatchNotificationEventInternal(
           requestType,
           title: `${capitalize(typeLabel)} request to approve`,
           message: `${requestInfo.requesterName} sent a ${typeLabel} request.`,
+          facts,
         });
       }
       return;
     }
 
     case "shift_request_claimed": {
-      const { requesterName, targetName, status } = await getRequestInfo(event.requestId);
+      const requestInfo = await getRequestInfo(event.requestId);
+      const { requesterName, targetName, status } = requestInfo;
       // Settled on the spot by an approver party: nothing waits on the queue.
       if (status !== "pending_approval") return;
       await notifyShiftRequestApprovers({
@@ -639,6 +854,7 @@ async function dispatchNotificationEventInternal(
         requestType: "pickup",
         title: "Pickup request to approve",
         message: `${targetName} offered to pick up ${requesterName}'s shift.`,
+        facts: await getRequestEmailFacts(event.orgId, requestInfo, "pickup"),
       });
       return;
     }
@@ -647,6 +863,7 @@ async function dispatchNotificationEventInternal(
       const requestInfo = await getRequestInfo(event.requestId);
       const requestType = requestInfo.requestType ?? event.requestType;
       const typeLabel = getShiftRequestTypeLabel(requestType);
+      const facts = await getRequestEmailFacts(event.orgId, requestInfo, requestType);
 
       if (event.accepted) {
         if (requestInfo.status !== "pending_approval") return;
@@ -657,6 +874,7 @@ async function dispatchNotificationEventInternal(
           requestType,
           title: `${capitalize(typeLabel)} request to approve`,
           message: `${requestInfo.targetName} accepted ${requestInfo.requesterName}'s ${typeLabel} request.`,
+          facts,
         });
         return;
       }
@@ -675,6 +893,7 @@ async function dispatchNotificationEventInternal(
             action: "view_request",
             tab: "mine",
           },
+          { email: { details: requestEmailDetails(facts, { viewer: "requester" }) } },
         );
       }
       return;
@@ -687,6 +906,12 @@ async function dispatchNotificationEventInternal(
       const requestInfo = await getRequestInfo(event.requestId);
       const typeLabel = getShiftRequestTypeLabel(requestInfo.requestType ?? "swap");
       const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
+      const facts = await getRequestEmailFacts(
+        event.orgId,
+        requestInfo,
+        requestInfo.requestType ?? "swap",
+      );
+      const note = event.adminNote;
       const metadata = {
         requestId: event.requestId,
         requestType: requestInfo.requestType ?? "swap",
@@ -702,6 +927,12 @@ async function dispatchNotificationEventInternal(
           "Request canceled",
           `A manager canceled your ${typeLabel} request.${noteText}`,
           metadata,
+          {
+            email: {
+              intro: `A manager canceled your ${typeLabel} request.`,
+              details: requestEmailDetails(facts, { viewer: "requester", note }),
+            },
+          },
         );
       }
       if (targetUserId && targetUserId !== requesterUserId && targetUserId !== actorUserId) {
@@ -712,6 +943,12 @@ async function dispatchNotificationEventInternal(
           `${capitalize(typeLabel)} canceled`,
           `${requestInfo.requesterName}'s ${typeLabel} request was canceled.${noteText}`,
           metadata,
+          {
+            email: {
+              intro: `${requestInfo.requesterName}'s ${typeLabel} request was canceled.`,
+              details: requestEmailDetails(facts, { viewer: "target", note }),
+            },
+          },
         );
       }
       return;
@@ -722,6 +959,8 @@ async function dispatchNotificationEventInternal(
       const requestType = requestInfo.requestType ?? event.requestType;
       const typeLabel = getShiftRequestTypeLabel(requestType);
       const { requesterUserId } = requestInfo;
+      const facts = await getRequestEmailFacts(event.orgId, requestInfo, requestType);
+      const note = event.adminNote;
       if (requesterUserId && requesterUserId !== actorUserId) {
         const status = event.approved ? "approved" : "rejected";
         const type: NotificationType = event.approved
@@ -731,11 +970,14 @@ async function dispatchNotificationEventInternal(
         // An auto-approved request reaches its requester only when the
         // other party's acceptance settled it, so say that rather than
         // quoting the requester their own name from the note.
-        const message = event.autoApproved
+        const intro = event.autoApproved
           ? requestType === "pickup" && requestInfo.parentRequestId != null
             ? `${requestInfo.targetName} picked up the shift you called off.`
             : `${requestInfo.targetName} accepted your ${typeLabel} request. It's approved and on the schedule.`
-          : `${event.approved ? "The schedule now shows the change." : "Your schedule stays as it was."}${noteText}`;
+          : event.approved
+            ? "The schedule now shows the change."
+            : "Your schedule stays as it was.";
+        const message = event.autoApproved ? intro : `${intro}${noteText}`;
 
         await sendNotification(
           requesterUserId,
@@ -750,6 +992,15 @@ async function dispatchNotificationEventInternal(
             action: "view_request",
             tab: "mine",
           },
+          {
+            email: {
+              intro,
+              details: requestEmailDetails(facts, {
+                viewer: "requester",
+                note: event.autoApproved ? undefined : note,
+              }),
+            },
+          },
         );
       }
 
@@ -762,6 +1013,10 @@ async function dispatchNotificationEventInternal(
       if (targetUserId && targetUserId !== requesterUserId && targetUserId !== actorUserId) {
         const status = event.approved ? "approved" : "rejected";
         const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
+        const intro =
+          requestType === "swap"
+            ? `The swap with ${requestInfo.requesterName} was ${status}.`
+            : `Your claim on ${requestInfo.requesterName}'s ${typeLabel} request was ${status}.`;
         await sendNotification(
           targetUserId,
           event.orgId,
@@ -769,9 +1024,7 @@ async function dispatchNotificationEventInternal(
             ? "shift_request_approved"
             : ("shift_request_rejected" as NotificationType),
           `${capitalize(typeLabel)} ${status}`,
-          requestType === "swap"
-            ? `The swap with ${requestInfo.requesterName} was ${status}.${noteText}`
-            : `Your claim on ${requestInfo.requesterName}'s ${typeLabel} request was ${status}.${noteText}`,
+          `${intro}${noteText}`,
           {
             requestId: event.requestId,
             requestType,
@@ -779,6 +1032,7 @@ async function dispatchNotificationEventInternal(
             action: "view_request",
             tab: "mine",
           },
+          { email: { intro, details: requestEmailDetails(facts, { viewer: "target", note }) } },
         );
       }
 
@@ -803,6 +1057,12 @@ async function dispatchNotificationEventInternal(
               action: "view_request",
               tab: "mine",
             },
+            {
+              email: {
+                intro: `Your claim on a ${typeLabel} request was rejected. The shift is open again.`,
+                details: requestEmailDetails(facts, { viewer: "target", note }),
+              },
+            },
           );
         }
       }
@@ -823,6 +1083,15 @@ async function dispatchNotificationEventInternal(
             fromRole: event.fromRole,
             toRole: event.toRole,
           },
+          {
+            email: {
+              intro: `${await getActorName(actorUserId)} changed your role.`,
+              details: [
+                { label: "Before", value: formatOrganizationRoleLabel(event.fromRole) },
+                { label: "After", value: formatOrganizationRoleLabel(event.toRole) },
+              ],
+            },
+          },
         );
       }
       return;
@@ -839,6 +1108,7 @@ async function dispatchNotificationEventInternal(
       const title = event.mode === "delete" ? "Schedule note removed" : "Schedule note added";
       const noteActor = await getActorName(actorUserId);
       const noteDate = formatNotificationDate(event.date);
+      const noteName = await getNoteTypeName(event.orgId, event.noteTypeId);
       // The date sits at the end rather than inside the noun phrase — "your
       // May 20, 2026 shift" reads badly once the year is spelled out.
       const message =
@@ -852,6 +1122,18 @@ async function dispatchNotificationEventInternal(
         title,
         message,
         { empId: event.empId, date: event.date, mode: event.mode },
+        {
+          email: {
+            intro:
+              event.mode === "delete"
+                ? `${noteActor} removed a note from your shift.`
+                : `${noteActor} added a note to your shift.`,
+            details: [
+              { label: "Date", value: noteDate },
+              ...(noteName ? [{ label: "Note", value: noteName }] : []),
+            ],
+          },
+        },
       );
       return;
     }
@@ -878,6 +1160,7 @@ async function dispatchNotificationEventInternal(
       const joinedAs = invitation?.roleToAssign
         ? ` as ${formatOrganizationRoleLabel(invitation.roleToAssign)}`
         : "";
+      const inviteDetails = invitationEmailDetails(invitation);
       const recipients = new Set<string>(superAdmins);
       if (inviter) recipients.add(inviter);
       recipients.delete(actorUserId);
@@ -893,6 +1176,7 @@ async function dispatchNotificationEventInternal(
               acceptedUserId: event.acceptedUserId,
               invitationId: event.invitationId ?? null,
             },
+            { email: { details: inviteDetails } },
           ),
         ),
       );
@@ -919,6 +1203,7 @@ async function dispatchNotificationEventInternal(
               invitationId: event.invitationId,
               inviteeEmail: event.inviteeEmail,
             },
+            { email: { closing: INVITE_AGAIN } },
           ),
         ),
       );
@@ -949,6 +1234,7 @@ async function dispatchNotificationEventInternal(
             "Member removed",
             `${removedByName} removed ${removedName} from ${orgName}.`,
             { removedUserId: event.removedUserId },
+            { email: { closing: `They can no longer sign in to ${orgName}.` } },
           ),
         ),
       );
@@ -961,6 +1247,7 @@ async function dispatchNotificationEventInternal(
       // nothing they can act on, and they can't see the before/after anywhere.
       const permissionChanges = summarizePermissionChanges(event.before, event.after);
       const changedByName = await getActorName(actorUserId);
+      const { granted, revoked } = listPermissionChanges(event.before, event.after);
       await sendNotification(
         event.targetUserId,
         event.orgId,
@@ -972,6 +1259,15 @@ async function dispatchNotificationEventInternal(
         {
           before: event.before,
           after: event.after,
+        },
+        {
+          email: {
+            intro: `${changedByName} changed your permissions for this organization.`,
+            details: [
+              ...(granted.length > 0 ? [{ label: "Added", value: granted.join(", ") }] : []),
+              ...(revoked.length > 0 ? [{ label: "Removed", value: revoked.join(", ") }] : []),
+            ],
+          },
         },
       );
       return;
@@ -988,6 +1284,7 @@ async function dispatchNotificationEventInternal(
       const recipients = new Set<string>(superAdmins);
       if (empUserId) recipients.add(empUserId);
       recipients.delete(actorUserId);
+      const { contact, placement } = await getEmployeeEmailDetails(event.orgId, event.empId);
       await Promise.all(
         [...recipients].map((userId) =>
           sendNotification(
@@ -999,6 +1296,12 @@ async function dispatchNotificationEventInternal(
               ? `${addedByName} added you to ${orgName}.`
               : `${addedByName} added ${empName} to ${orgName}.`,
             { empId: event.empId },
+            {
+              email:
+                userId === empUserId
+                  ? { details: placement, action: OWN_PROFILE }
+                  : { details: [...contact, ...placement] },
+            },
           ),
         ),
       );
@@ -1014,6 +1317,14 @@ async function dispatchNotificationEventInternal(
       if (empUserId) recipients.add(empUserId);
       recipients.delete(actorUserId);
       const transition = `${describeEmploymentStatus(event.fromStatus)} to ${describeEmploymentStatus(event.toStatus)}`;
+      const { awayUntil } = await getEmployeeEmailDetails(event.orgId, event.empId);
+      const statusDetails: NotificationEmailDetail[] = [
+        { label: "Before", value: describeEmploymentStatus(event.fromStatus) },
+        { label: "After", value: describeEmploymentStatus(event.toStatus) },
+        ...(event.toStatus === "inactive" && awayUntil
+          ? [{ label: "Returns", value: formatNotificationDate(awayUntil) }]
+          : []),
+      ];
       await Promise.all(
         [...recipients].map((userId) =>
           sendNotification(
@@ -1028,6 +1339,16 @@ async function dispatchNotificationEventInternal(
               empId: event.empId,
               fromStatus: event.fromStatus,
               toStatus: event.toStatus,
+            },
+            {
+              email: {
+                intro:
+                  userId === empUserId
+                    ? `${statusActorName} changed your status.`
+                    : `${statusActorName} changed ${statusEmpName}'s status.`,
+                details: statusDetails,
+                action: userId === empUserId ? OWN_PROFILE : undefined,
+              },
             },
           ),
         ),
@@ -1046,6 +1367,7 @@ async function dispatchNotificationEventInternal(
       const recipients = superAdmins.filter(
         (userId) => userId !== actorUserId && userId !== empUserId,
       );
+      const { suspendedUntil } = await getEmployeeEmailDetails(event.orgId, event.empId);
       await Promise.all(
         recipients.map((userId) =>
           sendNotification(
@@ -1055,6 +1377,13 @@ async function dispatchNotificationEventInternal(
             `${empName} is suspended`,
             SUSPENDED_ALERT_BODY,
             { empId: event.empId, toStatus: "suspended" },
+            {
+              email: {
+                details: suspendedUntil
+                  ? [{ label: "Suspended until", value: formatNotificationDate(suspendedUntil) }]
+                  : [],
+              },
+            },
           ),
         ),
       );
@@ -1065,14 +1394,14 @@ async function dispatchNotificationEventInternal(
       const empUserId = await getEmployeeUserId(event.empId);
       if (!empUserId || empUserId === actorUserId) return;
 
+      const labels = await getOrgCopyLabels(event.orgId);
+      const friendly = event.fields.map((f) => friendlyProfileFieldLabel(f, labels));
       let body: string;
       if (event.fields.length === 0) {
         body = "Open your profile to see what changed.";
       } else if (event.fields.length > 5) {
         body = "Several details changed.";
       } else {
-        const labels = await getOrgCopyLabels(event.orgId);
-        const friendly = event.fields.map((f) => friendlyProfileFieldLabel(f, labels));
         const verb = friendly.length === 1 ? "was" : "were";
         body = `${capitalizeFirst(joinWithAnd(friendly))} ${verb} updated.`;
       }
@@ -1084,6 +1413,16 @@ async function dispatchNotificationEventInternal(
         "Your profile was updated",
         body,
         { empId: event.empId, fields: event.fields },
+        {
+          email:
+            friendly.length > 0
+              ? {
+                  intro: "These details on your profile changed.",
+                  details: [{ label: "Updated", value: capitalizeFirst(friendly.join(", ")) }],
+                  action: OWN_PROFILE,
+                }
+              : { action: OWN_PROFILE },
+        },
       );
       return;
     }
@@ -1131,6 +1470,7 @@ async function dispatchNotificationEventInternal(
     }
 
     case "security_mfa_changed": {
+      const timeZone = event.orgId ? await getOrgTimeZone(event.orgId) : "UTC";
       await sendNotification(
         event.targetUserId,
         event.orgId,
@@ -1144,7 +1484,20 @@ async function dispatchNotificationEventInternal(
         { enabled: event.enabled },
         // Still emailed although Supabase's own factor notices are on (F-08):
         // until production is seen sending those, a duplicate beats silence.
-        { writeInApp: false },
+        {
+          writeInApp: false,
+          email: {
+            intro: event.enabled
+              ? "Two-factor authentication was turned on for your DubGrid account."
+              : "Two-factor authentication was turned off for your DubGrid account.",
+            details: [
+              { label: "Time", value: formatEmailDateTime(new Date().toISOString(), timeZone) },
+            ],
+            closing: event.enabled
+              ? "If it was you, you don't need to do anything. If it wasn't you, contact support@dubgrid.com right away."
+              : "If it was you, you don't need to do anything. If it wasn't you, change your password, turn it back on, review your active sessions, and contact support@dubgrid.com.",
+          },
+        },
       );
       return;
     }
@@ -1162,6 +1515,18 @@ async function dispatchNotificationEventInternal(
         metadataValue: event.stripeInvoiceId,
       });
       if (alreadySent) return;
+      const [timeZone, paymentDeadline] = await Promise.all([
+        getOrgTimeZone(event.orgId),
+        getPaymentDeadline(event.orgId),
+      ]);
+      const paymentDetails: NotificationEmailDetail[] = [
+        ...(event.amountDue != null
+          ? [{ label: "Amount due", value: formatInvoiceAmount(event.amountDue, event.currency) }]
+          : []),
+        ...(paymentDeadline
+          ? [{ label: "Pay by", value: formatEmailDate(paymentDeadline, timeZone) }]
+          : []),
+      ];
       await Promise.all(
         superAdmins.map((userId) =>
           sendNotification(
@@ -1175,6 +1540,7 @@ async function dispatchNotificationEventInternal(
               amountDue: event.amountDue ?? null,
               currency: event.currency ?? null,
             },
+            { email: { details: paymentDetails } },
           ),
         ),
       );
@@ -1248,6 +1614,13 @@ async function dispatchNotificationEventInternal(
             `${empName}'s email needs a fix`,
             emailBlockedBody(event.signInEmail, holderName),
             { empId: event.empId, signInEmail: event.signInEmail },
+            event.holderEmpId
+              ? {
+                  email: {
+                    action: { label: "Open staff record", href: `/people/${event.holderEmpId}` },
+                  },
+                }
+              : {},
           ),
         ),
       );
@@ -1279,9 +1652,8 @@ async function dispatchNotificationEventInternal(
     // ── Expiry sweepers (cron-driven) ──────────────────────────────────
 
     case "shift_request_expired": {
-      const { requesterUserId, targetName, hasTarget, parentRequestId } = await getRequestInfo(
-        event.requestId,
-      );
+      const requestInfo = await getRequestInfo(event.requestId);
+      const { requesterUserId, targetName, hasTarget, parentRequestId } = requestInfo;
       // Dedupe — the cron may re-run; once a row exists for this request the
       // sweeper won't re-fire because it filters on status='expired' already,
       // but keep this guard so a transient SQL error mid-run can't double-fire.
@@ -1310,6 +1682,14 @@ async function dispatchNotificationEventInternal(
           action: "view_request",
           tab: "mine",
         },
+        {
+          email: {
+            details: requestEmailDetails(
+              await getRequestEmailFacts(event.orgId, requestInfo, event.requestType),
+              { viewer: "requester" },
+            ),
+          },
+        },
       );
       return;
     }
@@ -1327,6 +1707,13 @@ async function dispatchNotificationEventInternal(
       if (alreadySent) return;
       const recipients = new Set<string>(superAdmins);
       if (inviter) recipients.add(inviter);
+      const timeZone = await getOrgTimeZone(event.orgId);
+      const expiredDetails: NotificationEmailDetail[] = [
+        ...invitationEmailDetails(inv),
+        ...(inv?.expiresAt
+          ? [{ label: "Expired", value: formatEmailDateTime(inv.expiresAt, timeZone) }]
+          : []),
+      ];
       await Promise.all(
         [...recipients].map((userId) =>
           sendNotification(
@@ -1339,6 +1726,7 @@ async function dispatchNotificationEventInternal(
               invitationId: event.invitationId,
               inviteeEmail: event.inviteeEmail,
             },
+            { email: { details: expiredDetails, closing: INVITE_AGAIN } },
           ),
         ),
       );
@@ -1373,6 +1761,7 @@ async function dispatchNotificationEventInternal(
     case "security_session_revoked": {
       // Self-revoke: user clicked the button. No alert at all — they know.
       if (event.initiatedBy === "self") return;
+      const timeZone = event.orgId ? await getOrgTimeZone(event.orgId) : "UTC";
       const where = event.deviceLabel ? ` on ${event.deviceLabel}` : "";
       await sendNotification(
         event.targetUserId,
@@ -1383,6 +1772,17 @@ async function dispatchNotificationEventInternal(
         {
           initiatedBy: event.initiatedBy,
           deviceLabel: event.deviceLabel ?? null,
+        },
+        {
+          email: {
+            intro: "We ended your sessions.",
+            details: [
+              ...(event.deviceLabel ? [{ label: "Device", value: event.deviceLabel }] : []),
+              { label: "Time", value: formatEmailDateTime(new Date().toISOString(), timeZone) },
+            ],
+            closing:
+              "Sign in again to continue. If you weren't expecting this, contact support@dubgrid.com.",
+          },
         },
       );
       return;

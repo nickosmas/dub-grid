@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { render } from "@react-email/components";
 import { createClient } from "@supabase/supabase-js";
+import { resolveAlertDestination } from "@dubgrid/domain";
 import { emailBaseUrl, emailOrgUrl } from "@/lib/email";
 import { NotificationEmail, type NotificationEmailDetail } from "@/emails/NotificationEmail";
 import {
@@ -125,10 +126,11 @@ export interface SendNotificationOptions {
    * lines than as the one sentence push and the inbox need.
    */
   email?: {
-    intro: string;
-    details: NotificationEmailDetail[];
-    closing: string;
-    /** A button into the app, with a path inside the organization. */
+    /** Stands in for the message, when the details carry part of it. */
+    intro?: string;
+    details?: NotificationEmailDetail[];
+    closing?: string;
+    /** A path inside the organization; defaults to where the alert itself goes. */
     action?: { label: string; href: string };
   };
 }
@@ -266,7 +268,7 @@ export async function sendNotification(
 
   try {
     const context = await getEmailContext(supabase, orgId, category);
-    const action = options.email?.action;
+    const action = options.email?.action ?? resolveAlertDestination({ type, metadata });
     const html = await render(
       createElement(NotificationEmail, {
         title,

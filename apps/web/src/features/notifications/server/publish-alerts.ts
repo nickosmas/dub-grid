@@ -1,5 +1,4 @@
 import { buildPermissionContext, scheduleViewerVisibility } from "@dubgrid/authz";
-import { scheduleCellStateSchema, type ScheduleCellState } from "@dubgrid/contracts";
 import {
   cellStateToChangeDay,
   describeShiftChange,
@@ -10,7 +9,7 @@ import type { AdminPermissions, OrganizationRole } from "@/types";
 import { isNoOpPublishChange, isNotePublishChangeRow } from "@/lib/db/publish-history";
 import logger from "@/lib/logger";
 import { sendNotification } from "./sender";
-import { buildShiftChangeAlert, type ChangedDay } from "./shift-change-alert";
+import { buildShiftChangeAlert, readCellState, type ChangedDay } from "./shift-change-alert";
 
 interface ChangeRow {
   emp_id: string;
@@ -18,12 +17,6 @@ interface ChangeRow {
   kind: string;
   from_state: unknown;
   to_state: unknown;
-}
-
-function readCellState(state: unknown): ScheduleCellState | null | undefined {
-  if (state == null) return null;
-  const parsed = scheduleCellStateSchema.safeParse(state);
-  return parsed.success ? parsed.data : undefined;
 }
 
 /**

@@ -17,9 +17,10 @@ export const emailTheme = {
   border: colorTokens.borderSubtle, // #E2E8F0
 } as const;
 
-// The app's dark ramp is zinc.
+// The page is pure black to match the pure white of light mode; the rest is the
+// app's zinc ramp.
 const emailDarkTheme = {
-  pageBg: "#09090B",
+  pageBg: "#000000",
   cardBg: "#18181B",
   textPrimary: "#FAFAFA",
   textBody: "#D4D4D8",
@@ -75,6 +76,7 @@ function darkRules(prefix: string, backgrounds: boolean, text: boolean): string 
  * whose white plate keeps the logo readable if it darkens the email anyway.
  */
 export const emailDarkCss = [
+  ":root{color-scheme:light dark;supported-color-schemes:light dark}",
   `@media (prefers-color-scheme:dark){${darkRules("", true, true)}}`,
   darkRules("[data-ogsc] ", false, true),
   darkRules("[data-ogsb] ", true, false),
@@ -86,6 +88,10 @@ export const styles = {
     padding: 0,
     backgroundColor: emailTheme.pageBg,
     fontFamily: fontStack,
+  },
+  page: {
+    width: "100%",
+    backgroundColor: emailTheme.pageBg,
   },
   container: {
     maxWidth: "560px",

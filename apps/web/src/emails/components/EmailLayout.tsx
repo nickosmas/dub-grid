@@ -55,64 +55,82 @@ export function EmailLayout({ logoUrl, preview, organization, fine, children }: 
       </Head>
       {preview ? <Preview>{preview}</Preview> : null}
       <Body className={emailClass.page} style={styles.body}>
-        <Container className={emailClass.page} style={styles.container}>
-          <Section style={styles.header}>
-            <div className={emailClass.logoLight}>
-              <Img
-                src={`${logoUrl}/email-logo-light.png`}
-                {...LOGO_SIZE}
-                alt="dubgrid"
-                style={{ display: "block" }}
-              />
-            </div>
-            <div
-              className={emailClass.logoDark}
-              style={{ display: "none", maxHeight: 0, overflow: "hidden" }}
-            >
-              <Img
-                src={`${logoUrl}/email-logo-dark.png`}
-                {...LOGO_SIZE}
-                alt=""
-                style={{ display: "block" }}
-              />
-            </div>
-            {organization ? (
-              <Text className={emailClass.ink} style={styles.organization}>
-                {organization}
-              </Text>
-            ) : null}
-          </Section>
-          <Section style={styles.content}>{children}</Section>
-          <Section style={styles.footer}>
-            <Hr className={emailClass.rule} style={styles.divider} />
-            {fine ? (
-              <Text
-                className={emailClass.muted}
-                style={{ ...styles.footerText, margin: "0 0 12px" }}
-              >
-                {fine}
-              </Text>
-            ) : null}
-            <Text className={emailClass.muted} style={styles.footerText}>
-              &copy; {COPYRIGHT_YEAR} DubGrid{"  "}&middot;{"  "}
-              <Link
-                className={emailClass.muted}
-                href={`${logoUrl}/privacy`}
-                style={{ color: emailTheme.textMuted, textDecoration: "underline" }}
-              >
-                Privacy Policy
-              </Link>
-              {"  "}&middot;{"  "}
-              <Link
-                className={emailClass.muted}
-                href={`${logoUrl}/terms`}
-                style={{ color: emailTheme.textMuted, textDecoration: "underline" }}
-              >
-                Terms of Service
-              </Link>
-            </Text>
-          </Section>
-        </Container>
+        {/* Many clients drop the body's background, which leaves their own gray beside the column. */}
+        <table
+          role="presentation"
+          width="100%"
+          cellPadding={0}
+          cellSpacing={0}
+          border={0}
+          bgcolor={emailTheme.pageBg}
+          className={emailClass.page}
+          style={styles.page}
+        >
+          <tbody>
+            <tr>
+              <td align="center">
+                <Container className={emailClass.page} style={styles.container}>
+                  <Section style={styles.header}>
+                    <div className={emailClass.logoLight}>
+                      <Img
+                        src={`${logoUrl}/email-logo-light.png`}
+                        {...LOGO_SIZE}
+                        alt="dubgrid"
+                        style={{ display: "block" }}
+                      />
+                    </div>
+                    <div
+                      className={emailClass.logoDark}
+                      style={{ display: "none", maxHeight: 0, overflow: "hidden" }}
+                    >
+                      <Img
+                        src={`${logoUrl}/email-logo-dark.png`}
+                        {...LOGO_SIZE}
+                        alt=""
+                        style={{ display: "block" }}
+                      />
+                    </div>
+                    {organization ? (
+                      <Text className={emailClass.ink} style={styles.organization}>
+                        {organization}
+                      </Text>
+                    ) : null}
+                  </Section>
+                  <Section style={styles.content}>{children}</Section>
+                  <Section style={styles.footer}>
+                    <Hr className={emailClass.rule} style={styles.divider} />
+                    {fine ? (
+                      <Text
+                        className={emailClass.muted}
+                        style={{ ...styles.footerText, margin: "0 0 12px" }}
+                      >
+                        {fine}
+                      </Text>
+                    ) : null}
+                    <Text className={emailClass.muted} style={styles.footerText}>
+                      &copy; {COPYRIGHT_YEAR} DubGrid{"  "}&middot;{"  "}
+                      <Link
+                        className={emailClass.muted}
+                        href={`${logoUrl}/privacy`}
+                        style={{ color: emailTheme.textMuted, textDecoration: "underline" }}
+                      >
+                        Privacy Policy
+                      </Link>
+                      {"  "}&middot;{"  "}
+                      <Link
+                        className={emailClass.muted}
+                        href={`${logoUrl}/terms`}
+                        style={{ color: emailTheme.textMuted, textDecoration: "underline" }}
+                      >
+                        Terms of Service
+                      </Link>
+                    </Text>
+                  </Section>
+                </Container>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </Body>
     </Html>
   );

@@ -20,6 +20,12 @@ describe("EmailLayout", () => {
     expect(page).toContain('name="color-scheme" content="light dark"');
   });
 
+  // Many clients drop the body's background, so the page color needs its own element.
+  it("paints the whole width white, and black in dark mode", async () => {
+    expect(await html()).toMatch(/<table[^>]*bgcolor="#FFFFFF"[^>]*width:100%/);
+    expect(emailDarkCss).toContain(`.${emailClass.page}{background-color:#000000!important}`);
+  });
+
   it("swaps the logo for every kind of dark mode", () => {
     for (const hook of ["@media (prefers-color-scheme:dark){", "[data-ogsc] "]) {
       const rules = emailDarkCss.slice(emailDarkCss.indexOf(hook));
