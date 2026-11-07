@@ -43,7 +43,6 @@ import {
   computeWeeklyStats,
   computeCoverageBySection,
   computeOpenShifts,
-  computeShiftBreakdown,
   buildActivityFeed,
 } from "@/lib/dashboard-stats";
 import { hasEffectiveCoverageRequirements } from "@dubgrid/schedule-core";
@@ -86,16 +85,12 @@ const ExpandedStaffHours = dynamic(() => import("./expanded/ExpandedStaffHours")
   ssr: false,
   loading: LazyProgressFallback,
 });
-const ExpandedBreakdown = dynamic(() => import("./expanded/ExpandedBreakdown"), {
-  ssr: false,
-  loading: LazyProgressFallback,
-});
 const ExpandedActivity = dynamic(() => import("./expanded/ExpandedActivity"), {
   ssr: false,
   loading: LazyProgressFallback,
 });
 
-type ExpandedPanel = "coverage" | "openShifts" | "staffHours" | "breakdown" | "activity" | null;
+type ExpandedPanel = "coverage" | "openShifts" | "staffHours" | "activity" | null;
 
 export type DashboardRoleVariant = "user" | "admin" | "super-admin";
 
@@ -308,7 +303,7 @@ export default function DashboardView({
     [],
   );
 
-  // The expanded panels below render on sectionCoverage/shiftBreakdown/etc.,
+  // The expanded panels below render on sectionCoverage and the like,
   // which are stubbed empty in user mode (see those useMemos). UserDashboard
   // never opens one, but a panel left open from before a mid-session switch
   // into user mode (e.g. an admin toggling "View as a User") would otherwise
@@ -755,30 +750,6 @@ export default function DashboardView({
     shiftRequests.requests,
   ]);
 
-  // Shift breakdown — admin/super-admin only (breakdown expanded panel).
-  const shiftBreakdown = useMemo(
-    () =>
-      isUserDashboardMode
-        ? { byFocusArea: [], totalShifts: 0 }
-        : computeShiftBreakdown(
-            currentPeriodShifts,
-            assignmentById,
-            shiftCategories,
-            focusAreas,
-            activeEmployees,
-            assignmentNameMap,
-          ),
-    [
-      isUserDashboardMode,
-      currentPeriodShifts,
-      assignmentById,
-      shiftCategories,
-      focusAreas,
-      activeEmployees,
-      assignmentNameMap,
-    ],
-  );
-
   // Period-scoped for the Activity Feed, matching mobile's date-bounded
   // accepted_at filter. `invitations` itself stays the full org-wide,
   // unbounded fetch (react-query cache shared with People/Members pages,
@@ -1049,7 +1020,6 @@ export default function DashboardView({
     otAlerts,
     currentHours,
     prevHours,
-    shiftBreakdown,
     activityItems,
     publishedWindowState,
     overtimeThreshold,
@@ -1219,9 +1189,6 @@ export default function DashboardView({
             focusAreaLabel={org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea}
             onClose={closeExpanded}
           />
-        )}
-        {expandedPanel === "breakdown" && (
-          <ExpandedBreakdown breakdown={shiftBreakdown} onClose={closeExpanded} />
         )}
         {expandedPanel === "activity" && (
           <ExpandedActivity items={activityItems} onClose={closeExpanded} />

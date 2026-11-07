@@ -21,7 +21,6 @@ import type {
   OpenShift,
   OTAlert,
   EmployeeHours,
-  ShiftTypeBreakdown,
   ActivityItem,
 } from "@/lib/dashboard-stats";
 import type { ViewMode } from "./DashboardView";
@@ -72,7 +71,6 @@ export interface DashboardContentProps {
   otAlerts: OTAlert[];
   currentHours: EmployeeHours[];
   prevHours: EmployeeHours[];
-  shiftBreakdown: ShiftTypeBreakdown;
   activityItems: ActivityItem[];
   publishedWindowState: PublishedWindowState;
   overtimeThreshold: number;

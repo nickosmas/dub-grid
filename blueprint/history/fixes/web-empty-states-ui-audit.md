@@ -97,8 +97,8 @@ its layout and was not opened. Mobile is untouched.
 
 ### Left as it was
 
-- `ExpandedBreakdown` can't be opened, and its removal is a file deletion the
-  owner should confirm.
+- `ExpandedBreakdown` couldn't be opened. The owner approved removing it, which
+  landed separately on fix/remove-shift-breakdown-popup.
 - Staff Export covers the whole directory, so it stays enabled when a filter
   shows nobody.
 - The Tools menu's red Bulk Delete Entries needs the owner's ruling on whether

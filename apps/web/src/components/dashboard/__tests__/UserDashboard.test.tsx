@@ -337,7 +337,6 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     publishedWindowState: "published",
     overtimeThreshold: 40,
     sectionCoverage: [],
-    shiftBreakdown: { byFocusArea: [], totalShifts: 0 },
     shiftCategories: [shiftCategory],
     shiftRequests: {
       allRequests: [],

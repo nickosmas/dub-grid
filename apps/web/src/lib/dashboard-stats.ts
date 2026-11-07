@@ -97,25 +97,6 @@ export interface OpenShift {
   urgency: "high" | "medium" | "low";
 }
 
-export interface AssignmentCount {
-  assignmentId: number;
-  assignmentLabel: string;
-  color: string;
-  count: number;
-}
-
-export interface FocusAreaBreakdown {
-  focusAreaId: number;
-  focusAreaName: string;
-  total: number;
-  codes: AssignmentCount[];
-}
-
-export interface ShiftTypeBreakdown {
-  byFocusArea: FocusAreaBreakdown[];
-  totalShifts: number;
-}
-
 export type ActivityIconVariant = "success" | "danger" | "warning" | "neutral";
 export type ActivityIconKind = "publish" | "pickup" | "swap" | "calloff" | "user_signup";
 
@@ -594,69 +575,6 @@ export function computeOpenShifts(
     const diff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
     return diff !== 0 ? diff : a.date.getTime() - b.date.getTime();
   });
-}
-
-// ─── Shift Type Breakdown ───────────────────────────────
-
-export function computeShiftBreakdown(
-  weekShifts: ShiftMap,
-  assignmentById: Map<number, AssignmentDefinition>,
-  _shiftCategories: ShiftCategory[],
-  focusAreas: FocusArea[],
-  _employees: Employee[],
-  assignmentLabelMap?: Map<number, string>,
-): ShiftTypeBreakdown {
-  // Count by (focusAreaId, assignmentId) pair
-  const faCounts = new Map<number, Map<number, number>>();
-  let totalShifts = 0;
-  for (const entry of Object.values(weekShifts)) {
-    if (entry.isDelete) continue;
-    if (entry.assignmentIds.length === 0) continue;
-    if (!hasWorkShift(entry.assignmentIds, assignmentById)) continue;
-
-    totalShifts++;
-
-    // Count the first non-off shift code, grouped by the shift code's focus area
-    for (const codeId of entry.assignmentIds) {
-      const sc = assignmentById.get(codeId);
-      if (sc) {
-        const faId = sc.focusAreaId ?? -1;
-        if (!faCounts.has(faId)) faCounts.set(faId, new Map());
-        const codeCounts = faCounts.get(faId)!;
-        codeCounts.set(codeId, (codeCounts.get(codeId) ?? 0) + 1);
-        break;
-      }
-    }
-  }
-
-  const faById = new Map(focusAreas.map((fa) => [fa.id, fa]));
-
-  const byFocusArea: FocusAreaBreakdown[] = Array.from(faCounts.entries())
-    .map(([faId, codeCounts]) => {
-      const fa = faById.get(faId);
-      const codes: AssignmentCount[] = Array.from(codeCounts.entries())
-        .map(([codeId, count]) => {
-          const sc = assignmentById.get(codeId);
-          return {
-            assignmentId: codeId,
-            assignmentLabel:
-              assignmentLabelMap?.get(codeId) ?? (sc?.name || sc?.label || "Unknown"),
-            color: sc?.color || "#CED4DA",
-            count,
-          };
-        })
-        .sort((a, b) => b.count - a.count);
-
-      return {
-        focusAreaId: faId,
-        focusAreaName: fa?.name ?? "Unassigned",
-        total: codes.reduce((s, c) => s + c.count, 0),
-        codes,
-      };
-    })
-    .sort((a, b) => b.total - a.total);
-
-  return { byFocusArea, totalShifts };
 }
 
 // ─── Activity Feed ──────────────────────────────────────
