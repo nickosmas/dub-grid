@@ -648,6 +648,37 @@ describe("POST /api/auth/login", () => {
     expectRefusal("rejected", "organization_access_denied", null);
   });
 
+  it("answers Access suspended when the host's organization has suspended them (F-224)", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
+    });
+    stubOrgLookup(ORG_ID);
+    rpc.mockResolvedValueOnce({
+      data: null,
+      error: {
+        message:
+          "Your access has been suspended. Contact your organization admin. Until 2026-12-01.",
+      },
+    });
+
+    const res = await POST(makeRequest("acme.localhost"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body).toMatchObject({ code: "ACCOUNT_SUSPENDED", suspendedUntil: "2026-12-01" });
+    expect(body).not.toHaveProperty("session");
+    expectRefusal("rejected", "account_suspended", ORG_ID);
+  });
+
   it("records an organization lookup outage as a failure, not a closed organization", async () => {
     signInWithPassword.mockResolvedValueOnce({
       data: {

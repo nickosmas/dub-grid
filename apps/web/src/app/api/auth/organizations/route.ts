@@ -5,6 +5,11 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import {
+  ACCOUNT_SUSPENDED_CODE,
+  ACCOUNT_SUSPENDED_MESSAGE,
+  isAccountSuspendedMessage,
+} from "@dubgrid/domain";
 
 const switchOrganizationSchema = z.object({
   targetOrgId: z.string().uuid(),
@@ -63,6 +68,13 @@ export async function POST(req: NextRequest) {
     const result = await supabase.rpc("switch_org", {
       target_org_id: parsed.data.targetOrgId,
     });
+
+    if (isAccountSuspendedMessage(result.error?.message)) {
+      return NextResponse.json(
+        { error: ACCOUNT_SUSPENDED_MESSAGE, code: ACCOUNT_SUSPENDED_CODE },
+        { status: 403 },
+      );
+    }
 
     if (result.error) {
       return NextResponse.json(
