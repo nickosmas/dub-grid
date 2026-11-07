@@ -26,7 +26,7 @@ function getRequestIp(req: NextRequest): string | null {
 const roleChangeSchema = z.object({
   targetUserId: z.string().uuid(),
   newRole: z.string().min(1),
-  orgId: z.string().uuid().nullable().optional(),
+  orgId: z.string().uuid(),
   idempotencyKey: z.string().uuid(),
 });
 
@@ -81,15 +81,13 @@ export async function POST(req: NextRequest) {
     // Redirect to sandbox if the caller is in sandbox mode, so role
     // changes inside a sandbox don't leak to the real organization's
     // memberships.
-    const effectiveOrgId = parsed.data.orgId
-      ? await resolveEffectiveOrgId(req, auth.user.id, parsed.data.orgId)
-      : null;
+    const effectiveOrgId = await resolveEffectiveOrgId(req, auth.user.id, parsed.data.orgId);
 
     // Defensive tier guard: only super_admin or gridmaster can promote
     // another user to super_admin. The change_user_role RPC also enforces
     // this, but checking at the API layer gives a clean 403 and avoids
     // round-tripping a forbidden mutation to the DB. (audit L3)
-    if (parsed.data.newRole === "super_admin" && effectiveOrgId) {
+    if (parsed.data.newRole === "super_admin") {
       const allowed = await isOrgSuperAdminOrGridmaster(
         getServiceClient(),
         auth.user.id,
@@ -100,10 +98,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (
-      effectiveOrgId &&
-      !(await isActingInSessionOrg(req, getServiceClient(), auth.user.id, effectiveOrgId))
-    ) {
+    if (!(await isActingInSessionOrg(req, getServiceClient(), auth.user.id, effectiveOrgId))) {
       return NextResponse.json({ error: API_ERRORS.NOT_ORG_MEMBER }, { status: 403 });
     }
 

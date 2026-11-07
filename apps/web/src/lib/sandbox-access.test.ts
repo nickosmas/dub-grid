@@ -5,11 +5,15 @@ import { canUseTestSandbox, findUsableSandbox } from "./sandbox-access";
 const USER_ID = "user-1";
 const SOURCE_ORG = "source-org";
 const SANDBOX_ORG = "sandbox-org";
+const LIVE_SOURCE = { archived_at: null, suspended_at: null };
 
 function client(rows: {
   membership?: { org_role: string; admin_permissions?: Record<string, boolean> | null } | null;
   profile?: { platform_role: string | null } | null;
   sandbox?: { id: string; sandbox_source_org_id: string | null } | null;
+  source?: { archived_at: string | null; suspended_at: string | null } | null;
+  employee?: { suspended_at: string | null } | null;
+  employeeError?: { message: string };
 }) {
   return {
     from(table: string) {
@@ -17,15 +21,26 @@ function client(rows: {
         select: () => query,
         eq: () => query,
         is: () => query,
-        maybeSingle: async () => ({
-          data:
-            table === "organization_memberships"
-              ? (rows.membership ?? null)
-              : table === "profiles"
-                ? (rows.profile ?? null)
-                : (rows.sandbox ?? null),
-          error: null,
-        }),
+        maybeSingle: async () => {
+          if (table === "employees") {
+            return { data: rows.employee ?? null, error: rows.employeeError ?? null };
+          }
+          if (table === "organizations" && rows.sandbox === undefined) {
+            return {
+              data: rows.source === undefined ? LIVE_SOURCE : rows.source,
+              error: null,
+            };
+          }
+          return {
+            data:
+              table === "organization_memberships"
+                ? (rows.membership ?? null)
+                : table === "profiles"
+                  ? (rows.profile ?? null)
+                  : (rows.sandbox ?? null),
+            error: null,
+          };
+        },
       };
       return query;
     },
@@ -52,6 +67,27 @@ describe("canUseTestSandbox", () => {
     ).resolves.toBe(false);
     await expect(allowed({ membership: { org_role: "user" } })).resolves.toBe(false);
     await expect(allowed({})).resolves.toBe(false);
+  });
+
+  it("refuses someone suspended from the source organization", async () => {
+    const owner = { membership: { org_role: "super_admin" } };
+    await expect(
+      allowed({ ...owner, employee: { suspended_at: "2026-11-01T00:00:00.000Z" } }),
+    ).resolves.toBe(false);
+    await expect(allowed({ ...owner, employeeError: { message: "read failed" } })).resolves.toBe(
+      false,
+    );
+  });
+
+  it("refuses a source organization that is archived, suspended or gone", async () => {
+    const owner = { membership: { org_role: "super_admin" } };
+    await expect(
+      allowed({ ...owner, source: { ...LIVE_SOURCE, archived_at: "2026-11-01T00:00:00.000Z" } }),
+    ).resolves.toBe(false);
+    await expect(
+      allowed({ ...owner, source: { ...LIVE_SOURCE, suspended_at: "2026-11-01T00:00:00.000Z" } }),
+    ).resolves.toBe(false);
+    await expect(allowed({ ...owner, source: null })).resolves.toBe(false);
   });
 });
 

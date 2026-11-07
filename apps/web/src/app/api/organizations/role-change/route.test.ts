@@ -126,6 +126,23 @@ describe("POST /api/organizations/role-change", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("requires the organization rather than taking the target's", async () => {
+    const rpc = vi.fn();
+    createRequestSupabaseClient.mockReturnValue({ rpc });
+    const { POST } = await importRoute();
+
+    const response = await POST(
+      makeRequest({
+        targetUserId: "33333333-3333-4333-8333-333333333333",
+        newRole: "user",
+        idempotencyKey: "44444444-4444-4444-8444-444444444444",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("blocks self role-change with 403", async () => {
     const { POST } = await importRoute();
     const res = await POST(

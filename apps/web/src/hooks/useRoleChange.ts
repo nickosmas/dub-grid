@@ -6,7 +6,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 export interface RoleChangeParams {
   targetUserId: string;
   newRole: string;
-  orgId?: string;
+  orgId: string;
 }
 
 export interface RoleChangeResult {
@@ -52,7 +52,7 @@ export function useRoleChange() {
         body: JSON.stringify({
           targetUserId: params.targetUserId,
           newRole: params.newRole,
-          orgId: params.orgId ?? null,
+          orgId: params.orgId,
           idempotencyKey,
         }),
       });

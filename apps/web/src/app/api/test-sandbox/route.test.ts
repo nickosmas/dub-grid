@@ -82,6 +82,29 @@ function buildServiceClient(opts: {
           }),
         };
       }
+      if (table === "organizations") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: { archived_at: null, suspended_at: null },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "employees") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { suspended_at: null }, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
       throw new Error(`Unexpected table: ${table}`);
     },
   };

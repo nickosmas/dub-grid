@@ -28,6 +28,7 @@ type MockAccessRow = {
   } | null;
   organization?: {
     archived_at?: string | null;
+    workspace_kind?: string;
     suspended_at: string | null;
     subscription_status: string | null;
     trial_ends_at: string | null;
@@ -356,6 +357,20 @@ describe("requireOrgPermissions", () => {
       );
 
       const result = await ask(SESSION_ORG);
+
+      expect("response" in result && result.response.status).toBe(403);
+    });
+
+    it("refuses a sandbox reached without the cookie that re-checks access (F-198)", async () => {
+      signedInTo(null);
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          ...member,
+          organization: { ...organization, workspace_kind: "sandbox" },
+        }),
+      );
+
+      const result = await ask(OTHER_ORG);
 
       expect("response" in result && result.response.status).toBe(403);
     });
