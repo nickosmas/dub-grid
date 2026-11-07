@@ -154,7 +154,7 @@ describe.skipIf(!reachable)("organization-bound references", () => {
       ON CONFLICT (expo_push_token) DO UPDATE SET org_id = EXCLUDED.org_id`;
 
     await db.query(register, [userId, orgA]);
-    expect(await refusal(register, [userId, orgB])).toBeNull();
+    await db.query(register, [userId, orgB]);
 
     expect(
       await one<string>(
