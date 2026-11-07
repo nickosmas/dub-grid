@@ -257,6 +257,7 @@ describe.skipIf(!reachable)("callers act in their session's organization", () =>
           WHERE user_id = $1 AND org_id <> $2`,
         [userId, orgA],
       );
+      await db.query(`DELETE FROM public.jwt_refresh_locks WHERE user_id = $1`, [userId]);
 
       expect((await mint()).error?.message).toMatch(SUSPENDED);
     });
