@@ -883,13 +883,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Fix alongside the larger findings; scope the idempotency lookups and the email throttle by organization first.
 **Resolution:**
 
-### F-210 [P1] open - Migration 124 stops a phone's push token moving between organizations
+### F-210 [P1] fixed - Migration 124 stops a phone's push token moving between organizations
 
 **File:** `supabase/migrations/124_org_bound_references.sql:42-54` (`refuse_org_id_change` on `mobile_device_tokens`); `packages/data-access/src/mobile.ts:2332-2344`; `001:823` (`expo_push_token` is globally unique)
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, multi-tenancy)
 **Why it matters:** This is a regression from F-192's repair, and it is in production. Registration upserts on `expo_push_token` and sends `org_id`, so moving an existing token raises "A row cannot move to another organization." On the stack the same upsert failed with that error. Someone who switches organization in the app stays registered under the old one and gets no pushes for the new one. `{ disabled: true }` from the other organization fails too, so the phone keeps the old organization's alerts. If someone from another organization signs in on the same install, the row keeps the previous person, so their alerts can reach this phone unless sign-out already disabled it. The upsert was run in SQL; the app's route wasn't. How many production phones are affected is unknown.
 **Suggested fix:** Take this table out of the trigger with a forward migration, since a device token follows the person rather than the organization, and add an integration test that moves a token.
-**Resolution:**
+**Resolution:** Fixed on fix/push-token-moves-org (2026-11-07), migration 125 drops the trigger on `mobile_device_tokens`, so a token can move with its phone. Every other upsert and `org_id` write in the app and the migrations was checked, and no other guarded table moves a row. The integration test moves a token and pins this table as the only exception. Rows stuck on the old organization since 124 move at the phone's next registration. Not run on a device.
 
 ### F-211 [P1] open - Re-inviting can mail another pending invitation's token to the wrong address
 
