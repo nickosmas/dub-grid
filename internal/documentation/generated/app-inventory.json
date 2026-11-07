@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:09ddafb50de1d997d7e6b28e08973a06c604f3b0de35b39e2bd2759e8a75a63c",
+  "sourceDigest": "sha256:886aa26507545e79522ae201ef0f93269225550ec0d6df67b248934dc8a56d8b",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5071,6 +5071,16 @@
       "sha256": "d1f46e00c1a79db37c5eb496550dd6b7bac7075223121c50a028eeed56ac8f4d",
       "source": {
         "path": "supabase/migrations/124_org_bound_references.sql"
+      }
+    },
+    {
+      "id": "migration:125_push_tokens_follow_their_person.sql",
+      "version": "125",
+      "name": "push_tokens_follow_their_person",
+      "file": "125_push_tokens_follow_their_person.sql",
+      "sha256": "0d803327277d479d681415618af0748a3c8f032c878366b413498a1053cdf4ce",
+      "source": {
+        "path": "supabase/migrations/125_push_tokens_follow_their_person.sql"
       }
     }
   ],

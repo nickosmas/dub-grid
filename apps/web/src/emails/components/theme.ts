@@ -8,7 +8,8 @@ import { colorTokens } from "@dubgrid/design-tokens";
 
 export const emailTheme = {
   brand: colorTokens.brand, // #2563EB
-  pageBg: colorTokens.surface, // #FFFFFF
+  pageBg: "#E5E5E5",
+  sheetBg: colorTokens.surface, // #FFFFFF
   cardBg: colorTokens.background, // #F8FAFC
   textPrimary: colorTokens.textPrimary, // #0F172A
   textBody: colorTokens.textMuted, // #475569
@@ -17,14 +18,15 @@ export const emailTheme = {
   border: colorTokens.borderSubtle, // #E2E8F0
 } as const;
 
-// The app's dark ramp is zinc.
+// The app's dark ramp is zinc, on a black page.
 const emailDarkTheme = {
-  pageBg: "#09090B",
-  cardBg: "#18181B",
+  pageBg: "#000000",
+  sheetBg: "#18181B",
+  cardBg: "#27272A",
   textPrimary: "#FAFAFA",
   textBody: "#D4D4D8",
   textMuted: "#A1A1AA",
-  border: "#27272A",
+  border: "#3F3F46",
 } as const;
 
 export const fontStack =
@@ -41,6 +43,7 @@ export const PREVIEW_LOGO_URL = "/static";
 /** The hooks the dark palette below restyles. */
 export const emailClass = {
   page: "dg-page",
+  sheet: "dg-sheet",
   card: "dg-card",
   ink: "dg-ink",
   body: "dg-body",
@@ -54,6 +57,7 @@ function darkRules(prefix: string, backgrounds: boolean, text: boolean): string 
   const dark = emailDarkTheme;
   const rules = [
     backgrounds ? `${prefix}.${emailClass.page}{background-color:${dark.pageBg}!important}` : "",
+    backgrounds ? `${prefix}.${emailClass.sheet}{background-color:${dark.sheetBg}!important}` : "",
     backgrounds ? `${prefix}.${emailClass.card}{background-color:${dark.cardBg}!important}` : "",
     text ? `${prefix}.${emailClass.card}{border-color:${dark.border}!important}` : "",
     text ? `${prefix}.${emailClass.rule}{border-color:${dark.border}!important}` : "",
@@ -75,6 +79,7 @@ function darkRules(prefix: string, backgrounds: boolean, text: boolean): string 
  * whose white plate keeps the logo readable if it darkens the email anyway.
  */
 export const emailDarkCss = [
+  ":root{color-scheme:light dark;supported-color-schemes:light dark}",
   `@media (prefers-color-scheme:dark){${darkRules("", true, true)}}`,
   darkRules("[data-ogsc] ", false, true),
   darkRules("[data-ogsb] ", true, false),
@@ -87,10 +92,18 @@ export const styles = {
     backgroundColor: emailTheme.pageBg,
     fontFamily: fontStack,
   },
-  container: {
+  page: {
+    width: "100%",
+    backgroundColor: emailTheme.pageBg,
+  },
+  pageCell: {
+    padding: "24px 16px",
+  },
+  sheet: {
     maxWidth: "560px",
     margin: "0 auto",
-    backgroundColor: emailTheme.pageBg,
+    backgroundColor: emailTheme.sheetBg,
+    borderRadius: "16px",
   },
   // The logo images carry 12px of padding, so their ink lines up with the text.
   header: {
@@ -108,7 +121,7 @@ export const styles = {
     padding: "12px 24px 8px",
   },
   footer: {
-    padding: "0 24px 32px",
+    padding: "0 24px 24px",
   },
   heading: {
     margin: "0 0 20px",

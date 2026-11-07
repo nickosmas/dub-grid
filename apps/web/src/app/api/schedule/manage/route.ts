@@ -2562,6 +2562,7 @@ export async function POST(req: NextRequest) {
             date: data.date,
             mode: "upsert",
             status,
+            noteTypeId: data.indicatorTypeId,
           }),
         );
         logScheduleAudit(auth.serviceClient, {
@@ -2636,6 +2637,7 @@ export async function POST(req: NextRequest) {
             date: data.date,
             mode: "delete",
             status: data.existingStatus === "draft" ? "draft" : "published",
+            noteTypeId: data.indicatorTypeId,
           }),
         );
         logScheduleAudit(auth.serviceClient, {

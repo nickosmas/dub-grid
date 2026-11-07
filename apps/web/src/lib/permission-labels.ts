@@ -81,6 +81,19 @@ function summarizeList(items: string[]): string {
   return `${shown.join(", ")}, and ${remaining} more`;
 }
 
+/** Every permission a change gave or took away, by its full label. */
+export function listPermissionChanges(
+  before: Record<string, boolean> | null | undefined,
+  after: Record<string, boolean> | null | undefined,
+): { granted: string[]; revoked: string[] } {
+  const granted: string[] = [];
+  const revoked: string[] = [];
+  for (const [key, now] of Object.entries(diffPermissions(before, after))) {
+    (now ? granted : revoked).push(permissionLabel(key));
+  }
+  return { granted, revoked };
+}
+
 /**
  * Describe what a permission change actually did, as a sentence fragment:
  * "gave you access to publish the schedule" / "removed your access to edit shifts".

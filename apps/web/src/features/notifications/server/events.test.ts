@@ -61,6 +61,110 @@ describe("dispatchNotificationEvent", () => {
     vi.clearAllMocks();
   });
 
+  it("gives approvers a request's shifts and tells them to go to the app", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "shift_requests") {
+        return makeShiftRequestBuilder({
+          status: "pending_approval",
+          type: "swap",
+          requester_shift_date: "2026-11-13",
+          target_shift_date: "2026-11-15",
+          expires_at: "2026-11-12T20:00:00.000Z",
+          requester: { user_id: "requester-user", first_name: "Alex", last_name: "North" },
+          target: { user_id: "target-user", first_name: "Bri", last_name: "Shaw" },
+        });
+      }
+      return makeMembershipBuilder({ superAdmins: [{ user_id: "super-admin-user" }] });
+    });
+
+    await dispatchNotificationEvent("requester-user", {
+      action: "shift_request_created",
+      orgId: "org-1",
+      requestId: "request-1",
+      requestType: "swap",
+    });
+
+    const options = vi.mocked(sendNotification).mock.calls[0]?.[6];
+    expect(options?.email?.closing).toBe("Go to the app to approve or reject it.");
+    expect(options?.email?.details?.map((detail) => detail.label)).toEqual([
+      "Alex North's shift",
+      "Bri Shaw's shift",
+      "Expires",
+    ]);
+    expect(options?.email?.details?.[0]?.value).toBe("Fri, Nov 13");
+  });
+
+  it("names who is picking up, with only the date when names can't be read", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "shift_requests") {
+        return makeShiftRequestBuilder({
+          status: "pending_approval",
+          type: "pickup",
+          requester_shift_date: "2026-11-13",
+          requester: { user_id: "requester-user", first_name: "Alex", last_name: "North" },
+          target: { user_id: "target-user", first_name: "Bri", last_name: "Shaw" },
+        });
+      }
+      return makeMembershipBuilder({ superAdmins: [{ user_id: "super-admin-user" }] });
+    });
+
+    await dispatchNotificationEvent("target-user", {
+      action: "shift_request_claimed",
+      orgId: "org-1",
+      requestId: "request-1",
+      requestType: "pickup",
+    });
+
+    const options = vi.mocked(sendNotification).mock.calls[0]?.[6];
+    expect(options?.email?.details).toEqual([
+      { label: "Alex North's shift", value: "Fri, Nov 13" },
+      { label: "Picking up", value: "Bri Shaw" },
+    ]);
+  });
+
+  it("speaks to an approver who sent the request as its requester", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "shift_requests") {
+        return makeShiftRequestBuilder({
+          status: "pending_approval",
+          type: "swap",
+          requester_shift_date: "2026-11-13",
+          requester: { user_id: "super-admin-user", first_name: "Alex", last_name: "North" },
+          target: { user_id: "target-user", first_name: "Bri", last_name: "Shaw" },
+        });
+      }
+      return makeMembershipBuilder({ superAdmins: [{ user_id: "super-admin-user" }] });
+    });
+
+    await dispatchNotificationEvent("target-user", {
+      action: "shift_request_responded",
+      orgId: "org-1",
+      requestId: "request-1",
+      requestType: "swap",
+      accepted: true,
+    });
+
+    const options = vi.mocked(sendNotification).mock.calls[0]?.[6];
+    expect(options?.email?.intro).toBe("Bri Shaw accepted your swap request.");
+    expect(options?.email?.details?.[0]?.label).toBe("Your shift");
+  });
+
+  it("lists every permission that changed in the email", async () => {
+    fromMock.mockImplementation(() =>
+      makeSingleRowBuilder({ first_name: "Jordan", last_name: "Lee" }),
+    );
+    await dispatchNotificationEvent("admin-user", {
+      action: "admin_permissions_changed",
+      orgId: "org-1",
+      targetUserId: "target-user",
+      before: { canEditShifts: true },
+      after: { canEditShifts: false, canPublishSchedule: true },
+    });
+
+    const options = vi.mocked(sendNotification).mock.calls[0]?.[6];
+    expect(options?.email?.details?.map((detail) => detail.label)).toEqual(["Added", "Removed"]);
+  });
+
   it("notifies the targeted teammate when a swap needs their response", async () => {
     fromMock.mockImplementation((table: string) => {
       if (table === "shift_requests") {
@@ -102,6 +206,7 @@ describe("dispatchNotificationEvent", () => {
         action: "respond_to_request",
         tab: "mine",
       },
+      expect.anything(),
     );
   });
 
@@ -154,6 +259,7 @@ describe("dispatchNotificationEvent", () => {
         action: "approve_request",
         tab: "approval",
       },
+      expect.anything(),
     );
     expect(sendNotification).toHaveBeenCalledWith(
       "approver-user",
@@ -167,6 +273,7 @@ describe("dispatchNotificationEvent", () => {
         action: "approve_request",
         tab: "approval",
       },
+      expect.anything(),
     );
     expect(sendNotification).not.toHaveBeenCalledWith(
       "schedule-only-user",
@@ -227,6 +334,7 @@ describe("dispatchNotificationEvent", () => {
       "Schedule note added",
       "An administrator added a note to your shift on May 20, 2026.",
       { empId: "emp-1", date: "2026-05-20", mode: "upsert" },
+      expect.anything(),
     );
   });
 
@@ -285,6 +393,7 @@ describe("dispatchNotificationEvent", () => {
       "system",
       "Your role changed",
       "Nic K changed your role from User to Super Admin.",
+      expect.anything(),
       expect.anything(),
     );
   });
@@ -420,8 +529,8 @@ describe("dispatchNotificationEvent", () => {
     });
 
     const options = vi.mocked(sendNotification).mock.calls[0]?.[6];
-    expect(options?.email?.details.map((d) => d.label)).toEqual(["App", "Time", "Device"]);
-    expect(options?.email?.details.at(-1)?.value).toBe("Android device");
+    expect(options?.email?.details?.map((d) => d.label)).toEqual(["App", "Time", "Device"]);
+    expect(options?.email?.details?.at(-1)?.value).toBe("Android device");
   });
 
   it("dispatches security_mfa_changed with writeInApp:false (email + push only)", async () => {
@@ -439,7 +548,7 @@ describe("dispatchNotificationEvent", () => {
       // Someone else's authenticator locks the owner out of a reset (41c3).
       expect.stringContaining("If this wasn't you, contact support@dubgrid.com right away."),
       { enabled: true },
-      { writeInApp: false },
+      expect.objectContaining({ writeInApp: false }),
     );
 
     await dispatchNotificationEvent("user-1", {
@@ -455,7 +564,7 @@ describe("dispatchNotificationEvent", () => {
       "Two-factor authentication disabled",
       expect.any(String),
       { enabled: false },
-      { writeInApp: false },
+      expect.objectContaining({ writeInApp: false }),
     );
   });
 
@@ -484,6 +593,7 @@ describe("dispatchNotificationEvent", () => {
       "We signed you out",
       expect.stringContaining("If you weren't expecting this, contact support@dubgrid.com."),
       { initiatedBy: "gridmaster", deviceLabel: null },
+      expect.anything(),
     );
   });
 
@@ -541,6 +651,7 @@ describe("dispatchNotificationEvent", () => {
       "Payment failed",
       expect.stringContaining("Sunrise Senior Living"),
       expect.objectContaining({ stripeInvoiceId: "in_test_123" }),
+      { email: { details: [{ label: "Amount due", value: "$49.00" }] } },
     );
   });
 
@@ -641,6 +752,7 @@ describe("dispatchNotificationEvent", () => {
       "Pickup request expired",
       "Your pickup request expired before anyone decided on it. Submit a new one if you still need it.",
       expect.objectContaining({ requestId: "req-1", requestType: "pickup" }),
+      expect.anything(),
     );
   });
 
@@ -687,6 +799,7 @@ describe("dispatchNotificationEvent", () => {
         "Pickup request expired",
         message,
         expect.objectContaining({ requestId: "req-1" }),
+        expect.anything(),
       );
     },
   );
@@ -736,6 +849,11 @@ describe("dispatchNotificationEvent", () => {
       "Invitation expired",
       expect.stringContaining("alex@example.com"),
       expect.objectContaining({ invitationId: "inv-1", inviteeEmail: "alex@example.com" }),
+      expect.objectContaining({
+        email: expect.objectContaining({
+          closing: "Send a new invitation from People if they still need access.",
+        }),
+      }),
     ]);
   });
 
@@ -896,6 +1014,7 @@ describe("dispatchNotificationEvent", () => {
       "Pickup request rejected",
       expect.stringContaining("Your schedule stays as it was."),
       expect.objectContaining({ requestId: "req-1" }),
+      expect.anything(),
     );
     expect(sendNotification).toHaveBeenCalledWith(
       "claimant-user",
@@ -904,6 +1023,7 @@ describe("dispatchNotificationEvent", () => {
       "Claim rejected",
       expect.stringContaining("was rejected"),
       expect.objectContaining({ requestId: "req-1", approved: false }),
+      expect.anything(),
     );
   });
 
@@ -943,6 +1063,7 @@ describe("dispatchNotificationEvent", () => {
         expect.stringMatching(/^Swap request/),
         expect.anything(),
         expect.anything(),
+        expect.anything(),
       );
       expect(sendNotification).toHaveBeenCalledWith(
         "partner-user",
@@ -951,6 +1072,7 @@ describe("dispatchNotificationEvent", () => {
         title,
         `The swap with Sam Lee ${phrase}. Manager's note: Covered`,
         expect.objectContaining({ requestId: "req-1", requestType: "swap", approved }),
+        expect.anything(),
       );
     },
   );
@@ -983,6 +1105,7 @@ describe("dispatchNotificationEvent", () => {
       "Request canceled",
       "A manager canceled your swap request. Manager's note: Covered another way",
       expect.objectContaining({ requestId: "req-1", requestType: "swap" }),
+      expect.anything(),
     );
     expect(sendNotification).toHaveBeenCalledWith(
       "partner-user",
@@ -991,6 +1114,7 @@ describe("dispatchNotificationEvent", () => {
       "Swap canceled",
       "Sam Lee's swap request was canceled. Manager's note: Covered another way",
       expect.objectContaining({ requestId: "req-1", requestType: "swap" }),
+      expect.anything(),
     );
   });
 
@@ -1018,6 +1142,7 @@ describe("dispatchNotificationEvent", () => {
     expect(sendNotification).toHaveBeenCalledTimes(1);
     expect(sendNotification).toHaveBeenCalledWith(
       "requester-user",
+      expect.anything(),
       expect.anything(),
       expect.anything(),
       expect.anything(),
@@ -1054,6 +1179,7 @@ describe("dispatchNotificationEvent", () => {
       "shift_request_rejected",
       "Pickup request rejected",
       expect.stringContaining("Your schedule stays as it was."),
+      expect.anything(),
       expect.anything(),
     );
   });
@@ -1113,6 +1239,7 @@ describe("dispatchNotificationEvent", () => {
       "Invitation accepted",
       "Sarah Chen accepted their invitation and joined Calm Haven as Admin.",
       { acceptedUserId: "new-user", invitationId: "inv-1" },
+      expect.anything(),
     );
   });
 
@@ -1189,6 +1316,7 @@ describe("dispatchNotificationEvent", () => {
         "Swap request approved",
         "Sam Lee accepted your swap request. It's approved and on the schedule.",
         expect.objectContaining({ requestId: "request-1", approved: true }),
+        expect.anything(),
       );
     });
 
@@ -1223,6 +1351,7 @@ describe("dispatchNotificationEvent", () => {
         "Pickup request approved",
         "Sam Lee picked up the shift you called off.",
         expect.objectContaining({ requestId: "request-1", approved: true }),
+        expect.anything(),
       );
     });
   });
@@ -1259,6 +1388,7 @@ describe("dispatchNotificationEvent", () => {
       "Priya Shah is suspended",
       "They can't sign in. Their shifts stay on the schedule.",
       { empId: "emp-1", toStatus: "suspended" },
+      expect.anything(),
     );
   });
 });
