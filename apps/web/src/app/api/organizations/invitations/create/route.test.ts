@@ -360,6 +360,7 @@ describe("POST /api/organizations/invitations/create", () => {
         : makeRefreshChain({
             data: {
               id: "inv-orphan",
+              email: "orphan@test.com",
               token: "fresh-tok",
               expires_at: "2026-02-02T00:00:00Z",
               ...SAME_ACCESS_AS_ADMIN,
@@ -406,6 +407,42 @@ describe("POST /api/organizations/invitations/create", () => {
   // Inviting someone as an Admin must not re-send a pending Super Admin link
   // and report success (F-30): only an invitation granting the same access is
   // refreshed.
+  // `_` and `%` are legal in an address and are wildcards to ILIKE, so a loose
+  // match rotated another person's invitation and mailed it here (F-211).
+  it("matches a pending invitation by the exact address and mails only that address", async () => {
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "An active invitation already exists for this email" },
+    }));
+    const matched: string[] = [];
+    const chain = makeRefreshChain({
+      data: {
+        id: "inv-exact",
+        email: "John_Smith@test.com",
+        token: "fresh-tok",
+        expires_at: "2026-02-02T00:00:00Z",
+        ...SAME_ACCESS_AS_ADMIN,
+      },
+      error: null,
+    });
+    chain.ilike = (_column: string, pattern: string) => {
+      matched.push(pattern);
+      return chain;
+    };
+    getServiceClient.mockReturnValue({ rpc, from: vi.fn(() => chain) });
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({ orgId: ORG_ID, email: "john_smith@test.com", role: "admin" }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(matched).toEqual(["john\\_smith@test.com"]);
+    expect(sendPendingInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "John_Smith@test.com" }),
+    );
+  });
+
   it("refuses to refresh a pending invitation that grants different access", async () => {
     const rpc = vi.fn(async () => ({
       data: null,
@@ -670,6 +707,7 @@ describe("POST /api/organizations/invitations/create", () => {
               ? {
                   data: {
                     id: "inv-7",
+                    email: "again@test.com",
                     token: "old-tok",
                     expires_at: "2026-01-01T00:00:00Z",
                     role_to_assign: "user",

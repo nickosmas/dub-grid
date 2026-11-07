@@ -891,13 +891,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Take this table out of the trigger with a forward migration, since a device token follows the person rather than the organization, and add an integration test that moves a token.
 **Resolution:** Fixed on fix/push-token-moves-org (2026-11-07), migration 125 drops the trigger on `mobile_device_tokens`, so a token can move with its phone. Every other upsert and `org_id` write in the app and the migrations was checked, and no other guarded table moves a row. The integration test moves a token and pins this table as the only exception. Rows stuck on the old organization since 124 move at the phone's next registration. Not run on a device.
 
-### F-211 [P1] open - Re-inviting can mail another pending invitation's token to the wrong address
+### F-211 [P1] fixed - Re-inviting can mail another pending invitation's token to the wrong address
 
 **File:** `apps/web/src/app/api/organizations/invitations/create/route.ts:118` (`.ilike("email", email)` unescaped), `:461` (mails the requested address, not the row's)
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security, multi-tenancy)
 **Why it matters:** This reaches the same result as F-193 by a different path. `_` is a one-character wildcard in ILIKE and is legal in an email address. Run end to end through real HTTP on the stack: with a pending invitation for `john.smith...`, an Admin who can manage staff held a pending invitation for `john_smith...` tied to a staff record, then re-invited `john_smith...` with no staff record. The lookup matched the victim's row, rotated its token and mailed it to the attacker's address. Registering with that token and the victim's address created a confirmed account with the attacker's password. It needs an existing pending invitation and a mailbox on the victim's domain that differs only at `_` positions.
 **Suggested fix:** Match the address exactly (lowercased) and send to the row's own email. Check every other `.ilike` on an address, as `contact-conflicts.ts:66` already escapes.
-**Resolution:**
+**Resolution:** Fixed on fix/invite-exact-address (2026-11-07): the lookup escapes the address, so `_` and `%` match only themselves and case still doesn't matter, and a refreshed invitation is mailed to the row's own address. This was the only unescaped `.ilike` on an address in the web app, mobile and packages. The route test checks the pattern and the recipient; the end-to-end attack wasn't rerun.
 
 ### F-212 [P1] open - An approver with no live session organization can settle requests
 
