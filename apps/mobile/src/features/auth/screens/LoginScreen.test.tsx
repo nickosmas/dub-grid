@@ -982,7 +982,7 @@ describe("LoginScreen", () => {
 
     expect(
       await screen.findByText(
-        "Your organization has suspended your access to the app. Contact an administrator there if you have questions.",
+        "Your access to the app is suspended, so you can't sign in right now. Contact your administrator for help.",
       ),
     ).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
@@ -1019,7 +1019,7 @@ describe("LoginScreen", () => {
 
     expect(
       await screen.findByText(
-        "Your organization has suspended your access to the app until Fri, Nov 20. Contact an administrator there if you have questions.",
+        "Your access to the app is suspended. You can sign in again on Fri, Nov 20. Contact your administrator for help.",
       ),
     ).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();

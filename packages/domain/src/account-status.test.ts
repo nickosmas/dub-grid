@@ -18,9 +18,18 @@ describe("a suspension's end at sign-in (51g3)", () => {
 
   it("names the day they get access back, and only their state", () => {
     expect(accessSuspendedBody("2026-11-20")).toBe(
-      "Your organization has suspended your access to the app until Fri, Nov 20. Contact an administrator there if you have questions.",
+      "Your access to the app is suspended. You can sign in again on Fri, Nov 20. Contact your administrator for help.",
     );
     expect(accessSuspendedBody(null)).toBe(ACCESS_SUSPENDED_BODY);
     expect(accessSuspendedBody("soon")).toBe(ACCESS_SUSPENDED_BODY);
+  });
+
+  it("names the organization when the caller knows it", () => {
+    expect(accessSuspendedBody(null, "Calm Haven")).toBe(
+      "Your access to Calm Haven is suspended, so you can't sign in right now. Contact your administrator for help.",
+    );
+    expect(accessSuspendedBody("2026-11-20", "Calm Haven")).toBe(
+      "Your access to Calm Haven is suspended. You can sign in again on Fri, Nov 20. Contact your administrator for help.",
+    );
   });
 });

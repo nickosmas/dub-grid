@@ -18,7 +18,7 @@ import { withThemeParam } from "@/lib/theme-preference";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { ORG_NOT_FOUND_MESSAGE, ORG_NOT_FOUND_PARAM } from "./constants";
-import { useClientHost } from "./shared";
+import { GotItFooter, useClientHost } from "./shared";
 
 // Shorter than the default: this is a pre-flight check standing between the
 // user and the sign-in form, so it should give up early and let them retry.
@@ -203,19 +203,16 @@ export default function DomainSelector() {
         </Card>
 
         {showHelp && (
-          <Modal title="How to find your domain" onClose={() => setShowHelp(false)}>
+          <Modal
+            title="How to find your domain"
+            onClose={() => setShowHelp(false)}
+            footer={<GotItFooter onClose={() => setShowHelp(false)} />}
+          >
             <p className="dg-auth-modal-copy">
               Your organization&apos;s domain is the address you use for DubGrid, such as{" "}
               <strong>yourorg</strong>.{baseDomain}. Enter the first part. If you don&apos;t know
               it, contact your organization administrator.
             </p>
-            <Button
-              type="button"
-              onClick={() => setShowHelp(false)}
-              className="dg-btn dg-btn-primary dg-auth-state-primary"
-            >
-              Got it
-            </Button>
           </Modal>
         )}
       </PageShell>
