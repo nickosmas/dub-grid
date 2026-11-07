@@ -1146,7 +1146,7 @@ describe("PersonDetailScreen", () => {
       },
     );
     const mismatchError = new ApiResponseError(
-      "The user account name does not match the employee record.",
+      "The name on the account doesn't match the employee record.",
       409,
       {
         code: "NAME_MISMATCH",

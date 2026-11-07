@@ -1336,7 +1336,7 @@ function NotificationRow({
           }}
         >
           {formatRelativeTime(notification.createdAt)}
-          {notification.channel === "email" ? " • Sent via email" : ""}
+          {notification.channel === "email" ? " • Sent by email" : ""}
           {disclosure.length > 0 && (
             <>
               {expanded ? (

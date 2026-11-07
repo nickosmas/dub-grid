@@ -859,7 +859,7 @@ function ShiftCategoriesSettings({
                 title={`Archive "${cat.name}"?`}
                 message={
                   <>
-                    <strong>{cat.name}</strong> is currently {catDepInfo!.summary.toLowerCase()}.{" "}
+                    <strong>{cat.name}</strong> is {catDepInfo!.summary.toLowerCase()}.{" "}
                     {"It stays on past schedules but can't be picked for anything new."}
                   </>
                 }

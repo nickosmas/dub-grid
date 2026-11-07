@@ -418,7 +418,7 @@ function IndicatorRow({
                 title={`Archive "${trimmedName || "schedule note"}"?`}
                 message={
                   <>
-                    <strong>{trimmedName || "this schedule note"}</strong> is currently{" "}
+                    <strong>{trimmedName || "this schedule note"}</strong> is{" "}
                     {dependencyInfo!.summary.toLowerCase()}.{" "}
                     {"Notes already placed stay, but it can't be picked for anything new."}
                   </>

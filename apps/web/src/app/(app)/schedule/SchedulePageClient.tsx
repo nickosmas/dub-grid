@@ -10092,7 +10092,7 @@ function SchedulerContent({
             <ConfirmDialog
               icon={Repeat}
               title={`Fill ${autoFillPreview.count} empty slot${autoFillPreview.count === 1 ? "" : "s"} from recurring schedules?`}
-              message={`This covers ${autoFillPreview.dateRange}. Shifts already on the schedule are not overwritten.`}
+              message={`This covers ${autoFillPreview.dateRange}. Shifts already on the schedule stay as they are.`}
               confirmLabel="Fill"
               variant="info"
               isLoading={isApplyingRecurring}

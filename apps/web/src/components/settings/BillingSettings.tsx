@@ -113,7 +113,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
             toast.error(
               formatClientErrorMessage(
                 error,
-                "Checkout completed, but billing could not be synced",
+                "Checkout finished, but we couldn't sync your billing. Refresh to check.",
               ),
             );
           })

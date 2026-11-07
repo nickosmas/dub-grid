@@ -43,7 +43,7 @@ export class NameMismatchError extends Error {
 
   constructor(
     public readonly details: NameMismatchDetails,
-    message = "The user account name does not match the employee record.",
+    message = "The name on the account doesn't match the employee record.",
   ) {
     super(message);
     this.name = "NameMismatchError";
@@ -87,7 +87,7 @@ export function parseNameMismatchResponse(payload: unknown): NameMismatchError |
 
 export function createNameMismatchResponseBody(
   details: NameMismatchDetails,
-  error = "The user account name does not match the employee record.",
+  error = "The name on the account doesn't match the employee record.",
 ): NameMismatchResponseBody {
   return {
     code: "NAME_MISMATCH",
