@@ -1,12 +1,13 @@
 // @vitest-environment node
 
 /**
- * Migration 126 (F-194, F-195, F-198, F-212, F-213): a caller acts through the
- * database only in the organization their session is signed in to, or in a Test
- * Sandbox they could still enter. Each case runs in a transaction that is rolled
+ * Migrations 126 and 127 (F-194, F-195, F-198, F-212, F-213, F-224): a caller acts
+ * through the database only in the organization their session is signed in to, or
+ * in a Test Sandbox they could still enter, and being refused one organization
+ * doesn't cost them their others. Each case runs in a transaction that is rolled
  * back.
  *
- * Skipped when the local Postgres is unreachable or behind migration 126.
+ * Skipped when the local Postgres is unreachable or behind migration 127.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -27,7 +28,7 @@ async function probeDb(): Promise<boolean> {
   try {
     await probe.connect();
     const { rows } = await probe.query<{ present: boolean }>(
-      `SELECT to_regproc('public.refuse_caller_outside_org') IS NOT NULL AS present`,
+      `SELECT to_regproc('public.sign_in_org_instead_of_default') IS NOT NULL AS present`,
     );
     return rows[0]?.present === true;
   } catch {
@@ -178,6 +179,116 @@ describe.skipIf(!reachable)("callers act in their session's organization", () =>
 
     expect(await createRequest(orgB, empB)).toMatch(/sign in to this organization/);
     expect(await volunteer(orgB, empB)).toMatch(/sign in to this organization/);
+  });
+
+  it("writes job overrides and starts a trial only in the session's organization (F-194)", async () => {
+    const job = await one<number>(`SELECT id FROM public.jobs WHERE org_id = $1 LIMIT 1`, [orgB]);
+    await signedInTo(orgA);
+
+    expect(await refusal(`SELECT public.set_job_shift_overrides($1)`, [job])).toMatch(
+      /sign in to this organization/,
+    );
+    expect(await refusal(`SELECT public.start_trial_for_org($1)`, [orgB])).toMatch(
+      /sign in to this organization/,
+    );
+  });
+
+  describe("being refused one organization (F-224)", () => {
+    const SESSION = "12701270-1270-4127-8127-127012701270";
+    const SUSPENDED = /Your access has been suspended/;
+
+    const mint = async (sessionId: string | null = SESSION) => {
+      const { rows } = await db.query<{
+        result: { error?: { message: string }; claims?: { org_id?: string } };
+      }>(`SELECT public.custom_access_token_hook($1::JSONB) AS result`, [
+        JSON.stringify({
+          user_id: userId,
+          claims: {
+            sub: userId,
+            aal: "aal1",
+            role: "authenticated",
+            ...(sessionId ? { session_id: sessionId } : {}),
+          },
+          authentication_method: "password",
+        }),
+      ]);
+      return rows[0]!.result;
+    };
+
+    const defaultOrg = () =>
+      one<string>(`SELECT org_id FROM public.profiles WHERE id = $1`, [userId]);
+
+    beforeEach(async () => {
+      await db.query(`DELETE FROM public.jwt_refresh_locks WHERE user_id = $1`, [userId]);
+      await db.query(`UPDATE public.profiles SET org_id = $2 WHERE id = $1`, [userId, orgA]);
+    });
+
+    it("starts a new session in another organization, and keeps the default", async () => {
+      await db.query(`UPDATE public.employees SET suspended_at = now() WHERE id = $1`, [empA]);
+
+      const { claims, error } = await mint();
+
+      expect(error).toBeUndefined();
+      expect(claims?.org_id).toBeTruthy();
+      expect(claims?.org_id).not.toBe(orgA);
+      expect(await defaultOrg()).toBe(orgA);
+    });
+
+    it("does the same for someone offboarded from their default", async () => {
+      await db.query(
+        `UPDATE public.organization_memberships SET archived_at = now()
+          WHERE user_id = $1 AND org_id = $2`,
+        [userId, orgA],
+      );
+      await db.query(`UPDATE public.employees SET status = 'removed' WHERE id = $1`, [empA]);
+      // Archiving a membership holds the person's tokens for a moment.
+      await db.query(`DELETE FROM public.jwt_refresh_locks WHERE user_id = $1`, [userId]);
+
+      const { claims, error } = await mint();
+
+      expect(error).toBeUndefined();
+      expect(claims?.org_id).not.toBe(orgA);
+    });
+
+    it("still refuses someone with nowhere else to go", async () => {
+      await db.query(`UPDATE public.employees SET suspended_at = now() WHERE id = $1`, [empA]);
+      await db.query(
+        `UPDATE public.organization_memberships SET archived_at = now()
+          WHERE user_id = $1 AND org_id <> $2`,
+        [userId, orgA],
+      );
+
+      expect((await mint()).error?.message).toMatch(SUSPENDED);
+    });
+
+    it("still refuses a session already in that organization", async () => {
+      await mint();
+      await db.query(`UPDATE public.employees SET suspended_at = now() WHERE id = $1`, [empA]);
+
+      expect((await mint()).error?.message).toMatch(SUSPENDED);
+    });
+
+    it("refuses a switch into it before writing anything", async () => {
+      await db.query(
+        `UPDATE public.employees SET suspended_at = now(), suspended_until = '2031-12-01'
+          WHERE id = $1`,
+        [empB],
+      );
+      await signedInTo(orgA);
+
+      const refused = await refusal(`SELECT public.switch_org($1)`, [orgB]);
+      await db.query("RESET ROLE");
+
+      expect(refused).toMatch(SUSPENDED);
+      expect(refused).toMatch(/Until 2031-12-01\./);
+      expect(await defaultOrg()).toBe(orgA);
+    });
+
+    it("still lets them switch between the rest", async () => {
+      await signedInTo(orgA);
+
+      expect(await refusal(`SELECT public.switch_org($1)`, [orgB])).toBeNull();
+    });
   });
 
   describe("settling a request (F-212)", () => {

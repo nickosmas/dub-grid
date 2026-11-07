@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:ac247e013b387cdbb5aefa56e0d70a5f0c15c5bdbc05cf1378bec212a7c77e58",
+  "sourceDigest": "sha256:9b15ba47749dc928f084bfcdf27e798b28f385075b44a09cd7aa26aa1f7a2f5f",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5091,6 +5091,16 @@
       "sha256": "3d9487d9f4067178792fed500893169d899f11b71f5693b52d1ff4c0c2fa747a",
       "source": {
         "path": "supabase/migrations/126_callers_act_in_their_session_org.sql"
+      }
+    },
+    {
+      "id": "migration:127_refused_org_keeps_the_others.sql",
+      "version": "127",
+      "name": "refused_org_keeps_the_others",
+      "file": "127_refused_org_keeps_the_others.sql",
+      "sha256": "6e52936f47fad5bdc23d978e5d6ed0853565066e77fb9df7726165b5ec2313a7",
+      "source": {
+        "path": "supabase/migrations/127_refused_org_keeps_the_others.sql"
       }
     }
   ],

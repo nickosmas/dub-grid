@@ -314,6 +314,16 @@ async function switchMobileOrgIfNeeded(
     target_org_id: membership.org_id,
   });
 
+  if (isAccountSuspendedMessage(switchResult.error?.message)) {
+    const suspendedUntil = suspendedUntilFromMessage(switchResult.error?.message);
+    throw new MobileApiRequestError(
+      403,
+      ACCOUNT_SUSPENDED_MESSAGE,
+      ACCOUNT_SUSPENDED_CODE,
+      suspendedUntil ? { suspendedUntil } : {},
+    );
+  }
+
   if (switchResult.error) {
     throw new MobileApiRequestError(400, "We could not switch your organization right now.");
   }
