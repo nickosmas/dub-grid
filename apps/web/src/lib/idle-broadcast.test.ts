@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { broadcastIdleActivity, listenForIdleActivity, STORAGE_KEY } from "./idle-broadcast";
+import {
+  broadcastIdleActivity,
+  listenForIdleActivity,
+  readIdleActivity,
+  STORAGE_KEY,
+  writeIdleActivity,
+} from "./idle-broadcast";
 
 // The BroadcastChannel path itself isn't unit-tested here: jsdom's Event/
 // MessageEvent globals are a different class hierarchy than Node's native
@@ -20,12 +26,23 @@ describe("idle-broadcast", () => {
     delete globalThis.BroadcastChannel;
 
     try {
-      broadcastIdleActivity(999);
-      expect(localStorage.getItem(STORAGE_KEY)).toBe("999");
+      broadcastIdleActivity(999, "s1");
+      expect(readIdleActivity("s1")).toBe(999);
 
       const received: number[] = [];
-      const unlisten = listenForIdleActivity((at) => received.push(at));
-      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY, newValue: "555" }));
+      const unlisten = listenForIdleActivity("s1", (at) => received.push(at));
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: STORAGE_KEY,
+          newValue: JSON.stringify({ at: 555, session: "s1" }),
+        }),
+      );
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: STORAGE_KEY,
+          newValue: JSON.stringify({ at: 777, session: "other" }),
+        }),
+      );
 
       expect(received).toEqual([555]);
       unlisten();
@@ -41,13 +58,34 @@ describe("idle-broadcast", () => {
 
     try {
       const received: number[] = [];
-      const unlisten = listenForIdleActivity((at) => received.push(at));
-      window.dispatchEvent(new StorageEvent("storage", { key: "some-other-key", newValue: "555" }));
+      const unlisten = listenForIdleActivity("s1", (at) => received.push(at));
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "some-other-key",
+          newValue: JSON.stringify({ at: 555, session: "s1" }),
+        }),
+      );
 
       expect(received).toEqual([]);
       unlisten();
     } finally {
       globalThis.BroadcastChannel = original;
     }
+  });
+
+  it("reads back only the same session's activity", () => {
+    writeIdleActivity(1_000, "s1");
+
+    expect(readIdleActivity("s1")).toBe(1_000);
+    expect(readIdleActivity("s2")).toBeNull();
+    expect(readIdleActivity(null)).toBeNull();
+  });
+
+  it("keeps nothing without a session, and ignores a malformed value", () => {
+    writeIdleActivity(1_000, null);
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+
+    localStorage.setItem(STORAGE_KEY, "999");
+    expect(readIdleActivity("s1")).toBeNull();
   });
 });
