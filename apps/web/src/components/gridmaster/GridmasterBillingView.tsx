@@ -80,7 +80,7 @@ function MiniCard({
           fontSize: "var(--dg-fs-card-title)",
           fontWeight: 700,
           color,
-          fontFamily: "var(--font-dm-mono), monospace",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
@@ -459,21 +459,6 @@ export default function GridmasterBillingView({
               <div style={{ padding: 16 }}>
                 <EmptyState
                   size="compact"
-                  icon={
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect x="2" y="5" width="20" height="14" rx="2" />
-                      <line x1="2" y1="10" x2="22" y2="10" />
-                    </svg>
-                  }
                   title="No organizations to bill"
                   description="Billing rows show up once organizations sign up or start a trial."
                 />

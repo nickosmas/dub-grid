@@ -167,11 +167,11 @@ describe("PersonScheduleSection", () => {
     renderSection();
     fireEvent.click(screen.getByRole("button", { name: "Show schedule and requests" }));
 
-    expect(await screen.findByText("No recurring shifts or series.")).toBeInTheDocument();
+    expect(await screen.findByText("No recurring shifts or series")).toBeInTheDocument();
     expect(screen.getByText("Nothing scheduled in this window.")).toBeInTheDocument();
-    expect(screen.getByText("No published changes.")).toBeInTheDocument();
-    expect(screen.getByText("No shift requests.")).toBeInTheDocument();
-    expect(screen.getByText("No profile change requests.")).toBeInTheDocument();
+    expect(screen.getByText("No published changes")).toBeInTheDocument();
+    expect(screen.getByText("No shift requests")).toBeInTheDocument();
+    expect(screen.getByText("No profile change requests")).toBeInTheDocument();
   });
 
   it("shows the error and loads again on retry", async () => {
@@ -184,7 +184,7 @@ describe("PersonScheduleSection", () => {
     expect(await screen.findByText("We couldn't load this schedule.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
-    expect(await screen.findByText("No shift requests.")).toBeInTheDocument();
+    expect(await screen.findByText("No shift requests")).toBeInTheDocument();
     expect(fetchGridmasterStaffActivity).toHaveBeenCalledTimes(2);
   });
 });

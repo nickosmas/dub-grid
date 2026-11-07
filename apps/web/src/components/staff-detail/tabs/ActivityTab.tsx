@@ -13,6 +13,8 @@ interface ActivityTabProps {
   timeZone?: string | null;
   /** The staff page's period, which the log follows. */
   range: { startDate: string; endDate: string; phrase: string };
+  /** Moves the page's period to the month holding this date. */
+  onJumpToDate?: (date: string) => void;
 }
 
 /** The change log for this person, filtered by kind from its own dropdown. */
@@ -23,6 +25,7 @@ export function ActivityTab({
   error,
   timeZone = null,
   range,
+  onJumpToDate,
 }: ActivityTabProps) {
   return (
     <PersonActivityTimeline
@@ -31,6 +34,7 @@ export function ActivityTab({
       error={error}
       timeZone={timeZone}
       range={range}
+      onJumpToDate={onJumpToDate}
       categories={PERSON_ACTIVITY_CATEGORIES}
       emptyDescription={`Changes to ${getEmployeeDisplayName(employee)}'s profile, status, access, or invitations will show up here.`}
     />

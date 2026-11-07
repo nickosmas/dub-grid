@@ -78,7 +78,7 @@ describe("AuditLogView", () => {
     // The Stripe payload is never flattened raw; a cancellation has no rows to add.
     expect(within(dialog).queryByText("Stripe Event Type")).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Customer Subscription Deleted")).not.toBeInTheDocument();
-    expect(within(dialog).getByText("No additional details were recorded.")).toBeInTheDocument();
+    expect(within(dialog).getByText("No additional details were recorded")).toBeInTheDocument();
     // The platform-wide view names the organization in the header, before the time.
     expect(within(dialog).getByText("Acme Health").parentElement).toHaveClass(
       "dg-activity-details-meta",

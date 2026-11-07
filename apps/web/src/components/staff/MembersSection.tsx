@@ -22,16 +22,7 @@ import { savePeopleOrder } from "@/lib/people-order";
 import { getPersonAccountState } from "@/lib/person-account-state";
 import { Button } from "@/components/Button";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  ChevronRight,
-  Import as ImportIcon,
-  Plus,
-  Search,
-  SlidersHorizontal,
-  Upload,
-  User,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Search, SlidersHorizontal, User } from "lucide-react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -1100,7 +1091,7 @@ export function MembersSection({
 
           {/* Headcount and credential totals are management reading; a
               regular user's directory is the list itself. */}
-          {!regularUserMode && (
+          {!regularUserMode && !showManagement && (
             <DirectorySummaryCards
               onScheduleCount={employees.length}
               fullTimeCount={employmentSummary.fullTime}
@@ -1114,7 +1105,6 @@ export function MembersSection({
               counts={certificationCounts}
               certifications={certifications}
               certificationLabel={certificationLabel}
-              useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
               certifiedCount={credentialSummary.certified}
               uncertifiedCount={credentialSummary.uncertified}
               selectedCertification={filterCertification}
@@ -1130,10 +1120,8 @@ export function MembersSection({
                 ? { display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }
                 : {
                     display: "flex",
-                    alignItems: "center",
+                    alignItems: "flex-end",
                     gap: 12,
-                    rowGap: 8,
-                    flexWrap: "wrap",
                     paddingBottom: 4,
                   }
             }
@@ -1144,7 +1132,7 @@ export function MembersSection({
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
-                flex: isMobile ? undefined : "1 1 auto",
+                flex: isMobile ? undefined : "1 1 0",
                 minWidth: 0,
                 maxWidth: "100%",
                 flexWrap: "wrap",
@@ -1365,8 +1353,11 @@ export function MembersSection({
                 className="dg-btn dg-btn-secondary"
                 style={{ position: "relative" }}
               >
-                <SlidersHorizontal size={14} strokeWidth={2.25} aria-hidden="true" />
-                {isMobile ? "" : "Filter"}
+                {isMobile ? (
+                  <SlidersHorizontal size={14} strokeWidth={2.25} aria-hidden="true" />
+                ) : (
+                  "Filter"
+                )}
                 {/* Counts the half you're looking at, so it never reports
                     filters the visible list isn't being narrowed by. */}
                 <NumericBadge
@@ -1448,7 +1439,7 @@ export function MembersSection({
                 alignItems: "center",
                 justifyContent: isMobile ? "flex-end" : undefined,
                 gap: 8,
-                flexWrap: "wrap",
+                flexShrink: 0,
               }}
             >
               {!showManagement && canManageEmployees && orgId && !isMobile && (
@@ -1464,7 +1455,6 @@ export function MembersSection({
                     className="dg-btn dg-btn-secondary"
                     disabled={!featureFlags.csvImport}
                   >
-                    <ImportIcon size={14} />
                     Import
                   </Button>
                 </MaybeHint>
@@ -1483,7 +1473,6 @@ export function MembersSection({
                     className="dg-btn dg-btn-secondary"
                     disabled={!hasExportableStaffRows || !featureFlags.csvExport}
                   >
-                    <Upload size={14} />
                     Export
                   </Button>
                 </MaybeHint>
@@ -1498,7 +1487,6 @@ export function MembersSection({
                     aria-haspopup="menu"
                     className="dg-btn dg-btn-primary"
                   >
-                    <Plus size={14} />
                     Add
                     <ChevronDown size={14} />
                   </Button>
@@ -1543,7 +1531,6 @@ export function MembersSection({
 
               {canAddScheduled && !canAddManagement && (
                 <Button onClick={onAdd} className="dg-btn dg-btn-primary">
-                  <Plus size={14} />
                   Add
                 </Button>
               )}
@@ -1553,7 +1540,6 @@ export function MembersSection({
                   onClick={() => setShowManagementInvite(true)}
                   className="dg-btn dg-btn-primary"
                 >
-                  <Plus size={14} />
                   Add
                 </Button>
               )}
@@ -1708,7 +1694,7 @@ export function MembersSection({
                         </div>
                         <div className="dg-staff-directory-head-cell flex">Roles</div>
                         <div className="dg-staff-directory-head-cell flex">Account</div>
-                        <div className="dg-staff-directory-head-cell flex">Access</div>
+                        <div className="dg-staff-directory-head-cell flex">Access role</div>
                         <div className="dg-staff-directory-head-cell flex">Date joined</div>
                         <div className="dg-staff-directory-head-cell flex" />
                       </div>
@@ -1823,7 +1809,7 @@ export function MembersSection({
                           )}
                           {canViewEmployeeDetails && (
                             <TableHead className="border-r border-[var(--dg-color-border-light)]">
-                              <div className="min-w-[132px]">Access</div>
+                              <div className="min-w-[132px]">Access role</div>
                             </TableHead>
                           )}
                           {canViewEmployeeDetails && (
@@ -2139,15 +2125,15 @@ export function MembersSection({
               </div>
             ) : (
               <EmptyState
-                icon={<User size={28} strokeWidth={1.5} />}
+                size="compact"
                 title={
                   searchQuery || managementHasActiveFilters
-                    ? "No results found"
+                    ? "No one matches your search or filters"
                     : "Nobody on an administrative team yet"
                 }
                 description={
                   searchQuery || managementHasActiveFilters
-                    ? "Try adjusting your search or filters."
+                    ? undefined
                     : "People on an administrative team will show here."
                 }
                 action={

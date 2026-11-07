@@ -193,7 +193,7 @@ export function buildOperationsReportPreviewTable(
           formatListValue(row.certification, `No ${terms.certification}`),
           formatListValue(row.departments, "No departments"),
         ]),
-        emptyText: "No staff records found.",
+        emptyText: "No staff records found",
       };
     case "staff-hours":
       return {
@@ -222,7 +222,7 @@ export function buildOperationsReportPreviewTable(
             row.absenceCount,
             row.overtimeHours,
           ]),
-        emptyText: "No published schedule for this range.",
+        emptyText: "No published schedule for this range",
       };
     case "staff-activity":
       return {
@@ -255,7 +255,7 @@ export function buildOperationsReportPreviewTable(
           row.allRequestCount,
           formatListValue(row.requestBreakdown, "No request activity"),
         ]),
-        emptyText: "No staff activity for this range.",
+        emptyText: "No staff activity for this range",
       };
     case "mentoring-hours":
       return {
@@ -272,7 +272,7 @@ export function buildOperationsReportPreviewTable(
           row.mentoredAssignmentCount,
           row.mentoredDays,
         ]),
-        emptyText: "No published mentored assignments for this range.",
+        emptyText: "No published mentored assignments for this range",
       };
     case "mentoring-detail":
       return {
@@ -297,7 +297,7 @@ export function buildOperationsReportPreviewTable(
           formatListValue(row.endTime, "Not set"),
           row.mentoringHours,
         ]),
-        emptyText: "No published mentored assignments for this range.",
+        emptyText: "No published mentored assignments for this range",
       };
     case "coverage":
       return {
@@ -320,7 +320,7 @@ export function buildOperationsReportPreviewTable(
           row.scheduled,
           row.openSlots,
         ]),
-        emptyText: "No coverage requirements for this range.",
+        emptyText: "No coverage requirements for this range",
       };
     case "shift-period-summary": {
       const summary = payload.reports.shiftPeriodSummary;
@@ -337,7 +337,7 @@ export function buildOperationsReportPreviewTable(
           ["Coverage", summary.coveragePct == null ? "Not available" : `${summary.coveragePct}%`],
           ["Requests", summary.requestCount],
         ],
-        emptyText: "No period data for this range.",
+        emptyText: "No period data for this range",
       };
     }
     case "shift-requests":
@@ -387,7 +387,7 @@ export function buildOperationsReportPreviewTable(
           formatResolutionHours(row.resolutionHours),
           formatListValue(row.managerNote, "-"),
         ]),
-        emptyText: "No matching requests for this range.",
+        emptyText: "No matching requests for this range",
       };
     case "absences-calloffs":
       return {
@@ -420,7 +420,7 @@ export function buildOperationsReportPreviewTable(
           formatListValue(row.decidedBy, "-"),
           formatListValue(row.managerNote, "-"),
         ]),
-        emptyText: "No absences or call-offs for this range.",
+        emptyText: "No absences or call-offs for this range",
       };
     case "roster-status":
       return {
@@ -445,7 +445,7 @@ export function buildOperationsReportPreviewTable(
           formatAccountLinked(row.linkedAccount),
           formatInvitationStatus(row.pendingInvitation),
         ]),
-        emptyText: "No staff records found.",
+        emptyText: "No staff records found",
       };
     case "certification-role-matrix":
       return {
@@ -472,7 +472,7 @@ export function buildOperationsReportPreviewTable(
           formatMissingCertification(row.missingCertification, terms.certification),
           formatMissingRole(row.missingRole, terms.role),
         ]),
-        emptyText: "No staff records found.",
+        emptyText: "No staff records found",
       };
     case "account-access":
       return {
@@ -495,7 +495,7 @@ export function buildOperationsReportPreviewTable(
           formatInvitationStatus(row.pendingInvitation),
           row.accountAccessStatus,
         ]),
-        emptyText: "No staff records found.",
+        emptyText: "No staff records found",
       };
     case "schedule-matrix":
       return {
@@ -512,7 +512,7 @@ export function buildOperationsReportPreviewTable(
             row.employeeName,
             ...payload.reports.scheduleMatrix.dates.map((date) => row.cells[date] ?? ""),
           ]),
-        emptyText: "No published schedule for this range.",
+        emptyText: "No published schedule for this range",
       };
     case "shift-notes":
       return {
@@ -529,7 +529,7 @@ export function buildOperationsReportPreviewTable(
           row.indicator,
           formatListValue(row.focusArea, `No ${terms.focusArea}`),
         ]),
-        emptyText: "No published schedule notes for this range.",
+        emptyText: "No published schedule notes for this range",
       };
   }
 }

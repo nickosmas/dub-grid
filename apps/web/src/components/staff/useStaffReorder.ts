@@ -10,14 +10,18 @@ interface UseStaffReorderOptions {
 export function useStaffReorder({ sorted, onSaveOrder }: UseStaffReorderOptions) {
   const [isReordering, setIsReordering] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<Employee[] | null>(null);
+  // The list behind the table can change under a search, so a move is measured
+  // against the order reordering started from.
+  const [startingOrder, setStartingOrder] = useState<Employee[]>([]);
 
   const isDirty = useMemo(() => {
     if (!isReordering || !pendingOrder) return false;
-    return pendingOrder.some((emp, i) => emp.id !== sorted[i]?.id);
-  }, [isReordering, pendingOrder, sorted]);
+    return pendingOrder.some((emp, i) => emp.id !== startingOrder[i]?.id);
+  }, [isReordering, pendingOrder, startingOrder]);
 
   const enterReorder = useCallback(() => {
     setIsReordering(true);
+    setStartingOrder(sorted);
     setPendingOrder([...sorted]);
   }, [sorted]);
 
@@ -29,8 +33,8 @@ export function useStaffReorder({ sorted, onSaveOrder }: UseStaffReorderOptions)
   }, [pendingOrder, onSaveOrder]);
 
   const discardReorder = useCallback(() => {
-    setPendingOrder([...sorted]);
-  }, [sorted]);
+    setPendingOrder([...startingOrder]);
+  }, [startingOrder]);
 
   const cancelReorder = useCallback(() => {
     setIsReordering(false);

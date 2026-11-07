@@ -742,7 +742,6 @@ export default function PublishHistoryPanel({
           {!loading && entries.length === 0 && (
             <EmptyState
               size="compact"
-              icon={<History size={22} />}
               title="No publish history yet"
               description="Published schedules appear here."
             />

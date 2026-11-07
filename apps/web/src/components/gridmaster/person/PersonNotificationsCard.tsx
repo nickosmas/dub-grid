@@ -88,7 +88,7 @@ export function PersonNotificationsCard({ record }: { record: GridmasterPersonRe
 
           <PersonSubheading>Recent notifications</PersonSubheading>
           {query.data.notifications.notifications.length === 0 ? (
-            <EmptyState size="inline" title="No notifications." />
+            <EmptyState size="inline" title="No notifications" />
           ) : (
             <ul className="flex flex-col divide-y divide-[var(--dg-color-border-light)]">
               {query.data.notifications.notifications.map((notification) => (

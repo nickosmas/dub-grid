@@ -11,7 +11,7 @@ import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import CustomSelect from "@/components/CustomSelect";
 import { RadioCardList } from "@/components/ui/radio-card-list";
 import type { PlannedChange, SuspensionDates } from "@/features/employees/client";
-import { CalendarX2, Ellipsis, Undo2 } from "lucide-react";
+import { Ellipsis } from "lucide-react";
 import { STATUS_ACTION_ICONS, STATUS_CHANGE_ICON } from "@/components/staff/status-action-icons";
 import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
@@ -333,14 +333,12 @@ function PlanCancelToggle({
   keepLabel: string;
   onToggle: () => void;
 }) {
-  const Icon = cancelling ? Undo2 : CalendarX2;
   return (
     <Button
       className="dg-btn dg-btn-secondary dg-btn-sm"
       style={{ alignSelf: "flex-start" }}
       onClick={onToggle}
     >
-      <Icon size={14} aria-hidden />
       {cancelling ? keepLabel : cancelLabel}
     </Button>
   );

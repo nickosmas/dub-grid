@@ -611,7 +611,7 @@ describe("CoveragePanel", () => {
         screen.getByText("No fixes found. Select a short cell to see why."),
       ).toBeInTheDocument();
       fireEvent.click(dateHeading(/Wednesday, October 28/));
-      expect(day().getByText("No fixes found for this day.")).toBeInTheDocument();
+      expect(day().getByText("No fixes found for this day")).toBeInTheDocument();
       expect(
         day().getByText("Select a short cell to see why each qualified person isn't suggested."),
       ).toBeInTheDocument();

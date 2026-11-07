@@ -56,11 +56,11 @@ test.describe("dashboard states", () => {
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/dashboard`);
 
     // The exact title depends on this org's current publish state (not
-    // something this test controls), so match any of OpenShiftsCard's three
+    // something this test controls), so match any of OpenShiftsCard's
     // known empty-state titles rather than assuming one.
-    await expect(
-      page.getByText(/Not published yet|No open shifts on published dates|All shifts covered/),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Not published yet|No open shifts/)).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByText(/Set up coverage requirements in Settings/i)).toBeVisible();
   });
 

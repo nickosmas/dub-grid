@@ -1866,7 +1866,7 @@ function JobRow({
                     })
                   }
                   disabled={!canManageScheduleDefinitions || isRegularStaffJob}
-                  emptyMessage="No departments exist yet."
+                  emptyMessage="No departments exist yet"
                 />
 
                 <ChecklistPanel

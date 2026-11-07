@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import { pluralLabelNoun } from "@dubgrid/domain";
 import type { SectionCoverage } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
-import type { FocusArea } from "@/types";
 import Modal from "@/components/Modal";
 
 import CustomSelect from "@/components/CustomSelect";
@@ -24,7 +24,6 @@ const PCT_COLORS = {
 
 interface ExpandedCoverageProps {
   sections: SectionCoverage[];
-  focusAreas: FocusArea[];
   focusAreaLabel: string;
   hasRequirements: boolean;
   publishedWindowState?: PublishedWindowState;
@@ -33,7 +32,6 @@ interface ExpandedCoverageProps {
 
 export default function ExpandedCoverage({
   sections,
-  focusAreas,
   focusAreaLabel,
   hasRequirements,
   publishedWindowState = "published",
@@ -44,7 +42,10 @@ export default function ExpandedCoverage({
   const isPartial = hasRequirements && publishedWindowState === "partial";
 
   const filtered = useMemo(
-    () => (filter === "all" ? sections : sections.filter((s) => s.focusAreaId === filter)),
+    () =>
+      (filter === "all" ? [...sections] : sections.filter((s) => s.focusAreaId === filter)).sort(
+        (a, b) => a.pct - b.pct,
+      ),
     [sections, filter],
   );
 
@@ -63,7 +64,7 @@ export default function ExpandedCoverage({
         {isUnpublished ? (
           <EmptyState
             size="compact"
-            title="This period has not been published yet."
+            title="This period has not been published yet"
             description="Coverage details will appear after the first publish."
           />
         ) : (
@@ -113,16 +114,21 @@ export default function ExpandedCoverage({
                   / {totalRequired} filled
                 </span>
               </div>
-              <CustomSelect
-                value={filter === "all" ? "all" : String(filter)}
-                options={[
-                  { value: "all", label: `All ${pluralLabelNoun(focusAreaLabel)}` },
-                  ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
-                ]}
-                onChange={(val) => setFilter(val === "all" ? "all" : Number(val))}
-                style={{ marginLeft: "auto" }}
-                fontSize="var(--dg-fs-label)"
-              />
+              {sections.length > 1 && (
+                <CustomSelect
+                  value={filter === "all" ? "all" : String(filter)}
+                  options={[
+                    { value: "all", label: `All ${pluralLabelNoun(focusAreaLabel)}` },
+                    ...sections.map((sec) => ({
+                      value: String(sec.focusAreaId),
+                      label: sec.focusAreaName,
+                    })),
+                  ]}
+                  onChange={(val) => setFilter(val === "all" ? "all" : Number(val))}
+                  style={{ marginLeft: "auto" }}
+                  fontSize="var(--dg-fs-label)"
+                />
+              )}
             </div>
 
             <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
@@ -240,6 +246,7 @@ export default function ExpandedCoverage({
                         {filtered[0].daily.map((d) => (
                           <div key={d.dateKey} style={heatmapHeaderStyle}>
                             {d.dayLabel}
+                            {filtered[0].daily.length > 7 ? ` ${Number(d.dateKey.slice(-2))}` : ""}
                           </div>
                         ))}
 
@@ -258,10 +265,12 @@ export default function ExpandedCoverage({
                                 : `${sec.focusAreaName} ${day.dayLabel}: no coverage requirement`;
 
                               return (
-                                <div
+                                <Link
                                   key={`${sec.focusAreaId}-${day.dateKey}`}
+                                  href={`/schedule?date=${day.dateKey}`}
                                   style={{
                                     height: 32,
+                                    textDecoration: "none",
                                     borderRadius: 5,
                                     display: "flex",
                                     alignItems: "center",
@@ -274,7 +283,7 @@ export default function ExpandedCoverage({
                                   aria-label={ariaLabel}
                                 >
                                   {cellLabel}
-                                </div>
+                                </Link>
                               );
                             })}
                           </React.Fragment>

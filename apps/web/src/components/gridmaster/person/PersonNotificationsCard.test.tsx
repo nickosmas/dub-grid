@@ -88,7 +88,7 @@ describe("PersonNotificationsCard", () => {
     renderCard();
 
     expect(await screen.findByText("Never changed. They get the defaults.")).toBeInTheDocument();
-    expect(screen.getByText("No notifications.")).toBeInTheDocument();
+    expect(screen.getByText("No notifications")).toBeInTheDocument();
   });
 
   it("renders nothing and fetches nothing without an account", () => {
