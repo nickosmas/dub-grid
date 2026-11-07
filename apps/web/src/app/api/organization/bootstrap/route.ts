@@ -12,6 +12,7 @@ import type {
   DbShiftCategory,
 } from "@dubgrid/db-types";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { findUsableSandbox } from "@/lib/sandbox-access";
 import { getServiceClient } from "@/lib/supabase-service";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { parseHost } from "@/lib/subdomain";
@@ -113,14 +114,11 @@ async function resolveOrganizationId(
     ? getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`)
     : null;
   if (sandbox && userId && sandbox.userId === userId) {
-    const { data: ownedSandbox } = await getServiceClient()
-      .from("organizations")
-      .select("id")
-      .eq("id", sandbox.sandboxOrgId)
-      .eq("workspace_kind", "sandbox")
-      .eq("sandbox_owner_user_id", userId)
-      .is("archived_at", null)
-      .maybeSingle();
+    const ownedSandbox = await findUsableSandbox(getServiceClient(), {
+      sandboxOrgId: sandbox.sandboxOrgId,
+      userId,
+      sessionId: sandbox.sessionId,
+    });
 
     if (ownedSandbox) {
       return { orgId: ownedSandbox.id, isGridmaster: false, fromVerifiedState: true };

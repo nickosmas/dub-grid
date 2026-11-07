@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:cec674076c081bd7576c7b8a930b6ccff627936bd90fd1ed4407a38403e4eed5",
+  "sourceDigest": "sha256:09ddafb50de1d997d7e6b28e08973a06c604f3b0de35b39e2bd2759e8a75a63c",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5031,6 +5031,46 @@
       "sha256": "9ec0a0634ee797f948c5126dd2cc687600afb4f40e8bf0b31d3029af1c58cd44",
       "source": {
         "path": "supabase/migrations/120_suspended_not_marked_away.sql"
+      }
+    },
+    {
+      "id": "migration:121_request_actions_stay_in_session_org.sql",
+      "version": "121",
+      "name": "request_actions_stay_in_session_org",
+      "file": "121_request_actions_stay_in_session_org.sql",
+      "sha256": "36fc564e05652cf5656e6b2895908a07bda96d6ccad1e9a809459082ee1fdf88",
+      "source": {
+        "path": "supabase/migrations/121_request_actions_stay_in_session_org.sql"
+      }
+    },
+    {
+      "id": "migration:122_schedule_writes_server_only.sql",
+      "version": "122",
+      "name": "schedule_writes_server_only",
+      "file": "122_schedule_writes_server_only.sql",
+      "sha256": "6151e50d55f86c88b248eb45d1aa21c65cd09e859439d6c713a2f0367dbc3e84",
+      "source": {
+        "path": "supabase/migrations/122_schedule_writes_server_only.sql"
+      }
+    },
+    {
+      "id": "migration:123_sandboxes_stay_out_of_org_switching.sql",
+      "version": "123",
+      "name": "sandboxes_stay_out_of_org_switching",
+      "file": "123_sandboxes_stay_out_of_org_switching.sql",
+      "sha256": "fe4ec8d0c319443ee8262a7428f8289d414e687199bb3fe0d7c007f65ac94289",
+      "source": {
+        "path": "supabase/migrations/123_sandboxes_stay_out_of_org_switching.sql"
+      }
+    },
+    {
+      "id": "migration:124_org_bound_references.sql",
+      "version": "124",
+      "name": "org_bound_references",
+      "file": "124_org_bound_references.sql",
+      "sha256": "d1f46e00c1a79db37c5eb496550dd6b7bac7075223121c50a028eeed56ac8f4d",
+      "source": {
+        "path": "supabase/migrations/124_org_bound_references.sql"
       }
     }
   ],
