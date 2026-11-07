@@ -8,18 +8,25 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="supported-color-schemes" content="light dark" />
     <style>
+      :root {
+        color-scheme: light dark;
+        supported-color-schemes: light dark;
+      }
       @media (prefers-color-scheme: dark) {
         .dg-page {
-          background-color: #09090b !important;
+          background-color: #000000 !important;
         }
-        .dg-card {
+        .dg-sheet {
           background-color: #18181b !important;
         }
         .dg-card {
-          border-color: #27272a !important;
+          background-color: #27272a !important;
+        }
+        .dg-card {
+          border-color: #3f3f46 !important;
         }
         .dg-rule {
-          border-color: #27272a !important;
+          border-color: #3f3f46 !important;
         }
         .dg-ink {
           color: #fafafa !important;
@@ -40,10 +47,10 @@
         }
       }
       [data-ogsc] .dg-card {
-        border-color: #27272a !important;
+        border-color: #3f3f46 !important;
       }
       [data-ogsc] .dg-rule {
-        border-color: #27272a !important;
+        border-color: #3f3f46 !important;
       }
       [data-ogsc] .dg-ink {
         color: #fafafa !important;
@@ -63,14 +70,17 @@
         overflow: visible !important;
       }
       [data-ogsb] .dg-page {
-        background-color: #09090b !important;
+        background-color: #000000 !important;
+      }
+      [data-ogsb] .dg-sheet {
+        background-color: #18181b !important;
       }
       [data-ogsb] .dg-card {
-        background-color: #18181b !important;
+        background-color: #27272a !important;
       }
     </style>
   </head>
-  <body class="dg-page" style="background-color: #ffffff; margin: 0; padding: 0">
+  <body class="dg-page" style="background-color: #e5e5e5; margin: 0; padding: 0">
     <!--$--><!--html--><!--head-->
     <div
       style="
@@ -100,129 +110,40 @@
       <tbody>
         <tr>
           <td
-            style="margin:0;padding:0;background-color:#FFFFFF;font-family:Inter, -apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Roboto, &#x27;Helvetica Neue&#x27;, Arial, sans-serif"
+            style="margin:0;padding:0;background-color:#E5E5E5;font-family:Inter, -apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Roboto, &#x27;Helvetica Neue&#x27;, Arial, sans-serif"
           >
             <table
-              align="center"
+              role="presentation"
               width="100%"
-              class="dg-page"
-              border="0"
               cellpadding="0"
               cellspacing="0"
-              role="presentation"
-              style="max-width: 560px; margin: 0 auto; background-color: #ffffff"
+              border="0"
+              bgcolor="#E5E5E5"
+              class="dg-page"
+              style="width: 100%; background-color: #e5e5e5"
             >
               <tbody>
-                <tr style="width: 100%">
-                  <td>
+                <tr>
+                  <td align="center" style="padding: 24px 16px">
                     <table
                       align="center"
                       width="100%"
+                      bgcolor="#FFFFFF"
+                      class="dg-sheet"
                       border="0"
                       cellpadding="0"
                       cellspacing="0"
                       role="presentation"
-                      style="padding: 24px 12px 12px"
+                      style="
+                        max-width: 560px;
+                        margin: 0 auto;
+                        background-color: #ffffff;
+                        border-radius: 16px;
+                      "
                     >
                       <tbody>
-                        <tr>
+                        <tr style="width: 100%">
                           <td>
-                            <div class="dg-logo-light">
-                              <img
-                                alt="dubgrid"
-                                height="46"
-                                src="{{ .SiteURL }}/email-logo-light.png"
-                                style="
-                                  display: block;
-                                  outline: none;
-                                  border: none;
-                                  text-decoration: none;
-                                "
-                                width="139"
-                              />
-                            </div>
-                            <div
-                              class="dg-logo-dark"
-                              style="display: none; max-height: 0; overflow: hidden"
-                            >
-                              <img
-                                alt=""
-                                height="46"
-                                src="{{ .SiteURL }}/email-logo-dark.png"
-                                style="
-                                  display: block;
-                                  outline: none;
-                                  border: none;
-                                  text-decoration: none;
-                                "
-                                width="139"
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <table
-                      align="center"
-                      width="100%"
-                      border="0"
-                      cellpadding="0"
-                      cellspacing="0"
-                      role="presentation"
-                      style="padding: 12px 24px 8px"
-                    >
-                      <tbody>
-                        <tr>
-                          <td>
-                            <p
-                              class="dg-ink"
-                              style="
-                                font-size: 24px;
-                                line-height: 30px;
-                                margin: 0 0 20px;
-                                font-weight: 600;
-                                letter-spacing: -0.02em;
-                                color: #0f172a;
-                                margin-top: 0;
-                                margin-right: 0;
-                                margin-bottom: 20px;
-                                margin-left: 0;
-                              "
-                            >
-                              Confirm your email change
-                            </p>
-                            <p
-                              class="dg-body"
-                              style="
-                                font-size: 16px;
-                                line-height: 26px;
-                                margin: 0 0 20px;
-                                color: #475569;
-                                margin-top: 0;
-                                margin-right: 0;
-                                margin-bottom: 20px;
-                                margin-left: 0;
-                              "
-                            >
-                              Hi
-                              <!-- -->there<!-- -->,
-                            </p>
-                            <p
-                              class="dg-body"
-                              style="
-                                font-size: 16px;
-                                line-height: 26px;
-                                margin: 0 0 20px;
-                                color: #475569;
-                                margin-top: 0;
-                                margin-right: 0;
-                                margin-bottom: 20px;
-                                margin-left: 0;
-                              "
-                            >
-                              Confirm the new email address for your DubGrid account using the
-                              button below. The link expires in 15 minutes.
-                            </p>
                             <table
                               align="center"
                               width="100%"
@@ -230,142 +151,256 @@
                               cellpadding="0"
                               cellspacing="0"
                               role="presentation"
-                              style="margin: 4px 0 28px"
+                              style="padding: 24px 12px 12px"
                             >
                               <tbody>
                                 <tr>
                                   <td>
-                                    <a
-                                      href="{{ .ConfirmationURL }}"
-                                      style="line-height:20px;text-decoration:none;display:inline-block;max-width:100%;mso-padding-alt:0px;background-color:#2563EB;color:#FFFFFF;font-family:Inter, -apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Roboto, &#x27;Helvetica Neue&#x27;, Arial, sans-serif;font-size:15px;font-weight:600;padding:13px 22px;border-radius:8px;padding-top:13px;padding-right:22px;padding-bottom:13px;padding-left:22px"
-                                      target="_blank"
-                                      ><span
-                                        ><!--[if mso
-                                          ]><i
-                                            style="
-                                              mso-font-width: 366.66666666666663%;
-                                              mso-text-raise: 19.5;
-                                            "
-                                            hidden
-                                            >&#8202;&#8202;&#8202;</i
-                                          ><!
-                                        [endif]--></span
-                                      ><span
+                                    <div class="dg-logo-light">
+                                      <img
+                                        alt="dubgrid"
+                                        height="46"
+                                        src="{{ .SiteURL }}/email-logo-light.png"
                                         style="
-                                          max-width: 100%;
-                                          display: inline-block;
-                                          line-height: 120%;
-                                          mso-padding-alt: 0px;
-                                          mso-text-raise: 9.75px;
+                                          display: block;
+                                          outline: none;
+                                          border: none;
+                                          text-decoration: none;
                                         "
-                                        >Confirm change</span
-                                      ><span
-                                        ><!--[if mso
-                                          ]><i style="mso-font-width: 366.66666666666663%" hidden
-                                            >&#8202;&#8202;&#8202;&#8203;</i
-                                          ><!
-                                        [endif]--></span
-                                      ></a
+                                        width="139"
+                                      />
+                                    </div>
+                                    <div
+                                      class="dg-logo-dark"
+                                      style="display: none; max-height: 0; overflow: hidden"
                                     >
+                                      <img
+                                        alt=""
+                                        height="46"
+                                        src="{{ .SiteURL }}/email-logo-dark.png"
+                                        style="
+                                          display: block;
+                                          outline: none;
+                                          border: none;
+                                          text-decoration: none;
+                                        "
+                                        width="139"
+                                      />
+                                    </div>
                                   </td>
                                 </tr>
                               </tbody>
                             </table>
-                            <p
-                              class="dg-body"
-                              style="
-                                font-size: 16px;
-                                line-height: 26px;
-                                margin: 0 0 20px;
-                                color: #475569;
-                                margin-top: 0;
-                                margin-right: 0;
-                                margin-bottom: 20px;
-                                margin-left: 0;
-                              "
+                            <table
+                              align="center"
+                              width="100%"
+                              border="0"
+                              cellpadding="0"
+                              cellspacing="0"
+                              role="presentation"
+                              style="padding: 12px 24px 8px"
                             >
-                              If you didn&#x27;t request this change, don&#x27;t confirm it, and
-                              contact support@dubgrid.com if you think someone else is using your
-                              account.
-                            </p>
-                            <p
-                              class="dg-body"
-                              style="
-                                font-size: 16px;
-                                line-height: 26px;
-                                margin: 0 0 20px;
-                                color: #475569;
-                                margin-top: 0;
-                                margin-right: 0;
-                                margin-bottom: 20px;
-                                margin-left: 0;
-                              "
+                              <tbody>
+                                <tr>
+                                  <td>
+                                    <p
+                                      class="dg-ink"
+                                      style="
+                                        font-size: 24px;
+                                        line-height: 30px;
+                                        margin: 0 0 20px;
+                                        font-weight: 600;
+                                        letter-spacing: -0.02em;
+                                        color: #0f172a;
+                                        margin-top: 0;
+                                        margin-right: 0;
+                                        margin-bottom: 20px;
+                                        margin-left: 0;
+                                      "
+                                    >
+                                      Confirm your email change
+                                    </p>
+                                    <p
+                                      class="dg-body"
+                                      style="
+                                        font-size: 16px;
+                                        line-height: 26px;
+                                        margin: 0 0 20px;
+                                        color: #475569;
+                                        margin-top: 0;
+                                        margin-right: 0;
+                                        margin-bottom: 20px;
+                                        margin-left: 0;
+                                      "
+                                    >
+                                      Hi
+                                      <!-- -->there<!-- -->,
+                                    </p>
+                                    <p
+                                      class="dg-body"
+                                      style="
+                                        font-size: 16px;
+                                        line-height: 26px;
+                                        margin: 0 0 20px;
+                                        color: #475569;
+                                        margin-top: 0;
+                                        margin-right: 0;
+                                        margin-bottom: 20px;
+                                        margin-left: 0;
+                                      "
+                                    >
+                                      Confirm the new email address for your DubGrid account using
+                                      the button below. The link expires in 15 minutes.
+                                    </p>
+                                    <table
+                                      align="center"
+                                      width="100%"
+                                      border="0"
+                                      cellpadding="0"
+                                      cellspacing="0"
+                                      role="presentation"
+                                      style="margin: 4px 0 28px"
+                                    >
+                                      <tbody>
+                                        <tr>
+                                          <td>
+                                            <a
+                                              href="{{ .ConfirmationURL }}"
+                                              style="line-height:20px;text-decoration:none;display:inline-block;max-width:100%;mso-padding-alt:0px;background-color:#2563EB;color:#FFFFFF;font-family:Inter, -apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Roboto, &#x27;Helvetica Neue&#x27;, Arial, sans-serif;font-size:15px;font-weight:600;padding:13px 22px;border-radius:8px;padding-top:13px;padding-right:22px;padding-bottom:13px;padding-left:22px"
+                                              target="_blank"
+                                              ><span
+                                                ><!--[if mso
+                                                  ]><i
+                                                    style="
+                                                      mso-font-width: 366.66666666666663%;
+                                                      mso-text-raise: 19.5;
+                                                    "
+                                                    hidden
+                                                    >&#8202;&#8202;&#8202;</i
+                                                  ><!
+                                                [endif]--></span
+                                              ><span
+                                                style="
+                                                  max-width: 100%;
+                                                  display: inline-block;
+                                                  line-height: 120%;
+                                                  mso-padding-alt: 0px;
+                                                  mso-text-raise: 9.75px;
+                                                "
+                                                >Confirm change</span
+                                              ><span
+                                                ><!--[if mso
+                                                  ]><i
+                                                    style="mso-font-width: 366.66666666666663%"
+                                                    hidden
+                                                    >&#8202;&#8202;&#8202;&#8203;</i
+                                                  ><!
+                                                [endif]--></span
+                                              ></a
+                                            >
+                                          </td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                    <p
+                                      class="dg-body"
+                                      style="
+                                        font-size: 16px;
+                                        line-height: 26px;
+                                        margin: 0 0 20px;
+                                        color: #475569;
+                                        margin-top: 0;
+                                        margin-right: 0;
+                                        margin-bottom: 20px;
+                                        margin-left: 0;
+                                      "
+                                    >
+                                      If you didn&#x27;t request this change, don&#x27;t confirm it,
+                                      and contact support@dubgrid.com if you think someone else is
+                                      using your account.
+                                    </p>
+                                    <p
+                                      class="dg-body"
+                                      style="
+                                        font-size: 16px;
+                                        line-height: 26px;
+                                        margin: 0 0 20px;
+                                        color: #475569;
+                                        margin-top: 0;
+                                        margin-right: 0;
+                                        margin-bottom: 20px;
+                                        margin-left: 0;
+                                      "
+                                    >
+                                      Thanks,<br /><strong
+                                        class="dg-ink"
+                                        style="color: #0f172a; font-weight: 600"
+                                        >The DubGrid team</strong
+                                      >
+                                    </p>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                            <table
+                              align="center"
+                              width="100%"
+                              border="0"
+                              cellpadding="0"
+                              cellspacing="0"
+                              role="presentation"
+                              style="padding: 0 24px 24px"
                             >
-                              Thanks,<br /><strong
-                                class="dg-ink"
-                                style="color: #0f172a; font-weight: 600"
-                                >The DubGrid team</strong
-                              >
-                            </p>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    <table
-                      align="center"
-                      width="100%"
-                      border="0"
-                      cellpadding="0"
-                      cellspacing="0"
-                      role="presentation"
-                      style="padding: 0 24px 32px"
-                    >
-                      <tbody>
-                        <tr>
-                          <td>
-                            <hr
-                              class="dg-rule"
-                              style="
-                                width: 100%;
-                                border: none;
-                                border-top: 1px solid #eaeaea;
-                                border-color: #e2e8f0;
-                                border-width: 1px 0 0;
-                                margin: 12px 0 20px;
-                              "
-                            />
-                            <p
-                              class="dg-muted"
-                              style="font-size:13px;line-height:20px;color:#64748B;margin:0;font-family:Inter, -apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Roboto, &#x27;Helvetica Neue&#x27;, Arial, sans-serif;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"
-                            >
-                              ©
-                              <!-- -->2026<!-- -->
-                              DubGrid<!-- -->
-                              <!-- -->·<!-- -->
-                              <a
-                                class="dg-muted"
-                                href="{{ .SiteURL }}/privacy"
-                                style="
-                                  color: #64748b;
-                                  text-decoration-line: none;
-                                  text-decoration: underline;
-                                "
-                                target="_blank"
-                                >Privacy Policy</a
-                              >
-                              <!-- -->·<!-- -->
-                              <a
-                                class="dg-muted"
-                                href="{{ .SiteURL }}/terms"
-                                style="
-                                  color: #64748b;
-                                  text-decoration-line: none;
-                                  text-decoration: underline;
-                                "
-                                target="_blank"
-                                >Terms of Service</a
-                              >
-                            </p>
+                              <tbody>
+                                <tr>
+                                  <td>
+                                    <hr
+                                      class="dg-rule"
+                                      style="
+                                        width: 100%;
+                                        border: none;
+                                        border-top: 1px solid #eaeaea;
+                                        border-color: #e2e8f0;
+                                        border-width: 1px 0 0;
+                                        margin: 12px 0 20px;
+                                      "
+                                    />
+                                    <p
+                                      class="dg-muted"
+                                      style="font-size:13px;line-height:20px;color:#64748B;margin:0;font-family:Inter, -apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Roboto, &#x27;Helvetica Neue&#x27;, Arial, sans-serif;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0"
+                                    >
+                                      ©
+                                      <!-- -->2026<!-- -->
+                                      DubGrid<!-- -->
+                                      <!-- -->·<!-- -->
+                                      <a
+                                        class="dg-muted"
+                                        href="{{ .SiteURL }}/privacy"
+                                        style="
+                                          color: #64748b;
+                                          text-decoration-line: none;
+                                          text-decoration: underline;
+                                        "
+                                        target="_blank"
+                                        >Privacy Policy</a
+                                      >
+                                      <!-- -->·<!-- -->
+                                      <a
+                                        class="dg-muted"
+                                        href="{{ .SiteURL }}/terms"
+                                        style="
+                                          color: #64748b;
+                                          text-decoration-line: none;
+                                          text-decoration: underline;
+                                        "
+                                        target="_blank"
+                                        >Terms of Service</a
+                                      >
+                                    </p>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
                           </td>
                         </tr>
                       </tbody>

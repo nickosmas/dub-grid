@@ -1,3 +1,4 @@
+import { scheduleCellStateSchema, type ScheduleCellState } from "@dubgrid/contracts";
 import { resolveAlertDestination } from "@dubgrid/domain";
 import {
   formatShiftChangeCompact,
@@ -32,8 +33,15 @@ const DAY_LABEL = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
-function dayLabel(date: string): string {
+export function dayLabel(date: string): string {
   return DAY_LABEL.format(new Date(`${date}T00:00:00Z`));
+}
+
+/** A stored cell, or undefined when it doesn't parse; null is an empty cell. */
+export function readCellState(state: unknown): ScheduleCellState | null | undefined {
+  if (state == null) return null;
+  const parsed = scheduleCellStateSchema.safeParse(state);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function listDays(labels: string[]): string {

@@ -172,6 +172,17 @@ describe("sendNotification email", () => {
     expect(html).toContain("Open schedule");
   });
 
+  it("gives an alert with no email layout of its own a button to where it goes", async () => {
+    state.orgName = "Calm Haven";
+    state.prefs = { shift_requests: { email: true } };
+
+    await sendNotification("user-1", "org-1", "shift_request_rejected", "Request declined", "No.");
+
+    const { html } = sendResendEmail.mock.calls[0]?.[0] as { html: string };
+    expect(html).toContain("/schedule?requests=mine");
+    expect(html).toContain("Open requests");
+  });
+
   it("leaves the button out when there's no organization to link into", async () => {
     const action = { label: "Open schedule", href: "/schedule" };
     const email = { intro: "Changed.", details: [], closing: "", action };
