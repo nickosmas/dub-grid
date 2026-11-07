@@ -23,6 +23,7 @@ type MockRows = {
     suspended_at: string | null;
     subscription_status: string | null;
     trial_ends_at: string | null;
+    workspace_kind?: string;
   } | null;
   employee?: { status?: string | null; suspended_at?: string | null } | null;
 };
@@ -90,6 +91,27 @@ describe("isActingInSessionOrg (F-194)", () => {
   it("refuses someone suspended from the organization", async () => {
     const suspended = client({ suspended_at: "2026-11-01T00:00:00.000Z" });
     await expect(isActingInSessionOrg(req, suspended, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+  });
+
+  it("opens a sandbox only through its cookie (F-198)", async () => {
+    const sandbox = makeServiceClient({
+      profile: { platform_role: "none" },
+      organization: {
+        suspended_at: null,
+        subscription_status: null,
+        trial_ends_at: null,
+        workspace_kind: "sandbox",
+      },
+    });
+
+    signedInTo(null);
+    await expect(isActingInSessionOrg(req, sandbox, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
+      user: { id: ACTOR_ID },
+      claims: { org_id: ORG_ID, in_sandbox: true },
+    });
+    await expect(isActingInSessionOrg(req, sandbox, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
 
   it("refuses a request that isn't the actor's own", async () => {
