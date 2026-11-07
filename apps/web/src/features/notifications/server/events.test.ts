@@ -122,6 +122,33 @@ describe("dispatchNotificationEvent", () => {
     ]);
   });
 
+  it("speaks to an approver who sent the request as its requester", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "shift_requests") {
+        return makeShiftRequestBuilder({
+          status: "pending_approval",
+          type: "swap",
+          requester_shift_date: "2026-11-13",
+          requester: { user_id: "super-admin-user", first_name: "Alex", last_name: "North" },
+          target: { user_id: "target-user", first_name: "Bri", last_name: "Shaw" },
+        });
+      }
+      return makeMembershipBuilder({ superAdmins: [{ user_id: "super-admin-user" }] });
+    });
+
+    await dispatchNotificationEvent("target-user", {
+      action: "shift_request_responded",
+      orgId: "org-1",
+      requestId: "request-1",
+      requestType: "swap",
+      accepted: true,
+    });
+
+    const options = vi.mocked(sendNotification).mock.calls[0]?.[6];
+    expect(options?.email?.intro).toBe("Bri Shaw accepted your swap request.");
+    expect(options?.email?.details?.[0]?.label).toBe("Your shift");
+  });
+
   it("lists every permission that changed in the email", async () => {
     fromMock.mockImplementation(() =>
       makeSingleRowBuilder({ first_name: "Jordan", last_name: "Lee" }),

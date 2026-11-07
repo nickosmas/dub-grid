@@ -8,7 +8,8 @@ import { colorTokens } from "@dubgrid/design-tokens";
 
 export const emailTheme = {
   brand: colorTokens.brand, // #2563EB
-  pageBg: colorTokens.surface, // #FFFFFF
+  pageBg: "#F5F5F5",
+  sheetBg: colorTokens.surface, // #FFFFFF
   cardBg: colorTokens.background, // #F8FAFC
   textPrimary: colorTokens.textPrimary, // #0F172A
   textBody: colorTokens.textMuted, // #475569
@@ -17,15 +18,15 @@ export const emailTheme = {
   border: colorTokens.borderSubtle, // #E2E8F0
 } as const;
 
-// The page is pure black to match the pure white of light mode; the rest is the
-// app's zinc ramp.
+// The app's dark ramp is zinc, on a black page.
 const emailDarkTheme = {
   pageBg: "#000000",
-  cardBg: "#18181B",
+  sheetBg: "#18181B",
+  cardBg: "#27272A",
   textPrimary: "#FAFAFA",
   textBody: "#D4D4D8",
   textMuted: "#A1A1AA",
-  border: "#27272A",
+  border: "#3F3F46",
 } as const;
 
 export const fontStack =
@@ -42,6 +43,7 @@ export const PREVIEW_LOGO_URL = "/static";
 /** The hooks the dark palette below restyles. */
 export const emailClass = {
   page: "dg-page",
+  sheet: "dg-sheet",
   card: "dg-card",
   ink: "dg-ink",
   body: "dg-body",
@@ -55,7 +57,9 @@ function darkRules(prefix: string, backgrounds: boolean, text: boolean): string 
   const dark = emailDarkTheme;
   const rules = [
     backgrounds ? `${prefix}.${emailClass.page}{background-color:${dark.pageBg}!important}` : "",
+    backgrounds ? `${prefix}.${emailClass.sheet}{background-color:${dark.sheetBg}!important}` : "",
     backgrounds ? `${prefix}.${emailClass.card}{background-color:${dark.cardBg}!important}` : "",
+    text ? `${prefix}.${emailClass.sheet}{border-color:${dark.border}!important}` : "",
     text ? `${prefix}.${emailClass.card}{border-color:${dark.border}!important}` : "",
     text ? `${prefix}.${emailClass.rule}{border-color:${dark.border}!important}` : "",
     text ? `${prefix}.${emailClass.ink}{color:${dark.textPrimary}!important}` : "",
@@ -93,10 +97,15 @@ export const styles = {
     width: "100%",
     backgroundColor: emailTheme.pageBg,
   },
-  container: {
+  pageCell: {
+    padding: "24px 16px",
+  },
+  sheet: {
     maxWidth: "560px",
     margin: "0 auto",
-    backgroundColor: emailTheme.pageBg,
+    backgroundColor: emailTheme.sheetBg,
+    border: `1px solid ${emailTheme.border}`,
+    borderRadius: "16px",
   },
   // The logo images carry 12px of padding, so their ink lines up with the text.
   header: {
@@ -114,7 +123,7 @@ export const styles = {
     padding: "12px 24px 8px",
   },
   footer: {
-    padding: "0 24px 32px",
+    padding: "0 24px 24px",
   },
   heading: {
     margin: "0 0 20px",

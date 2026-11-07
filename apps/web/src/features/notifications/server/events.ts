@@ -728,6 +728,8 @@ async function notifyShiftRequestApprovers(input: {
   requestType: "pickup" | "swap" | "calloff";
   title: string;
   message: string;
+  /** The message as the requester reads it, when they can approve too. */
+  requesterIntro?: string;
   facts: RequestEmailFacts;
 }) {
   const adminIds = await getAdminsWithPermission(input.orgId, "canApproveShiftRequests");
@@ -750,6 +752,7 @@ async function notifyShiftRequestApprovers(input: {
           },
           {
             email: {
+              intro: adminId === input.facts.requesterUserId ? input.requesterIntro : undefined,
               details: requestEmailDetails(input.facts, {
                 viewer: "approver",
                 readerUserId: adminId,
@@ -854,6 +857,7 @@ async function dispatchNotificationEventInternal(
         requestType: "pickup",
         title: "Pickup request to approve",
         message: `${targetName} offered to pick up ${requesterName}'s shift.`,
+        requesterIntro: `${targetName} offered to pick up your shift.`,
         facts: await getRequestEmailFacts(event.orgId, requestInfo, "pickup"),
       });
       return;
@@ -874,6 +878,7 @@ async function dispatchNotificationEventInternal(
           requestType,
           title: `${capitalize(typeLabel)} request to approve`,
           message: `${requestInfo.targetName} accepted ${requestInfo.requesterName}'s ${typeLabel} request.`,
+          requesterIntro: `${requestInfo.targetName} accepted your ${typeLabel} request.`,
           facts,
         });
         return;

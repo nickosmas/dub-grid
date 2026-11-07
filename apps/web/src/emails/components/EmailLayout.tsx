@@ -39,8 +39,9 @@ export type EmailLayoutProps = {
 };
 
 /**
- * Branded shell for every DubGrid email: the logo and body sit directly on
- * the page, and only a template's facts or code go in a card.
+ * Branded shell for every DubGrid email: one white sheet on a light gray page,
+ * logo included, since its white plate would show on the gray. Inside it, only
+ * a template's facts or code go in a card.
  *
  * The logo is two images because it's a dark wordmark on light and a white one
  * on dark, and no mail client can recolor an image. See `emailDarkCss`.
@@ -68,8 +69,12 @@ export function EmailLayout({ logoUrl, preview, organization, fine, children }: 
         >
           <tbody>
             <tr>
-              <td align="center">
-                <Container className={emailClass.page} style={styles.container}>
+              <td align="center" style={styles.pageCell}>
+                <Container
+                  bgcolor={emailTheme.sheetBg}
+                  className={emailClass.sheet}
+                  style={styles.sheet}
+                >
                   <Section style={styles.header}>
                     <div className={emailClass.logoLight}>
                       <Img

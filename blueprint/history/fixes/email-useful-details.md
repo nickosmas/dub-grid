@@ -1,4 +1,4 @@
-# Fix: Alert emails carry the details, and the page is pure white or black
+# Fix: Alert emails carry the details, in a card on a gray page
 
 **Type:** Fix
 **Status:** verified
@@ -11,10 +11,10 @@ hold as much useful data as possible and tell the reader to go to the app to
 respond (2026-11-07). The email said only "Sam Rivera sent a swap request." Most
 alerts were one sentence, with no button.
 
-The same day they said the background was gray rather than white or black.
-Dark mode's page was `#09090B`, and React Email's own wrapper cell kept its
-light inline background with none of our dark classes, so the sides of the email
-never followed dark mode. Clients that drop the body's background did the same.
+The same day they said the background was an unclear gray rather than following
+the theme. React Email's own wrapper cell kept its light inline background with
+none of our dark classes, so the sides of the email never followed dark mode, and
+clients that drop the body's background left their own color there.
 
 ## The fix
 
@@ -34,9 +34,12 @@ never followed dark mode. Clients that drop the body's background did the same.
 - **Buttons.** Every alert with an organization now has a button, by default
   to where the alert goes in the app. The email-needs-a-fix alert opens the
   record that holds the address, and alerts about the reader open their profile.
-- **Page color.** Dark mode's page is `#000000`, and a full-width table carries
-  the page color with `bgcolor`, so it survives a client dropping the body's
-  background.
+- **Layout.** The whole email now sits in one white card on a light gray page
+  (`#F5F5F5`), which replaces the 2026-11-06 choice of no outer card (owner,
+  2026-11-07, after first asking for pure white and black). Dark mode is a zinc
+  card on a black page. The logo sits inside the card, so its white plate stays
+  hidden, and a full-width table carries the page color with `bgcolor`, so it
+  survives a client dropping the body's background.
 
 Push and the in-app inbox keep their one sentence. A failed lookup never costs
 an alert: the email falls back to fewer facts.

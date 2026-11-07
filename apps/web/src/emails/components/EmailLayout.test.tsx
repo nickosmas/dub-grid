@@ -21,9 +21,15 @@ describe("EmailLayout", () => {
   });
 
   // Many clients drop the body's background, so the page color needs its own element.
-  it("paints the whole width white, and black in dark mode", async () => {
-    expect(await html()).toMatch(/<table[^>]*bgcolor="#FFFFFF"[^>]*width:100%/);
+  it("sets the email on a full-width gray page, and black in dark mode", async () => {
+    const page = await html();
+
+    expect(page).toMatch(/<table[^>]*bgcolor="#F5F5F5"[^>]*width:100%/);
+    expect(page.lastIndexOf("email-logo-light.png")).toBeGreaterThan(
+      page.indexOf('class="dg-sheet"'),
+    );
     expect(emailDarkCss).toContain(`.${emailClass.page}{background-color:#000000!important}`);
+    expect(emailDarkCss).toContain(`.${emailClass.sheet}{background-color:#18181B!important}`);
   });
 
   it("swaps the logo for every kind of dark mode", () => {
