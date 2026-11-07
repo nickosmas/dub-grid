@@ -54,10 +54,15 @@ describe("resolveEffectiveOrgId", () => {
   });
 
   it("uses a live sandbox owned by the verified auth session", async () => {
-    const organizationQuery = query({ id: SANDBOX_ORG_ID });
+    const organizationQuery = query({ id: SANDBOX_ORG_ID, sandbox_source_org_id: REAL_ORG_ID });
     const profileQuery = query({ platform_role: null });
+    const membershipQuery = query({ org_role: "super_admin" });
     serviceFrom.mockImplementation((table: string) =>
-      table === "organizations" ? organizationQuery : profileQuery,
+      table === "organizations"
+        ? organizationQuery
+        : table === "organization_memberships"
+          ? membershipQuery
+          : profileQuery,
     );
 
     await expect(resolveEffectiveOrgId(request(), USER_ID, REAL_ORG_ID)).resolves.toBe(
@@ -71,6 +76,19 @@ describe("resolveEffectiveOrgId", () => {
       resolveEffectiveOrgId(request("55555555-5555-4555-8555-555555555555"), USER_ID, REAL_ORG_ID),
     ).rejects.toThrow("Invalid Test Sandbox session state");
     expect(serviceFrom).not.toHaveBeenCalled();
+  });
+
+  it("rejects an owner demoted since entering (F-198)", async () => {
+    serviceFrom.mockImplementation((table: string) =>
+      table === "organizations"
+        ? query({ id: SANDBOX_ORG_ID, sandbox_source_org_id: REAL_ORG_ID })
+        : table === "organization_memberships"
+          ? query({ org_role: "user" })
+          : query({ platform_role: null }),
+    );
+    await expect(resolveEffectiveOrgId(request(), USER_ID, REAL_ORG_ID)).rejects.toThrow(
+      "Invalid Test Sandbox ownership state",
+    );
   });
 
   it("rejects stale server-side sandbox state instead of falling back to the real tenant", async () => {

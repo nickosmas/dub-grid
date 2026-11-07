@@ -283,7 +283,7 @@ The hook also updates `profiles.last_sign_in_at` (debounced to 5-minute interval
 
 ## Sandbox Cookie
 
-Enables per-user Test Sandbox mode, where a super_admin can work against a sandboxed clone of their organization without affecting real data.
+Enables per-user Test Sandbox mode, where a Super Admin, or an Admin who can manage staff, works against a sandboxed clone of their organization without affecting real data.
 
 ### Cookie Details
 
