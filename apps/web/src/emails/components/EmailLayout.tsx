@@ -1,11 +1,26 @@
 import * as React from "react";
-import { Body, Container, Html, Img, Link, Preview, Section, Text } from "@react-email/components";
-import { emailTheme, styles } from "./theme";
+import {
+  Body,
+  Container,
+  Head,
+  Hr,
+  Html,
+  Img,
+  Link,
+  Preview,
+  Section,
+  Text,
+} from "@react-email/components";
+import { emailClass, emailDarkCss, emailTheme, styles } from "./theme";
 
 // Go templates have no date function, so this can't be computed at send
 // time like the site footer's `{new Date().getFullYear()}` - bump it once
 // a year.
 const COPYRIGHT_YEAR = 2026;
+
+// Both images are 8x and the same size, so swapping them moves nothing. See
+// scripts/generate-wordmark-lockup.mts.
+const LOGO_SIZE = { width: 139, height: 46 } as const;
 
 export type EmailLayoutProps = {
   /**
@@ -16,49 +31,72 @@ export type EmailLayoutProps = {
   logoUrl: string;
   /** Short inbox preview text (hidden in the body). */
   preview?: string;
+  /** The organization this email is from, under the logo. */
+  organization?: string;
+  /** Why the reader got this or how long it lasts, under the footer rule. */
+  fine?: React.ReactNode;
   children: React.ReactNode;
 };
 
 /**
- * Branded shell for every DubGrid email: grid logo + lowercase "dubgrid"
- * wordmark over a white card, matching the in-app brand.
+ * Branded shell for every DubGrid email: the logo and body sit directly on
+ * the page, and only a template's facts or code go in a card.
+ *
+ * The logo is two images because it's a dark wordmark on light and a white one
+ * on dark, and no mail client can recolor an image. See `emailDarkCss`.
  */
-export function EmailLayout({ logoUrl, preview, children }: EmailLayoutProps) {
+export function EmailLayout({ logoUrl, preview, organization, fine, children }: EmailLayoutProps) {
   return (
     <Html lang="en">
+      <Head>
+        <meta name="color-scheme" content="light dark" />
+        <meta name="supported-color-schemes" content="light dark" />
+        <style dangerouslySetInnerHTML={{ __html: emailDarkCss }} />
+      </Head>
       {preview ? <Preview>{preview}</Preview> : null}
-      <Body style={styles.body}>
-        <Container style={styles.container}>
-          <Section style={styles.card}>
-            <Section style={styles.header}>
-              {/* Lockup is a pre-rendered image (symbol + DM Sans wordmark) so the
-                  brand mark is identical even in clients that strip web fonts.
-                  Source is 8x (1248x368); displayed at 156x46. See
-                  scripts/generate-wordmark-lockup.mts. */}
+      <Body className={emailClass.page} style={styles.body}>
+        <Container className={emailClass.page} style={styles.container}>
+          <Section style={styles.header}>
+            <div className={emailClass.logoLight}>
               <Img
-                src={`${logoUrl}/email-lockup.png`}
-                width={156}
-                height={46}
+                src={`${logoUrl}/email-logo-light.png`}
+                {...LOGO_SIZE}
                 alt="dubgrid"
-                style={{ display: "inline-block" }}
+                style={{ display: "block" }}
               />
-            </Section>
-            <Section style={styles.content}>{children}</Section>
+            </div>
+            <div
+              className={emailClass.logoDark}
+              style={{ display: "none", maxHeight: 0, overflow: "hidden" }}
+            >
+              <Img
+                src={`${logoUrl}/email-logo-dark.png`}
+                {...LOGO_SIZE}
+                alt=""
+                style={{ display: "block" }}
+              />
+            </div>
+            {organization ? (
+              <Text className={emailClass.ink} style={styles.organization}>
+                {organization}
+              </Text>
+            ) : null}
           </Section>
+          <Section style={styles.content}>{children}</Section>
           <Section style={styles.footer}>
-            {/* Footer wordmark image (muted), 67x24 displayed / 8x source. */}
-            <Img
-              src={`${logoUrl}/email-wordmark.png`}
-              width={67}
-              height={24}
-              alt="dubgrid"
-              style={{ display: "inline-block" }}
-            />
-            <Text style={{ ...styles.footerText, margin: "12px 0 6px" }}>
-              &copy; {COPYRIGHT_YEAR} DubGrid
-            </Text>
-            <Text style={styles.footerText}>
+            <Hr className={emailClass.rule} style={styles.divider} />
+            {fine ? (
+              <Text
+                className={emailClass.muted}
+                style={{ ...styles.footerText, margin: "0 0 12px" }}
+              >
+                {fine}
+              </Text>
+            ) : null}
+            <Text className={emailClass.muted} style={styles.footerText}>
+              &copy; {COPYRIGHT_YEAR} DubGrid{"  "}&middot;{"  "}
               <Link
+                className={emailClass.muted}
                 href={`${logoUrl}/privacy`}
                 style={{ color: emailTheme.textMuted, textDecoration: "underline" }}
               >
@@ -66,6 +104,7 @@ export function EmailLayout({ logoUrl, preview, children }: EmailLayoutProps) {
               </Link>
               {"  "}&middot;{"  "}
               <Link
+                className={emailClass.muted}
                 href={`${logoUrl}/terms`}
                 style={{ color: emailTheme.textMuted, textDecoration: "underline" }}
               >

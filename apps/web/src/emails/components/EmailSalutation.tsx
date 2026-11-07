@@ -1,18 +1,24 @@
 import * as React from "react";
 import { Text } from "@react-email/components";
-import { emailTheme, styles } from "./theme";
+import { emailClass, emailTheme, text } from "./theme";
 
-/** No name: the address may not be the reader's, so the greeting assumes nothing. */
-export function EmailGreeting() {
-  return <Text style={styles.paragraph}>Hi there,</Text>;
+/**
+ * Pass `firstName` only to mail bound for a member's own verified address. An
+ * invitation or a confirmation may reach a stranger, so those assume nothing.
+ */
+export function EmailGreeting({ firstName }: { firstName?: string | null }) {
+  const name = firstName?.trim();
+  return <Text {...text.paragraph}>Hi {name || "there"},</Text>;
 }
 
 export function EmailSignOff() {
   return (
-    <Text style={styles.paragraph}>
+    <Text {...text.paragraph}>
       Thanks,
       <br />
-      <strong style={{ color: emailTheme.textPrimary }}>The DubGrid team</strong>
+      <strong className={emailClass.ink} style={{ color: emailTheme.textPrimary, fontWeight: 600 }}>
+        The DubGrid team
+      </strong>
     </Text>
   );
 }

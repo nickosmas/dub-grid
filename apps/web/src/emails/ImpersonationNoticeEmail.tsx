@@ -2,7 +2,7 @@ import * as React from "react";
 import { Text } from "@react-email/components";
 import { EmailLayout } from "./components/EmailLayout";
 import { EmailGreeting, EmailSignOff } from "./components/EmailSalutation";
-import { styles, PREVIEW_LOGO_URL } from "./components/theme";
+import { text, PREVIEW_LOGO_URL } from "./components/theme";
 import { formatInvitationExpiry } from "./invitation-expiry";
 
 export type ImpersonationNoticeEmailProps = {
@@ -42,10 +42,10 @@ export function ImpersonationNoticeEmail({
   const where = orgName ? <strong>{orgName}</strong> : "DubGrid";
   const deadline = ended ? null : formatInvitationExpiry(expiresAt, timeZone);
   return (
-    <EmailLayout logoUrl={logoUrl} preview={heading}>
-      <Text style={styles.heading}>{heading}</Text>
+    <EmailLayout logoUrl={logoUrl} preview={heading} organization={orgName}>
+      <Text {...text.heading}>{heading}</Text>
       <EmailGreeting />
-      <Text style={styles.paragraph}>
+      <Text {...text.paragraph}>
         {ended ? (
           <>
             DubGrid support has finished using your account in {where}. There&apos;s nothing you
@@ -58,7 +58,7 @@ export function ImpersonationNoticeEmail({
           </>
         )}
       </Text>
-      <Text style={styles.paragraph}>
+      <Text {...text.paragraph}>
         If you weren&apos;t expecting this, contact support@dubgrid.com.
       </Text>
       <EmailSignOff />

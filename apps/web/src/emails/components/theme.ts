@@ -1,19 +1,30 @@
 /**
  * Shared style tokens for email templates, mirrored from the app's
  * design tokens so emails stay in sync with the product palette.
- * Inline styles are used throughout because email clients strip <style>.
+ * Styles stay inline because some clients strip <style>; the dark palette is
+ * the one thing that lives in it, as an enhancement over the light inline look.
  */
 import { colorTokens } from "@dubgrid/design-tokens";
 
 export const emailTheme = {
   brand: colorTokens.brand, // #2563EB
-  pageBg: colorTokens.background, // #F8FAFC
-  cardBg: colorTokens.surface, // #FFFFFF
+  pageBg: colorTokens.surface, // #FFFFFF
+  cardBg: colorTokens.background, // #F8FAFC
   textPrimary: colorTokens.textPrimary, // #0F172A
   textBody: colorTokens.textMuted, // #475569
   textMuted: colorTokens.textSubtle, // #64748B
   textInverse: colorTokens.textInverse, // #FFFFFF
   border: colorTokens.borderSubtle, // #E2E8F0
+} as const;
+
+// The app's dark ramp is zinc.
+const emailDarkTheme = {
+  pageBg: "#09090B",
+  cardBg: "#18181B",
+  textPrimary: "#FAFAFA",
+  textBody: "#D4D4D8",
+  textMuted: "#A1A1AA",
+  border: "#27272A",
 } as const;
 
 export const fontStack =
@@ -22,10 +33,52 @@ export const fontStack =
 /**
  * `logoUrl` used only by the react-email dev preview (via PreviewProps), so
  * the brand images load: the `email dev` server serves src/emails/static at
- * `/static`, making `${PREVIEW_LOGO_URL}/email-lockup.png` resolve locally.
+ * `/static`, making `${PREVIEW_LOGO_URL}/email-logo-light.png` resolve locally.
  * Production/runtime passes a real origin instead.
  */
 export const PREVIEW_LOGO_URL = "/static";
+
+/** The hooks the dark palette below restyles. */
+export const emailClass = {
+  page: "dg-page",
+  card: "dg-card",
+  ink: "dg-ink",
+  body: "dg-body",
+  muted: "dg-muted",
+  rule: "dg-rule",
+  logoLight: "dg-logo-light",
+  logoDark: "dg-logo-dark",
+} as const;
+
+function darkRules(prefix: string, backgrounds: boolean, text: boolean): string {
+  const dark = emailDarkTheme;
+  const rules = [
+    backgrounds ? `${prefix}.${emailClass.page}{background-color:${dark.pageBg}!important}` : "",
+    backgrounds ? `${prefix}.${emailClass.card}{background-color:${dark.cardBg}!important}` : "",
+    text ? `${prefix}.${emailClass.card}{border-color:${dark.border}!important}` : "",
+    text ? `${prefix}.${emailClass.rule}{border-color:${dark.border}!important}` : "",
+    text ? `${prefix}.${emailClass.ink}{color:${dark.textPrimary}!important}` : "",
+    text ? `${prefix}.${emailClass.body}{color:${dark.textBody}!important}` : "",
+    text ? `${prefix}.${emailClass.muted}{color:${dark.textMuted}!important}` : "",
+    text ? `${prefix}.${emailClass.logoLight}{display:none!important}` : "",
+    text
+      ? `${prefix}.${emailClass.logoDark}{display:block!important;max-height:none!important;overflow:visible!important}`
+      : "",
+  ];
+  return rules.filter(Boolean).join("");
+}
+
+/**
+ * Apple Mail and others answer the media query; Outlook's web and phone apps
+ * mark their dark mode with data-ogsc (text) and data-ogsb (backgrounds). A
+ * client that does neither, such as Gmail's phone apps, keeps the light image,
+ * whose white plate keeps the logo readable if it darkens the email anyway.
+ */
+export const emailDarkCss = [
+  `@media (prefers-color-scheme:dark){${darkRules("", true, true)}}`,
+  darkRules("[data-ogsc] ", false, true),
+  darkRules("[data-ogsb] ", true, false),
+].join("");
 
 export const styles = {
   body: {
@@ -35,77 +88,71 @@ export const styles = {
     fontFamily: fontStack,
   },
   container: {
-    maxWidth: "520px",
-    margin: "40px auto",
-    padding: "0 16px",
+    maxWidth: "560px",
+    margin: "0 auto",
+    backgroundColor: emailTheme.pageBg,
   },
-  card: {
-    backgroundColor: emailTheme.cardBg,
-    borderRadius: "12px",
-    overflow: "hidden",
-    boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
-  },
+  // The logo images carry 12px of padding, so their ink lines up with the text.
   header: {
-    padding: "32px 32px 0",
-    textAlign: "center" as const,
+    padding: "24px 12px 12px",
   },
-  wordmark: {
-    fontSize: "22px",
-    lineHeight: "1",
-    fontWeight: 700,
-    letterSpacing: "-0.02em",
+  // Lines up with the wordmark's ink, like the body text.
+  organization: {
+    margin: "2px 0 0 12px",
+    fontSize: "14px",
+    lineHeight: "20px",
+    fontWeight: 600,
     color: emailTheme.textPrimary,
-    fontFamily: fontStack,
-    margin: "12px 0 0",
   },
   content: {
-    padding: "32px",
+    padding: "12px 24px 8px",
+  },
+  footer: {
+    padding: "0 24px 32px",
   },
   heading: {
-    margin: "0 0 16px",
-    fontSize: "22px",
-    fontWeight: 700,
+    margin: "0 0 20px",
+    fontSize: "24px",
+    lineHeight: "30px",
+    fontWeight: 600,
     letterSpacing: "-0.02em",
     color: emailTheme.textPrimary,
   },
   paragraph: {
-    margin: "0 0 24px",
+    margin: "0 0 20px",
     fontSize: "16px",
-    lineHeight: "1.6",
+    lineHeight: "26px",
     color: emailTheme.textBody,
-  },
-  detailList: {
-    margin: "0 0 24px",
-  },
-  detail: {
-    margin: "0 0 8px",
-    fontSize: "16px",
-    lineHeight: "1.6",
-    color: emailTheme.textBody,
-  },
-  detailLabel: {
-    color: emailTheme.textPrimary,
-    fontWeight: 600,
   },
   fine: {
     margin: 0,
     fontSize: "13px",
-    lineHeight: "1.6",
+    lineHeight: "20px",
     color: emailTheme.textMuted,
+  },
+  card: {
+    margin: "0 0 24px",
+    backgroundColor: emailTheme.cardBg,
+    border: `1px solid ${emailTheme.border}`,
+    borderRadius: "10px",
   },
   divider: {
     borderColor: emailTheme.border,
     borderWidth: "1px 0 0",
-    margin: "24px 0 20px",
-  },
-  footer: {
-    padding: "20px 0",
-    textAlign: "center" as const,
+    margin: "12px 0 20px",
   },
   footerText: {
-    fontSize: "12px",
+    fontSize: "13px",
+    lineHeight: "20px",
     color: emailTheme.textMuted,
     margin: 0,
     fontFamily: fontStack,
   },
+} as const;
+
+/** Spread onto `Text`: the inline look plus the hook that restyles it in dark mode. */
+export const text = {
+  heading: { style: styles.heading, className: emailClass.ink },
+  paragraph: { style: styles.paragraph, className: emailClass.body },
+  fine: { style: styles.fine, className: emailClass.muted },
 } as const;
