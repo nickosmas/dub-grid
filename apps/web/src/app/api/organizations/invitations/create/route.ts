@@ -43,6 +43,7 @@ import {
   sendPendingInvitationEmail,
 } from "@/features/organization/server/invitation-delivery";
 import { invitationAdminPermissions } from "@/features/organization/server/invitation-permissions";
+import { escapeLikePattern } from "@/features/employees/server/contact-conflicts";
 
 const postSchema = z.object({
   email: z.string().trim().email(),
@@ -59,6 +60,7 @@ const postSchema = z.object({
 
 type RefreshedInvitation = {
   invitationId: string;
+  email: string;
   token: string;
   expiresAt: string;
   previousToken: string;
@@ -113,9 +115,9 @@ async function refreshPendingInvitation(
 ): Promise<RefreshedInvitation | "different-access" | null> {
   const pending = serviceClient
     .from("invitations")
-    .select("id, token, expires_at, role_to_assign, department_ids, dept_admin_ids")
+    .select("id, email, token, expires_at, role_to_assign, department_ids, dept_admin_ids")
     .eq("org_id", orgId)
-    .ilike("email", email)
+    .ilike("email", escapeLikePattern(email))
     .is("accepted_at", null)
     .is("revoked_at", null)
     .gte("expires_at", new Date().toISOString());
@@ -152,6 +154,7 @@ async function refreshPendingInvitation(
 
   return {
     invitationId: data.id as string,
+    email: current.email as string,
     token: data.token as string,
     expiresAt: data.expires_at as string,
     previousToken: current.token as string,
@@ -458,7 +461,7 @@ export async function POST(req: NextRequest) {
             await sendPendingInvitationEmail({
               orgId,
               token: refreshed.token,
-              email: inviteeEmail,
+              email: refreshed.email,
               expiresAt: refreshed.expiresAt,
               kind: "reissue",
             });
