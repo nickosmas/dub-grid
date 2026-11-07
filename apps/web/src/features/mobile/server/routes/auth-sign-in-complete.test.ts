@@ -50,6 +50,39 @@ describe("POST mobile sign-in complete", () => {
     );
   });
 
+  it("starts a Super Admin's trial once the second factor is verified (F-227)", async () => {
+    const rpc = vi.fn(async () => ({ error: null }));
+    requireMobileAuth.mockResolvedValue({
+      user: { id: "user-1" },
+      currentOrg: { id: "org-1" },
+      userClient: { rpc },
+      claims: {
+        org_role: "super_admin",
+        aal: "aal2",
+        amr: [{ method: "totp", timestamp: now() }],
+      },
+    });
+
+    const response = await POST(post());
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("start_trial_for_org", { p_org_id: "org-1" });
+  });
+
+  it("leaves the trial alone for anyone else", async () => {
+    const rpc = vi.fn(async () => ({ error: null }));
+    requireMobileAuth.mockResolvedValue({
+      user: { id: "user-1" },
+      currentOrg: { id: "org-1" },
+      userClient: { rpc },
+      claims: { org_role: "user", aal: "aal2", amr: [{ method: "totp", timestamp: now() }] },
+    });
+
+    await POST(post());
+
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("refuses a session that has not just verified a second factor", async () => {
     requireMobileAuth.mockResolvedValue({
       user: { id: "user-1" },
