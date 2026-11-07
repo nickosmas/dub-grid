@@ -8,7 +8,7 @@ import { colorTokens } from "@dubgrid/design-tokens";
 
 export const emailTheme = {
   brand: colorTokens.brand, // #2563EB
-  pageBg: "#F5F5F5",
+  pageBg: "#E5E5E5",
   sheetBg: colorTokens.surface, // #FFFFFF
   cardBg: colorTokens.background, // #F8FAFC
   textPrimary: colorTokens.textPrimary, // #0F172A

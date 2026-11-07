@@ -24,7 +24,7 @@ describe("EmailLayout", () => {
   it("sets the email on a full-width gray page, and black in dark mode", async () => {
     const page = await html();
 
-    expect(page).toMatch(/<table[^>]*bgcolor="#F5F5F5"[^>]*width:100%/);
+    expect(page).toMatch(/<table[^>]*bgcolor="#E5E5E5"[^>]*width:100%/);
     expect(page.lastIndexOf("email-logo-light.png")).toBeGreaterThan(
       page.indexOf('class="dg-sheet"'),
     );
