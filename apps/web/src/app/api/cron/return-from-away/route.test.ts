@@ -639,6 +639,7 @@ describe("GET /api/cron/return-from-away", () => {
         user_id: `user-${id}`,
         planned_from: from,
         planned_until: until,
+        planned_note: null,
         planned_by: "manager-1",
         version: 4,
         organization: { timezone },
@@ -663,6 +664,7 @@ describe("GET /api/cron/return-from-away", () => {
         {
           suspended_at: null,
           suspended_by: null,
+          status_note: "",
           status_changed_at: "2026-10-27T01:00:00.000Z",
           version: 8,
         },
@@ -699,6 +701,7 @@ describe("GET /api/cron/return-from-away", () => {
           suspended_at: "2026-10-27T01:00:00.000Z",
           suspended_by: "manager-1",
           suspended_until: "2026-11-20",
+          status_note: "",
           status_changed_at: "2026-10-27T01:00:00.000Z",
           updated_by: "manager-1",
           version: 5,
@@ -728,6 +731,28 @@ describe("GET /api/cron/return-from-away", () => {
             suspendedUntil: "2026-11-20",
             changedFields: ["suspended_at"],
           },
+        }),
+      ]);
+    });
+
+    it("carries a planned suspension's reason onto the person and its audit row", async () => {
+      rows([], [], [], {
+        suspensions: [
+          plannedSuspension("emp-la", "org-la", "2026-10-26", null, "America/Los_Angeles", {
+            planned_note: "Under review",
+          }),
+        ],
+      });
+
+      await GET(makeReq());
+
+      expect(updateEmployee).toHaveBeenCalledWith(
+        expect.objectContaining({ status_note: "Under review" }),
+        expect.anything(),
+      );
+      expect(auditInsert).toHaveBeenCalledWith([
+        expect.objectContaining({
+          details: expect.objectContaining({ note: "Under review" }),
         }),
       ]);
     });

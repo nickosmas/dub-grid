@@ -48,12 +48,14 @@ const bodySchema = z
       .min(1)
       .max(BULK_STATUS_MAX_PEOPLE)
       .refine((people) => new Set(people.map((p) => p.empId)).size === people.length),
-    /** Mark away and Offboard: the reason, the same for everyone. */
-    note: z.string().max(500).optional(),
+    /** Mark away, Suspend and Offboard: the reason, the same for everyone. */
+    note: z.string().trim().max(500).optional(),
     /** Mark away: the first day back, the same for everyone. */
     returnDate: z.string().date().nullable().optional(),
   })
-  .refine((body) => body.note === undefined || ["markAway", "archive"].includes(body.action))
+  .refine(
+    (body) => body.note === undefined || ["markAway", "suspend", "archive"].includes(body.action),
+  )
   .refine((body) => !body.returnDate || body.action === "markAway");
 
 /**
