@@ -163,7 +163,7 @@ export function markSessionReported(
   }
 }
 
-function readSupabaseSessionId(accessToken: string): string | null {
+export function readSupabaseSessionId(accessToken: string): string | null {
   try {
     const encodedPayload = accessToken.split(".")[1];
     if (!encodedPayload) return null;

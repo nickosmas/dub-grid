@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
-import { broadcastIdleActivity, listenForIdleActivity } from "@/lib/idle-broadcast";
+import {
+  broadcastIdleActivity,
+  listenForIdleActivity,
+  readIdleActivity,
+  writeIdleActivity,
+} from "@/lib/idle-broadcast";
 
 export type IdleTimerPhase = "active" | "warning" | "expired";
 
@@ -13,6 +18,11 @@ export interface UseIdleTimerOptions {
   throttleMs?: number;
   /** When false, no listeners are attached and the timer never expires. */
   enabled: boolean;
+  /**
+   * The auth session this clock belongs to. With it, every tab of the session
+   * shares one deadline, and a reload continues it rather than starting over.
+   */
+  sessionKey?: string | null;
   /** Called exactly once when the idle deadline is reached. */
   onExpire: () => void;
 }
@@ -21,7 +31,7 @@ export interface UseIdleTimerResult {
   phase: IdleTimerPhase;
   /** Seconds until expiry; only meaningful while `phase === "warning"`. */
   secondsRemaining: number;
-  /** Resets the idle clock immediately (unthrottled) and notifies other tabs. */
+  /** Resets the idle clock (unthrottled, even during the warning) and notifies other tabs. */
   stayActive: () => void;
 }
 
@@ -44,6 +54,7 @@ export function useIdleTimer({
   warningMs = DEFAULT_WARNING_MS,
   throttleMs = DEFAULT_THROTTLE_MS,
   enabled,
+  sessionKey = null,
   onExpire,
 }: UseIdleTimerOptions): UseIdleTimerResult {
   const [phase, setPhase] = useState<IdleTimerPhase>("active");
@@ -63,9 +74,23 @@ export function useIdleTimer({
     }
   }, []);
 
+  // Another tab, or this one before a reload, may have recorded later activity.
+  const latestActivityAt = useCallback(() => {
+    const stored = readIdleActivity(sessionKey);
+    if (stored !== null && stored > lastActivityAtRef.current) {
+      lastActivityAtRef.current = stored;
+    }
+    return lastActivityAtRef.current;
+  }, [sessionKey]);
+
+  const isPastDeadline = useCallback(
+    (now: number) => now - latestActivityAt() >= timeoutMs,
+    [latestActivityAt, timeoutMs],
+  );
+
   const recompute = useCallback(() => {
     clearScheduled();
-    const elapsed = Date.now() - lastActivityAtRef.current;
+    const elapsed = Date.now() - latestActivityAt();
     const remaining = timeoutMs - elapsed;
 
     if (remaining <= 0) {
@@ -88,25 +113,30 @@ export function useIdleTimer({
       setPhase("active");
       timeoutIdRef.current = setTimeout(recompute, remaining - warningMs);
     }
-  }, [timeoutMs, warningMs, clearScheduled]);
+  }, [timeoutMs, warningMs, clearScheduled, latestActivityAt]);
 
   const registerActivity = useCallback(
     (at: number, { broadcast }: { broadcast: boolean }) => {
+      if (expiredRef.current) return;
       // Strictly-less-than, not <=: a same-millisecond first activity event
       // (e.g. right at mount) must still count, not be silently dropped.
       if (at < lastActivityAtRef.current) return;
       lastActivityAtRef.current = at;
-      if (broadcast) broadcastIdleActivity(at);
+      if (broadcast) broadcastIdleActivity(at, sessionKey);
       recompute();
     },
-    [recompute],
+    [recompute, sessionKey],
   );
 
   const stayActive = useCallback(() => {
     const now = Date.now();
     lastThrottleFlushRef.current = now;
+    if (isPastDeadline(now)) {
+      recompute();
+      return;
+    }
     registerActivity(now, { broadcast: true });
-  }, [registerActivity]);
+  }, [isPastDeadline, recompute, registerActivity]);
 
   useEffect(() => {
     if (!enabled) {
@@ -114,7 +144,12 @@ export function useIdleTimer({
       return;
     }
 
-    lastActivityAtRef.current = Date.now();
+    // A stored time past the deadline, from a reload or a reopened tab, signs
+    // out at once below rather than granting a fresh 30 minutes.
+    const now = Date.now();
+    const stored = readIdleActivity(sessionKey);
+    if (stored === null) writeIdleActivity(now, sessionKey);
+    lastActivityAtRef.current = stored ?? now;
     // -Infinity, not 0: guarantees the very first activity event after mount
     // is never throttled away, regardless of how soon it fires.
     lastThrottleFlushRef.current = -Infinity;
@@ -125,6 +160,14 @@ export function useIdleTimer({
       const now = Date.now();
       if (now - lastThrottleFlushRef.current < throttleMs) return;
       lastThrottleFlushRef.current = now;
+      // A timer that slept with the laptop, or ran late in a hidden tab, may
+      // not have fired yet: activity past the deadline signs out instead of
+      // reviving the session, and once the warning is due only Stay signed
+      // in extends it, so a passer-by's mouse can't.
+      if (timeoutMs - (now - latestActivityAt()) <= warningMs) {
+        recompute();
+        return;
+      }
       registerActivity(now, { broadcast: true });
     };
 
@@ -132,7 +175,7 @@ export function useIdleTimer({
       if (document.visibilityState === "visible") recompute();
     };
 
-    const unlisten = listenForIdleActivity((at) => {
+    const unlisten = listenForIdleActivity(sessionKey, (at) => {
       registerActivity(at, { broadcast: false });
     });
 
@@ -154,7 +197,7 @@ export function useIdleTimer({
       document.removeEventListener("visibilitychange", handleWake);
       window.removeEventListener("pageshow", handleWake);
     };
-  }, [enabled, timeoutMs, warningMs, throttleMs]);
+  }, [enabled, sessionKey, timeoutMs, warningMs, throttleMs]);
 
   return { phase, secondsRemaining, stayActive };
 }
