@@ -1001,6 +1001,18 @@ button {
   font-family: inherit;
   transition: background 150ms ease;
 }
+/* An option's label stays on one line and truncates at the menu's cap. The
+   block padding, taken back by the margin, keeps descenders from being
+   clipped at the row's `line-height: 1`. */
+.dg-menu-item-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-block: 0.15em;
+  margin-block: -0.15em;
+}
 /* Keeps a hovered row from fusing with the selected one below it. */
 .dg-menu-item + .dg-menu-item {
   margin-top: 2px;

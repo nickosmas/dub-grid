@@ -20,7 +20,9 @@ interface CustomSelectProps<T extends string | number> {
   placeholder?: string;
   height?: React.CSSProperties["height"];
   /** Extra style on the wrapper, for how the control sits in its layout
-   *  (width, flex). For the trigger's own chrome use `triggerStyle`. */
+   *  (width, flex). Content-sized by default; pass `width: "100%"` only for a
+   *  field lined up with others in a form. For the trigger's own chrome use
+   *  `triggerStyle`. */
   style?: React.CSSProperties;
   /** Extra style on the trigger button itself: border, radius, padding. */
   triggerStyle?: React.CSSProperties;
@@ -79,7 +81,18 @@ export default function CustomSelect<T extends string | number>({
   );
 
   const trigger = (
-    <div ref={ref} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+    // `minWidth: 0` and `maxWidth: "100%"` let a narrow row shrink the trigger
+    // to an ellipsis instead of pushing it past its neighbours.
+    <div
+      ref={ref}
+      style={{
+        display: "inline-block",
+        verticalAlign: "middle",
+        minWidth: 0,
+        maxWidth: "100%",
+        ...style,
+      }}
+    >
       <Button
         id={id}
         type="button"
@@ -208,6 +221,7 @@ export default function CustomSelect<T extends string | number>({
                 role="option"
                 aria-selected={isActive}
                 className="dg-menu-item"
+                title={opt.label}
                 onClick={() => {
                   onChange(opt.value);
                   setOpen(false);
@@ -225,7 +239,7 @@ export default function CustomSelect<T extends string | number>({
                       : undefined,
                 }}
               >
-                {opt.label}
+                <span className="dg-menu-item-label">{opt.label}</span>
               </Button>
             );
           })}
