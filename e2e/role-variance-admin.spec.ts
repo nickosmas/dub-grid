@@ -18,7 +18,7 @@ const SUPER_ADMIN_ONLY_SETTINGS = [
   "Activity Log",
   "Danger Zone",
   // canManageOrgSettings is forced false for admins in buildPerms.
-  "Shift Display Mode",
+  "Schedule Display",
 ];
 
 test.describe("role variance: qa-admin route entry contract", () => {
