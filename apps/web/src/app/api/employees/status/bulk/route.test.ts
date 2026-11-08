@@ -238,7 +238,7 @@ describe("POST /api/employees/status/bulk", () => {
       { action: "markAway", people: [...people(1), ...people(1)] },
       { action: "delete", people: people(1) },
       { action: "suspend", people: people(1), returnDate: "2027-01-04" },
-      { action: "suspend", people: people(1), note: "why" },
+      { action: "markActive", people: people(1), note: "why" },
       {
         action: "markAway",
         people: Array.from({ length: 101 }, (_, n) => ({
@@ -353,6 +353,22 @@ describe("POST /api/employees/status/bulk", () => {
     expect(list[2].code).toBe("OFFBOARD_OUT_OF_REACH");
     expect(endOffboardedAccess).toHaveBeenCalledTimes(2);
     expect(tables.employees.map((row) => row.status)).toEqual(["removed", "removed", "active"]);
+  });
+
+  it("stores one trimmed reason for everyone it suspends", async () => {
+    tables.employees = [employee(1), employee(2)];
+    const list = await results(
+      await POST(request({ action: "suspend", people: people(1, 2), note: "  Under review  " })),
+    );
+    expect(list.map((r) => r.ok)).toEqual([true, true]);
+    expect(tables.employees.map((row) => row.status_note)).toEqual([
+      "Under review",
+      "Under review",
+    ]);
+    expect(tables.audit_log.map((row) => row.details)).toEqual([
+      expect.objectContaining({ note: "Under review" }),
+      expect.objectContaining({ note: "Under review" }),
+    ]);
   });
 
   it("suspends and offboards each person with the single route's follow-ups", async () => {

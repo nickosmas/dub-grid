@@ -159,7 +159,7 @@ export function OpenShiftStaffingModal({
         <SectionNotice
           tone="warning"
           messages={[
-            "Shifts on the day before or after this date are not loaded, so overnight overlaps with them could not be checked.",
+            "We couldn't load shifts on the days before and after, so overnight overlaps weren't checked.",
           ]}
         />
       )}

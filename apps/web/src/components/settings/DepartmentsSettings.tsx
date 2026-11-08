@@ -1222,8 +1222,7 @@ function DepartmentSection({
                 title={`Archive "${deleteConfirm.dept.name}"?`}
                 message={
                   <>
-                    <strong>{deleteConfirm.dept.name}</strong> is currently{" "}
-                    {deps!.summary.toLowerCase()}.{" "}
+                    <strong>{deleteConfirm.dept.name}</strong> is {deps!.summary.toLowerCase()}.{" "}
                     {"It stays on past schedules but can't be picked for anything new."}
                   </>
                 }
@@ -1288,8 +1287,7 @@ function DepartmentSection({
                 title={`Archive "${faDeleteConfirm.fa.name}"?`}
                 message={
                   <>
-                    <strong>{faDeleteConfirm.fa.name}</strong> is currently{" "}
-                    {deps!.summary.toLowerCase()}.{" "}
+                    <strong>{faDeleteConfirm.fa.name}</strong> is {deps!.summary.toLowerCase()}.{" "}
                     {"It stays on past schedules but can't be picked for anything new."}
                   </>
                 }

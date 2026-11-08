@@ -138,7 +138,7 @@ export function describeSeatBreakdown(breakdown: SeatBreakdown): {
       key: "archived",
       label: `${EMPLOYMENT_STATUS_LABELS.removed} staff`,
       count: breakdown.archived,
-      detail: `People who have been ${EMPLOYMENT_STATUS_LABELS.removed.toLowerCase()} never take a seat.`,
+      detail: `${EMPLOYMENT_STATUS_LABELS.removed} people never take a seat.`,
     });
   }
   return { billed, notBilled };

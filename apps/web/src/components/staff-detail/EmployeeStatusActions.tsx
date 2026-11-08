@@ -318,6 +318,7 @@ const CHOICE_TONES = {
 
 const NOTE_PLACEHOLDERS: Partial<Record<StatusAction, string>> = {
   markAway: "Reason (optional) - e.g. Family leave",
+  suspend: "Reason (optional) - e.g. Under review",
   archive: "Reason (optional) - e.g. Left the company",
 };
 
@@ -596,7 +597,11 @@ export function EmployeeStatusActions({
             : onRemove(employee.id, trimmedNote));
           break;
         case "suspend":
-          await onSuspend?.(employee.id, { startDate: laterStart, until: until || null });
+          await onSuspend?.(employee.id, {
+            startDate: laterStart,
+            until: until || null,
+            note: trimmedNote,
+          });
           break;
         case "reinstate":
           await onReinstate?.(employee.id);

@@ -113,6 +113,8 @@ type UpdateEmployeeSuspension = (
     suspended: boolean;
     /** Suspending: the first day with access again (51g3), or null. */
     suspendedUntil?: string | null;
+    /** Suspending: the reason, or empty. Reinstating clears it. */
+    statusNote?: string;
     updatedBy: string;
   },
 ) => Promise<Employee | null>;
@@ -1234,7 +1236,7 @@ async function changeSuspension(
     employeeId: input.employeeId,
     expectedVersion: input.body.expectedVersion,
     suspended: suspending,
-    ...(suspending ? { suspendedUntil } : {}),
+    ...(suspending ? { suspendedUntil, statusNote: input.body.note ?? "" } : {}),
     updatedBy: auth.user.id,
   });
 
@@ -1276,6 +1278,7 @@ async function changeSuspension(
     resource_id: input.employeeId,
     details: {
       ...(suspending && suspendedUntil ? { suspendedUntil } : {}),
+      ...(suspending && input.body.note ? { note: input.body.note } : {}),
       changedFields: ["suspended_at"],
     },
     ip_address: input.requestIp,

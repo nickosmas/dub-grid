@@ -26,7 +26,10 @@ export async function GET(req: NextRequest) {
     const supabase = createRequestSupabaseClient(req);
     const result = await supabase.rpc("get_my_organizations");
     if (result.error) {
-      return NextResponse.json({ error: "Unable to verify organization access." }, { status: 403 });
+      return NextResponse.json(
+        { error: "We couldn't verify your access to this organization. Try again." },
+        { status: 403 },
+      );
     }
 
     return NextResponse.json({

@@ -76,6 +76,7 @@ interface PlannedSuspensionRow {
   user_id: string | null;
   planned_from: string;
   planned_until: string | null;
+  planned_note: string | null;
   planned_by: string | null;
   version: number;
   organization: { timezone: string | null } | null;
@@ -503,6 +504,7 @@ async function reinstateEndedSuspensions(
       .update({
         suspended_at: null,
         suspended_by: null,
+        status_note: "",
         status_changed_at: at,
         version: row.version + 1,
       })
@@ -555,7 +557,7 @@ async function startPlannedSuspensions(
   const { data, error } = await db
     .from("employees")
     .select(
-      "id, org_id, user_id, planned_from, planned_until, planned_by, version, organization:organizations(timezone)",
+      "id, org_id, user_id, planned_from, planned_until, planned_note, planned_by, version, organization:organizations(timezone)",
     )
     .eq("status", "active")
     .is("archived_at", null)
@@ -590,6 +592,7 @@ async function startPlannedSuspensions(
               suspended_at: at,
               suspended_by: row.planned_by,
               suspended_until: row.planned_until,
+              status_note: row.planned_note ?? "",
               status_changed_at: at,
               updated_by: row.planned_by,
               version: row.version + 1,
@@ -630,6 +633,7 @@ async function startPlannedSuspensions(
         details: {
           plannedFrom: row.planned_from,
           ...(row.planned_until ? { suspendedUntil: row.planned_until } : {}),
+          ...(row.planned_note ? { note: row.planned_note } : {}),
           changedFields: ["suspended_at"],
         },
       })),

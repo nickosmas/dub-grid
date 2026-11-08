@@ -22,7 +22,7 @@ const endSessionSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["targetEditorSessionIds"],
-        message: "The current editor session cannot end itself.",
+        message: "This tab can't close itself.",
       });
     }
     if (new Set(value.targetEditorSessionIds).size !== value.targetEditorSessionIds.length) {

@@ -1594,6 +1594,8 @@ export async function updateMobileEmployeeSuspensionRow(
     suspended: boolean;
     /** Suspending: the first day with access again (51g3), or null. */
     suspendedUntil?: string | null;
+    /** Suspending: the reason, or empty. Reinstating clears it. */
+    statusNote?: string;
     updatedBy: string;
   },
 ): Promise<DbEmployee | null> {
@@ -1604,6 +1606,7 @@ export async function updateMobileEmployeeSuspensionRow(
       suspended_at: input.suspended ? now : null,
       suspended_by: input.suspended ? input.updatedBy : null,
       suspended_until: input.suspended ? (input.suspendedUntil ?? null) : null,
+      status_note: input.suspended ? (input.statusNote ?? "") : "",
       status_changed_at: now,
       updated_by: input.updatedBy,
       version: input.expectedVersion + 1,

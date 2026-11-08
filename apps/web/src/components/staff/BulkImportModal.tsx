@@ -661,7 +661,9 @@ export function BulkImportModal({
               {parseErrors.length > 0 && (
                 <Banner tone="warning" icon={FileWarning} className="mb-4">
                   <div>
-                    <strong>{parseErrors.length} warning(s):</strong>
+                    <strong>
+                      {parseErrors.length} {parseErrors.length === 1 ? "warning" : "warnings"}:
+                    </strong>
                     <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
                       {parseErrors.slice(0, 5).map((e, i) => (
                         <li key={`parse-${i}-${e.slice(0, 30)}`}>{e}</li>
@@ -821,10 +823,11 @@ export function BulkImportModal({
                   </div>
                   {(result.errors.length > 0 || skippedDuplicates > 0) && (
                     <div style={{ fontWeight: 400, marginTop: 2 }}>
-                      {result.errors.length > 0 && `${result.errors.length} error(s)`}
+                      {result.errors.length > 0 &&
+                        `${result.errors.length} ${result.errors.length === 1 ? "error" : "errors"}`}
                       {result.errors.length > 0 && skippedDuplicates > 0 && " · "}
                       {skippedDuplicates > 0 &&
-                        `${skippedDuplicates} duplicate row(s) skipped before import`}
+                        `${skippedDuplicates} duplicate ${skippedDuplicates === 1 ? "row" : "rows"} skipped before import`}
                     </div>
                   )}
                 </div>

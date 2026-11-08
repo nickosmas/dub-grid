@@ -29,7 +29,9 @@ export function StaffEmptyState({
       ? "No active staff"
       : activeTab === "inactive"
         ? "No one is away"
-        : "No one is offboarded";
+        : activeTab === "suspended"
+          ? "No one is suspended"
+          : "No one is offboarded";
 
   const description = hasFilters
     ? undefined
@@ -37,7 +39,9 @@ export function StaffEmptyState({
       ? "Add your first staff member."
       : activeTab === "inactive"
         ? "People you mark away will appear here."
-        : "People you offboard will appear here.";
+        : activeTab === "suspended"
+          ? "People you suspend will appear here."
+          : "People you offboard will appear here.";
 
   return (
     <EmptyState

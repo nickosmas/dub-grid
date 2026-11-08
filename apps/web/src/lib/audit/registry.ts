@@ -626,14 +626,18 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
       // The daily job starts a planned suspension (51g3) with no actor.
       const name = who(d, ctx, "a team member");
       const until = d.date("suspendedUntil");
+      const note = d.text("note");
+      const reason = note ? `: ${note}` : "";
       if (d.date("plannedFrom")) {
         return until
-          ? `${who(d, ctx, "A team member")}'s planned suspension started, until ${until}`
-          : `${who(d, ctx, "A team member")}'s planned suspension started`;
+          ? `${who(d, ctx, "A team member")}'s planned suspension started, until ${until}${reason}`
+          : `${who(d, ctx, "A team member")}'s planned suspension started${reason}`;
       }
-      return until ? `Suspended ${name}'s access until ${until}` : `Suspended ${name}'s access`;
+      return until
+        ? `Suspended ${name}'s access until ${until}${reason}`
+        : `Suspended ${name}'s access${reason}`;
     },
-    suppressKeys: ["suspendedUntil", "plannedFrom"],
+    suppressKeys: ["suspendedUntil", "plannedFrom", "note"],
   },
   "employee.reinstated": {
     category: "people",
@@ -1272,7 +1276,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d) => {
       const reason = d.text("reason");
-      return `Suspended the organization${reason ? ` — ${reason}` : ""}`;
+      return `Suspended the organization${reason ? `: ${reason}` : ""}`;
     },
     suppressKeys: ["reason"],
   },
@@ -1324,7 +1328,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     headline: (d, ctx) => {
       const target = who(d, ctx, "a team member");
       const reason = d.text("justification");
-      return `Started viewing the app as ${target}${reason ? ` — ${reason}` : ""}`;
+      return `Started viewing the app as ${target}${reason ? `: ${reason}` : ""}`;
     },
     suppressKeys: ["justification"],
   },
@@ -1356,7 +1360,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "update",
     headline: (d) => {
       const reason = d.text("reason");
-      return `Stopped viewing the app as another person${reason ? ` — ${reason}` : ""}`;
+      return `Stopped viewing the app as another person${reason ? `: ${reason}` : ""}`;
     },
     suppressKeys: ["reason"],
   },

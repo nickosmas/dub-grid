@@ -1146,7 +1146,7 @@ describe("PersonDetailScreen", () => {
       },
     );
     const mismatchError = new ApiResponseError(
-      "The user account name does not match the employee record.",
+      "The name on the account doesn't match the employee record.",
       409,
       {
         code: "NAME_MISMATCH",
@@ -1599,6 +1599,21 @@ describe("PersonDetailScreen", () => {
         copyAction: "markAway",
         expectedVersion: 7,
         note: "Family leave",
+      });
+    });
+
+    it("suspends someone with a reason", () => {
+      const mutate = renderWithStatusMutation();
+
+      openStatus();
+      pick(/^Suspended/);
+      fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "  Under review  " } });
+      confirm("Suspend");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "suspend",
+        copyAction: "suspend",
+        note: "Under review",
       });
     });
 
