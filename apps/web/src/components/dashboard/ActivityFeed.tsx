@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import type { ActivityItem } from "@/lib/dashboard-stats";
 import { ActivityIcon } from "./ActivityIcon";
 import ExpandButton from "./ExpandButton";
@@ -58,17 +59,16 @@ export default function ActivityFeed({
               </span>
             )}
             {defaultCollapsed && (
-              <span
+              <ChevronDown
+                size={12}
+                strokeWidth={2.5}
                 style={{
-                  fontSize: "var(--dg-type-metadata-size)",
-                  color: "var(--dg-color-text-subtle)",
-                  transition: "transform 0.15s",
+                  color: "var(--dg-color-text-faint)",
+                  flexShrink: 0,
+                  transition: "transform 150ms ease",
                   transform: collapsed ? "rotate(0deg)" : "rotate(180deg)",
-                  display: "inline-block",
                 }}
-              >
-                &#9660;
-              </span>
+              />
             )}
           </div>
           {!collapsed && <div className="dg-card-subtitle">Latest events</div>}

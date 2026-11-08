@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { Archive, Trash2 } from "lucide-react";
+import { Archive, ChevronDown, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
@@ -313,16 +313,16 @@ function AbsenceTypeRow({
             {form.name || "Untitled absence type"}
           </span>
         )}
-        <span
+        <ChevronDown
+          size={12}
+          strokeWidth={2.5}
           style={{
-            fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--dg-color-text-primary)",
-            transform: expanded ? "rotate(180deg)" : "none",
+            color: "var(--dg-color-text-faint)",
+            flexShrink: 0,
             transition: "transform 150ms ease",
+            transform: expanded ? "rotate(180deg)" : "none",
           }}
-        >
-          ▾
-        </span>
+        />
       </Button>
 
       {expanded && (
