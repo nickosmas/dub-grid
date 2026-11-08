@@ -517,7 +517,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               ...organizations.map((org) => ({ value: org.id, label: org.name })),
             ]}
             onChange={updateOrgFilter}
-            style={{ flex: "1 1 auto" }}
+            style={{ flex: "0 1 auto" }}
             fontSize={12}
           />
           <CustomSelect
@@ -530,7 +530,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               { value: "unknown", label: "Unknown" },
             ]}
             onChange={updatePlatformFilter}
-            style={{ flex: "1 1 auto" }}
+            style={{ flex: "0 1 auto" }}
             fontSize={12}
           />
           <CustomSelect
@@ -542,7 +542,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               { value: "stale", label: "Stale" },
             ]}
             onChange={updateStatusFilter}
-            style={{ width: "auto", minWidth: 130 }}
+            style={{ flex: "0 1 auto" }}
             fontSize={12}
           />
           <div style={{ flex: 1 }} />
