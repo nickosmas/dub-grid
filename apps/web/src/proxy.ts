@@ -10,7 +10,10 @@ import {
   getPlatformBillingPolicy,
   ORG_ACCESS_SELECT,
 } from "@/lib/billing-policy";
-import { localSupabaseConnectSources } from "@/lib/local-supabase-csp";
+import {
+  hostedSupabaseConnectSources,
+  localSupabaseConnectSources,
+} from "@/lib/local-supabase-csp";
 import { evaluateMfaClaimState } from "@dubgrid/authz";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { THEME_COOKIE_NAME, withThemeParam } from "@/lib/theme-preference";
@@ -20,6 +23,7 @@ import { getProxyJwks, supabaseTokenClaimChecks } from "@/lib/auth/verify-token"
 import * as Sentry from "@/lib/sentry";
 import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./lib/supabase-keys";
 import { getSupabaseUrl, requireSupabaseUrl } from "@/lib/supabase-keys";
+import { authCookieOptions } from "@/lib/auth/auth-cookie-options";
 
 /**
  * Vercel Edge Proxy for RBAC Route Protection
@@ -200,11 +204,10 @@ export async function proxy(req: NextRequest) {
     parsedHost.hostname === "::1";
 
   // CSP. Two script-src policies (SECURITY_AUDIT.md F-4):
-  //  - Static/public pages (marketing, login, auth flows) are pre-rendered and
-  //    can't carry a per-request nonce, so they keep 'unsafe-inline'. These pages
-  //    hold no user data and have no injection sink.
-  //  - The authenticated app is rendered dynamically (its layouts/pages set
-  //    `export const dynamic = "force-dynamic"` for exactly this reason), so in
+  //  - The marketing pages are pre-rendered and can't carry a per-request nonce,
+  //    so they keep 'unsafe-inline'. They hold no user data and no session.
+  //  - Everything under the (app) group, the sign-in pages included (F-204), is
+  //    rendered dynamically (`export const dynamic = "force-dynamic"`), so in
   //    production it drops 'unsafe-inline' for a per-request nonce + 'strict-dynamic'.
   //    Next.js stamps the nonce onto its inline bootstrap scripts (read from this
   //    request CSP header) and the nonced bundle loads analytics by propagation.
@@ -238,7 +241,8 @@ export async function proxy(req: NextRequest) {
   // deployment. Without it, the client-side Supabase SDK's own calls (session
   // refresh, getUser, etc.) are silently blocked by CSP after a successful
   // server-side login, leaving the user stuck on the login page.
-  const devConnectExtras = localSupabaseConnectSources(getSupabaseUrl());
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseConnectSrc = `${hostedSupabaseConnectSources(supabaseUrl)} ${localSupabaseConnectSources(supabaseUrl)}`;
   const buildCsp = (scriptSrc: string) =>
     `
     default-src 'self';
@@ -246,7 +250,7 @@ export async function proxy(req: NextRequest) {
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${mapsConnectSrc} ${devConnectExtras};
+    connect-src 'self' ${supabaseConnectSrc} https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${mapsConnectSrc};
     frame-ancestors 'self';
     object-src 'none';
     base-uri 'none';
@@ -310,8 +314,19 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/api")
   ) {
+    // The sign-in pages live in the dynamic (app) group, so they can take the
+    // nonce policy; a script injected there would otherwise read the session.
+    const isSignInPage =
+      pathname === "/login" ||
+      pathname === "/goodbye" ||
+      pathname === "/accept-invite" ||
+      pathname === "/forgot-password" ||
+      pathname === "/reset-password" ||
+      pathname.startsWith("/auth/");
+    const publicCsp = isSignInPage ? dynamicCspHeaderValue : contentSecurityPolicyHeaderValue;
+    requestHeaders.set("Content-Security-Policy", publicCsp);
     const res = NextResponse.next({ request: { headers: requestHeaders } });
-    res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
+    res.headers.set("Content-Security-Policy", publicCsp);
     return res;
   }
 
@@ -334,6 +349,7 @@ export async function proxy(req: NextRequest) {
   // the sb-<project-ref>-auth-token cookie format and multi-chunk cookie
   // reconstruction used by @supabase/ssr browser clients.
   const supabase = createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
+    cookieOptions: authCookieOptions(req.nextUrl.protocol),
     cookies: {
       getAll() {
         return req.cookies.getAll();

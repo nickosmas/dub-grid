@@ -1,5 +1,6 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { clientEnv } from "@/lib/env";
+import { authCookieOptions } from "@/lib/auth/auth-cookie-options";
 
 let browserClient: ReturnType<typeof createBrowserClient> | null = null;
 
@@ -19,6 +20,11 @@ export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, 
       browserClient = createBrowserClient(
         clientEnv.NEXT_PUBLIC_SUPABASE_URL,
         clientEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+        {
+          cookieOptions: authCookieOptions(
+            typeof window === "undefined" ? "https:" : window.location.protocol,
+          ),
+        },
       );
     }
     const value = (browserClient as unknown as Record<string, unknown>)[prop as string];

@@ -147,7 +147,7 @@ then the split CSP was re-applied:
    prerendered with a nonce CSP it cannot carry).
 3. `apps/web/src/proxy.ts` now builds two CSP variants:
    - **Authenticated app** (production): `script-src 'self' 'nonce-{random}' 'strict-dynamic' https://va.vercel-scripts.com` — no `'unsafe-inline'`
-   - **Static/public pages** (marketing, login, auth flows): `script-src 'self' 'unsafe-inline' ...` — these are pre-rendered and hold no user data or injection sinks
+   - **Marketing pages** (`/`, privacy, terms, cookie policy, request demo): `script-src 'self' 'unsafe-inline' ...`: pre-rendered, no session and no injection sinks. The sign-in pages (login, goodbye, invitation, password and `/auth/*`) render dynamically and take the nonce policy (F-204).
    - **Development** (both variants): `'unsafe-inline'` so HMR/React Refresh work
 4. The nonce is a 16-byte random value encoded as base64 per request.
 
