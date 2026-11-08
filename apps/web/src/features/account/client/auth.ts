@@ -255,6 +255,14 @@ export async function verifyBrowserOtp(input: { type: EmailOtpType; token_hash: 
 }
 
 /**
+ * Tells the server this web session is in use, so the token hook keeps
+ * renewing it (128). Best effort: a missed report only shortens the session.
+ */
+export async function touchWebSession(): Promise<void> {
+  await supabase.rpc("touch_web_session");
+}
+
+/**
  * Raw browser Supabase client, for realtime primitives (e.g.
  * `@dubgrid/realtime-core`) that need to construct their own channels rather
  * than going through `createBrowserRealtimeChannel`. This file is the one

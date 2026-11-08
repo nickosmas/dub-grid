@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:d332dab93b320efa2567a22986be543de3f6093cd7ca1d45d2d06b13a2c6e6c7",
+  "sourceDigest": "sha256:de116823b5bc9ab7663d7666a45e8f3a49e04b1df9f39eccd0ca4207d9f79235",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5101,6 +5101,16 @@
       "sha256": "6e52936f47fad5bdc23d978e5d6ed0853565066e77fb9df7726165b5ec2313a7",
       "source": {
         "path": "supabase/migrations/127_refused_org_keeps_the_others.sql"
+      }
+    },
+    {
+      "id": "migration:128_web_session_idle_limit.sql",
+      "version": "128",
+      "name": "web_session_idle_limit",
+      "file": "128_web_session_idle_limit.sql",
+      "sha256": "9e5f370685cdf1b2f5d6da54990a6044bc87c6e629bddc80dafe9d095ed1f273",
+      "source": {
+        "path": "supabase/migrations/128_web_session_idle_limit.sql"
       }
     }
   ],

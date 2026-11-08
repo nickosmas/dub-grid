@@ -1,18 +1,21 @@
 "use client";
 
-import { useCallback, useId, useMemo } from "react";
+import { useCallback, useId, useMemo, useRef } from "react";
 import Modal from "@/components/Modal";
 import { Timer } from "lucide-react";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/components/AuthProvider";
 import { useLogout } from "@/hooks";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
-import { refreshBrowserSession } from "@/features/account/client";
+import { refreshBrowserSession, touchWebSession } from "@/features/account/client";
 import { readSupabaseSessionId } from "@/features/account/client/session-registration";
 import { rememberPageForSignIn } from "@/lib/auth/return-after-sign-in";
 
 const INACTIVITY_REDIRECT = "/goodbye?reason=inactivity";
 const FINAL_ANNOUNCEMENT_SECONDS = 10;
+// The server stops renewing a web session after 35 minutes without a report,
+// so reporting every 5 minutes of use keeps it a step behind the browser's 30.
+const ACTIVITY_REPORT_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
  * Signs the user out after 30 minutes of client-side inactivity, showing a
@@ -44,10 +47,20 @@ export default function InactivityGuard() {
     signOut({ redirectTo: INACTIVITY_REDIRECT });
   }, [signOut, userId]);
 
+  const lastReportAtRef = useRef(0);
+  const handleActivity = useCallback((at: number) => {
+    if (at - lastReportAtRef.current < ACTIVITY_REPORT_INTERVAL_MS) return;
+    lastReportAtRef.current = at;
+    void touchWebSession().catch(() => {
+      // Best-effort; the next report after five minutes tries again.
+    });
+  }, []);
+
   const { phase, secondsRemaining, stayActive } = useIdleTimer({
     enabled: Boolean(user),
     sessionKey,
     onExpire: handleExpire,
+    onActivity: handleActivity,
   });
 
   const handleStay = useCallback(() => {

@@ -140,6 +140,27 @@ describe("useIdleTimer", () => {
     expect(onExpire).toHaveBeenCalledTimes(1);
   });
 
+  it("reports this tab's own activity, not activity another tab announced", () => {
+    let deliver: (at: number) => void = () => {};
+    vi.mocked(listenForIdleActivity).mockImplementation((_session, cb) => {
+      deliver = cb;
+      return () => {};
+    });
+    const onActivity = vi.fn();
+    renderHook(() => useIdleTimer({ ...baseOptions(), onActivity }));
+
+    act(() => {
+      vi.advanceTimersByTime(THROTTLE_MS + 1);
+      fireActivity();
+    });
+    expect(onActivity).toHaveBeenCalledExactlyOnceWith(THROTTLE_MS + 1);
+
+    act(() => {
+      deliver(THROTTLE_MS + 500);
+    });
+    expect(onActivity).toHaveBeenCalledTimes(1);
+  });
+
   it("does not attach listeners or expire when disabled", () => {
     const onExpire = vi.fn();
     renderHook(() => useIdleTimer({ ...baseOptions(onExpire), enabled: false }));
