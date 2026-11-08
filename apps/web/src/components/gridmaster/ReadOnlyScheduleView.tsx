@@ -264,9 +264,15 @@ export default function ReadOnlyScheduleView({
                           color: "var(--dg-color-text-muted)",
                         }}
                       >
-                        {r.focusAreaName ??
-                          r.assignmentDetails.find((assignment) => assignment.focusAreaName)
-                            ?.focusAreaName ??
+                        {/* Each shift's own focus area: someone can work another area's shift. */}
+                        {[
+                          ...new Set(
+                            r.assignmentDetails
+                              .map((assignment) => assignment.focusAreaName)
+                              .filter(Boolean),
+                          ),
+                        ].join(", ") ||
+                          r.focusAreaName ||
                           "-"}
                       </td>
                       <td style={gmTdStyle}>

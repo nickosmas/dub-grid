@@ -864,6 +864,7 @@ export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInp
   const rowLabels = new Map(
     input.matrix.rows.map((row) => [row.rowKey, `${row.focusAreaName} · ${row.rowLabel}`]),
   );
+  const rowFocusAreaIds = new Map(input.matrix.rows.map((row) => [row.rowKey, row.focusAreaId]));
   const text: CoverageSuggestionTextLookups = {
     personName: (employeeId) => {
       const employee = employeeById.get(employeeId);
@@ -877,6 +878,7 @@ export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInp
     focusAreaName: (focusAreaId) => input.focusAreaNames.get(focusAreaId) ?? null,
     absenceName: (absenceTypeId) => input.absenceNames.get(absenceTypeId) ?? "Unknown absence",
     rowLabel: (rowKey) => rowLabels.get(rowKey) ?? null,
+    rowFocusAreaId: (rowKey) => rowFocusAreaIds.get(rowKey) ?? null,
     formatDate: (dateKey) => formatShortDate(parseLocalDateKey(dateKey)),
   };
   return { engine, text };

@@ -1,6 +1,7 @@
 import {
   orderFocusAreasByDepartment,
   singularLabelNoun,
+  shiftDisplayName,
   DEFAULT_ORGANIZATION_LABELS,
 } from "@dubgrid/domain";
 import { absenceSideOf } from "@dubgrid/schedule-core";
@@ -213,6 +214,7 @@ export interface AbsenceCalloffReportRow {
   status: string;
   /** The shift given up, as the schedule names it; empty on a published absence. */
   droppedShift: string;
+  droppedShiftFocusArea: string;
   droppedShiftTime: string;
   /** When the call-off was submitted; empty on a published absence. */
   submittedAt: string;
@@ -264,6 +266,7 @@ export interface AccountAccessReportRow {
 export interface ScheduleMatrixReportRow {
   employeeId: string;
   employeeName: string;
+  focusAreas: string;
   cells: Record<string, string>;
 }
 
@@ -287,6 +290,11 @@ export interface OperationsReportFilters {
 export interface OperationsReportFilterOption {
   id: string;
   label: string;
+}
+
+export interface OperationsReportShiftFilterOption extends OperationsReportFilterOption {
+  /** The shift's focus area, so the filter can list shifts under it; absent for an org-wide shift. */
+  focusArea?: string;
 }
 
 export interface OperationsReportEmployeeFilterOption extends OperationsReportFilterOption {
@@ -314,7 +322,7 @@ export interface OperationsReportPayload {
   filterOptions: {
     employees: OperationsReportEmployeeFilterOption[];
     focusAreas: OperationsReportFilterOption[];
-    shiftCategories: OperationsReportFilterOption[];
+    shiftCategories: OperationsReportShiftFilterOption[];
     jobs: OperationsReportFilterOption[];
     indicators: OperationsReportFilterOption[];
     dates: string[];
@@ -735,13 +743,46 @@ function hasAnyNumber(values: number[] | null | undefined, selected: Set<number>
   return (values ?? []).some((value) => selected.has(value));
 }
 
-function formatBreakdown(values: Map<string, { count: number; hours?: number }>): string {
+/** Org-wide shifts first, then each focus area's shifts in the focus areas' order. */
+function shiftFilterOptions(
+  source: OperationsReportFilterOptionSource,
+): OperationsReportShiftFilterOption[] {
+  const areaRank = new Map(source.focusAreas.map((focusArea, index) => [focusArea.id, index]));
+  const areaName = buildMap(source.focusAreas);
+  const rank = (shift: ShiftCategoryRow) =>
+    shift.focus_area_id == null ? -1 : (areaRank.get(shift.focus_area_id) ?? areaRank.size);
+  return source.shiftCategories
+    .map((shift, index) => ({ shift, index }))
+    .sort((a, b) => rank(a.shift) - rank(b.shift) || a.index - b.index)
+    .map(({ shift }) => {
+      const focusArea = shift.focus_area_id == null ? undefined : areaName.get(shift.focus_area_id);
+      return { id: String(shift.id), label: shift.name, ...(focusArea ? { focusArea } : {}) };
+    });
+}
+
+function addToBreakdown(
+  values: Map<string, { label: string; count: number; hours: number }>,
+  key: string,
+  label: string,
+  hours: number,
+) {
+  const current = values.get(key) ?? { label, count: 0, hours: 0 };
+  current.count += 1;
+  current.hours += hours;
+  values.set(key, current);
+}
+
+/** Values are keyed by label unless they carry their own, as the id-keyed shift and job breakdowns do. */
+function formatBreakdown(
+  values: Map<string, { label?: string; count: number; hours?: number }>,
+): string {
   return Array.from(values.entries())
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([label, value]) =>
+    .map(([key, value]) => ({ ...value, label: value.label ?? key }))
+    .sort((left, right) => left.label.localeCompare(right.label))
+    .map((value) =>
       value.hours == null
-        ? `${label} (${value.count})`
-        : `${label} (${value.count}, ${roundHours(value.hours)}h)`,
+        ? `${value.label} (${value.count})`
+        : `${value.label} (${value.count}, ${roundHours(value.hours)}h)`,
     )
     .join("; ");
 }
@@ -800,10 +841,7 @@ export function buildOperationsReportFilterOptions(
       id: String(focusArea.id),
       label: getNamedValue(focusArea),
     })),
-    shiftCategories: source.shiftCategories.map((shift) => ({
-      id: String(shift.id),
-      label: shift.name,
-    })),
+    shiftCategories: shiftFilterOptions(source),
     jobs: source.jobs.map((job) => ({ id: String(job.id), label: getNamedValue(job) })),
     indicators: source.indicatorTypes.map((indicator) => ({
       id: String(indicator.id),
@@ -852,6 +890,21 @@ export function buildOperationsReportPayload(
   const indicatorById = new Map(source.indicatorTypes.map((row) => [row.id, row.name]));
   const shiftById = new Map(source.shiftCategories.map((row) => [row.id, row]));
   const shiftNameById = new Map(source.shiftCategories.map((row) => [row.id, row.name]));
+  // Where no focus area column sits beside it, a shared name carries its area.
+  const shiftLabelById = new Map(
+    source.shiftCategories.map((row) => [
+      row.id,
+      shiftDisplayName(
+        { id: row.id, name: row.name, focusAreaId: row.focus_area_id },
+        source.shiftCategories.map((shift) => ({
+          id: shift.id,
+          name: shift.name,
+          focusAreaId: shift.focus_area_id,
+        })),
+        (id) => focusAreaById.get(id),
+      ),
+    ]),
+  );
   const currentReportEmployees = source.employees.filter((employee) => {
     if (employeeIdSet.size > 0 && !employeeIdSet.has(employee.id)) return false;
     return hasAnyNumber(employee.focus_area_ids, focusAreaIdSet);
@@ -1037,8 +1090,8 @@ export function buildOperationsReportPayload(
         0,
       ),
     );
-    const shiftBreakdownValues = new Map<string, { count: number; hours: number }>();
-    const jobBreakdownValues = new Map<string, { count: number; hours: number }>();
+    const shiftBreakdownValues = new Map<string, { label: string; count: number; hours: number }>();
+    const jobBreakdownValues = new Map<string, { label: string; count: number; hours: number }>();
     for (const item of workedEntries) {
       for (const segment of item.entry.segments ?? []) {
         if (
@@ -1048,19 +1101,21 @@ export function buildOperationsReportPayload(
         ) {
           continue;
         }
-        const label =
+        const hours = getSegmentDurationHours(segment);
+        addToBreakdown(
+          shiftBreakdownValues,
+          segment.shiftId == null ? "general" : `shift:${segment.shiftId}`,
           segment.shiftId == null
             ? "General shift"
-            : (shiftNameById.get(segment.shiftId) ?? "Unknown shift");
-        const current = shiftBreakdownValues.get(label) ?? { count: 0, hours: 0 };
-        current.count += 1;
-        current.hours += getSegmentDurationHours(segment);
-        shiftBreakdownValues.set(label, current);
-        const jobLabel = jobById.get(segment.jobId) ?? "Unknown job";
-        const jobCurrent = jobBreakdownValues.get(jobLabel) ?? { count: 0, hours: 0 };
-        jobCurrent.count += 1;
-        jobCurrent.hours += getSegmentDurationHours(segment);
-        jobBreakdownValues.set(jobLabel, jobCurrent);
+            : (shiftLabelById.get(segment.shiftId) ?? "Unknown shift"),
+          hours,
+        );
+        addToBreakdown(
+          jobBreakdownValues,
+          `job:${segment.jobId}`,
+          jobById.get(segment.jobId) ?? "Unknown job",
+          hours,
+        );
       }
     }
     const workedDays = new Set(workedEntries.map((item) => item.entry.date)).size;
@@ -1370,7 +1425,7 @@ export function buildOperationsReportPayload(
           employeeName: employeeNameById.get(participant.employeeId) ?? "Unknown employee",
           date: participant.date,
           shiftCategories: getRequestStateShiftCategoryIds(participant.state)
-            .map((shiftId) => shiftNameById.get(shiftId) ?? "Unknown shift")
+            .map((shiftId) => shiftLabelById.get(shiftId) ?? "Unknown shift")
             .join("; "),
           requestType: request.type,
           status: request.status,
@@ -1439,6 +1494,7 @@ export function buildOperationsReportPayload(
     absenceType: entry.label,
     status: "published",
     droppedShift: "",
+    droppedShiftFocusArea: "",
     droppedShiftTime: "",
     submittedAt: "",
     noticeHours: null,
@@ -1481,6 +1537,7 @@ export function buildOperationsReportPayload(
             : (absenceTypeById.get(request.absence_type_id) ?? "Unknown absence type"),
         status: request.status,
         droppedShift: dropped.shift,
+        droppedShiftFocusArea: dropped.focusArea,
         droppedShiftTime: dropped.time,
         submittedAt: request.created_at,
         noticeHours: shiftStart
@@ -1552,6 +1609,18 @@ export function buildOperationsReportPayload(
     };
   });
 
+  // A cell names the focus area only for work outside the person's own, as
+  // the grid does, since the row alone says where their shifts usually are.
+  const matrixShiftLabel = (item: ResolvedEntry, ownFocusAreaIds: readonly number[]) => {
+    const otherAreas = getEntryFocusAreaIds(item, shiftById)
+      .filter((id) => !ownFocusAreaIds.includes(id))
+      .map((id) => focusAreaById.get(id))
+      .filter((name): name is string => Boolean(name));
+    return otherAreas.length > 0
+      ? `${item.entry.label} (${otherAreas.join(", ")})`
+      : item.entry.label;
+  };
+
   const scheduleMatrix = {
     dates: reportDates,
     rows: reportEmployees.map((employee) => {
@@ -1559,7 +1628,7 @@ export function buildOperationsReportPayload(
       for (const date of reportDates) {
         const shiftLabels = entries
           .filter((item) => item.entry.empId === employee.id && item.entry.date === date)
-          .map((item) => item.entry.label);
+          .map((item) => matrixShiftLabel(item, employee.focus_area_ids ?? []));
         const absence = absenceMatrixText.get(`${employee.id}_${date}`);
         const labels = absence
           ? absence.first
@@ -1573,6 +1642,7 @@ export function buildOperationsReportPayload(
       return {
         employeeId: employee.id,
         employeeName: formatName(employee),
+        focusAreas: formatList(employee.focus_area_ids, focusAreaById, unknownFocusArea),
         cells,
       };
     }),

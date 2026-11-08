@@ -1,5 +1,5 @@
 "use client";
-import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
+import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS, shiftDisplayName } from "@dubgrid/domain";
 import { PencilLine, Search } from "lucide-react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -47,12 +47,7 @@ import {
 import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
-import {
-  describePreferences,
-  PreferencesModal,
-  shiftLabel,
-  type PreferencesSave,
-} from "./PreferencesModal";
+import { describePreferences, PreferencesModal, type PreferencesSave } from "./PreferencesModal";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { useCloseOnWindowResize, usePopupCornerAlign } from "@/hooks/useAnchoredPopup";
 import type {
@@ -270,10 +265,11 @@ function ShiftCellPopover({
   );
 }
 
-function migrateLegacyDraftValue(
+export function migrateLegacyDraftValue(
   value: unknown,
   assignments: AssignmentDefinition[],
   absenceTypes: AbsenceType[],
+  employeeFocusAreaIds: readonly number[],
 ): ScheduleCellInput | null {
   if (!value) return null;
   if (typeof value === "object" && value !== null && "kind" in value) {
@@ -335,7 +331,14 @@ function migrateLegacyDraftValue(
       : null;
   }
 
-  const assignment = assignments.find((candidate) => candidate.label === value);
+  // Focus areas can share a label: take the person's own, or the only match,
+  // and drop a value that could be either.
+  const matches = assignments.filter((candidate) => candidate.label === value);
+  const assignment =
+    matches.find(
+      (candidate) =>
+        candidate.focusAreaId != null && employeeFocusAreaIds.includes(candidate.focusAreaId),
+    ) ?? (matches.length === 1 ? matches[0] : undefined);
   if (!assignment?.jobId) return null;
   return {
     kind: "worked",
@@ -723,7 +726,12 @@ export function RecurringScheduleSection({
           const migrated: RecurringScheduleDraft = {};
           for (const [employeeId, employeeDirty] of Object.entries(draft.draftData)) {
             for (const [dayKey, value] of Object.entries(employeeDirty)) {
-              const migratedValue = migrateLegacyDraftValue(value, assignments, absenceTypes);
+              const migratedValue = migrateLegacyDraftValue(
+                value,
+                assignments,
+                absenceTypes,
+                employees.find((employee) => employee.id === employeeId)?.focusAreaIds ?? [],
+              );
               if (migratedValue !== null) {
                 if (!migrated[employeeId]) {
                   migrated[employeeId] = {};
@@ -744,7 +752,15 @@ export function RecurringScheduleSection({
     return () => {
       cancelled = true;
     };
-  }, [absenceTypes, assignments, canManage, currentUserId, orgId, recurringShiftsQuery.isPending]);
+  }, [
+    absenceTypes,
+    assignments,
+    canManage,
+    currentUserId,
+    employees,
+    orgId,
+    recurringShiftsQuery.isPending,
+  ]);
 
   const hasDirtyChanges = Object.keys(dirtySchedules).length > 0;
   const dirtyCount = Object.values(dirtySchedules).reduce(
@@ -1434,7 +1450,7 @@ export function RecurringScheduleSection({
                         (id) => {
                           const shift = shiftCategoryById.get(id);
                           return shift
-                            ? shiftLabel(shift, shiftCategories, focusAreaName)
+                            ? shiftDisplayName(shift, shiftCategories, focusAreaName)
                             : undefined;
                         },
                         (id) => jobById.get(id)?.name,

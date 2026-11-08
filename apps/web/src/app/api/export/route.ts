@@ -11,6 +11,7 @@ import { z } from "zod";
 import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
 import { orderFocusAreasByDepartment } from "@dubgrid/domain";
 import { withoutHiddenStaff } from "@dubgrid/data-access";
+import { capitalizeFirst, DEFAULT_ORGANIZATION_LABELS, pluralLabelNoun } from "@dubgrid/domain";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -174,7 +175,7 @@ async function exportSchedule(
   const { data: employees, error: empErr } = await withoutHiddenStaff(
     supabase
       .from("employees")
-      .select("id, first_name, last_name")
+      .select("id, first_name, last_name, focus_area_ids")
       .eq("org_id", orgId)
       .is("archived_at", null),
     hiddenUserIds,
@@ -188,10 +189,37 @@ async function exportSchedule(
     endDate: end,
   });
 
-  // Fetch absence types for published absence labels.
-  const [{ data: absenceTypes }] = await Promise.all([
-    supabase.from("absence_types").select("id, label").eq("org_id", orgId).is("archived_at", null),
-  ]);
+  // Absence types for published absence labels; focus areas so a shift's
+  // area can be named, since two areas can share a shift's name.
+  const [{ data: absenceTypes }, { data: focusAreas }, { data: shiftCategories }, { data: org }] =
+    await Promise.all([
+      supabase
+        .from("absence_types")
+        .select("id, label")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+      supabase.from("focus_areas").select("id, name").eq("org_id", orgId),
+      supabase.from("shift_categories").select("id, focus_area_id").eq("org_id", orgId),
+      supabase.from("organizations").select("focus_area_label").eq("id", orgId).maybeSingle(),
+    ]);
+  const focusAreaNameById = new Map(
+    (focusAreas ?? []).map((row: Record<string, unknown>) => [
+      row.id as number,
+      row.name as string,
+    ]),
+  );
+  const shiftFocusAreaById = new Map(
+    (shiftCategories ?? []).map((row: Record<string, unknown>) => [
+      row.id as number,
+      row.focus_area_id as number | null,
+    ]),
+  );
+  const employeeFocusAreaIds = new Map(
+    (employees ?? []).map((emp: Record<string, unknown>) => [
+      emp.id as string,
+      (emp.focus_area_ids as number[] | null) ?? [],
+    ]),
+  );
   const absenceTypeById = new Map(
     (absenceTypes ?? []).map((row: Record<string, unknown>) => [
       row.id as number,
@@ -215,11 +243,34 @@ async function exportSchedule(
   for (const row of shifts as PublishedShiftRow[]) {
     const entry = resolvePublishedScheduleEntry(row, new Map(), absenceTypeById);
     if (!entry) continue;
-    shiftIndex.set(`${entry.empId}:${entry.date}`, publishedCellText(entry, absenceTypeById));
+    // Like the grid, a cell names the area only for work outside the person's own.
+    const ownAreas = employeeFocusAreaIds.get(entry.empId) ?? [];
+    const otherAreas = [
+      ...new Set(
+        (entry.segments ?? [])
+          .map((segment) =>
+            segment.shiftId != null ? shiftFocusAreaById.get(segment.shiftId) : null,
+          )
+          .filter((id): id is number => id != null && !ownAreas.includes(id)),
+      ),
+    ]
+      .map((id) => focusAreaNameById.get(id))
+      .filter((name): name is string => Boolean(name));
+    const text = publishedCellText(entry, absenceTypeById);
+    shiftIndex.set(
+      `${entry.empId}:${entry.date}`,
+      otherAreas.length > 0 ? `${text} (${otherAreas.join(", ")})` : text,
+    );
   }
 
   const headers = [
     "Employee",
+    capitalizeFirst(
+      pluralLabelNoun(
+        (org as { focus_area_label?: string | null } | null)?.focus_area_label?.trim() ||
+          DEFAULT_ORGANIZATION_LABELS.focusArea,
+      ),
+    ),
     ...dates.map((d) => {
       const dt = new Date(d + "T00:00:00Z");
       return dt.toLocaleDateString("en-US", {
@@ -234,7 +285,11 @@ async function exportSchedule(
 
   const rows = (employees ?? []).map((emp: Record<string, unknown>) => {
     const name = `${emp.first_name} ${emp.last_name}`;
-    return [name, ...dates.map((date) => shiftIndex.get(`${emp.id}:${date}`) ?? "")];
+    const areas = (employeeFocusAreaIds.get(emp.id as string) ?? [])
+      .map((id) => focusAreaNameById.get(id))
+      .filter(Boolean)
+      .join("; ");
+    return [name, areas, ...dates.map((date) => shiftIndex.get(`${emp.id}:${date}`) ?? "")];
   });
 
   return buildCsv(headers, rows);

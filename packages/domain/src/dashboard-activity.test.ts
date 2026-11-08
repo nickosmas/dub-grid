@@ -49,6 +49,15 @@ describe("describeShiftRequestActivity", () => {
     ).toBe("Pickup request · Day Shift · Awaiting approval");
     expect(
       describeShiftRequestActivity({
+        type: "pickup",
+        shiftName: "Day Shift",
+        focusAreaName: "East Wing",
+        requesterName: "Alex Rivera",
+        status: "open",
+      }),
+    ).toMatch(/^Pickup request · Day Shift in East Wing · /);
+    expect(
+      describeShiftRequestActivity({
         type: "swap",
         shiftName: "Day Shift",
         requesterName: "Alex Rivera",

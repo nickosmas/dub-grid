@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { shiftDisplayNamesById } from "@dubgrid/domain";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import ActionQueueCard, { buildActionItems } from "./ActionQueueCard";
 import ActivityFeed from "./ActivityFeed";
@@ -41,6 +42,10 @@ export default function AdminDashboard(props: DashboardContentProps) {
     onExpandPanel,
   } = props;
   const draftTotal = draftNewCount + draftModifiedCount + draftDeletedCount;
+  const shiftLabelById = useMemo(
+    () => shiftDisplayNamesById(shiftCategories, focusAreas),
+    [shiftCategories, focusAreas],
+  );
   const actionItems = useMemo(
     () =>
       buildActionItems({
@@ -54,6 +59,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
         orgId: props.org.id,
         onResolve: permissions.canApproveShiftRequests ? shiftRequests.resolve : undefined,
         assignmentNameMap,
+        shiftLabelById,
       }),
     [
       currentEmpId,
@@ -64,6 +70,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
       shiftRequests.pendingApproval,
       shiftRequests.resolve,
       assignmentNameMap,
+      shiftLabelById,
     ],
   );
   const actionableCoverageSections = useMemo(

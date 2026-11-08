@@ -69,10 +69,17 @@ export function scheduleNoteGroups(
     const all = scheduleNotesForRow(notes);
     return all.length > 0 ? [{ key: "shift", title: null, notes: all }] : [];
   }
+  const nameOf = (segment: MobileScheduleEntrySegment) => segment.shiftName?.trim() || null;
   return segments.flatMap((segment, index) => {
     const own = scheduleNotesForRow((notes ?? []).filter((note) => isOnSegment(note, segment)));
     if (own.length === 0) return [];
-    const title = segment.shiftName?.trim() || segment.displayFocusAreaName?.trim() || "Shift";
+    const name = nameOf(segment);
+    const area = segment.displayFocusAreaName?.trim() || null;
+    // Both halves can be a "Day Shift" when they are two focus areas' shifts.
+    const shared =
+      name != null &&
+      segments.some((other, otherIndex) => otherIndex !== index && nameOf(other) === name);
+    const title = (shared && area ? `${name} in ${area}` : name) || area || "Shift";
     return [{ key: `shift-${index}`, title, notes: own }];
   });
 }

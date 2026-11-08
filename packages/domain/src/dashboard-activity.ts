@@ -47,11 +47,18 @@ export function summarizePublishChanges(
 export function describeShiftRequestActivity(input: {
   type: string;
   shiftName: string;
+  /** Named because two focus areas can share a shift's name. */
+  focusAreaName?: string | null;
   requesterName: string;
   status: string;
 }): string {
   const status = formatShiftRequestStatusLabel(input.status);
-  if (input.type === "pickup") return `Pickup request · ${input.shiftName} · ${status}`;
+  if (input.type === "pickup") {
+    const shift = input.focusAreaName
+      ? `${input.shiftName} in ${input.focusAreaName}`
+      : input.shiftName;
+    return `Pickup request · ${shift} · ${status}`;
+  }
   if (input.type === "calloff") return `Call-off request · ${input.requesterName} · ${status}`;
   return `Swap request · ${input.requesterName} · ${status}`;
 }

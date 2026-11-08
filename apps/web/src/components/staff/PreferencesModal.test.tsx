@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { JobDefinition, ShiftCategory } from "@/types";
-import { describePreferences, PreferencesModal, shiftLabel } from "./PreferencesModal";
+import { describePreferences, PreferencesModal } from "./PreferencesModal";
 
 const shift = (id: number, name: string, focusAreaId: number, startTime: string, endTime: string) =>
   ({ id, orgId: "org", name, focusAreaId, startTime, endTime, sortOrder: id }) as ShiftCategory;
@@ -67,13 +67,6 @@ describe("describePreferences", () => {
         (id) => jobNames[id],
       ),
     ).toBeNull();
-  });
-});
-
-describe("shiftLabel", () => {
-  it("names the focus area only when another shift shares the name", () => {
-    expect(shiftLabel(SHIFTS[0], SHIFTS, areaName)).toBe("Day Shift (Skilled Nursing)");
-    expect(shiftLabel(SHIFTS[1], SHIFTS, areaName)).toBe("Evening Shift");
   });
 });
 

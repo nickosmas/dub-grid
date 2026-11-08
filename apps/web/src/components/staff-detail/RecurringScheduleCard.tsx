@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { DAY_LABELS } from "@/lib/constants";
+import { shiftDisplayName } from "@dubgrid/domain";
 import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import {
@@ -55,6 +56,8 @@ export function buildDayPills(
     absenceTypeById: Map<number, AbsenceType>;
     shiftById: Map<number, ShiftCategory>;
     jobById: Map<number, JobDefinition>;
+    /** Names a shared shift name's focus area; without it names stay bare. */
+    focusAreaName?: (focusAreaId: number) => string | undefined;
   },
   isDarkTheme: boolean,
 ): DayPill[] {
@@ -107,9 +110,13 @@ export function buildDayPills(
     // the job in. Resolve the shift by id first so the two lines stay separate,
     // exactly as the dashboard's schedule row does.
     const shiftId = segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
+    const shift = shiftId != null ? shiftById.get(shiftId) : undefined;
     const name =
+      (shift && lookups.focusAreaName
+        ? shiftDisplayName(shift, [...shiftById.values()], lookups.focusAreaName)
+        : null) ||
       segment.shiftName ||
-      (shiftId != null ? shiftById.get(shiftId)?.name : null) ||
+      shift?.name ||
       assignment?.name ||
       segment.label ||
       recurringShift.shiftLabel;
