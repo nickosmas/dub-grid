@@ -210,206 +210,203 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
   }
 
   return (
-    <div className="divide-y divide-[var(--dg-color-border-light)]">
-      <div className="dg-card-body">
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
-                Password
-              </div>
-              <p className="dg-card-description">
-                Choose a strong password: at least 10 characters with a lowercase letter, an
-                uppercase letter, a number and a symbol.
-              </p>
-            </div>
-            {!showPasswordForm && (
-              <Button
-                type="button"
-                onClick={openForm}
-                className="dg-btn dg-btn-secondary dg-btn-sm self-start"
-              >
-                Change password
-              </Button>
-            )}
-          </div>
-
-          {showPasswordForm && (
-            <Form
-              onSubmit={requestPasswordChange}
-              style={{ display: "flex", flexDirection: "column", gap: 14 }}
-            >
-              <div>
-                <label className="dg-label" htmlFor="security-current-password">
-                  Current Password
-                </label>
-                <PasswordInput
-                  id="security-current-password"
-                  placeholder="Enter your current password"
-                  value={currentPassword}
-                  onChange={setCurrentPassword}
-                  showPassword={showPassword}
-                  onToggle={() => setShowPassword((v) => !v)}
-                  autoComplete="current-password"
-                  className="dg-input"
-                />
-              </div>
-              {needsCode && (
+    <>
+      <section aria-labelledby="security-sign-in-title" className="dg-card">
+        <div className="dg-card-header">
+          <h2 id="security-sign-in-title" className="dg-card-title">
+            Password and two-factor
+          </h2>
+        </div>
+        <div className="divide-y divide-[var(--dg-color-border-light)]">
+          <div className="dg-card-body">
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <label className="dg-label" htmlFor="security-authenticator-code">
-                    Authenticator Code
-                  </label>
-                  <input
-                    id="security-authenticator-code"
-                    className="dg-input dg-tabular-nums"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    placeholder="6-digit code"
-                    value={code}
-                    onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                  />
-                </div>
-              )}
-              <div>
-                <label className="dg-label">New Password</label>
-                <PasswordInput
-                  placeholder="Enter new password"
-                  value={newPassword}
-                  onChange={setNewPassword}
-                  showPassword={showPassword}
-                  onToggle={() => setShowPassword((v) => !v)}
-                  autoComplete="new-password"
-                  ariaDescribedBy="password-strength-label password-strength-hints"
-                  className="dg-input"
-                />
-                <PasswordStrength password={newPassword} />
-              </div>
-              <div>
-                <label className="dg-label">Confirm New Password</label>
-                <PasswordInput
-                  placeholder="Confirm new password"
-                  value={confirmPassword}
-                  onChange={setConfirmPassword}
-                  showPassword={showPassword}
-                  onToggle={() => setShowPassword((v) => !v)}
-                  ariaDescribedBy={mismatchError ? "security-confirm-error" : undefined}
-                  autoComplete="new-password"
-                  className="dg-input"
-                />
-                {mismatchError && (
-                  <p className="dg-form-error" id="security-confirm-error">
-                    {mismatchError}
+                  <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
+                    Password
+                  </div>
+                  <p className="dg-card-description">
+                    Choose a strong password: at least 10 characters with a lowercase letter, an
+                    uppercase letter, a number and a symbol.
                   </p>
+                </div>
+                {!showPasswordForm && (
+                  <Button
+                    type="button"
+                    onClick={openForm}
+                    className="dg-btn dg-btn-secondary dg-btn-sm self-start"
+                  >
+                    Change password
+                  </Button>
                 )}
               </div>
-              {error && <p className="dg-form-error">{error}</p>}
-              <div className="dg-footer-bar dg-footer-bar--bleed flex flex-wrap justify-end gap-2">
-                <Button
-                  type="button"
-                  onClick={hasPasswordChanges ? discardChanges : closeForm}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                >
-                  {getEditorDismissLabel({ hasUnsavedChanges: hasPasswordChanges })}
-                </Button>
-                <button
-                  type="submit"
-                  disabled={saving || !canSubmitPassword}
-                  className="dg-btn dg-btn-primary dg-btn-sm"
-                >
-                  <ButtonLoading
-                    loading={saving}
-                    spinnerColor="var(--dg-color-text-inverse)"
-                    spinnerSize={16}
-                  >
-                    Update Password
-                  </ButtonLoading>
-                </button>
-              </div>
-            </Form>
-          )}
-        </div>
-      </div>
 
-      <div className="dg-card-body">
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
-              Two-factor authentication
+              {showPasswordForm && (
+                <Form
+                  onSubmit={requestPasswordChange}
+                  style={{ display: "flex", flexDirection: "column", gap: 14 }}
+                >
+                  <div>
+                    <label className="dg-label" htmlFor="security-current-password">
+                      Current Password
+                    </label>
+                    <PasswordInput
+                      id="security-current-password"
+                      placeholder="Enter your current password"
+                      value={currentPassword}
+                      onChange={setCurrentPassword}
+                      showPassword={showPassword}
+                      onToggle={() => setShowPassword((v) => !v)}
+                      autoComplete="current-password"
+                      className="dg-input"
+                    />
+                  </div>
+                  {needsCode && (
+                    <div>
+                      <label className="dg-label" htmlFor="security-authenticator-code">
+                        Authenticator Code
+                      </label>
+                      <input
+                        id="security-authenticator-code"
+                        className="dg-input dg-tabular-nums"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        placeholder="6-digit code"
+                        value={code}
+                        onChange={(event) =>
+                          setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                        }
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="dg-label">New Password</label>
+                    <PasswordInput
+                      placeholder="Enter new password"
+                      value={newPassword}
+                      onChange={setNewPassword}
+                      showPassword={showPassword}
+                      onToggle={() => setShowPassword((v) => !v)}
+                      autoComplete="new-password"
+                      ariaDescribedBy="password-strength-label password-strength-hints"
+                      className="dg-input"
+                    />
+                    <PasswordStrength password={newPassword} />
+                  </div>
+                  <div>
+                    <label className="dg-label">Confirm New Password</label>
+                    <PasswordInput
+                      placeholder="Confirm new password"
+                      value={confirmPassword}
+                      onChange={setConfirmPassword}
+                      showPassword={showPassword}
+                      onToggle={() => setShowPassword((v) => !v)}
+                      ariaDescribedBy={mismatchError ? "security-confirm-error" : undefined}
+                      autoComplete="new-password"
+                      className="dg-input"
+                    />
+                    {mismatchError && (
+                      <p className="dg-form-error" id="security-confirm-error">
+                        {mismatchError}
+                      </p>
+                    )}
+                  </div>
+                  {error && <p className="dg-form-error">{error}</p>}
+                  <div className="dg-footer-bar dg-footer-bar--bleed flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      onClick={hasPasswordChanges ? discardChanges : closeForm}
+                      className="dg-btn dg-btn-secondary dg-btn-sm"
+                    >
+                      {getEditorDismissLabel({ hasUnsavedChanges: hasPasswordChanges })}
+                    </Button>
+                    <button
+                      type="submit"
+                      disabled={saving || !canSubmitPassword}
+                      className="dg-btn dg-btn-primary dg-btn-sm"
+                    >
+                      <ButtonLoading
+                        loading={saving}
+                        spinnerColor="var(--dg-color-text-inverse)"
+                        spinnerSize={16}
+                      >
+                        Update Password
+                      </ButtonLoading>
+                    </button>
+                  </div>
+                </Form>
+              )}
             </div>
+          </div>
+
+          <div className="dg-card-body">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
+                  Two-factor authentication
+                </div>
+                <p className="dg-card-description">
+                  Add a second sign-in step using an authenticator app.
+                </p>
+              </div>
+              <MFASetup
+                mfaEnabled={mfaEnabled}
+                onStatusChange={(enabled) => {
+                  setProfile((current) => ({
+                    first_name: current?.first_name ?? null,
+                    last_name: current?.last_name ?? null,
+                    mfa_enabled: enabled,
+                  }));
+                  if (user) {
+                    void queryClient.invalidateQueries({
+                      queryKey: queryKeys.account.all(user.id),
+                    });
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="security-devices-title" className="dg-card">
+        <div className="dg-card-header">
+          <div>
+            <h2 id="security-devices-title" className="dg-card-title">
+              Devices
+            </h2>
             <p className="dg-card-description">
-              Add a second sign-in step using an authenticator app.
+              Where you&apos;re signed in, and when you last signed in.
             </p>
           </div>
-          <MFASetup
-            mfaEnabled={mfaEnabled}
-            onStatusChange={(enabled) => {
-              setProfile((current) => ({
-                first_name: current?.first_name ?? null,
-                last_name: current?.last_name ?? null,
-                mfa_enabled: enabled,
-              }));
-              if (user) {
-                void queryClient.invalidateQueries({ queryKey: queryKeys.account.all(user.id) });
-              }
-            }}
-          />
         </div>
-      </div>
-
-      <div className="dg-card-body">
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
-                Other devices
-              </div>
-              <p className="dg-card-description">You stay signed in here.</p>
-            </div>
-            <Button
-              type="button"
-              onClick={() => setPendingSessionSignOut("others")}
-              disabled={signingOut !== null || otherSessionCount === 0}
-              className="dg-btn dg-btn-secondary dg-btn-sm self-start"
-              aria-label="Sign out other devices"
-            >
-              <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
-                Sign out
-              </ButtonLoading>
-            </Button>
-          </div>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
-                All devices
-              </div>
-              <p className="dg-card-description">Including this one.</p>
-            </div>
-            <Button
-              type="button"
-              onClick={() => setPendingSessionSignOut("global")}
-              disabled={signingOut !== null}
-              className="dg-btn dg-btn-danger dg-btn-sm self-start"
-              aria-label="Sign out all devices"
-            >
-              <ButtonLoading loading={signingOut === "global"} spinnerSize={14}>
-                Sign out
-              </ButtonLoading>
-            </Button>
-          </div>
-          <div className="border-t border-[var(--dg-color-border-light)] pt-4">
-            <div className="mb-3">
-              <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
-                Devices
-              </div>
-              <div className="dg-card-description">
-                Where you&apos;re signed in, and when you last signed in.
-              </div>
-            </div>
-            <SessionList onOtherSessionCountChange={handleOtherSessionCountChange} />
-          </div>
+        <div className="dg-card-body">
+          <SessionList onOtherSessionCountChange={handleOtherSessionCountChange} />
         </div>
-      </div>
+        <div className="dg-card-body grid grid-cols-2 gap-3 border-t border-[var(--dg-color-border-light)]">
+          <Button
+            type="button"
+            onClick={() => setPendingSessionSignOut("others")}
+            disabled={signingOut !== null || otherSessionCount === 0}
+            className="dg-btn dg-btn-secondary dg-btn-sm min-w-0"
+          >
+            <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
+              Sign out other devices
+            </ButtonLoading>
+          </Button>
+          <Button
+            type="button"
+            onClick={() => setPendingSessionSignOut("global")}
+            disabled={signingOut !== null}
+            className="dg-btn dg-btn-danger dg-btn-sm min-w-0"
+          >
+            <ButtonLoading loading={signingOut === "global"} spinnerSize={14}>
+              Sign out all devices
+            </ButtonLoading>
+          </Button>
+        </div>
+      </section>
 
       {pendingConfirm && !stepUp.dialog && (
         <ConfirmDialog
@@ -442,6 +439,6 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           }}
         />
       )}
-    </div>
+    </>
   );
 }

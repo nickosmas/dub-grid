@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 
@@ -25,21 +25,19 @@ import { DataPrivacyPanel } from "@/components/account/DataPrivacyPanel";
 import DeleteAccountCard from "@/components/account/DeleteAccountCard";
 import { RequestDeletionCard } from "@/components/account/RequestDeletionCard";
 import { EmployeeStatusCard } from "@/components/staff-detail/EmployeeStatusCard";
-import { RecordCard, WorkCard } from "@/components/staff-detail/PersonInfoCards";
+import { WorkAndRecordCard } from "@/components/staff-detail/PersonInfoCards";
 import { StaffOverviewTab } from "@/components/staff-detail/tabs/StaffOverviewTab";
 import { ScheduleTab } from "@/components/staff-detail/tabs/ScheduleTab";
 import { CalendarSubscriptionCard } from "./CalendarSubscriptionCard";
 import { ProfileHeader } from "./ProfileHeader";
-import {
-  availableProfileTabs,
-  resolveProfileLink,
-  type ProfileAccountSection,
-  type ProfileTab,
-} from "./profile-tabs";
+import { availableProfileTabs, resolveProfileLink, type ProfileTab } from "./profile-tabs";
 
 const TAB_LABELS: Record<ProfileTab, string> = {
   account: "Account",
   schedule: "Schedule",
+  alerts: "Alerts",
+  security: "Security",
+  privacy: "Privacy",
 };
 
 const PERIOD_PHRASE = "in the last 12 weeks";
@@ -49,22 +47,18 @@ const toLocalDate = (iso: string) => {
   return new Date(year, month - 1, day);
 };
 
-/** A card on the Account tab, its title in the header bar, its parts ruled apart. */
-function AccountSection({
+/** A settings card, its title in the header bar, its parts ruled apart. */
+function SettingsSection({
   id,
   title,
   children,
 }: {
-  id: ProfileAccountSection;
+  id: string;
   title: string;
   children: ReactNode;
 }) {
   return (
-    <section
-      id={`profile-${id}`}
-      aria-labelledby={`profile-${id}-title`}
-      className="dg-card scroll-mt-6"
-    >
+    <section aria-labelledby={`profile-${id}-title`} className="dg-card">
       <div className="dg-card-header">
         <h2 id={`profile-${id}-title`} className="dg-card-title">
           {title}
@@ -76,8 +70,9 @@ function AccountSection({
 }
 
 /**
- * /profile: your own page. Account holds your details, sign-in, alerts and
- * privacy settings, and Schedule shows your record the way a manager sees it.
+ * /profile: your own page. Account holds your details and record, Schedule
+ * shows your record the way a manager sees it, and Alerts, Security and
+ * Privacy hold your settings.
  */
 export function ProfilePage() {
   const router = useRouter();
@@ -125,17 +120,13 @@ export function ProfilePage() {
     () => availableProfileTabs({ hasStaffRecord: Boolean(employee), isOnSchedule }),
     [employee, isOnSchedule],
   );
-  const { tab: activeTab, section: linkedSection } = resolveProfileLink(
+  const activeTab = resolveProfileLink(
     { tab: searchParams.get("tab"), section: searchParams.get("section") },
     tabs,
   );
   const openTab = useCallback(
-    (tab: ProfileTab, section?: ProfileAccountSection) => {
-      const params = new URLSearchParams();
-      if (tab !== tabs[0]) params.set("tab", tab);
-      if (section) params.set("section", section);
-      const query = params.toString();
-      router.replace(query ? `/profile?${query}` : "/profile", { scroll: false });
+    (tab: ProfileTab) => {
+      router.replace(tab === tabs[0] ? "/profile" : `/profile?tab=${tab}`, { scroll: false });
     },
     [router, tabs],
   );
@@ -146,6 +137,8 @@ export function ProfilePage() {
   const canManageScheduleEmployees = Boolean(canManageEmployees);
   const orgRole: OrganizationRole | null =
     !isGridmaster && (role === "user" || role === "admin" || role === "super_admin") ? role : null;
+  // Read in the record card when nothing on Account lets you change it.
+  const recordAccessRole = employee && !canManageManagementAccess ? orgRole : null;
 
   const range = useMemo(
     () => getProfileOverviewDateRange(new Date(), org?.timezone),
@@ -169,13 +162,6 @@ export function ProfilePage() {
 
   const showSkeleton = useSkeletonGate(permsLoading || profileLoading);
 
-  useEffect(() => {
-    if (activeTab !== "account" || !linkedSection) return;
-    document
-      .getElementById(`profile-${linkedSection}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [activeTab, linkedSection, profileLoading, showSkeleton]);
-
   // Wait for real permissions before rendering: canEditProfileDirectly
   // defaults to false while perms are loading, which would otherwise flash
   // the non-admin "request a name change" UI at admins for a moment.
@@ -183,7 +169,7 @@ export function ProfilePage() {
     return (
       <>
         <ProgressBar loading={permsLoading || profileLoading} />
-        {showSkeleton ? <PersonPageSkeleton variant="profile" tabCount={2} /> : null}
+        {showSkeleton ? <PersonPageSkeleton variant="profile" tabCount={tabs.length} /> : null}
       </>
     );
   }
@@ -241,22 +227,22 @@ export function ProfilePage() {
         ) : null}
 
         <div className="flex min-w-0 flex-col gap-5">
-          {tabs.length > 1 ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="max-w-full overflow-x-auto">
               <SpanTabs<ProfileTab>
                 aria-label="Profile sections"
-                className="w-max"
+                className="w-max max-sm:[&_.dg-span-tab]:px-1!"
                 items={tabs.map((tab) => ({ value: tab, label: TAB_LABELS[tab] }))}
                 value={activeTab}
                 onChange={(tab) => openTab(tab)}
               />
-              {activeTab === "schedule" ? (
-                <span className="text-[13px] text-[var(--dg-color-text-subtle)]">
-                  The last 12 weeks
-                </span>
-              ) : null}
             </div>
-          ) : null}
+            {activeTab === "schedule" ? (
+              <span className="text-[13px] text-[var(--dg-color-text-subtle)]">
+                The last 12 weeks
+              </span>
+            ) : null}
+          </div>
 
           <section aria-label={TAB_LABELS[activeTab]}>
             {activeTab === "schedule" && employee && isOnSchedule && (
@@ -309,65 +295,79 @@ export function ProfilePage() {
 
             {activeTab === "account" && (
               <div className="flex flex-col gap-4">
-                <div id="profile-details" className="flex scroll-mt-6 flex-col gap-4">
-                  <ProfilePanel
-                    user={user}
-                    profile={profile}
+                <ProfilePanel
+                  user={user}
+                  profile={profile}
+                  employee={employee}
+                  managementDepartmentIds={managementDepartmentIds}
+                  isOrgMember={isOrgMember}
+                  orgId={orgId}
+                  canEditProfileDirectly={canEditProfileDirectly}
+                  isGridmaster={Boolean(isGridmaster)}
+                  role={role}
+                  departments={departments}
+                  isOnSchedule={isOnSchedule}
+                  canManageManagementAccess={canManageManagementAccess}
+                  canManageScheduleEmployees={canManageScheduleEmployees}
+                  focusAreas={focusAreas}
+                  certifications={certifications}
+                  roles={orgRoles}
+                  focusAreaLabel={org?.focusAreaLabel}
+                  certificationLabel={org?.certificationLabel}
+                  roleLabel={org?.roleLabel}
+                  setProfile={setProfile}
+                  setEmployee={setEmployee}
+                  refetchProfile={refetchProfile}
+                  saveBarSlot={saveBarSlot}
+                  showAccessRole={!recordAccessRole}
+                />
+                {employee ? (
+                  <WorkAndRecordCard
                     employee={employee}
-                    managementDepartmentIds={managementDepartmentIds}
-                    isOrgMember={isOrgMember}
-                    orgId={orgId}
-                    canEditProfileDirectly={canEditProfileDirectly}
-                    isGridmaster={Boolean(isGridmaster)}
-                    role={role}
-                    departments={departments}
-                    isOnSchedule={isOnSchedule}
-                    canManageManagementAccess={canManageManagementAccess}
-                    canManageScheduleEmployees={canManageScheduleEmployees}
-                    focusAreas={focusAreas}
-                    certifications={certifications}
-                    roles={orgRoles}
-                    focusAreaLabel={org?.focusAreaLabel}
-                    certificationLabel={org?.certificationLabel}
-                    roleLabel={org?.roleLabel}
-                    setProfile={setProfile}
-                    setEmployee={setEmployee}
-                    refetchProfile={refetchProfile}
-                    saveBarSlot={saveBarSlot}
-                  />
-                </div>
-                {employee && !canEditProfileDirectly ? (
-                  <WorkCard
-                    employee={employee}
-                    focusAreas={focusAreas}
-                    certifications={certifications}
-                    roles={orgRoles}
-                    focusAreaLabel={org?.focusAreaLabel}
-                    certificationLabel={org?.certificationLabel}
-                    roleLabel={org?.roleLabel}
-                    showScheduleDetails={isOnSchedule}
-                    hideInternalNotes
+                    orgRole={recordAccessRole}
+                    work={
+                      !canEditProfileDirectly && isOnSchedule
+                        ? {
+                            focusAreas,
+                            certifications,
+                            roles: orgRoles,
+                            focusAreaLabel: org?.focusAreaLabel,
+                            certificationLabel: org?.certificationLabel,
+                            roleLabel: org?.roleLabel,
+                          }
+                        : null
+                    }
                   />
                 ) : null}
-                {employee ? <RecordCard employee={employee} /> : null}
-                <AccountSection id="security" title="Sign-in and security">
-                  <SecurityPanel user={user} profile={profile} setProfile={setProfile} />
-                </AccountSection>
-                <AccountSection id="notifications" title="Alerts">
-                  <NotificationsPanel
-                    isGridmaster={Boolean(isGridmaster)}
-                    isSuperAdmin={Boolean(isSuperAdmin)}
-                  />
-                </AccountSection>
-                <AccountSection id="data-privacy" title="Data and privacy">
+                <div ref={setSaveBarSlot} className="sticky bottom-4 z-10 empty:hidden" />
+              </div>
+            )}
+
+            {activeTab === "alerts" && (
+              <SettingsSection id="notifications" title="Alerts">
+                <NotificationsPanel
+                  isGridmaster={Boolean(isGridmaster)}
+                  isSuperAdmin={Boolean(isSuperAdmin)}
+                />
+              </SettingsSection>
+            )}
+
+            {activeTab === "security" && (
+              <div className="flex flex-col gap-4">
+                <SecurityPanel user={user} profile={profile} setProfile={setProfile} />
+              </div>
+            )}
+
+            {activeTab === "privacy" && (
+              <div className="flex flex-col gap-4">
+                <SettingsSection id="data-privacy" title="Data and privacy">
                   <DataPrivacyPanel />
-                </AccountSection>
+                </SettingsSection>
                 {isGridmaster ? null : isSuperAdmin ? (
                   <DeleteAccountCard />
                 ) : (
                   <RequestDeletionCard orgId={orgId} isOrgMember={isOrgMember} />
                 )}
-                <div ref={setSaveBarSlot} className="sticky bottom-4 z-10 empty:hidden" />
               </div>
             )}
           </section>

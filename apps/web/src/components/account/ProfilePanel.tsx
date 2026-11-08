@@ -104,6 +104,8 @@ interface ProfilePanelProps {
   refetchProfile: () => Promise<unknown>;
   /** Where the Unsaved changes bar goes, so it can stay in view over the whole tab. */
   saveBarSlot?: HTMLElement | null;
+  /** False when the page shows a plain access role in its record card instead. */
+  showAccessRole?: boolean;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -183,6 +185,7 @@ export function ProfilePanel({
   setEmployee,
   refetchProfile,
   saveBarSlot,
+  showAccessRole = true,
 }: ProfilePanelProps) {
   const stepUp = useStepUpAction();
   const firstName = profile?.first_name?.trim() || null;
@@ -820,22 +823,24 @@ export function ProfilePanel({
         </AccountCard>
       )}
 
-      <AccountCard title="Access">
-        {isGridmaster ? (
-          <Field label="Platform role" value="Gridmaster" />
-        ) : canManageManagementAccess && selfOrgRole ? (
-          <MemberAccessControls
-            orgRole={selfOrgRole}
-            adminPermissions={selfMembership?.adminPermissions}
-            onRoleChange={handleRoleChange}
-            onPermissionsChange={handlePermissionsChange}
-            isSelf
-            labels={{ focusAreaLabel, certificationLabel, roleLabel }}
-          />
-        ) : (
-          <Field label="Access role" value={ROLE_LABELS[role] ?? role} />
-        )}
-      </AccountCard>
+      {isGridmaster || canManageManagementAccess || showAccessRole ? (
+        <AccountCard title="Access">
+          {isGridmaster ? (
+            <Field label="Platform role" value="Gridmaster" />
+          ) : canManageManagementAccess && selfOrgRole ? (
+            <MemberAccessControls
+              orgRole={selfOrgRole}
+              adminPermissions={selfMembership?.adminPermissions}
+              onRoleChange={handleRoleChange}
+              onPermissionsChange={handlePermissionsChange}
+              isSelf
+              labels={{ focusAreaLabel, certificationLabel, roleLabel }}
+            />
+          ) : (
+            <Field label="Access role" value={ROLE_LABELS[role] ?? role} />
+          )}
+        </AccountCard>
+      ) : null}
 
       {/* Department assignment only applies to management involvement, so a
        *  self-viewer with neither existing departments nor the permission to
