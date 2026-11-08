@@ -441,7 +441,7 @@ export function ProfileChangeRequestQueue({
                 <Button
                   type="button"
                   disabled={resolvingId === request.id}
-                  className={`dg-btn dg-btn-sm ${request.type === "account_deletion" ? "dg-btn-danger-filled" : "dg-btn-primary"}`}
+                  className={`dg-btn dg-btn-sm ${request.type === "account_deletion" ? "dg-btn-danger" : "dg-btn-primary"}`}
                   onClick={() => setPendingResolution({ request, action: "approve" })}
                 >
                   <ButtonLoading loading={resolvingId === request.id}>Approve</ButtonLoading>

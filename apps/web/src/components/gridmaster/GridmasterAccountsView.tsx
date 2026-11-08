@@ -429,7 +429,7 @@ export default function GridmasterAccountsView({
                       <td style={gmTdStyle}>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                           <Button
-                            className="dg-btn dg-btn-danger"
+                            className="dg-btn dg-btn-secondary"
                             style={{ fontSize: "var(--dg-fs-caption)" }}
                             onClick={() => setForceLogoutConfirm(account)}
                             disabled={isSelf || isLoading}
@@ -465,10 +465,7 @@ export default function GridmasterAccountsView({
                           </Button>
                           <Button
                             className="dg-btn dg-btn-secondary"
-                            style={{
-                              fontSize: "var(--dg-fs-caption)",
-                              color: "var(--dg-color-danger)",
-                            }}
+                            style={{ fontSize: "var(--dg-fs-caption)" }}
                             onClick={() => {
                               setDemoteTarget(account);
                               setDemoteOrgId(organizations[0]?.id ?? "");

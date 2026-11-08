@@ -190,6 +190,10 @@ export function StaffContextBar({
         ),
       ).filter((plan) => plan.eligible.length > 0)
     : [];
+  // One red per bar: Offboard when it's offered, otherwise Suspend.
+  const strongestStatusAction = (["archive", "suspend"] as const).find((action) =>
+    statusPlans.some((plan) => plan.action === action),
+  );
 
   return (
     <div
@@ -274,9 +278,7 @@ export function StaffContextBar({
                 key={plan.action}
                 onClick={() => onBulkStatus?.(plan)}
                 className={`dg-btn dg-btn-sm dg-tabular-nums ${
-                  plan.action === "suspend" || plan.action === "archive"
-                    ? "dg-btn-danger"
-                    : "dg-btn-secondary"
+                  plan.action === strongestStatusAction ? "dg-btn-danger" : "dg-btn-secondary"
                 }`}
               >
                 {describeStatusAction(plan.action, "").label} ({plan.eligible.length})
