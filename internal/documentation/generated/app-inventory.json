@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:d332dab93b320efa2567a22986be543de3f6093cd7ca1d45d2d06b13a2c6e6c7",
+  "sourceDigest": "sha256:a1eee43ba98e64c1e6ad85b821625f9b07c835a39e76ababf9a445f3c13d3677",
   "webRoutes": [
     {
       "id": "web:/",
@@ -776,7 +776,7 @@
       "id": "settings:org-display",
       "section": "org-display",
       "group": "Scheduling",
-      "defaultLabel": "Shift Display Mode",
+      "defaultLabel": "Schedule Display",
       "route": "/settings?section=org-display",
       "accessPredicates": [
         "perms.canAccessSettings",
