@@ -32,9 +32,12 @@ const ruleDescriptionStyle: React.CSSProperties = {
   marginTop: 3,
 };
 
+// `flex-start` keeps each rule's control at its content width instead of
+// stretching it across the card.
 const ruleRowStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
+  alignItems: "flex-start",
   gap: 10,
   padding: "18px 0",
   borderTop: "1px solid var(--dg-color-border-light)",

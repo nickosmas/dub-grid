@@ -107,6 +107,12 @@
   the final action spans both columns (three is two above, one full-width below;
   five continues with two equal rows, then one full-width below). Do not let
   labels or variants make a peer larger within a row.
+- Dropdowns are never wider than they need to be (owner, 2026-11-07). A
+  trigger (`CustomSelect`, `StaffMultiSelect`, `DateRangePicker`) sizes to
+  its label and truncates in a narrow row; in a toolbar or filter row only the
+  search field takes the leftover width. Give a dropdown `width: 100%` only
+  when it lines up with other fields in a form. Menus size to their longest
+  option, one line each.
 - Button labels never wrap on either platform. Keep them to one line. Web
   truncates rather than creating a second line. Mobile fits the label to the
   button's width by measurement (`FitText`): the font shrinks by the ratio of

@@ -616,7 +616,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6d42906ab2459ac92524484a9a8e7e5e002f035291905829fed7eff981ba6689"
+      "evidenceFingerprint": "sha256:4873ec0828f3b9ca2632b49fa9d8c2e4d4fec617b31e204340f898975f76ab82"
     },
     {
       "id": "dashboard",
@@ -764,7 +764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7ad5a3aebcd536c2ea1053efef4f74d17d99f3c8058c2c09ed15d9dfee629cff"
+      "evidenceFingerprint": "sha256:fc2f098604a6de13da6595681fc6ccf403069de6973e2b6a8856eec6dd8c8fae"
     },
     {
       "id": "person-detail",
@@ -845,7 +845,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d6dbca0c6a3eca08b1a1b862187bbf3fe5e7433ac47c8058088d7ee7e9abe7ab"
+      "evidenceFingerprint": "sha256:8b4ec3d0c72f523ffcc000acac881a9c1c4ce128216101eacf019323547c179c"
     },
     {
       "id": "invitations",
@@ -1017,7 +1017,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8d0bc2257f397697559ebb3013e627441d2d6239a9559826c27f6bc5607eb0c4"
+      "evidenceFingerprint": "sha256:55cadd4ca74576136e807271417ba1265f554463b27e452fe53b855c4b333289"
     },
     {
       "id": "terminology",
@@ -1387,7 +1387,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:5fbb78990d7d073c455c272cf9a65f20204e524a486ac4f6de901d17abdd9c10"
+      "evidenceFingerprint": "sha256:30db1d85d887147c878bba798f292525504aea511b4f3331ffa8df5a3fd247aa"
     },
     {
       "id": "reports",
@@ -1439,7 +1439,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5f04d26dadfa7e46d66adc23ef01291579e92c9f495326d35c64c744ba78b86e"
+      "evidenceFingerprint": "sha256:2821dae0b1ebc20f32e699b1bec09d2d689af8b75d7ce5c8c5918c223c5ea7f6"
     },
     {
       "id": "profile",
@@ -1514,7 +1514,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0bc7e4f69670685be6d0571b59858ebf8c4c462bc0d59fc4222778d496aae642"
+      "evidenceFingerprint": "sha256:119c61faa2fa169d6e3860e597bedc6e67d049d2b6b571a38a90b19817983eee"
     },
     {
       "id": "security-sessions",
@@ -1593,7 +1593,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:318400e0013be5be74b8311f3087bcfa9068bc11f10f6f9aadd282bf4359577f"
+      "evidenceFingerprint": "sha256:6e1d57528744dee3b179a5c2542a5ddcb54ab7ea9b69493a6f0d86116c599a3f"
     },
     {
       "id": "privacy-controls",
@@ -1656,7 +1656,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:e05a64b905810672f41712652e6e50df2bf448c50de7423754f7df4fad82f0e1"
+      "evidenceFingerprint": "sha256:8ac80ebda472b520485533a390332dc8668f079e84ba699aa0012b1f5faafa4b"
     },
     {
       "id": "schedule-rules-display",
@@ -1710,7 +1710,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9c156960ded135c322318150f663666f81bfc114ea6e8471482146b1e0dc51c8"
+      "evidenceFingerprint": "sha256:14bedb0a05d2c55e6e4ffbb5b29615032e8409b2b0a5b53255c989474d481ec6"
     },
     {
       "id": "roles-certifications-indicators",
@@ -1821,7 +1821,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:81d36e929c345ded828e524c86b192b05ce3ceaa3535ef3580d3cb14ef33a209"
+      "evidenceFingerprint": "sha256:ed3d4f4ac48149a0f4ace538cbdac577946e799b26d44c1d43efbbc97044d484"
     },
     {
       "id": "departments-focus-areas",
@@ -2035,7 +2035,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:ed68bd92cc26f0a0717d9fa7e77e7e03725b530d54b1a9b8911178895b009a1e"
+      "evidenceFingerprint": "sha256:2a543a79a11177571fa2f429813c2f0f86f814dc26bc5dc8690ec8874bdcfd72"
     },
     {
       "id": "mobile-schedule",
@@ -2148,7 +2148,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:bd266046117d060e7bc15f5ce92d20656b2860406b3c7e13a43c76eed88a02dc"
+      "evidenceFingerprint": "sha256:4be0b21f7bdaf7d508d08c673f4a5a93bb0fadf20a45290befd115e042b8ac12"
     }
   ],
   "surfaceExclusions": [

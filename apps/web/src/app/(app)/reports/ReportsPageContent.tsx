@@ -1035,7 +1035,7 @@ function ReportsContent() {
 // of the row so the toolbar spans the page.
 const controlLabelStyle: CSSProperties = {
   display: "grid",
-  flex: "1 1 auto",
+  flex: "0 1 auto",
   maxWidth: "100%",
   gap: 6,
   color: "var(--dg-type-field-title-color)",
@@ -1116,6 +1116,7 @@ const targetDropdownButtonStyle: CSSProperties = {
   cursor: "pointer",
   display: "flex",
   fontFamily: "inherit",
+  gap: 8,
   justifyContent: "space-between",
   minHeight: "var(--dg-toolbar-h)",
   minWidth: 0,
@@ -1135,6 +1136,9 @@ const targetDropdownSummaryStyle: CSSProperties = {
   flex: 1,
   fontSize: "var(--dg-type-control-size)",
   fontWeight: 500,
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
   whiteSpace: "nowrap",
 };
 
@@ -1146,7 +1150,9 @@ const targetDropdownPopoverStyle: CSSProperties = {
   maxHeight: "min(420px, calc(100vh - 80px))",
   overflowY: "auto",
   padding: 12,
-  width: "min(340px, calc(100vw - 32px))",
+  minWidth: "max(var(--anchor-width), 240px)",
+  width: "max-content",
+  maxWidth: "min(340px, calc(100vw - 32px))",
 };
 
 const targetDropdownHeaderStyle: CSSProperties = {

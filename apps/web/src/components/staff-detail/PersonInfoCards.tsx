@@ -70,7 +70,7 @@ const namesOf = (ids: number[], items: ReadonlyArray<{ id: number; name: string 
     .map((id) => items.find((item) => item.id === id)?.name)
     .filter((name): name is string => Boolean(name));
 
-interface WorkCardProps {
+interface WorkFieldsProps {
   employee: Employee;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
@@ -78,13 +78,9 @@ interface WorkCardProps {
   focusAreaLabel?: string;
   certificationLabel?: string;
   roleLabel?: string;
-  /** Management-only people have no schedule fields to show. */
-  showScheduleDetails: boolean;
-  /** Internal notes are written about someone, for the people who manage them. */
-  hideInternalNotes?: boolean;
 }
 
-export function WorkCard({
+function WorkFields({
   employee,
   focusAreas,
   certifications,
@@ -92,23 +88,40 @@ export function WorkCard({
   focusAreaLabel = "Schedule areas",
   certificationLabel = "Certification",
   roleLabel = "Roles",
-  showScheduleDetails,
-  hideInternalNotes = false,
-}: WorkCardProps) {
+}: WorkFieldsProps) {
   const certification = certifications.find((item) => item.id === employee.certificationId);
   const list = (names: string[]) => (names.length > 0 ? names.join(", ") : <Missing>None</Missing>);
 
   return (
+    <>
+      <InfoField label={focusAreaLabel}>
+        {list(namesOf(employee.focusAreaIds, focusAreas))}
+      </InfoField>
+      <InfoField label={certificationLabel}>
+        {certification ? certification.name : <Missing>None</Missing>}
+      </InfoField>
+      <InfoField label={roleLabel}>{list(namesOf(employee.roleIds, roles))}</InfoField>
+    </>
+  );
+}
+
+interface WorkCardProps extends WorkFieldsProps {
+  /** Management-only people have no schedule fields to show. */
+  showScheduleDetails: boolean;
+  /** Internal notes are written about someone, for the people who manage them. */
+  hideInternalNotes?: boolean;
+}
+
+export function WorkCard({
+  showScheduleDetails,
+  hideInternalNotes = false,
+  ...fields
+}: WorkCardProps) {
+  return (
     <AboutCard title="Work">
       {showScheduleDetails ? (
         <dl className="m-0 grid gap-x-6 gap-y-4 sm:grid-cols-2">
-          <InfoField label={focusAreaLabel}>
-            {list(namesOf(employee.focusAreaIds, focusAreas))}
-          </InfoField>
-          <InfoField label={certificationLabel}>
-            {certification ? certification.name : <Missing>None</Missing>}
-          </InfoField>
-          <InfoField label={roleLabel}>{list(namesOf(employee.roleIds, roles))}</InfoField>
+          <WorkFields {...fields} />
         </dl>
       ) : null}
       {hideInternalNotes ? null : (
@@ -116,8 +129,8 @@ export function WorkCard({
           className={`m-0 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg-secondary)] px-3.5 py-3 ${showScheduleDetails ? "mt-4" : ""}`}
         >
           <InfoField label="Internal notes">
-            {employee.contactNotes ? (
-              <span className="whitespace-pre-wrap">{employee.contactNotes}</span>
+            {fields.employee.contactNotes ? (
+              <span className="whitespace-pre-wrap">{fields.employee.contactNotes}</span>
             ) : (
               <Missing>None</Missing>
             )}
@@ -218,8 +231,7 @@ export function AccessCard({
   );
 }
 
-/** The facts of their record: who they are on file and when things happened. */
-export function RecordCard({ employee }: { employee: Employee }) {
+function RecordFields({ employee }: { employee: Employee }) {
   const planned =
     (employee.status === "active" || plannedReturn(employee)) &&
     describePlannedChangeInFull(employee);
@@ -227,37 +239,78 @@ export function RecordCard({ employee }: { employee: Employee }) {
     value ? DAY.format(new Date(value)) : <Missing>Not recorded</Missing>;
 
   return (
-    <AboutCard title="Record">
-      <dl
-        data-testid="person-record"
-        className="dg-tabular-nums m-0 grid gap-x-6 gap-y-4 sm:grid-cols-2"
-      >
-        <InfoField label="Employee ID">
-          {employee.employeeNumber != null ? (
-            `#${employee.employeeNumber}`
-          ) : (
-            <Missing>None</Missing>
-          )}
-        </InfoField>
-        <InfoField label="Added">{day(employee.createdAt)}</InfoField>
-        {employee.joinedAt !== undefined ? (
-          <InfoField label="Joined">
+    <>
+      <InfoField label="Employee ID">
+        {employee.employeeNumber != null ? (
+          <span className="dg-tabular-nums">#{employee.employeeNumber}</span>
+        ) : (
+          <Missing>None</Missing>
+        )}
+      </InfoField>
+      <InfoField label="Added">
+        <span className="dg-tabular-nums">{day(employee.createdAt)}</span>
+      </InfoField>
+      {employee.joinedAt !== undefined ? (
+        <InfoField label="Joined">
+          <span className="dg-tabular-nums">
             {employee.joinedAt ? day(employee.joinedAt) : <Missing>Not joined</Missing>}
-          </InfoField>
-        ) : null}
-        {employee.firstDay ? (
-          <InfoField label="First day">{formatFirstDay(employee.firstDay)}</InfoField>
-        ) : null}
-        <InfoField label="Status changed">{day(employee.statusChangedAt)}</InfoField>
-        {planned ? <InfoField label="Planned">{planned}</InfoField> : null}
-      </dl>
-      {employee.statusNote ? (
-        <dl className="m-0 mt-4 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg-secondary)] px-3.5 py-3">
-          <InfoField label="Status note">
-            <span className="whitespace-pre-wrap">{employee.statusNote}</span>
-          </InfoField>
-        </dl>
+          </span>
+        </InfoField>
       ) : null}
+      {employee.firstDay ? (
+        <InfoField label="First day">
+          <span className="dg-tabular-nums">{formatFirstDay(employee.firstDay)}</span>
+        </InfoField>
+      ) : null}
+      <InfoField label="Status changed">
+        <span className="dg-tabular-nums">{day(employee.statusChangedAt)}</span>
+      </InfoField>
+      {planned ? <InfoField label="Planned">{planned}</InfoField> : null}
+    </>
+  );
+}
+
+function StatusNote({ employee }: { employee: Employee }) {
+  if (!employee.statusNote) return null;
+  return (
+    <dl className="m-0 mt-4 rounded-[var(--dg-radius-md)] bg-[var(--dg-color-bg-secondary)] px-3.5 py-3">
+      <InfoField label="Status note">
+        <span className="whitespace-pre-wrap">{employee.statusNote}</span>
+      </InfoField>
+    </dl>
+  );
+}
+
+/** The facts of their record: who they are on file and when things happened. */
+export function RecordCard({ employee }: { employee: Employee }) {
+  return (
+    <AboutCard title="Record">
+      <dl data-testid="person-record" className="m-0 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+        <RecordFields employee={employee} />
+      </dl>
+      <StatusNote employee={employee} />
+    </AboutCard>
+  );
+}
+
+interface WorkAndRecordCardProps {
+  employee: Employee;
+  /** Shown here when nothing above lets you change it. */
+  orgRole: OrganizationRole | null;
+  /** Work details to read here, or null when they're edited above or don't apply. */
+  work: Omit<WorkFieldsProps, "employee"> | null;
+}
+
+/** Your own page's read-only facts in one card: access role, work details and record. */
+export function WorkAndRecordCard({ employee, orgRole, work }: WorkAndRecordCardProps) {
+  return (
+    <AboutCard title={work ? "Work and record" : "Record"}>
+      <dl data-testid="person-record" className="m-0 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+        {orgRole ? <InfoField label="Access role">{ROLE_NAMES[orgRole]}</InfoField> : null}
+        {work ? <WorkFields employee={employee} {...work} /> : null}
+        <RecordFields employee={employee} />
+      </dl>
+      <StatusNote employee={employee} />
     </AboutCard>
   );
 }
