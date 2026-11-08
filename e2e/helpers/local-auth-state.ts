@@ -39,6 +39,22 @@ export async function setLocalOrganizationSubscription(
   });
 }
 
+/** Leaves one unread alert in the person's inbox for that organization. */
+export async function ensureLocalUnreadAlert(email: string, slug: string): Promise<void> {
+  await withDatabase(async (database) => {
+    const inserted = await database.query(
+      `INSERT INTO public.notifications (id, user_id, org_id, type, category, title, message)
+       SELECT '5eed0a1e-0000-4000-8000-000000000001', u.id, o.id, 'system', 'system',
+              'Test alert', 'Left unread for the badge checks.'
+         FROM auth.users u, public.organizations o
+        WHERE u.email = $1 AND o.slug = $2
+       ON CONFLICT (id) DO UPDATE SET read_at = NULL, archived_at = NULL`,
+      [email, slug],
+    );
+    if (inserted.rowCount !== 1) throw new Error(`No local ${email} in ${slug}`);
+  });
+}
+
 export async function clearLocalMfaFactors(email: string): Promise<void> {
   await withDatabase(async (database) => {
     await database.query(

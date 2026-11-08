@@ -2877,6 +2877,13 @@ async function main() {
   const gridmasterSql = readFileSync("supabase/seed_gridmaster.sql", "utf8");
   await db.query(gridmasterSql);
 
+  // A trial would start on the first Super Admin sign-in and lock the
+  // organization 17 days later, so seeded organizations skip billing, as Test
+  // Sandbox does. A Gridmaster can still put one on a trial to test it.
+  await db.query(
+    `UPDATE public.organizations SET subscription_status = 'active', trial_started_at = NULL, trial_ends_at = NULL`,
+  );
+
   console.log(
     `    ✓ Calm Haven configuration mirrored with 26 Arden Wood employees, ${ardenWoodJobs.totalJobCount} jobs, and seeded shifts`,
   );
