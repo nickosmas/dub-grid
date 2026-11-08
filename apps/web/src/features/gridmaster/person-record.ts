@@ -85,6 +85,8 @@ export interface GridmasterOrganizationNames {
   focusAreas: Record<number, string>;
   roles: Record<number, string>;
   certifications: Record<number, string>;
+  /** Department and focus area ids in the order Settings lists them. */
+  order?: { departments: number[]; focusAreas: number[] };
 }
 
 export interface GridmasterPersonOrganization {

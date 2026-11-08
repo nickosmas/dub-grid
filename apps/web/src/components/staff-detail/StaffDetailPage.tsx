@@ -1324,10 +1324,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       }
     />
   ) : null;
+  // In the order Settings lists them, not the order they were assigned.
   const namesOf = (ids: number[], items: ReadonlyArray<{ id: number; name: string }>) =>
-    ids
-      .map((id) => items.find((item) => item.id === id)?.name)
-      .filter((name): name is string => Boolean(name));
+    items.filter((item) => ids.includes(item.id)).map((item) => item.name);
   const headerSummary =
     employee && showScheduleDetails
       ? [

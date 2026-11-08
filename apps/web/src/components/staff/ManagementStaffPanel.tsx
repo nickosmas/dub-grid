@@ -391,9 +391,7 @@ export function ManagementStaffPanel({
     }
   };
 
-  const personDepts = person.managementDepartmentIds
-    .map((id) => departments.find((d) => d.id === id))
-    .filter((d): d is NonNullable<typeof d> => d != null);
+  const personDepts = departments.filter((d) => person.managementDepartmentIds.includes(d.id));
   const displayName =
     person.firstName || person.lastName
       ? `${person.firstName} ${person.lastName}`.trim()

@@ -1,4 +1,8 @@
-import { singularLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
+import {
+  orderFocusAreasByDepartment,
+  singularLabelNoun,
+  DEFAULT_ORGANIZATION_LABELS,
+} from "@dubgrid/domain";
 import { absenceSideOf } from "@dubgrid/schedule-core";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
@@ -572,7 +576,12 @@ function formatList(
   map: Map<number, string>,
   fallbackLabel: string,
 ): string {
-  return (ids ?? [])
+  // The map holds its rows in Settings order, so names follow it rather than
+  // the order the ids were saved in.
+  const rank = new Map([...map.keys()].map((id, index) => [id, index]));
+  const rankOf = (id: number) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
+  return [...(ids ?? [])]
+    .sort((left, right) => rankOf(left) - rankOf(right))
     .map((id) => map.get(id) ?? fallbackLabel)
     .filter(Boolean)
     .join("; ");
@@ -1130,7 +1139,13 @@ export function buildOperationsReportPayload(
     .sort((left, right) => left.employeeName.localeCompare(right.employeeName));
 
   const coverage: CoverageReportRow[] = [];
-  for (const requirement of source.coverageRequirements) {
+  const focusAreaRank = new Map([...focusAreaById.keys()].map((id, index) => [id, index]));
+  const requirementsInFocusAreaOrder = [...source.coverageRequirements].sort(
+    (left, right) =>
+      (focusAreaRank.get(left.focus_area_id) ?? Number.MAX_SAFE_INTEGER) -
+      (focusAreaRank.get(right.focus_area_id) ?? Number.MAX_SAFE_INTEGER),
+  );
+  for (const requirement of requirementsInFocusAreaOrder) {
     if (focusAreaIdSet.size > 0 && !focusAreaIdSet.has(requirement.focus_area_id)) {
       continue;
     }
@@ -2282,6 +2297,48 @@ const EMPLOYEE_REPORT_COLUMNS =
   "id, employee_number, first_name, last_name, employment_type, email, phone, status, seniority, focus_area_ids, certification_id, role_ids, department_ids, user_id";
 
 /**
+ * Focus areas in the order Settings lists them: a focus area's own order only
+ * counts inside its department.
+ */
+async function fetchFocusAreasInDepartmentOrder(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<FocusAreaRow[]> {
+  const [focusAreas, departments] = await Promise.all([
+    fetchTableRows<FocusAreaRow & { sort_order: number }>((from, to) =>
+      serviceClient
+        .from("focus_areas")
+        .select("id, name, department_id, sort_order")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchTableRows<{ id: number; type: string; sort_order: number }>((from, to) =>
+      serviceClient
+        .from("departments")
+        .select("id, type, sort_order")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+  ]);
+  return orderFocusAreasByDepartment(
+    focusAreas.map((row) => ({
+      row,
+      departmentId: row.department_id ?? null,
+      sortOrder: row.sort_order,
+    })),
+    departments.map((department) => ({
+      id: department.id,
+      type: department.type,
+      sortOrder: department.sort_order,
+    })),
+  ).map(({ row }) => ({ id: row.id, name: row.name, department_id: row.department_id }));
+}
+
+/**
  * The five lookups the filter dropdowns need. One definition, used by both
  * the full report load and the options-only load, so the dropdowns can never
  * be built from a different query than the report itself.
@@ -2305,15 +2362,7 @@ function fetchFilterOptionSource(
         .order("id", { ascending: true })
         .range(from, to),
     ),
-    focusAreas: fetchTableRows<FocusAreaRow>((from, to) =>
-      serviceClient
-        .from("focus_areas")
-        .select("id, name, department_id")
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
+    focusAreas: fetchFocusAreasInDepartmentOrder(serviceClient, orgId),
     shiftCategories: fetchTableRows<ShiftCategoryRow>((from, to) =>
       serviceClient
         .from("shift_categories")
@@ -2433,6 +2482,7 @@ export async function loadOperationsReport(
         .select("id, name, abbr")
         .eq("org_id", input.orgId)
         .is("archived_at", null)
+        .order("sort_order", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to),
     ),
@@ -2442,6 +2492,7 @@ export async function loadOperationsReport(
         .select("id, name, abbr")
         .eq("org_id", input.orgId)
         .is("archived_at", null)
+        .order("sort_order", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to),
     ),
@@ -2451,6 +2502,7 @@ export async function loadOperationsReport(
         .select("id, name, abbr")
         .eq("org_id", input.orgId)
         .is("archived_at", null)
+        .order("sort_order", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to),
     ),

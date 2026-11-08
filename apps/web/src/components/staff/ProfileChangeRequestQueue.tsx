@@ -106,12 +106,9 @@ function formatPlainValue(value: unknown): string {
 
 function formatReferenceList(ids: unknown, items: ReferenceItem[]): string {
   if (!Array.isArray(ids) || ids.length === 0) return "None";
-  return ids
-    .map((id) => {
-      const match = items.find((item) => item.id === id);
-      return match?.name ?? match?.abbr ?? String(id);
-    })
-    .join(", ");
+  const known = items.filter((item) => ids.includes(item.id)).map((item) => item.name);
+  const unknown = ids.filter((id) => !items.some((item) => item.id === id)).map((id) => String(id));
+  return [...known, ...unknown].join(", ");
 }
 
 function formatReferenceValue(value: unknown, items: ReferenceItem[]): string {

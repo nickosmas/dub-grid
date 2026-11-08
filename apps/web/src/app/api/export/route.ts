@@ -9,6 +9,7 @@ import {
 } from "@/lib/published-shifts";
 import { z } from "zod";
 import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
+import { orderFocusAreasByDepartment } from "@dubgrid/domain";
 import { withoutHiddenStaff } from "@dubgrid/data-access";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
@@ -60,19 +61,57 @@ async function exportStaff(
   if (error) throw error;
 
   // Fetch focus areas and certifications for name resolution
-  const [{ data: focusAreas }, { data: certs }, { data: roles }] = await Promise.all([
-    supabase.from("focus_areas").select("id, name").eq("org_id", orgId).is("archived_at", null),
-    supabase.from("certifications").select("id, name").eq("org_id", orgId).is("archived_at", null),
-    supabase
-      .from("organization_roles")
-      .select("id, name")
-      .eq("org_id", orgId)
-      .is("archived_at", null),
-  ]);
+  const [{ data: focusAreas }, { data: departments }, { data: certs }, { data: roles }] =
+    await Promise.all([
+      supabase
+        .from("focus_areas")
+        .select("id, name, department_id, sort_order")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+      supabase
+        .from("departments")
+        .select("id, type, sort_order")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+      supabase
+        .from("certifications")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+      supabase
+        .from("organization_roles")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order"),
+    ]);
 
-  const faMap = new Map(
-    (focusAreas ?? []).map((fa: Record<string, unknown>) => [fa.id as number, fa.name as string]),
+  const orderedFocusAreas = orderFocusAreasByDepartment(
+    (
+      (focusAreas ?? []) as {
+        id: number;
+        name: string;
+        department_id: number | null;
+        sort_order: number;
+      }[]
+    ).map((fa) => ({
+      id: fa.id,
+      name: fa.name,
+      departmentId: fa.department_id,
+      sortOrder: fa.sort_order,
+    })),
+    ((departments ?? []) as { id: number; type: string; sort_order: number }[]).map((d) => ({
+      id: d.id,
+      type: d.type,
+      sortOrder: d.sort_order,
+    })),
   );
+  const faMap = new Map(orderedFocusAreas.map((fa) => [fa.id, fa.name]));
+  // Names follow the order Settings lists them, not the order ids were saved in.
+  const namesInOrder = (ids: number[], map: Map<number, string>) => [
+    ...[...map].filter(([id]) => ids.includes(id)).map(([, name]) => name),
+    ...ids.filter((id) => !map.has(id)).map(String),
+  ];
   const certMap = new Map(
     (certs ?? []).map((c: Record<string, unknown>) => [c.id as number, c.name as string]),
   );
@@ -99,9 +138,9 @@ async function exportStaff(
     emp.phone as string,
     emp.status as string,
     emp.seniority as number,
-    ((emp.focus_area_ids as number[]) ?? []).map((id) => faMap.get(id) ?? String(id)).join("; "),
+    namesInOrder((emp.focus_area_ids as number[]) ?? [], faMap).join("; "),
     emp.certification_id ? (certMap.get(emp.certification_id as number) ?? "") : "",
-    ((emp.role_ids as number[]) ?? []).map((id) => roleMap.get(id) ?? String(id)).join("; "),
+    namesInOrder((emp.role_ids as number[]) ?? [], roleMap).join("; "),
     emp.contact_notes as string,
   ]);
 
