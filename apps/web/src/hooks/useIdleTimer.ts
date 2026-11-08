@@ -25,6 +25,8 @@ export interface UseIdleTimerOptions {
   sessionKey?: string | null;
   /** Called exactly once when the idle deadline is reached. */
   onExpire: () => void;
+  /** Called on this tab's own activity, not activity another tab reported. */
+  onActivity?: (at: number) => void;
 }
 
 export interface UseIdleTimerResult {
@@ -56,11 +58,13 @@ export function useIdleTimer({
   enabled,
   sessionKey = null,
   onExpire,
+  onActivity,
 }: UseIdleTimerOptions): UseIdleTimerResult {
   const [phase, setPhase] = useState<IdleTimerPhase>("active");
   const [secondsRemaining, setSecondsRemaining] = useState(0);
 
   const onExpireRef = useLatestRef(onExpire);
+  const onActivityRef = useLatestRef(onActivity);
 
   const lastActivityAtRef = useRef(Date.now());
   const lastThrottleFlushRef = useRef(0);
@@ -122,10 +126,13 @@ export function useIdleTimer({
       // (e.g. right at mount) must still count, not be silently dropped.
       if (at < lastActivityAtRef.current) return;
       lastActivityAtRef.current = at;
-      if (broadcast) broadcastIdleActivity(at, sessionKey);
+      if (broadcast) {
+        broadcastIdleActivity(at, sessionKey);
+        onActivityRef.current?.(at);
+      }
       recompute();
     },
-    [recompute, sessionKey],
+    [recompute, sessionKey, onActivityRef],
   );
 
   const stayActive = useCallback(() => {
