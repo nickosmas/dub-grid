@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type {
   AssignmentDefinition,
+  Employee,
+  JobDefinition,
   RecurringShift,
   ScheduleCellInput,
   ScheduleCellStateEntry,
@@ -10,6 +12,7 @@ import type {
 import {
   availabilityFromShifts,
   availabilityWithPlanned,
+  buildCoverageSuggestionInput,
   daysInARowWith,
   daysPastUsualLimit,
   draftDayFromShifts,
@@ -1048,5 +1051,47 @@ describe("job preferences", () => {
     // Ben prefers Supervisor and Evening: a Day Supervisor shift matches one, not both.
     expect(standing("ben", "2026-10-26", DAY_SUPERVISOR, []).preference).toBe("other");
     expect(standing("cat", "2026-10-26", DAY, []).preference).toBe("none");
+  });
+});
+
+describe("shifts without a job turned off", () => {
+  // Job 10 is the fixtures' job; job 12 is the default shift job, worked as just a shift.
+  const SHIFT_ONLY_DAY = 104;
+  const jobs = [
+    { id: 10, name: "Nurse", abbr: "RN", systemKey: null },
+    { id: 12, name: "Default shift job", abbr: "SHIFT", systemKey: "default_shift_job" },
+  ] as unknown as JobDefinition[];
+  const ana = {
+    id: "ana",
+    focusAreaIds: [7],
+    roleIds: [],
+    certificationId: null,
+  } as unknown as Employee;
+  const engineFor = (defaultShiftEnabled?: boolean) =>
+    buildCoverageSuggestionInput({
+      matrix: { rows: [], dateKeys: [] },
+      coverage: {},
+      mentoredCredit: 1,
+      shifts: {},
+      employees: [ana],
+      assignments: [...assignments, { ...assignment(SHIFT_ONLY_DAY, 1), jobId: 12 }],
+      shiftCategories,
+      jobs,
+      requests: [],
+      focusAreaNames: new Map(),
+      assignmentNames: new Map(),
+      absenceNames: new Map(),
+      loadedDateKeys: LOADED,
+      defaultShiftEnabled,
+    } as unknown as Parameters<typeof buildCoverageSuggestionInput>[0]).engine;
+
+  it("plans nobody on one, and still plans the same shift with a job", () => {
+    expect(engineFor(false).qualifiedFor("ana", SHIFT_ONLY_DAY)).toBe(false);
+    expect(engineFor(false).qualifiedFor("ana", DAY)).toBe(true);
+  });
+
+  it("plans one while they're allowed", () => {
+    expect(engineFor(true).qualifiedFor("ana", SHIFT_ONLY_DAY)).toBe(true);
+    expect(engineFor(undefined).qualifiedFor("ana", SHIFT_ONLY_DAY)).toBe(true);
   });
 });

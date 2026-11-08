@@ -234,11 +234,19 @@ export async function PUT(req: NextRequest) {
 
   try {
     // ── Permission check ──────────────────────────────────────────────
+    // Allow shifts without a job sits in Settings > Jobs, so managing shifts
+    // and jobs may change it on its own.
+    const onlyShiftsWithoutJob =
+      Object.entries(fields).filter(([, value]) => value !== undefined).length === 1 &&
+      fields.defaultShiftEnabled !== undefined;
     const orgAuth = await requireOrgPermissions(
       req,
       bodyOrgId,
       (permissions) =>
-        permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageOrgSettings,
+        permissions.isGridmaster ||
+        permissions.isSuperAdmin ||
+        permissions.canManageOrgSettings ||
+        (onlyShiftsWithoutJob && permissions.canManageScheduleDefinitions),
       { allowDuringSetup: true, actor: user },
     );
     if ("response" in orgAuth) {

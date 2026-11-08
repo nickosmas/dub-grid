@@ -194,7 +194,7 @@ export interface MobileAssignmentSeedRows {
 }
 
 export interface MobileOpenShiftContextRows extends MobileAssignmentSeedRows {
-  organizationRow: Pick<DbOrganization, "coverage_rule_config"> | null;
+  organizationRow: Pick<DbOrganization, "coverage_rule_config" | "default_shift_enabled"> | null;
   coverageRequirementRows: DbCoverageRequirement[];
   employeeRows: DbEmployee[];
 }
@@ -1238,7 +1238,7 @@ export async function fetchMobileOpenShiftContextRows(
       fetchMobileAssignmentSeedRows(serviceClient, orgId),
       serviceClient
         .from("organizations")
-        .select("coverage_rule_config")
+        .select("coverage_rule_config, default_shift_enabled")
         .eq("id", orgId)
         .maybeSingle(),
       serviceClient.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
@@ -1260,7 +1260,10 @@ export async function fetchMobileOpenShiftContextRows(
   return {
     ...assignmentSeedRows,
     organizationRow:
-      (organizationResult.data as Pick<DbOrganization, "coverage_rule_config"> | null) ?? null,
+      (organizationResult.data as Pick<
+        DbOrganization,
+        "coverage_rule_config" | "default_shift_enabled"
+      > | null) ?? null,
     coverageRequirementRows: (coverageResult.data ?? []) as DbCoverageRequirement[],
     employeeRows: (employeeResult.data ?? []) as DbEmployee[],
   };

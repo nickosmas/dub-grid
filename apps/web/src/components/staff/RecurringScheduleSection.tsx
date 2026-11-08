@@ -20,6 +20,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { Banner } from "@/components/ui/Banner";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
+import { countPausedRecurringDays, pausedRecurringDaysMessage } from "@/lib/system-jobs";
 import ProgressBar from "@/components/ProgressBar";
 import ShiftPicker from "@/components/ShiftPicker";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
@@ -1033,9 +1034,16 @@ export function RecurringScheduleSection({
     ? (employees.find((employee) => employee.id === activeCell.empId) ?? null)
     : null;
 
+  const pausedDays = countPausedRecurringDays(
+    recurringShiftsQuery.data ?? [],
+    jobs,
+    defaultShiftEnabled,
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
       <ProgressBar loading={loading} />
+      {pausedDays > 0 && <Banner tone="warning">{pausedRecurringDaysMessage(pausedDays)}</Banner>}
       {editingPreferenceFor && (
         <PreferencesModal
           personName={getEmployeeDisplayName(editingPreferenceFor)}
