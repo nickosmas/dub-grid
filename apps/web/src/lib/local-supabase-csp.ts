@@ -13,3 +13,18 @@ export function localSupabaseConnectSources(supabaseUrl: string | undefined): st
     .flatMap((host) => [`http://${host}:${port}`, `ws://${host}:${port}`])
     .join(" ");
 }
+
+/**
+ * The connect-src origins for a hosted project: that project alone, so a script
+ * can't send data to another Supabase project. A local stack needs none here.
+ */
+export function hostedSupabaseConnectSources(supabaseUrl: string | undefined): string {
+  if (supabaseUrl && LOOPBACK_SUPABASE_URL.test(supabaseUrl)) return "";
+  try {
+    const { host, protocol } = new URL(supabaseUrl ?? "");
+    if (protocol === "https:") return `https://${host} wss://${host}`;
+  } catch {
+    // Unset or malformed: fall through to the platform's domain.
+  }
+  return "https://*.supabase.co wss://*.supabase.co";
+}

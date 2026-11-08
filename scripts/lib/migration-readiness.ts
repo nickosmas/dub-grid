@@ -67,6 +67,18 @@ export function loadMigrationInventory(directory: string): MigrationFile[] {
 
   if (parsed.length === 0) throw new Error("No numbered migrations found.");
 
+  // Two branches written at once both take the next number; say so plainly
+  // rather than as a gap further along.
+  const byVersion = Map.groupBy(parsed, (migration) => migration.version);
+  for (const [version, files] of byVersion) {
+    if (files.length > 1) {
+      throw new Error(
+        `Migration number ${version} is used twice: ${files.map((file) => file.file).join(", ")}. ` +
+          `Renumber the newer one to ${String(parsed.length).padStart(3, "0")} and update checksums.sha256.`,
+      );
+    }
+  }
+
   parsed.forEach((migration, index) => {
     const expected = String(index + 1).padStart(3, "0");
     if (migration.version !== expected) {

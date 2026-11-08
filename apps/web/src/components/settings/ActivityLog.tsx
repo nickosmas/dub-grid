@@ -205,7 +205,6 @@ export default function ActivityLog({
             {searchQuery && <SearchClearButton onClear={clearSearch} />}
           </div>
           <CustomSelect
-            style={{ flex: "0 1 auto" }}
             value={categoryFilter}
             options={categoryOptions.map(({ value, label }) => ({ value, label }))}
             onChange={resetPage(setCategoryFilter)}

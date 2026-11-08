@@ -469,17 +469,36 @@ describe("middleware: Content-Security-Policy", () => {
     );
   }
 
-  // F-4: static/public pages keep 'unsafe-inline' (they're prerendered, no nonce
-  // possible); the authenticated app is force-dynamic so it gets a per-request
-  // nonce + 'strict-dynamic' and drops 'unsafe-inline'. See SECURITY_AUDIT.md F-4.
-  it("keeps 'unsafe-inline' and uses no nonce on static/public pages", async () => {
-    const req = makeNextRequest("http://localhost:3000/login");
+  // F-4: the marketing pages keep 'unsafe-inline' (they're prerendered, no nonce
+  // possible); the app, sign-in pages included (F-204), is force-dynamic so it
+  // gets a per-request nonce + 'strict-dynamic' and drops 'unsafe-inline'.
+  it("keeps 'unsafe-inline' and uses no nonce on the marketing pages", async () => {
+    const req = makeNextRequest("http://localhost:3000/privacy");
     const res = await runMiddleware(req);
     const scriptSrc = scriptSrcOf(res);
     expect(scriptSrc).toContain("'unsafe-inline'");
     expect(scriptSrc).not.toContain("'nonce-");
     // Google Places loader (OrganizationLocationFields) under the static policy.
     expect(scriptSrc).toContain("https://maps.googleapis.com");
+  });
+
+  it.each([
+    "/login",
+    "/goodbye",
+    "/accept-invite",
+    "/forgot-password",
+    "/reset-password",
+    "/auth/verify",
+  ])("gives the sign-in page %s the nonce policy without asking for a session", async (path) => {
+    const req = makeNextRequest(`http://acme.localhost:3000${path}`, {
+      host: "acme.localhost:3000",
+    });
+    const res = await runMiddleware(req);
+    expect((res as { _type: string })._type).toBe("next");
+    const scriptSrc = scriptSrcOf(res);
+    expect(scriptSrc).toMatch(/'nonce-[^']+'/);
+    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
   });
 
   it("does not upgrade HTTP assets on local production-mode hosts", async () => {

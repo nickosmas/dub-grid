@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 import logger from "@/lib/logger";
+import { authCookieOptions } from "@/lib/auth/auth-cookie-options";
 import { requireSupabasePublishableKey, requireSupabaseUrl } from "@/lib/supabase-keys";
 import { withTimeoutOrThrow } from "@/lib/with-timeout";
 
@@ -29,6 +30,7 @@ export async function authCookiesForSession(
 ): Promise<SessionCookie[] | null> {
   const cookies: SessionCookie[] = [];
   const client = createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
+    cookieOptions: authCookieOptions(req.nextUrl.protocol),
     cookies: {
       getAll() {
         return req.cookies.getAll();

@@ -102,8 +102,9 @@ Dependabot. All of them merge into `dev` through a pull request.
 
 Agent sessions working in a shared local checkout follow the Blueprint's
 prefixes instead (`feature/`, `fix/`, `rollback/` from `blueprint/config.json`),
-cut from `dev` and squash-merged back into it locally by `/complete`, each
-from its own worktree so several sessions never collide. See "DubGrid Git policy"
+cut from `dev` and squash-merged back into it through a pull request opened by
+`/complete`, each from its own worktree so several sessions never collide.
+Nothing pushes to `dev` directly. See "DubGrid Git policy"
 and "Several agents share this checkout" in `AGENTS.md`.
 
 ---

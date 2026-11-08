@@ -1013,6 +1013,14 @@ button {
   padding-block: 0.15em;
   margin-block: -0.15em;
 }
+/* A filter row's dropdowns hug their labels on wider screens. Once the row
+   wraps on a phone, they share each line so the lines end flush. */
+@media (max-width: 640px) {
+  .dg-filter-row > .dg-select,
+  .dg-activity-toolbar-filters > .dg-select {
+    flex-grow: 1;
+  }
+}
 /* Keeps a hovered row from fusing with the selected one below it. */
 .dg-menu-item + .dg-menu-item {
   margin-top: 2px;
