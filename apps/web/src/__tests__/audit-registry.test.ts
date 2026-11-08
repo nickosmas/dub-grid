@@ -504,6 +504,18 @@ describe("audience", () => {
     }
   });
 
+  it("names a shift's focus area, since two areas can share a shift's name", () => {
+    expect(
+      describeAuditAction("shift_category.upserted", {
+        name: "Day Shift",
+        focusAreaName: "East Wing",
+      }),
+    ).toBe('Saved shift "Day Shift" in East Wing');
+    expect(describeAuditAction("shift_category.archived", { name: "Day Shift" })).toBe(
+      'Removed shift "Day Shift"',
+    );
+  });
+
   it("names a single-device sign-out rather than a plain sign-out", () => {
     expect(describeAuditAction("security.auth.session", { scope: "device" })).toBe(
       "Signed out one of their devices",

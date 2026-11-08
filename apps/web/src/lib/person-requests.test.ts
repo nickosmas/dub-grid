@@ -86,6 +86,17 @@ describe("buildPersonRequestRows", () => {
     });
   });
 
+  it("names the focus area of a shift whose name another area shares", () => {
+    const request = {
+      ...pickupTheyTook,
+      targetSegments: [{ shiftId: 5, jobId: 1, position: 0, shiftName: "Day Shift" }],
+    } as unknown as ShiftRequest;
+    const [row] = buildPersonRequestRows("emp", [request], [], names, {
+      shiftLabelById: new Map([[5, "Day Shift (East Wing)"]]),
+    });
+    expect(row.details).toBe("Mon, Oct 19 · Day Shift (East Wing)");
+  });
+
   it("leaves out someone else's profile request", () => {
     const rows = buildPersonRequestRows(
       "emp",

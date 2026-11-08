@@ -233,6 +233,15 @@ function createServiceClientForSchedule(
         sort_order: 0,
         archived_at: null,
       },
+      {
+        id: 13,
+        org_id: "org-1",
+        department_id: null,
+        name: "Memory Care",
+        color: "#eff6ff",
+        sort_order: 1,
+        archived_at: null,
+      },
     ],
     error: null,
   });
@@ -1659,6 +1668,43 @@ describe("fetchMobileScheduleEntries", () => {
         isMentored: true,
       }),
     ]);
+  });
+
+  it("names each focus area when a day's two shifts share a name", async () => {
+    const shift = (id: number, shiftId: number, focusAreaId: number) => ({
+      id,
+      label: "D",
+      name: "Day Shift",
+      shiftId,
+      jobId: 91,
+      focusAreaId,
+      defaultStartTime: id === 44 ? "07:00:00" : "15:00:00",
+      defaultEndTime: id === 44 ? "11:00:00" : "19:00:00",
+    });
+    const serviceClient = createServiceClientForSchedule(
+      {
+        id: "196d610f-2283-486c-a9e0-197852969a31",
+        first_name: "Nic",
+        last_name: "Kosmas",
+        org_id: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+      },
+      {
+        shiftFocusAreaId: null,
+        assignmentIds: [44, 45],
+        shiftIds: [101, 102],
+        assignments: [shift(44, 101, 12), shift(45, 102, 13)],
+      },
+    );
+
+    const entries = await fetchMobileScheduleEntries(serviceClient as never, {
+      orgId: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+      startDate: "2026-04-18",
+      endDate: "2026-04-24",
+    });
+
+    expect(entries[0]?.presentation.shiftName).toBe(
+      "Day Shift (Skilled Nursing) / Day Shift (Memory Care)",
+    );
   });
 
   it("normalizes stale split custom times after a published shift is reduced to one segment", async () => {

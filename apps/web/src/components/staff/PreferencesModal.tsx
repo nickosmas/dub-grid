@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
+import { shiftDisplayName } from "@dubgrid/domain";
 import {
   formatScheduleTimeRange,
   type CoverageJobPreference,
@@ -35,17 +36,6 @@ function modesFor(kind: Kind): { value: Mode; title: string; detail: string }[] 
     },
     { value: "only", title: `Only some ${many}`, detail: `They never get any other ${one}.` },
   ];
-}
-
-/** "Day Shift", or "Day Shift (Skilled Nursing)" when another shift has the same name. */
-export function shiftLabel(
-  shift: ShiftCategory,
-  shifts: ReadonlyArray<ShiftCategory>,
-  focusAreaName: (focusAreaId: number) => string | undefined,
-): string {
-  const shared = shifts.some((other) => other.id !== shift.id && other.name === shift.name);
-  const area = shift.focusAreaId != null ? focusAreaName(shift.focusAreaId) : undefined;
-  return shared && area ? `${shift.name} (${area})` : shift.name;
 }
 
 /** "Only Evening Shift", "Prefers Supervisor, Nurse", or null without a preference. */
@@ -147,7 +137,10 @@ export function PreferencesModal({
   const chosen = (kind: Kind) => choices[kind].ids.filter((id) => available[kind].includes(id));
   const needsItem = (kind: Kind) => choices[kind].mode !== "any" && chosen(kind).length === 0;
   const names: Record<Kind, (id: number) => string | undefined> = {
-    shifts: (id) => shifts.find((shift) => shift.id === id)?.name,
+    shifts: (id) => {
+      const shift = shifts.find((candidate) => candidate.id === id);
+      return shift ? shiftDisplayName(shift, shifts, focusAreaName) : undefined;
+    },
     jobs: (id) => jobs.find((job) => job.id === id)?.name,
   };
   const summary = (kind: Kind) =>

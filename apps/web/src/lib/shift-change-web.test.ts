@@ -185,6 +185,29 @@ describe("describeMentoringChanges", () => {
     ]);
   });
 
+  it("names the focus area when two of the day's shifts share a name", () => {
+    const twoAreas = buildShiftChangeResolvers({
+      assignments: [assignment(100, 1, 10), assignment(104, 5, 10, { focusAreaId: 2 })],
+      shiftCategories: [
+        category(1, "Day Shift", { focusAreaId: 1 }),
+        category(5, "Day Shift", { focusAreaId: 2, startTime: "15:00", endTime: "23:00" }),
+      ],
+      jobs: [job(10, "Registered Nurse")],
+      absenceTypes,
+      focusAreas,
+    });
+    const day = (secondMentored: boolean): ScheduleCellState => ({
+      ...worked(1),
+      segments: [
+        { shiftId: 1, jobId: 10, position: 0, isMentored: false },
+        { shiftId: 5, jobId: 10, position: 1, isMentored: secondMentored },
+      ],
+    });
+    expect(describeMentoringChanges(day(false), day(true), twoAreas)).toEqual([
+      "Day Shift in Memory Care is now mentored.",
+    ]);
+  });
+
   it("says nothing for an unchanged, added or removed shift", () => {
     expect(describeMentoringChanges(mentored(1, true), mentored(1, true), resolvers)).toEqual([]);
     expect(describeMentoringChanges(mentored(1, false), mentored(2, true), resolvers)).toEqual([]);

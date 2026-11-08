@@ -42,6 +42,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     draftModifiedCount: 0,
     draftNewCount: 1,
     focusAreas: [{ id: 1, name: "Front Desk" }],
+    shiftCategories: [],
     isMobile: false,
     onExpandPanel: vi.fn(),
     openShifts: [

@@ -1,7 +1,7 @@
 "use client";
 
 import type { AbsencePillLayout } from "@/lib/absence-pill";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef } from "react";
 import {
   AbsenceType,
   Employee,
@@ -35,6 +35,7 @@ import {
 } from "@/lib/colors";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { MaybeHint } from "@/components/ui/hint";
+import { legendGroupsByFocusArea } from "@/components/PrintLegend";
 import { printFontSizeLabel } from "@/components/print-font-sizes";
 import { PrintShiftPill, type PrintShiftPillProps } from "@/components/PrintShiftPill";
 import { absenceStripeFill } from "@/lib/absence-stripes";
@@ -1164,35 +1165,54 @@ export default function PrintScheduleView({
               >
                 Shift key
               </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(10em, 1fr))",
-                  gap: "0.5em 1.5em",
-                }}
-              >
-                {legendItems.map((s) => (
-                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
-                    <span
+              {legendGroupsByFocusArea(legendItems, focusAreas).map((group, index) => (
+                <Fragment key={group.title ?? `group-${index}`}>
+                  {group.title ? (
+                    <div
                       style={{
-                        background: s.color,
-                        border: `1px solid ${borderColor(s.text)}`,
-                        color: s.text,
-                        borderRadius: "0.3em",
-                        padding: "0.15em 0.5em",
-                        fontSize: "0.9em",
-                        fontWeight: 700,
-                        flexShrink: 0,
-                        minWidth: "2.5em",
-                        textAlign: "center",
+                        fontSize: "0.85em",
+                        fontWeight: 600,
+                        color: "#334766",
+                        margin: index === 0 ? "0 0 0.4em" : "0.9em 0 0.4em",
                       }}
                     >
-                      {s.label}
-                    </span>
-                    <span style={{ fontSize: "0.9em", color: "#334766" }}>{s.name}</span>
+                      {group.title}
+                    </div>
+                  ) : null}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(10em, 1fr))",
+                      gap: "0.5em 1.5em",
+                    }}
+                  >
+                    {group.items.map((s) => (
+                      <div
+                        key={s.id}
+                        style={{ display: "flex", alignItems: "center", gap: "0.5em" }}
+                      >
+                        <span
+                          style={{
+                            background: s.color,
+                            border: `1px solid ${borderColor(s.text)}`,
+                            color: s.text,
+                            borderRadius: "0.3em",
+                            padding: "0.15em 0.5em",
+                            fontSize: "0.9em",
+                            fontWeight: 700,
+                            flexShrink: 0,
+                            minWidth: "2.5em",
+                            textAlign: "center",
+                          }}
+                        >
+                          {s.label}
+                        </span>
+                        <span style={{ fontSize: "0.9em", color: "#334766" }}>{s.name}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </Fragment>
+              ))}
             </div>
           )}
 

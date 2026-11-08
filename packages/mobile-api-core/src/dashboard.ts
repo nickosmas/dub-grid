@@ -558,6 +558,7 @@ export function buildActivityFeed(
           request.requesterPresentation.segments?.[0]?.shiftName ||
           request.requesterPresentation.shiftName ||
           request.requesterPresentation.label,
+        focusAreaName: request.requesterPresentation.focusAreaName ?? null,
         requesterName: request.requesterName,
         status: request.status,
       }),

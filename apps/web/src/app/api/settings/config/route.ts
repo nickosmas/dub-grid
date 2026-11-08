@@ -673,6 +673,48 @@ function focusAreaRemovalCacheKeys(orgId: string): string[] {
   ];
 }
 
+/**
+ * What a shift's audit row records: its name and focus area, since two areas
+ * can share a shift's name. Read before an archive, delete or restore, which
+ * send only the id.
+ */
+async function shiftAuditDetails(
+  serviceClient: SettingsServiceClient,
+  orgId: string,
+  shifts: ReadonlyArray<{ name: string; focusAreaId: number | null }>,
+): Promise<Array<{ name: string; focusAreaName?: string }>> {
+  const ids = [
+    ...new Set(shifts.flatMap((shift) => (shift.focusAreaId == null ? [] : [shift.focusAreaId]))),
+  ];
+  const { data } =
+    ids.length > 0
+      ? await serviceClient.from("focus_areas").select("id, name").eq("org_id", orgId).in("id", ids)
+      : { data: [] };
+  const areaName = new Map((data ?? []).map((row) => [row.id as number, row.name as string]));
+  return shifts.map((shift) => {
+    const focusAreaName = shift.focusAreaId == null ? undefined : areaName.get(shift.focusAreaId);
+    return focusAreaName ? { name: shift.name, focusAreaName } : { name: shift.name };
+  });
+}
+
+async function storedShiftAuditDetails(
+  serviceClient: SettingsServiceClient,
+  orgId: string,
+  id: number,
+) {
+  const { data } = await serviceClient
+    .from("shift_categories")
+    .select("name, focus_area_id")
+    .eq("org_id", orgId)
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) return undefined;
+  const [details] = await shiftAuditDetails(serviceClient, orgId, [
+    { name: data.name as string, focusAreaId: (data.focus_area_id as number | null) ?? null },
+  ]);
+  return details;
+}
+
 async function saveShiftCategoryRow(
   serviceClient: SettingsServiceClient,
   shiftCategory: ShiftCategoryInput,
@@ -857,6 +899,8 @@ async function finishItemBatch<T extends { id: number }>(args: {
   actor: User;
   saves: PromiseSettledResult<T>[];
   names: string[];
+  /** Each item's audit details when a name alone isn't enough; defaults to `{ name }`. */
+  details?: Array<Record<string, unknown>>;
   cacheKeys: string[];
   audit: { action: AuditAction; resourceType: AuditResourceType };
 }): Promise<NextResponse> {
@@ -880,7 +924,7 @@ async function finishItemBatch<T extends { id: number }>(args: {
             {
               ...args.audit,
               resourceId: String(result.value.id),
-              details: { name: args.names[index] },
+              details: args.details?.[index] ?? { name: args.names[index] },
             },
           ]
         : [],
@@ -2527,7 +2571,11 @@ export async function POST(req: NextRequest) {
           action: "shift_category.upserted",
           resourceType: "shift_category",
           resourceId: String(item.id),
-          details: { name: validatedShiftCategory.shiftCategory.name },
+          details: (
+            await shiftAuditDetails(serviceClient, validatedShiftCategory.shiftCategory.orgId, [
+              validatedShiftCategory.shiftCategory,
+            ])
+          )[0],
           orgId: validatedShiftCategory.shiftCategory.orgId,
         });
         return NextResponse.json({ item });
@@ -2548,11 +2596,13 @@ export async function POST(req: NextRequest) {
           actor,
           saves,
           names: items.map((item) => item.name),
+          details: await shiftAuditDetails(serviceClient, data.orgId, items),
           cacheKeys: shiftCategoryCacheKeys(data.orgId),
           audit: { action: "shift_category.upserted", resourceType: "shift_category" },
         });
       }
       case "deleteShiftCategory": {
+        const details = await storedShiftAuditDetails(serviceClient, data.orgId, data.itemId);
         const wantHard =
           data.hard === true &&
           !(await shiftCategoryHasAnyReferencesForOrg(data.itemId, data.orgId));
@@ -2584,6 +2634,7 @@ export async function POST(req: NextRequest) {
           action: wantHard ? "shift_category.deleted" : "shift_category.archived",
           resourceType: "shift_category",
           resourceId: String(data.itemId),
+          details,
           orgId: data.orgId,
         });
         return NextResponse.json({ success: true });
@@ -2607,6 +2658,7 @@ export async function POST(req: NextRequest) {
           action: "shift_category.restored",
           resourceType: "shift_category",
           resourceId: String(data.itemId),
+          details: await storedShiftAuditDetails(serviceClient, data.orgId, data.itemId),
           orgId: data.orgId,
         });
         return NextResponse.json({ success: true });
