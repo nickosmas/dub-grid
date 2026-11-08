@@ -35,6 +35,7 @@ import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/edi
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { PresetColorPicker, TimeInput12h, inputStyle, labelStyle } from "./shared";
+import { namesForIds, summarizeNames } from "./job-placement-summary";
 import {
   PREDEFINED_COLORS,
   TRANSPARENT_BORDER,
@@ -108,6 +109,7 @@ const EMPTY_SCHEDULED_JOB_STYLE = {
   text: "",
 } as const;
 const DEFAULT_SHIFT_JOB_NAME = "Default shift job";
+const DEFAULT_SHIFT_JOB_LABEL = "Shift only";
 const DEFAULT_SHIFT_JOB_ABBR = "SHIFT";
 
 function deriveJobAbbreviation(name: string): string {
@@ -655,18 +657,7 @@ function EligibilityModeToggle({
   );
 }
 
-function buildSectionHeaderText(
-  section: JobSection,
-  focusAreas: string,
-): { title: string; description: string } {
-  if (section === "defaultShift") {
-    return {
-      title: "Default Shift Job",
-      description:
-        "Configure shift-only assignments like Day Shift. The job is hidden on the grid but still controls placement, qualifications, times, and colors.",
-    };
-  }
-
+function buildSectionHeaderText(section: JobSection): { title: string; description: string } {
   if (section === "shiftless") {
     return {
       title: "General Jobs",
@@ -677,8 +668,42 @@ function buildSectionHeaderText(
 
   return {
     title: "Scheduled Jobs",
-    description: `Choose departments first, narrow to ${focusAreas}, then define exactly how the job behaves on each selected shift.`,
+    description:
+      "Jobs worked on a shift, like Charge Nurse. Each one sets where it can be scheduled and who qualifies.",
   };
+}
+
+function DefaultShiftCard({
+  toggle,
+  children,
+}: {
+  toggle: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        background: "var(--dg-color-surface)",
+        borderRadius: "var(--dg-radius-md)",
+        border: "1px solid var(--dg-color-border)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        className="dg-card-header-bar"
+        style={{ paddingInline: 16, borderBottom: children ? undefined : "none" }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div className="dg-card-title">Allow shifts without a job</div>
+          <div className="dg-card-description">
+            Staff can be scheduled with just a shift, like Day Shift. Jobs still work as before.
+          </div>
+        </div>
+        {toggle ? <div style={{ flexShrink: 0 }}>{toggle}</div> : null}
+      </div>
+      {children ? <div style={{ padding: "0 16px" }}>{children}</div> : null}
+    </div>
+  );
 }
 
 function DefaultShiftToggle({
@@ -723,8 +748,8 @@ function DefaultShiftToggle({
       toast[result.status === "saved" ? "success" : "info"](
         result.status === "saved"
           ? next
-            ? "Shift-only assignments enabled"
-            : "Shift-only assignments disabled"
+            ? "Shifts can now be scheduled without a job"
+            : "Every shift now needs a job"
           : "This setting was refreshed to the latest saved value.",
       );
     } catch (err) {
@@ -737,41 +762,23 @@ function DefaultShiftToggle({
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ textAlign: "right" }}>
-          <div
-            style={{
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 600,
-              color: "var(--dg-color-text-secondary)",
-            }}
-          >
-            Shift-only assignments
-          </div>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
-            Let staff be scheduled with just a shift, no job attached
-          </div>
-        </div>
-        <Switch
-          checked={enabled}
-          onChange={(next) => setPendingValue(next)}
-          disabled={disabled || saving}
-          ariaLabel="Shift-only assignments"
-        />
-      </div>
+      <Switch
+        checked={enabled}
+        onChange={(next) => setPendingValue(next)}
+        disabled={disabled || saving}
+        ariaLabel="Allow shifts without a job"
+      />
       {pendingValue !== null ? (
         <ConfirmDialog
-          title={
-            pendingValue ? "Enable shift-only assignments?" : "Disable shift-only assignments?"
-          }
+          title={pendingValue ? "Allow shifts without a job?" : "Require a job on every shift?"}
           message={
             pendingValue ? (
               <>
-                Staff can be scheduled with just a shift, no job attached. The{" "}
-                <strong>Default Shift Job</strong> appears in Jobs settings.
+                Staff can be scheduled with just a shift. Choose where under{" "}
+                <strong>{DEFAULT_SHIFT_JOB_LABEL}</strong>.
               </>
             ) : (
-              "Staff can no longer be scheduled with just a shift going forward."
+              "Staff can no longer be scheduled with just a shift."
             )
           }
           summary={
@@ -780,13 +787,14 @@ function DefaultShiftToggle({
               : {
                   points: [
                     <>
-                      The <strong>Default Shift Job</strong> is hidden from Jobs settings.
+                      The <strong>{DEFAULT_SHIFT_JOB_LABEL}</strong> settings are hidden until you
+                      allow it again.
                     </>,
-                    "Shifts and coverage requirements that already use it keep working as before.",
+                    "Shifts already scheduled without a job stay on the schedule. Change them if they need a job.",
                   ],
                 }
           }
-          confirmLabel={pendingValue ? "Enable" : "Disable"}
+          confirmLabel={pendingValue ? "Allow" : "Require a job"}
           variant={pendingValue ? "info" : "warning"}
           isLoading={saving}
           onConfirm={() => handleConfirm()}
@@ -803,7 +811,6 @@ function JobSectionCard({
   canManageScheduleDefinitions,
   onAdd,
   hideAddButton = false,
-  headerAction,
   focusAreasTerm,
   children,
 }: {
@@ -813,10 +820,9 @@ function JobSectionCard({
   canManageScheduleDefinitions: boolean;
   onAdd: () => void;
   hideAddButton?: boolean;
-  headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const header = buildSectionHeaderText(section, focusAreasTerm);
+  const header = buildSectionHeaderText(section);
 
   return (
     <div
@@ -832,7 +838,6 @@ function JobSectionCard({
           <div className="dg-card-title">{header.title}</div>
           <div className="dg-card-description">{header.description}</div>
         </div>
-        {headerAction ? <div style={{ flexShrink: 0 }}>{headerAction}</div> : null}
       </div>
 
       {rows.length > 0 ? (
@@ -849,7 +854,7 @@ function JobSectionCard({
           action={
             canManageScheduleDefinitions ? (
               <Button onClick={onAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
-                {section === "shiftless" ? "+ Add General Job" : "+ Add Scheduled Job"}
+                {section === "shiftless" ? "Add general job" : "Add scheduled job"}
               </Button>
             ) : undefined
           }
@@ -865,7 +870,7 @@ function JobSectionCard({
               className="dg-btn dg-btn-dashed dg-btn-sm"
               style={{ width: "100%" }}
             >
-              {section === "shiftless" ? "+ Add General Job" : "+ Add Scheduled Job"}
+              {section === "shiftless" ? "Add general job" : "Add scheduled job"}
             </Button>
           </div>
         ) : null
@@ -1292,11 +1297,20 @@ function JobRow({
     closeEditor();
   }, [closeEditor, expanded, isDirty, requestClose]);
 
-  const placementSummary = isDefaultShiftJob
-    ? `Shift-only: ${form.departmentIds.length} dept · ${form.focusAreaIds.length} area · ${form.applicableShiftIds.length} shift`
-    : section === "shiftless"
-      ? "General / no shift"
-      : `${formatCount(form.departmentIds.length, "department")} · ${formatCount(form.focusAreaIds.length, singularLabelNoun(focusAreaLabel))} · ${formatCount(form.applicableShiftIds.length, "shift")}`;
+  const placementSummary =
+    section === "shiftless"
+      ? "Worked without a shift"
+      : [
+          summarizeNames(
+            namesForIds(activeScheduledDepartments, form.departmentIds),
+            "departments",
+          ),
+          summarizeNames(
+            namesForIds(activeFocusAreas, form.focusAreaIds),
+            pluralLabelNoun(focusAreaLabel),
+          ),
+          summarizeNames(namesForIds(activeShifts, form.applicableShiftIds), "shifts"),
+        ].join(" · ");
 
   const eligibleRoleSummary =
     form.eligibleRoleIds.length === 0
@@ -1356,15 +1370,15 @@ function JobRow({
               color: "var(--dg-color-text-primary)",
             }}
           >
-            {form.name || "Untitled job"}
+            {isDefaultShiftJob ? DEFAULT_SHIFT_JOB_LABEL : form.name || "Untitled job"}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3 }}>
             <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
               {placementSummary}
             </span>
-            {isLockedIdentityJob ? (
+            {isLockedIdentityJob && !isDefaultShiftJob ? (
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-brand)" }}>
-                {isDefaultShiftJob ? "Shift-only" : "System default"}
+                System default
               </span>
             ) : null}
           </div>
@@ -1421,7 +1435,7 @@ function JobRow({
                 <div>
                   <label style={labelStyle}>Job name</label>
                   <input
-                    value={form.name}
+                    value={isDefaultShiftJob ? DEFAULT_SHIFT_JOB_LABEL : form.name}
                     onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                     placeholder={section === "shiftless" ? "e.g. Office" : "e.g. Supervisor"}
                     className="dg-input"
@@ -1501,10 +1515,10 @@ function JobRow({
                         primary={getJobPreviewLabel({
                           jobName: form.name,
                           jobAbbr: form.abbr,
-                          shiftDisplayMode: "name",
+                          shiftDisplayMode,
                         })}
                         bg={form.color}
-                        mode="name"
+                        mode={shiftDisplayMode}
                       />
                     </div>
                   </div>
@@ -2060,14 +2074,14 @@ function JobRow({
                     const previewPrimary = getShiftPreviewPrimaryLabel({
                       shiftName: shift.name,
                       shiftAbbr: shift.abbr,
-                      shiftDisplayMode: "name",
+                      shiftDisplayMode,
                     });
                     const previewSecondary = isDefaultShiftJob
                       ? null
                       : getJobPreviewLabel({
                           jobName: form.name,
                           jobAbbr: form.abbr,
-                          shiftDisplayMode: "name",
+                          shiftDisplayMode,
                         });
                     const resolvedTimes = resolveJobTimesForShift(
                       {
@@ -2127,7 +2141,7 @@ function JobRow({
                             primary={previewPrimary}
                             secondary={previewSecondary}
                             bg={resolvedColor}
-                            mode="name"
+                            mode={shiftDisplayMode}
                             previewId={String(shift.id)}
                           />
                         </div>
@@ -2705,8 +2719,8 @@ export default function JobsSettings({
         compareJobsByQualificationSeniority(left, right, orgRoles, certifications),
       );
     const drafts = scheduled.filter((job) => job.isNew);
-    return [...(defaultShiftEnabled ? defaultShiftRows : []), ...persisted, ...drafts];
-  }, [certifications, defaultShiftEnabled, defaultShiftRows, orgRoles, visibleRows]);
+    return [...persisted, ...drafts];
+  }, [certifications, orgRoles, visibleRows]);
   const shiftlessRows = useMemo(() => {
     const shiftless = visibleRows.filter((job) => getJobSection(job) === "shiftless");
     const persisted = shiftless
@@ -2816,6 +2830,33 @@ export default function JobsSettings({
     [emitPersistedJobs, local],
   );
 
+  const renderJobRow = (
+    job: JobDefinition & { isNew?: boolean },
+    section: JobSection,
+    isLast: boolean,
+  ) => (
+    <JobRow
+      key={job.id}
+      job={job}
+      section={section}
+      orgId={orgId}
+      roleLabel={roleLabel}
+      certificationLabel={certificationLabel}
+      focusAreaLabel={focusAreaLabel}
+      scheduleRoles={scheduleRoles}
+      certifications={certifications}
+      departments={departments}
+      focusAreas={focusAreas}
+      shiftCategories={activeShiftCategories}
+      onSaved={handleSaved}
+      onDeleted={handleDeleted}
+      canManageScheduleDefinitions={canManageScheduleDefinitions}
+      allJobs={visibleRows}
+      shiftDisplayMode={organization?.shiftDisplayMode ?? "code"}
+      isLast={isLast}
+    />
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {scheduleRoles.length === 0 ? (
@@ -2828,44 +2869,32 @@ export default function JobsSettings({
         </Banner>
       ) : null}
 
-      <JobSectionCard
-        section="scheduled"
-        focusAreasTerm={pluralLabelNoun(focusAreaLabel)}
-        rows={scheduledRows}
-        canManageScheduleDefinitions={canManageScheduleDefinitions && canCreateScheduledJob}
-        onAdd={handleAddScheduledJob}
-        headerAction={
+      <DefaultShiftCard
+        toggle={
           organization && onOrganizationSave ? (
             <DefaultShiftToggle
               organization={organization}
               onOrganizationSave={onOrganizationSave}
               disabled={!canManageScheduleDefinitions}
             />
-          ) : undefined
+          ) : null
         }
       >
-        {scheduledRows.map((job, jobIndex) => (
-          <JobRow
-            key={job.id}
-            job={job}
-            section={isDefaultShiftSystemJob(job) ? "defaultShift" : "scheduled"}
-            orgId={orgId}
-            roleLabel={roleLabel}
-            certificationLabel={certificationLabel}
-            focusAreaLabel={focusAreaLabel}
-            scheduleRoles={scheduleRoles}
-            certifications={certifications}
-            departments={departments}
-            focusAreas={focusAreas}
-            shiftCategories={activeShiftCategories}
-            onSaved={handleSaved}
-            onDeleted={handleDeleted}
-            canManageScheduleDefinitions={canManageScheduleDefinitions}
-            allJobs={visibleRows}
-            shiftDisplayMode={organization?.shiftDisplayMode ?? "code"}
-            isLast={jobIndex === scheduledRows.length - 1}
-          />
-        ))}
+        {defaultShiftEnabled
+          ? defaultShiftRows.map((job) => renderJobRow(job, "defaultShift", true))
+          : null}
+      </DefaultShiftCard>
+
+      <JobSectionCard
+        section="scheduled"
+        focusAreasTerm={pluralLabelNoun(focusAreaLabel)}
+        rows={scheduledRows}
+        canManageScheduleDefinitions={canManageScheduleDefinitions && canCreateScheduledJob}
+        onAdd={handleAddScheduledJob}
+      >
+        {scheduledRows.map((job, jobIndex) =>
+          renderJobRow(job, "scheduled", jobIndex === scheduledRows.length - 1),
+        )}
       </JobSectionCard>
 
       {!canCreateScheduledJob ? (
@@ -2888,28 +2917,9 @@ export default function JobsSettings({
         canManageScheduleDefinitions={canManageScheduleDefinitions}
         onAdd={handleAddShiftlessJob}
       >
-        {shiftlessRows.map((job, jobIndex) => (
-          <JobRow
-            key={job.id}
-            job={job}
-            section="shiftless"
-            orgId={orgId}
-            roleLabel={roleLabel}
-            certificationLabel={certificationLabel}
-            focusAreaLabel={focusAreaLabel}
-            scheduleRoles={scheduleRoles}
-            certifications={certifications}
-            departments={departments}
-            focusAreas={focusAreas}
-            shiftCategories={activeShiftCategories}
-            onSaved={handleSaved}
-            onDeleted={handleDeleted}
-            canManageScheduleDefinitions={canManageScheduleDefinitions}
-            allJobs={visibleRows}
-            shiftDisplayMode={organization?.shiftDisplayMode ?? "code"}
-            isLast={jobIndex === shiftlessRows.length - 1}
-          />
-        ))}
+        {shiftlessRows.map((job, jobIndex) =>
+          renderJobRow(job, "shiftless", jobIndex === shiftlessRows.length - 1),
+        )}
       </JobSectionCard>
     </div>
   );

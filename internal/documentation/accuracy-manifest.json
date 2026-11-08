@@ -1067,7 +1067,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a9ebd845f410efe6f55941bb29bd453a3d73517d3189556a920cc982f608bd6d"
+      "evidenceFingerprint": "sha256:259517fa029edd67c949e2e221dc92bf51a3998bbcb34ff2653e3c0e40ca3a88"
     },
     {
       "id": "roles",
@@ -1710,7 +1710,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ccef4b62a3fcb08449537ba381cbd99713680d7a9ce14b02d870b4142b56a091"
+      "evidenceFingerprint": "sha256:cd5b99ea34cfdb1b7ebe42dd284ff3ca7989004ccb7dafe7de6d94f1bc8c81a2"
     },
     {
       "id": "roles-certifications-indicators",
@@ -1764,7 +1764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a51162f5861317003881df9d5ed75e8d6673b39b47c607569009b57c1c6a04ef"
+      "evidenceFingerprint": "sha256:b55bd420e3eca9d1f54f1dfb5b3fda8c6e98c691fdef2f5d4c0056ddefe4129f"
     },
     {
       "id": "organization-activity-controls",
@@ -1932,7 +1932,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b68c355434385cc2f146ae863fcc6bcd408cff32ce45291ae09fa59101ed54d3"
+      "evidenceFingerprint": "sha256:952a798767f1a525c55d0bfbaf6bdc5c540a2269d1d48a593d755af2995ff9ca"
     },
     {
       "id": "schedule-tools",
