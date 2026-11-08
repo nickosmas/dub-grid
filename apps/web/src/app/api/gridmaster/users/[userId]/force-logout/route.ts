@@ -45,13 +45,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
 
     // Ending every session would sign the caller out of the one they are
     // using, and the SQL function deletes the rows a keep-one sign-out lists.
-    // Their other devices have "Sign out other devices" for that.
+    // Their other devices have Sign out under Other devices for that.
     // UUIDs match case-insensitively in Postgres, so compare them that way.
     if (parsed.data.userId.toLowerCase() === auth.user.id.toLowerCase()) {
       return NextResponse.json(
         {
           error:
-            "You can't force a sign-out on your own account. Use Sign out other devices in your security settings.",
+            "You can't force a sign-out on your own account. Sign out your other devices from your security settings.",
         },
         { status: 400 },
       );

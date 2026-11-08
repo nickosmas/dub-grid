@@ -345,7 +345,7 @@ describe("SecurityPanel session actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out other devices" }));
 
     const dialog = screen.getByRole("alertdialog", { name: "Sign out other devices?" });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Sign out other devices" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Sign out" }));
 
     await waitFor(() =>
       expect(signOutAccountSessions).toHaveBeenCalledExactlyOnceWith("others", "old-token"),
@@ -355,18 +355,18 @@ describe("SecurityPanel session actions", () => {
   it("confirms before signing out everywhere", () => {
     renderSecurityPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out all devices" }));
 
     expect(mockSignOut).not.toHaveBeenCalled();
-    expect(screen.getByRole("alertdialog", { name: "Sign out everywhere?" })).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog", { name: "Sign out all devices?" })).toBeInTheDocument();
   });
 
   it("signs out everywhere before starting local browser teardown", async () => {
     renderSecurityPanel();
-    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out all devices" }));
 
-    const dialog = screen.getByRole("alertdialog", { name: "Sign out everywhere?" });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Sign out everywhere" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Sign out all devices?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Sign out" }));
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith({ scope: "local" }));
     expect(signOutAccountSessions).toHaveBeenCalledExactlyOnceWith("global", "old-token");
@@ -383,9 +383,11 @@ describe("SecurityPanel session actions", () => {
         }),
       );
       renderSecurityPanel();
-      const name = scope === "others" ? "Sign out other devices" : "Sign out everywhere";
+      const name = scope === "others" ? "Sign out other devices" : "Sign out all devices";
       fireEvent.click(screen.getByRole("button", { name }));
-      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name }));
+      fireEvent.click(
+        within(screen.getByRole("alertdialog")).getByRole("button", { name: "Sign out" }),
+      );
       const challenge = await screen.findByRole("dialog", { name: "Confirm your identity" });
       expect(screen.getAllByRole("dialog")).toHaveLength(1);
       expect(mockSignOut).not.toHaveBeenCalled();
@@ -412,13 +414,13 @@ describe("SecurityPanel session actions", () => {
       }),
     );
     renderSecurityPanel();
-    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out all devices" }));
     fireEvent.click(
-      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Sign out everywhere" }),
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Sign out" }),
     );
     const challenge = await screen.findByRole("dialog", { name: "Confirm your identity" });
     fireEvent.click(within(challenge).getByRole("button", { name: "Cancel" }));
-    await screen.findByRole("alertdialog", { name: "Sign out everywhere?" });
+    await screen.findByRole("alertdialog", { name: "Sign out all devices?" });
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(signOutAccountSessions).toHaveBeenCalledOnce();
   });
@@ -426,15 +428,13 @@ describe("SecurityPanel session actions", () => {
   it("does not automatically retry or navigate after an ambiguous bulk failure", async () => {
     signOutAccountSessions.mockRejectedValueOnce(new TypeError("network failure"));
     renderSecurityPanel();
-    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out all devices" }));
     fireEvent.click(
-      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Sign out everywhere" }),
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Sign out" }),
     );
     await waitFor(() =>
       expect(
-        within(screen.getByRole("alertdialog")).getByRole("button", {
-          name: "Sign out everywhere",
-        }),
+        within(screen.getByRole("alertdialog")).getByRole("button", { name: "Sign out" }),
       ).toBeEnabled(),
     );
     expect(mockSignOut).not.toHaveBeenCalled();

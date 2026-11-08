@@ -55,6 +55,10 @@ Second round:
 - The People bulk bar reds Offboard, or Suspend when Offboard isn't offered. On the
   Gridmaster person page Deactivate is secondary beside Terminate account; in the
   accounts table only Deactivate is red. Select all in Bulk Delete mode is secondary.
+- The sign-out wording no longer repeats (owner, 2026-11-07): the rows read Other
+  devices and All devices, each with a Sign out button, and the dialogs ask once
+  ("Sign out all devices?") and confirm with Sign out. The mobile sheet's options
+  read the same.
 - Delete organization, Bulk Delete's Delete button and Approve on an account deletion
   request moved from solid red to the red outline.
 
