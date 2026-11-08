@@ -115,6 +115,8 @@ const REDIRECT_CONSUMERS: Record<string, string> = {
     "Forwards the application-owned recovery callback to Supabase Auth.",
   "apps/web/src/hooks/useLogout.ts":
     "Accepts an application-owned post-logout destination before hard navigation.",
+  "apps/web/src/lib/auth/return-after-sign-in.ts":
+    "Returns the same person to an internal page after an inactivity sign-out.",
 };
 
 const OTP_CONSUMERS: Record<string, string> = {
