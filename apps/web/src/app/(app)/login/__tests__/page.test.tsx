@@ -10,6 +10,7 @@
 import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { rememberPageForSignIn } from "@/lib/auth/return-after-sign-in";
 import OrgLogin, { type OrgLoginSeed } from "@/app/(app)/login/OrgLogin";
 import { RequestTimeoutError } from "@/lib/fetch-with-timeout";
 
@@ -214,6 +215,35 @@ describe("OrgLogin submit states", () => {
         sessionToken("user-1", TARGET_ORG_ID, "calmhaven"),
         { dashboard: true },
       );
+    });
+
+    it("returns the same person to the page an inactivity sign-out left", async () => {
+      rememberPageForSignIn("user-1", "/schedule?view=month");
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        loginResponse({ ...COOKIE_RESPONSE, didSwitchOrg: false }),
+      );
+      const { container } = renderWithQueryClient(
+        <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+      );
+      submitForm(container);
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/schedule?view=month"));
+      expect(mockPrimeSignInQueries).toHaveBeenCalledWith(expect.any(Object), expect.any(String), {
+        dashboard: false,
+      });
+    });
+
+    it("sends someone else to the dashboard", async () => {
+      rememberPageForSignIn("user-2", "/schedule");
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        loginResponse({ ...COOKIE_RESPONSE, didSwitchOrg: false }),
+      );
+      const { container } = renderWithQueryClient(
+        <OrgLogin orgSlug="calmhaven" seed={{ status: "found", name: "Calm Haven" }} />,
+      );
+      submitForm(container);
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/dashboard"));
     });
 
     it("hard-navigates a switched sign-in at once, leaving the new document to read the cookies", async () => {

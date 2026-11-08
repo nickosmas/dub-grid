@@ -9,6 +9,7 @@ import { useLogout } from "@/hooks";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { refreshBrowserSession } from "@/features/account/client";
 import { readSupabaseSessionId } from "@/features/account/client/session-registration";
+import { rememberPageForSignIn } from "@/lib/auth/return-after-sign-in";
 
 const INACTIVITY_REDIRECT = "/goodbye?reason=inactivity";
 const FINAL_ANNOUNCEMENT_SECONDS = 10;
@@ -29,9 +30,19 @@ export default function InactivityGuard() {
     [accessToken],
   );
 
-  const handleExpire = useCallback(() => {
+  const handleSignOutNow = useCallback(() => {
     signOut({ redirectTo: INACTIVITY_REDIRECT });
   }, [signOut]);
+
+  // Only a timed-out sign-out brings them back here; Sign out now is a choice.
+  const userId = user?.id;
+  const handleExpire = useCallback(() => {
+    if (userId) {
+      const { pathname, search, hash } = window.location;
+      rememberPageForSignIn(userId, `${pathname}${search}${hash}`);
+    }
+    signOut({ redirectTo: INACTIVITY_REDIRECT });
+  }, [signOut, userId]);
 
   const { phase, secondsRemaining, stayActive } = useIdleTimer({
     enabled: Boolean(user),
@@ -56,7 +67,7 @@ export default function InactivityGuard() {
       aria-describedby={descriptionId}
       footer={
         <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
-          <Button type="button" className="dg-btn dg-btn-secondary" onClick={handleExpire}>
+          <Button type="button" className="dg-btn dg-btn-secondary" onClick={handleSignOutNow}>
             Sign out now
           </Button>
           <Button type="button" className="dg-btn dg-btn-primary" onClick={handleStay}>
