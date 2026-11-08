@@ -526,6 +526,18 @@ export function registerInvitedUser(input: {
 }
 
 /**
+ * Tells the server this web session is in use, so the token hook keeps
+ * renewing it (128). Best effort: a missed report only shortens the session.
+ */
+export async function reportWebSessionActivity(): Promise<void> {
+  try {
+    await fetchWithTimeout("/api/auth/session-activity", { method: "POST" });
+  } catch {
+    // The next report, five minutes of use later, tries again.
+  }
+}
+
+/**
  * Records that a two-factor sign-in finished, once the session is in its
  * organization. Best-effort: an audit write must never hold up signing in.
  */

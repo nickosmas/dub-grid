@@ -15,7 +15,9 @@ as the refresh token lived.
   browser's 30 plus the gap between reports). A session already past the
   limit can't be revived by a leftover access token.
 - The idle timer reports this tab's own activity (`onActivity`), and
-  `InactivityGuard` sends it at most every 5 minutes.
+  `InactivityGuard` sends it at most every 5 minutes to
+  `POST /api/auth/session-activity`, which calls `touch_web_session` as the
+  signed-in user (UI code doesn't call the database directly).
 - iOS, Android and a session with no recorded platform are never checked: the
   app stays signed in until the person signs out (owner, 2026-11-08).
 

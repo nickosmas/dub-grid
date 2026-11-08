@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:de116823b5bc9ab7663d7666a45e8f3a49e04b1df9f39eccd0ca4207d9f79235",
+  "sourceDigest": "sha256:a10b505232998eeaa55d17aeab5b11aff52079c962a58eefdbc897e2eb0377c5",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2380,6 +2380,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/auth/recovery-request/route.ts"
+      }
+    },
+    {
+      "id": "http:POST:/api/auth/session-activity",
+      "method": "POST",
+      "path": "/api/auth/session-activity",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/auth/session-activity/route.ts"
       }
     },
     {

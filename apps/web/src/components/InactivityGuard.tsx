@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { useAuth } from "@/components/AuthProvider";
 import { useLogout } from "@/hooks";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
-import { refreshBrowserSession, touchWebSession } from "@/features/account/client";
+import { refreshBrowserSession, reportWebSessionActivity } from "@/features/account/client";
 import { readSupabaseSessionId } from "@/features/account/client/session-registration";
 import { rememberPageForSignIn } from "@/lib/auth/return-after-sign-in";
 
@@ -51,9 +51,7 @@ export default function InactivityGuard() {
   const handleActivity = useCallback((at: number) => {
     if (at - lastReportAtRef.current < ACTIVITY_REPORT_INTERVAL_MS) return;
     lastReportAtRef.current = at;
-    void touchWebSession().catch(() => {
-      // Best-effort; the next report after five minutes tries again.
-    });
+    void reportWebSessionActivity();
   }, []);
 
   const { phase, secondsRemaining, stayActive } = useIdleTimer({
