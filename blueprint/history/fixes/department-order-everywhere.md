@@ -25,9 +25,8 @@ in the order they were saved, sorted them alphabetically, or by id.
   coverage rows), the staff CSV export, the new-person alert email, and the
   "has shifts in" question order focus areas by department.
 - Mobile: management department names, the People row, person detail, and
-  the staff hours, open shifts and coverage filters; the mobile API's focus
-  area rows come in Settings order too. The mobile coverage list itself
-  still leads with the worst covered, on purpose.
+  the staff hours, open shifts and coverage filters. The mobile coverage
+  list itself still leads with the worst covered, on purpose.
 
 ## Evidence
 

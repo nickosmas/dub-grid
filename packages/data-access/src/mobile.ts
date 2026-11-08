@@ -740,73 +740,47 @@ export async function fetchMobileAssignmentSeedRows(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileAssignmentSeedRows> {
-  const [
-    focusAreaResult,
-    departmentResult,
-    shiftResult,
-    jobResult,
-    roleResult,
-    certificationResult,
-  ] = await Promise.all([
-    serviceClient
-      .from("focus_areas")
-      .select(FOCUS_AREA_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null),
-    serviceClient
-      .from("departments")
-      .select("id, type, sort_order")
-      .eq("org_id", orgId)
-      .is("archived_at", null),
-    serviceClient
-      .from("shift_categories")
-      .select(SHIFT_CATEGORY_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("jobs")
-      .select(JOB_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("organization_roles")
-      .select(ORG_ROLE_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("certifications")
-      .select(NAMED_ITEM_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-  ]);
+  const [focusAreaResult, shiftResult, jobResult, roleResult, certificationResult] =
+    await Promise.all([
+      serviceClient
+        .from("focus_areas")
+        .select(FOCUS_AREA_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+      serviceClient
+        .from("shift_categories")
+        .select(SHIFT_CATEGORY_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order"),
+      serviceClient
+        .from("jobs")
+        .select(JOB_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order"),
+      serviceClient
+        .from("organization_roles")
+        .select(ORG_ROLE_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order"),
+      serviceClient
+        .from("certifications")
+        .select(NAMED_ITEM_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order"),
+    ]);
 
   if (focusAreaResult.error) throw focusAreaResult.error;
-  if (departmentResult.error) throw departmentResult.error;
   if (shiftResult.error) throw shiftResult.error;
   if (jobResult.error) throw jobResult.error;
   if (roleResult.error) throw roleResult.error;
   if (certificationResult.error) throw certificationResult.error;
 
   return {
-    // In Settings order, so lists built from these rows tie-break the same way.
-    focusAreaRows: orderFocusAreasByDepartment(
-      ((focusAreaResult.data ?? []) as DbFocusArea[]).map((row) => ({
-        row,
-        departmentId: row.department_id,
-        sortOrder: row.sort_order,
-      })),
-      ((departmentResult.data ?? []) as { id: number; type: string; sort_order: number }[]).map(
-        (department) => ({
-          id: department.id,
-          type: department.type,
-          sortOrder: department.sort_order,
-        }),
-      ),
-    ).map(({ row }) => row),
+    focusAreaRows: (focusAreaResult.data ?? []) as DbFocusArea[],
     shiftCategoryRows: (shiftResult.data ?? []) as DbShiftCategory[],
     jobRows: (jobResult.data ?? []) as DbJobDefinition[],
     organizationRoleRows: (roleResult.data ?? []) as DbNamedItem[],
