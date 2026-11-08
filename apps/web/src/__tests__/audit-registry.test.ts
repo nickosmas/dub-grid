@@ -335,6 +335,19 @@ describe("audit copy never leaks implementation detail", () => {
     expect(headline({})).toBe("Cleared upcoming shifts for Barbara Trent");
   });
 
+  it("adds a suspension's reason to its headline and not to the detail rows", () => {
+    const headline = (details: Record<string, unknown>) =>
+      describeAuditAction("employee.suspended", details, { targetLabel: "Barbara Trent" });
+    expect(headline({ note: "Under review" })).toBe(
+      "Suspended Barbara Trent's access: Under review",
+    );
+    expect(headline({ suspendedUntil: "2026-11-20", note: "Under review" })).toContain("until");
+    expect(headline({})).toBe("Suspended Barbara Trent's access");
+    expect(
+      formatDetails({ action: "employee.suspended", details: { note: "Under review" } }),
+    ).toEqual([]);
+  });
+
   it("renders a change list as before/after rows using its own labels", () => {
     const rows = formatDetails({
       action: "org.updated",

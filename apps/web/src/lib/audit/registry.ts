@@ -626,14 +626,18 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
       // The daily job starts a planned suspension (51g3) with no actor.
       const name = who(d, ctx, "a team member");
       const until = d.date("suspendedUntil");
+      const note = d.text("note");
+      const reason = note ? `: ${note}` : "";
       if (d.date("plannedFrom")) {
         return until
-          ? `${who(d, ctx, "A team member")}'s planned suspension started, until ${until}`
-          : `${who(d, ctx, "A team member")}'s planned suspension started`;
+          ? `${who(d, ctx, "A team member")}'s planned suspension started, until ${until}${reason}`
+          : `${who(d, ctx, "A team member")}'s planned suspension started${reason}`;
       }
-      return until ? `Suspended ${name}'s access until ${until}` : `Suspended ${name}'s access`;
+      return until
+        ? `Suspended ${name}'s access until ${until}${reason}`
+        : `Suspended ${name}'s access${reason}`;
     },
-    suppressKeys: ["suspendedUntil", "plannedFrom"],
+    suppressKeys: ["suspendedUntil", "plannedFrom", "note"],
   },
   "employee.reinstated": {
     category: "people",

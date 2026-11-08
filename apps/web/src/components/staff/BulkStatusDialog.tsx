@@ -68,8 +68,8 @@ export function describeBulkStatusFailures(
   });
 }
 
-/** Mark away and Offboard store a reason. */
-const TAKES_NOTE: ReadonlySet<BulkStatusAction> = new Set(["markAway", "archive"]);
+/** Mark away, Suspend and Offboard store a reason. */
+const TAKES_NOTE: ReadonlySet<BulkStatusAction> = new Set(["markAway", "suspend", "archive"]);
 
 const VARIANTS: Record<BulkStatusAction, "danger" | "warning" | "info"> = {
   markActive: "info",

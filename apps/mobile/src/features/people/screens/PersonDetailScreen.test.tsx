@@ -1602,6 +1602,21 @@ describe("PersonDetailScreen", () => {
       });
     });
 
+    it("suspends someone with a reason", () => {
+      const mutate = renderWithStatusMutation();
+
+      openStatus();
+      pick(/^Suspended/);
+      fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "  Under review  " } });
+      confirm("Suspend");
+
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+        action: "suspend",
+        copyAction: "suspend",
+        note: "Under review",
+      });
+    });
+
     it("marks someone away until a day they pick, with an absence", () => {
       const mutate = renderWithStatusMutation();
 

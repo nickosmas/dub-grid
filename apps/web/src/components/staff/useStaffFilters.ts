@@ -3,7 +3,7 @@ import { getEffectiveOrgRole, getOrgRolePrivilegeRank } from "@dubgrid/domain";
 import type { Employee, FocusArea, NamedItem, OrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 
-export type EmployeeTab = "all" | "active" | "inactive" | "removed";
+export type EmployeeTab = "all" | "active" | "inactive" | "suspended" | "removed";
 export type SortKey = "seniority" | "name" | "access";
 
 /** What the toolbar's sort dropdown offers, in the order it lists them. */
@@ -137,10 +137,16 @@ export function useStaffFilters({
       all: employees.length + inactiveEmployees.length + removedEmployees.length,
       active: employees.length,
       inactive: inactiveEmployees.length,
+      suspended: employees.filter((employee) => employee.suspendedAt).length,
       removed: removedEmployees.length,
     }),
-    [employees.length, inactiveEmployees.length, removedEmployees.length],
+    [employees, inactiveEmployees.length, removedEmployees.length],
   );
+
+  // The Suspended tab disappears with its last person, so don't leave it selected.
+  useEffect(() => {
+    if (activeTab === "suspended" && tabCounts.suspended === 0) setActiveTab("active");
+  }, [activeTab, tabCounts.suspended]);
 
   // employees.departmentIds is rarely populated (no UI writes it) — derive an
   // employee's effective scheduled department(s) from their focus areas instead,
@@ -180,7 +186,9 @@ export function useStaffFilters({
           ? employees
           : activeTab === "inactive"
             ? inactiveEmployees
-            : removedEmployees;
+            : activeTab === "suspended"
+              ? employees.filter((employee) => employee.suspendedAt)
+              : removedEmployees;
 
     const normalizedSearch = searchQuery.trim().toLowerCase();
 

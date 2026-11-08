@@ -420,6 +420,7 @@ export function MembersSection({
   const {
     activeTab,
     setActiveTab,
+    tabCounts,
     searchQuery,
     setSearchQuery,
     sortConfig,
@@ -880,6 +881,9 @@ export function MembersSection({
           label: EMPLOYMENT_STATUS_LABELS.inactive,
           count: inactiveEmployees.length,
         },
+        ...(tabCounts.suspended > 0
+          ? [{ key: "suspended" as const, label: "Suspended", count: tabCounts.suspended }]
+          : []),
         { key: "removed", label: EMPLOYMENT_STATUS_LABELS.removed, count: removedEmployees.length },
       ]
     : [{ key: "active", label: "Active", count: employees.length }];
