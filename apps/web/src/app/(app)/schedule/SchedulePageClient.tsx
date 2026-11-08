@@ -164,6 +164,7 @@ import {
   type SuggestionWrite,
 } from "./_lib/coverage-suggestions";
 import { planRecurringFills } from "./_lib/recurring-fills";
+import { jobIdTakesNewWork } from "@/lib/system-jobs";
 import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
 import { buildSchedulableOn } from "./_lib/schedulable-on";
 import {
@@ -412,6 +413,9 @@ import {
   ShiftJobSegment,
 } from "@/types";
 
+const SHIFT_WITHOUT_JOB_OFF_MESSAGE =
+  "Shifts without a job are turned off. Choose a job, or allow them in Settings under Jobs.";
+
 type CoverageGap = ReturnType<typeof computeCoverageGaps>[number];
 
 type ContextMenuState = {
@@ -584,6 +588,16 @@ function SchedulerContent({
     loadError,
     bootstrapRetryable,
   } = useOrganizationData();
+  // Settings > Jobs can turn off shifts without a job: work already scheduled
+  // stays, and nothing new is planned, filled or offered on them.
+  const jobTakesNewWork = useMemo(
+    () => jobIdTakesNewWork(jobs, org?.defaultShiftEnabled),
+    [jobs, org?.defaultShiftEnabled],
+  );
+  const newWorkJobIds = useMemo(
+    () => jobs.filter((job) => jobTakesNewWork(job.id)).map((job) => job.id),
+    [jobs, jobTakesNewWork],
+  );
   // Use orgId from JWT (available immediately) so employee fetch starts
   // in parallel with org data instead of waiting for it.
   const {
@@ -3516,12 +3530,27 @@ function SchedulerContent({
     [getOpenShiftTimeRanges, hasDateAndTimeStarted],
   );
 
+  // ── Coverage gaps ──────────────────────────────────────────────────────────
+  const assignmentById = useMemo(() => {
+    const map = new Map<number, AssignmentDefinition>();
+    for (const sc of assignments) map.set(sc.id, sc);
+    // Include archived codes from allAssignmentDefinitions for shift lookup
+    for (const sc of allAssignmentDefinitions) {
+      if (!map.has(sc.id)) map.set(sc.id, sc);
+    }
+    return map;
+  }, [assignments, allAssignmentDefinitions]);
+
+  // A gap is offered only with work that can still be added: shifts without
+  // a job can be turned off in Settings > Jobs.
   const getActionableCoverageGapAssignmentIds = useCallback(
     (gap: CoverageGap): number[] =>
       gap.eligibleAssignmentDefinitionIds.filter(
-        (assignmentId) => !isCoverageGapStarted(gap, [assignmentId]),
+        (assignmentId) =>
+          jobTakesNewWork(assignmentById.get(assignmentId)?.jobId) &&
+          !isCoverageGapStarted(gap, [assignmentId]),
       ),
-    [isCoverageGapStarted],
+    [assignmentById, isCoverageGapStarted, jobTakesNewWork],
   );
 
   const isOpenShiftStarted = useCallback(
@@ -3536,17 +3565,6 @@ function SchedulerContent({
       ),
     [getOpenShiftTimeRanges, hasDateAndTimeStarted],
   );
-
-  // ── Coverage gaps ──────────────────────────────────────────────────────────
-  const assignmentById = useMemo(() => {
-    const map = new Map<number, AssignmentDefinition>();
-    for (const sc of assignments) map.set(sc.id, sc);
-    // Include archived codes from allAssignmentDefinitions for shift lookup
-    for (const sc of allAssignmentDefinitions) {
-      if (!map.has(sc.id)) map.set(sc.id, sc);
-    }
-    return map;
-  }, [assignments, allAssignmentDefinitions]);
 
   // ── Cross-date overlap warnings for the open edit panel ─────────────────
   const overnightOverlapWarnings = useMemo((): string[] => {
@@ -5952,6 +5970,23 @@ function SchedulerContent({
   );
 
   // ── Grid-owned drag/drop handler ─────────────────────────────────────────
+  // A paste or drop may not add a shift without a job while they're off; a
+  // cell that already holds one keeps it. The server refuses it too (129).
+  const addsPausedShiftWithoutJob = useCallback(
+    (cellKey: string, input: ScheduleCellInput): boolean => {
+      if (input.kind !== "worked") return false;
+      const entry = shifts[cellKey];
+      const held = [...(entry?.segments ?? []), ...(entry?.publishedSegments ?? [])];
+      return input.segments.some(
+        (segment) =>
+          !jobTakesNewWork(segment.jobId) &&
+          !held.some(
+            (existing) => existing.jobId === segment.jobId && existing.shiftId === segment.shiftId,
+          ),
+      );
+    },
+    [jobTakesNewWork, shifts],
+  );
   const handleMoveGridEntry = useCallback<NonNullable<ScheduleGridHandlers["onMoveEntry"]>>(
     ({ sourceCellId, targetCellId, payload, mode }) => {
       const sourceKey = `${sourceCellId.empId}_${sourceCellId.dateKey}`;
@@ -5959,6 +5994,10 @@ function SchedulerContent({
       if (sourceKey === targetKey) return;
 
       if (!guardActiveSession()) return;
+      if (addsPausedShiftWithoutJob(targetKey, payload)) {
+        toast.error(SHIFT_WITHOUT_JOB_OFF_MESSAGE);
+        return;
+      }
 
       const payloadAssignmentDefinitionIds = getInputAssignmentDefinitionIds(payload);
       if (payloadAssignmentDefinitionIds.length > 0) {
@@ -6129,6 +6168,7 @@ function SchedulerContent({
       shifts,
       org,
       guardActiveSession,
+      addsPausedShiftWithoutJob,
       getInputAssignmentDefinitionIds,
       getPublishedSnapshot,
       checkQualification,
@@ -6173,6 +6213,10 @@ function SchedulerContent({
       if (!schedulableOn(empId, formatDateKey(date))) return;
       if (!guardActiveSession()) return;
       const cellKey = `${empId}_${formatDateKey(date)}`;
+      if (addsPausedShiftWithoutJob(cellKey, clipboard)) {
+        toast.error(SHIFT_WITHOUT_JOB_OFF_MESSAGE);
+        return;
+      }
 
       // Check if target employee qualifies for the pasted shift
       const clipboardAssignmentDefinitionIds = getInputAssignmentDefinitionIds(clipboard);
@@ -6208,6 +6252,7 @@ function SchedulerContent({
       clipboard,
       setShift,
       guardActiveSession,
+      addsPausedShiftWithoutJob,
       getInputAssignmentDefinitionIds,
       checkQualification,
       schedulableOn,
@@ -6336,7 +6381,7 @@ function SchedulerContent({
         startDate,
         endDate,
         activeShiftIds: new Set(shiftCategories.map((shift) => shift.id)),
-        activeJobIds: new Set(jobs.map((job) => job.id)),
+        activeJobIds: new Set(newWorkJobIds),
         activeAbsenceTypeIds: new Set(absenceTypes.map((type) => type.id)),
         schedulableOn,
       });
@@ -6354,7 +6399,7 @@ function SchedulerContent({
     } finally {
       setIsApplyingRecurring(false);
     }
-  }, [org, getAutoFillRange, absenceTypes, shifts, shiftCategories, jobs, schedulableOn]);
+  }, [org, getAutoFillRange, absenceTypes, shifts, shiftCategories, newWorkJobIds, schedulableOn]);
 
   // Actually apply recurring schedules (called after confirmation)
   const handleApplyRecurring = useCallback(async () => {
@@ -7214,6 +7259,7 @@ function SchedulerContent({
       loadedDateKeys: availableSwapDates,
       preferences: shiftPreferences,
       jobPreferences,
+      defaultShiftEnabled: org?.defaultShiftEnabled,
     };
     const { engine, text } = buildCoverageSuggestionInput(adapterInput);
     const result = suggestCoverageFixes(engine);
@@ -7250,6 +7296,7 @@ function SchedulerContent({
     focusAreas,
     jobs,
     org?.coverageRuleConfig,
+    org?.defaultShiftEnabled,
     orgRoles,
     scheduleEmployees,
     shiftCategories,
@@ -7663,7 +7710,7 @@ function SchedulerContent({
         startDate: parseLocalDateKey(dateKeys[0]),
         endDate: parseLocalDateKey(dateKeys[dateKeys.length - 1]),
         activeShiftIds: new Set(shiftCategories.map((shift) => shift.id)),
-        activeJobIds: new Set(jobs.map((job) => job.id)),
+        activeJobIds: new Set(newWorkJobIds),
         activeAbsenceTypeIds: new Set(absenceTypes.map((type) => type.id)),
         employeeIds: allAreas ? undefined : new Set(scopedEmployeeIds),
         schedulableOn,
@@ -7753,6 +7800,7 @@ function SchedulerContent({
       coverageMatrix,
       employees,
       jobs,
+      newWorkJobIds,
       org,
       allowSixthDay,
       employeesInBuildScope,

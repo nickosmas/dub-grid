@@ -581,3 +581,17 @@ export function restoreIndicatorType(indicatorTypeId: number, orgId: string): Pr
     "We couldn't restore schedule note. Try again.",
   ).then(() => undefined);
 }
+
+/** What stays when shifts without a job are turned off, from today on. */
+export interface ShiftWithoutJobUsage {
+  upcomingShifts: number;
+  recurringDays: number;
+  coverageRequirements: number;
+}
+
+export function fetchShiftWithoutJobUsage(orgId: string): Promise<ShiftWithoutJobUsage> {
+  return requestSettingsJson<ShiftWithoutJobUsage>(
+    buildQuery("fetchShiftWithoutJobUsage", { orgId }),
+    { errorMessage: "We couldn't load how shifts without a job are used." },
+  );
+}

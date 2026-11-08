@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cd960230cd00ba8bcb1e7872f3aea6468ecd3851dc2762006049ea406c9fd28e"
+      "evidenceFingerprint": "sha256:a1b76deb32f5a6467e58be8a4c51cebdcf1d099925122dcc50743d03bfb45c8e"
     },
     {
       "id": "introduction",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:13d498374dbe5eba17e248c3793b677b2cdcdd00fcfc726274585d6876a25c4b"
+      "evidenceFingerprint": "sha256:8973b0f9c8f37c66ba114c5da1327ef44aca170f6cb3864745d6c490b4b5740f"
     },
     {
       "id": "quickstart",
@@ -238,7 +238,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:330c4b19c071d48d222cb1e4a06686cc356900d6a429785504c6de1814c1a80a"
+      "evidenceFingerprint": "sha256:1ff2f1bf1278126ea72770000fd61b676b34efd8a11d1add01a2999c7792ce43"
     },
     {
       "id": "onboarding",
@@ -386,7 +386,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c51374a2db66499380a1fcd506f71c15ace34b97f6b151d005ffa8299b89db52"
+      "evidenceFingerprint": "sha256:25904a6c9cf866530055c32c4cf972821fab975c68a5aba1227253cdf2366a8b"
     },
     {
       "id": "draft-publish",
@@ -444,7 +444,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:da18d1bb320194097d85a85f73ccaf5ce51463d48c5f9a20cff03478df8df6e5"
+      "evidenceFingerprint": "sha256:09e60c6198b5ed19ee61fca747e2bdccca10047465f395c3b8ccec2438794845"
     },
     {
       "id": "recurring-shifts",
@@ -499,7 +499,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1f98ec9b2de4a7e8711f5bed8e99dedf3dfebd694cf99317b39b2e7f2fdc023c"
+      "evidenceFingerprint": "sha256:c0c97ba24a02b6e203994d424cc3400f533ce2be8a881b479a8ff24b0035eed1"
     },
     {
       "id": "realtime",
@@ -546,7 +546,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0b2044cb01e7a9c2a076fb85f6909e0933954501ab023b30796ff8c3e7042764"
+      "evidenceFingerprint": "sha256:76f5f9d21f616b4972bf3c3bc9e89b6ec1f8ba3d2df448e05a45cc099663f9bc"
     },
     {
       "id": "shift-requests",
@@ -616,7 +616,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9b32e3e0647aa72e067601bb79abc35159e5d13ac588a3457d81b26dfd1faf00"
+      "evidenceFingerprint": "sha256:66129c775648b4004977d5c7e5e1760f5508f4276bc194f7ef5aa1f8a63d5f00"
     },
     {
       "id": "dashboard",
@@ -845,7 +845,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6c65fd0f893d92978a5eedcad81eb2dfc85c8917b63429e77cc13e0ee39d111e"
+      "evidenceFingerprint": "sha256:bd0187088d7a4e1908461248aeec4d274048326f5cc4b4457716f32f39aee032"
     },
     {
       "id": "invitations",
@@ -1017,7 +1017,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c667a8f990b1be052ff645f1a41d58c261e01cf4b093e3c621e1525bcdb23576"
+      "evidenceFingerprint": "sha256:de6aebd2369409cf8942352010ea772d9a5ae0290f2ff6adabde1cbfe5465956"
     },
     {
       "id": "terminology",
@@ -1067,7 +1067,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0b65acaa9164a9164fe3d4908fe8af3df692bcc1709dbe169d3cf2dee26e56e6"
+      "evidenceFingerprint": "sha256:133ce68d52f2410159131f704cfb1bb7c36fee7c44a0a907de86c66b65f7a82f"
     },
     {
       "id": "roles",
@@ -1514,7 +1514,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f7d6dd7a8a43d41103b9b50c545cfda41f9ff4416f6f581b99e905287acec50c"
+      "evidenceFingerprint": "sha256:392ffcb1ceca7d8b935f4b78557b87410d5551f2c6bff831b58754534be51b56"
     },
     {
       "id": "security-sessions",
@@ -1710,7 +1710,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:27c0dc525670409d3550ffeb79a689a57364945ebbc9f3ea7c690f4e1842c6bc"
+      "evidenceFingerprint": "sha256:1e99937d11ac2ea9c64ead0b9747df7a96682f76f065bbe1fcec1805c896becc"
     },
     {
       "id": "roles-certifications-indicators",
@@ -1764,7 +1764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:161c506219f0579be3af16d8d14579655fbce72a6a16e6045be15f99af6a39d4"
+      "evidenceFingerprint": "sha256:b05f06fa1617cb01f8fa13ce632174ec1f644a729f1f025735139da0f2e0ed85"
     },
     {
       "id": "organization-activity-controls",
@@ -1932,7 +1932,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7b8046a075055abb9c1522c41decbb2894ae870c263062645a630a239240acb9"
+      "evidenceFingerprint": "sha256:2f6c9d7f252bd4bdd7345d82e14dd6af5791430d4ce4ae0a5164d1a5a6a2ff61"
     },
     {
       "id": "schedule-tools",
@@ -1984,7 +1984,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:56307530214111fedff52a20f6223f8c45a9c3f177c97d92bad6aebb250a8ca9"
+      "evidenceFingerprint": "sha256:1763d3d28efdac9e2e8d98cd64cc1dd5f1d4803518307f8a0533688f97d1adbf"
     },
     {
       "id": "coverage-open-shifts",
@@ -2035,7 +2035,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:cf05c1ac0acf9f45533a0f2a0fb6acc149754d23799220335f067fe20580ff59"
+      "evidenceFingerprint": "sha256:85d5238c90e001737e9759ea6f385f7c8a4e993f90b8dfeecc842c795585571f"
     },
     {
       "id": "mobile-schedule",
@@ -2148,7 +2148,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:fdc7c5e518801e912b2f643d6a0729a51c5c359575a02d3b30ae3d380882fe8b"
+      "evidenceFingerprint": "sha256:291e1d3ed7857b8d2350289d68c8b77db57db49de498272d75196daabb3415d8"
     }
   ],
   "surfaceExclusions": [

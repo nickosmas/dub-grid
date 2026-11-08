@@ -96,8 +96,16 @@ export default function ShiftPicker({
     },
     // Tiles always spell names out, whatever the grid shows.
     shiftDisplayMode: "name",
-    defaultShiftEnabled,
-  });
+  }).filter(
+    // With shifts without a job turned off, only the cell's own one stays, so it can be seen and kept.
+    (option) =>
+      defaultShiftEnabled ||
+      !option.isShiftOnly ||
+      currentAssignmentDefinitionIds.includes(option.assignmentId) ||
+      currentSegments.some(
+        (segment) => segment.shiftId === option.shiftId && segment.jobId === option.jobId,
+      ),
+  );
   const spokenLabelById = new Map(
     assignableOptions.map((option) => [
       option.id,
