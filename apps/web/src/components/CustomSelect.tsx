@@ -85,6 +85,7 @@ export default function CustomSelect<T extends string | number>({
     // to an ellipsis instead of pushing it past its neighbours.
     <div
       ref={ref}
+      className="dg-select"
       style={{
         display: "inline-block",
         verticalAlign: "middle",

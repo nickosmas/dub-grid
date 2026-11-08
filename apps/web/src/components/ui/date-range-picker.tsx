@@ -123,6 +123,7 @@ export default function DateRangePicker({
           the control run under its neighbour. */}
       <div
         ref={triggerRef}
+        className="dg-select"
         style={{ display: "inline-block", minWidth: 0, maxWidth: "100%", ...style }}
       >
         <Button

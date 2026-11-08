@@ -923,7 +923,7 @@ function Toolbar({
     <div
       role="toolbar"
       aria-label="Alerts"
-      className="dg-toolbar-type dg-field-raised"
+      className="dg-toolbar-type dg-field-raised dg-filter-row"
       style={{
         display: "flex",
         alignItems: "center",
@@ -999,7 +999,6 @@ function Toolbar({
         value={category}
         options={categoryOptions}
         onChange={onCategoryChange}
-        style={{ flex: "0 1 auto" }}
         fontSize="var(--dg-fs-navigation-item)"
         fontWeight="var(--dg-type-control-weight)"
         activeFontWeight="var(--dg-type-control-weight)"
@@ -1011,7 +1010,6 @@ function Toolbar({
         value={priority}
         options={priorityOptions}
         onChange={onPriorityChange}
-        style={{ flex: "0 1 auto" }}
         fontSize="var(--dg-fs-navigation-item)"
         fontWeight="var(--dg-type-control-weight)"
         activeFontWeight="var(--dg-type-control-weight)"

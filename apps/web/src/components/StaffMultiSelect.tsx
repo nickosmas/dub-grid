@@ -55,7 +55,11 @@ export default function StaffMultiSelect({
   };
 
   return (
-    <div ref={ref} style={{ display: "inline-block", minWidth: 0, maxWidth: "100%", ...style }}>
+    <div
+      ref={ref}
+      className="dg-select"
+      style={{ display: "inline-block", minWidth: 0, maxWidth: "100%", ...style }}
+    >
       <Button
         type="button"
         aria-label={ariaLabel}
