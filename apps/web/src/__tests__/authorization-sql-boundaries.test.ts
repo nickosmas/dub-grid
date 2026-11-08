@@ -63,6 +63,7 @@ const expectedAuthenticatedSecurityDefiners = [
   "start_impersonation",
   "start_trial_for_org",
   "switch_org",
+  "touch_web_session",
   "update_schedule_last_viewed",
   "update_series_all_shifts",
   "upsert_recurring_shift",
