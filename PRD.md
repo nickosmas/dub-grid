@@ -766,7 +766,7 @@ The `/settings` route hosts the organization configuration panels, grouped by `?
 
 - **General** - Organization Details (name, address, phone, employee count, timezone) and Labels (custom terminology)
 - **Staff designations** - Departments (two-type model, focus areas as children), Roles, Certifications
-- **Scheduling** - Shift Display Mode (preview kept fully visible and selectable at supported widths and zoom levels), Schedule Rules (conflict prevention, default shift), Shifts, Jobs, Absence Types, Coverage (minimum staffing per focus area, shift/job, and day), Indicators
+- **Scheduling** - Schedule Display (preview kept fully visible and selectable at supported widths and zoom levels), Schedule Rules (conflict prevention, default shift), Shifts, Jobs, Absence Types, Coverage (minimum staffing per focus area, shift/job, and day), Indicators
 - **Billing** - Subscription (Stripe, seats)
 - **Audit** - Activity Log (date-navigated, per-period stats)
 - **Danger Zone** - Delete Organization (behind fresh sensitive-action auth)
