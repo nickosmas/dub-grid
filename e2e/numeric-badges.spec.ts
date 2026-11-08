@@ -91,6 +91,15 @@ async function measureBadges(
 test("numeric badges keep one pill contract across values, themes, and zoom", async ({ page }) => {
   test.slow();
   await loginAsQaSuperAdmin(page);
+  // The seed leaves the inbox empty, so the header bell gets an unread count
+  // to draw on every route.
+  await page.route(
+    (url) => url.pathname === "/api/notifications" && url.search === "",
+    async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      await route.fulfill({ json: { notifications: [], unreadCount: 7 } });
+    },
+  );
 
   const failures: BadgeFailure[] = [];
   let measured = 0;
