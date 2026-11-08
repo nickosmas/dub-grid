@@ -138,9 +138,9 @@ export default function PrivacyPolicyPage() {
               you the appropriate features and data.
             </li>
             <li style={{ marginBottom: "8px" }}>
-              <strong>Organization data.</strong> For each organization (tenant), we store the
-              organization name, domain, and optional contact information such as address and phone
-              number that administrators may configure.
+              <strong>Organization data.</strong> For each organization, we store the organization
+              name, domain, and optional contact information such as address and phone number that
+              administrators may configure.
             </li>
             <li style={{ marginBottom: "8px" }}>
               <strong>Employee roster data.</strong> Organizations use DubGrid to manage staff
@@ -227,8 +227,8 @@ export default function PrivacyPolicyPage() {
               they are permitted to access.
             </li>
             <li style={{ marginBottom: "8px" }}>
-              Isolate each organization&apos;s data (multi-tenant isolation) so that one
-              organization cannot access another&apos;s data.
+              Isolate each organization&apos;s data so that one organization cannot access
+              another&apos;s data.
             </li>
             <li style={{ marginBottom: "8px" }}>
               Send transactional email such as invitations, email verification, password resets, and

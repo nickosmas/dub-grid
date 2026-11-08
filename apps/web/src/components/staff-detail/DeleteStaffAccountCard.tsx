@@ -72,7 +72,7 @@ export function DeleteStaffAccountCard({
   const message = !offboarded
     ? "Offboard them first. Their account can be deleted once they've left."
     : usedElsewhere
-      ? "This account is also used outside your organization, so it can't be deleted here."
+      ? "This account is also used outside your organization, so it can't be deleted."
       : "Deletes their account for good. Their staff record, shifts and history stay.";
 
   return (

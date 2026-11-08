@@ -1276,7 +1276,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "delete",
     headline: (d) => {
       const reason = d.text("reason");
-      return `Suspended the organization${reason ? ` — ${reason}` : ""}`;
+      return `Suspended the organization${reason ? `: ${reason}` : ""}`;
     },
     suppressKeys: ["reason"],
   },
@@ -1328,7 +1328,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     headline: (d, ctx) => {
       const target = who(d, ctx, "a team member");
       const reason = d.text("justification");
-      return `Started viewing the app as ${target}${reason ? ` — ${reason}` : ""}`;
+      return `Started viewing the app as ${target}${reason ? `: ${reason}` : ""}`;
     },
     suppressKeys: ["justification"],
   },
@@ -1360,7 +1360,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "update",
     headline: (d) => {
       const reason = d.text("reason");
-      return `Stopped viewing the app as another person${reason ? ` — ${reason}` : ""}`;
+      return `Stopped viewing the app as another person${reason ? `: ${reason}` : ""}`;
     },
     suppressKeys: ["reason"],
   },
