@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { loginAsQaSuperAdmin } from "./helpers/auth";
+import { loginAsQaSuperAdmin, QA_SUPER_ADMIN_EMAIL } from "./helpers/auth";
+import { ensureLocalUnreadAlert } from "./helpers/local-auth-state";
 
 /**
  * Every numeric count badge is one pill contract (feature 23a): the height is
@@ -90,16 +91,10 @@ async function measureBadges(
 
 test("numeric badges keep one pill contract across values, themes, and zoom", async ({ page }) => {
   test.slow();
+  // The seed leaves the inbox empty, and the Alerts page and the header bell
+  // only draw a count for an unread alert.
+  await ensureLocalUnreadAlert(QA_SUPER_ADMIN_EMAIL, "ardenwood");
   await loginAsQaSuperAdmin(page);
-  // The seed leaves the inbox empty, so the header bell gets an unread count
-  // to draw on every route.
-  await page.route(
-    (url) => url.pathname === "/api/notifications" && url.search === "",
-    async (route) => {
-      if (route.request().method() !== "GET") return route.continue();
-      await route.fulfill({ json: { notifications: [], unreadCount: 7 } });
-    },
-  );
 
   const failures: BadgeFailure[] = [];
   let measured = 0;
