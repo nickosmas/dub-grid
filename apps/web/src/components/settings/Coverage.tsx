@@ -19,7 +19,7 @@ import {
   resolveJobColorsForShift,
   resolveJobTimesForShift,
 } from "@/lib/job-placement";
-import { isDefaultShiftSystemJob, isRegularStaffSystemJob } from "@/lib/system-jobs";
+import { isRegularStaffSystemJob } from "@/lib/system-jobs";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { EmptyState } from "@/components/EmptyState";
@@ -259,25 +259,11 @@ function buildCoverageOptions(args: {
   orgRoles: NamedItem[];
   certifications: NamedItem[];
   shiftDisplayMode: ShiftDisplayMode;
-  defaultShiftEnabled?: boolean;
 }): AssignableShiftOption[] {
-  const {
-    focusAreas,
-    shiftCategories,
-    jobs,
-    orgRoles,
-    certifications,
-    shiftDisplayMode,
-    defaultShiftEnabled = true,
-  } = args;
+  const { focusAreas, shiftCategories, jobs, orgRoles, certifications, shiftDisplayMode } = args;
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const activeShifts = shiftCategories.filter((shift) => !shift.archivedAt);
-  const activeJobs = jobs.filter(
-    (job) =>
-      !job.archivedAt &&
-      !isRegularStaffSystemJob(job) &&
-      !(defaultShiftEnabled === false && isDefaultShiftSystemJob(job)),
-  );
+  const activeJobs = jobs.filter((job) => !job.archivedAt && !isRegularStaffSystemJob(job));
   const focusAreaNameById = new Map(
     activeFocusAreas.map((focusArea) => [focusArea.id, focusArea.name]),
   );
@@ -412,12 +398,15 @@ function CoverageOptionRow({
   onDraftChange,
   canEdit,
   isLast,
+  paused,
 }: {
   option: AssignableShiftOption;
   draft: CoverageDraft;
   onDraftChange: (draft: CoverageDraft) => void;
   canEdit: boolean;
   isLast?: boolean;
+  /** A shift without a job while they're turned off: it counts, and nobody new is scheduled on it. */
+  paused?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const panelId = React.useId();
@@ -465,6 +454,12 @@ function CoverageOptionRow({
           <div style={{ marginTop: 4 }}>
             <CoveragePreview draft={draft} />
           </div>
+          {paused && (
+            <div className="dg-type-metadata" style={{ marginTop: 4 }}>
+              Shifts without a job are off, so Auto-build won&apos;t fill this. It still counts
+              toward coverage.
+            </div>
+          )}
         </div>
         <ChevronDown
           size={16}
@@ -637,6 +632,7 @@ function FocusAreaCoverageCard({
   requirements,
   canEdit,
   onBatchSaved,
+  shiftsWithoutJobOff,
 }: {
   orgId: string;
   focusArea: FocusArea;
@@ -644,6 +640,7 @@ function FocusAreaCoverageCard({
   requirements: CoverageRequirement[];
   canEdit: boolean;
   onBatchSaved: (requirements: CoverageRequirement[]) => void;
+  shiftsWithoutJobOff: boolean;
 }) {
   const [saving, setSaving] = useState(false);
   // Edits whose save failed, kept through the resync that the saved ones cause.
@@ -800,6 +797,7 @@ function FocusAreaCoverageCard({
                       }
                       canEdit={canEdit}
                       isLast={optionIndex === section.options.length - 1}
+                      paused={shiftsWithoutJobOff && option.isShiftOnly}
                     />
                   ))}
                 </div>
@@ -873,13 +871,25 @@ export default function CoverageRequirementsSettings({
         orgRoles,
         certifications,
         shiftDisplayMode: "name",
-        defaultShiftEnabled,
       }),
-    [certifications, focusAreas, jobs, orgRoles, shiftCategories, defaultShiftEnabled],
+    [certifications, focusAreas, jobs, orgRoles, shiftCategories],
   );
+  // With shifts without a job turned off, one keeps its row only while it has
+  // a requirement, which still counts and can be set to 0.
   const coverageOptions = useMemo(
-    () => assignableOptions.filter(isCoverageTargetOption),
-    [assignableOptions],
+    () =>
+      assignableOptions.filter(
+        (option) =>
+          isCoverageTargetOption(option) &&
+          (defaultShiftEnabled ||
+            !option.isShiftOnly ||
+            coverageRequirements.some(
+              (requirement) =>
+                requirement.focusAreaId === option.focusAreaId &&
+                requirementMatchesOption(requirement, option),
+            )),
+      ),
+    [assignableOptions, coverageRequirements, defaultShiftEnabled],
   );
 
   const sectionsByFocusArea = useMemo(() => {
@@ -958,6 +968,7 @@ export default function CoverageRequirementsSettings({
           requirements={coverageRequirements}
           canEdit={canEdit}
           onBatchSaved={handleBatchSaved}
+          shiftsWithoutJobOff={!defaultShiftEnabled}
         />
       ))}
     </div>

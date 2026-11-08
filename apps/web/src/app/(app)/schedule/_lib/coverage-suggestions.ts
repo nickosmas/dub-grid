@@ -33,6 +33,7 @@ import type {
   ShiftRequest,
 } from "@/types";
 import { scheduleCellSnapshotToInput } from "@/lib/schedule-cells";
+import { jobIdTakesNewWork } from "@/lib/system-jobs";
 import { isEmployeeQualifiedForAssignmentDefinition } from "@/lib/assignable-shifts";
 import { checkCrossDateOverlap, timesOverlap } from "@/lib/schedule-logic";
 import { addDays, formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
@@ -86,6 +87,8 @@ export interface CoverageSuggestionAdapterInput {
    * on them; anyone else in `employees` who isn't active is not planned.
    */
   awayRanges?: ReadonlyMap<string, AwayRange>;
+  /** Settings > Jobs: when false, nobody is planned on a shift without a job. */
+  defaultShiftEnabled?: boolean;
 }
 
 /** The shift an assignment belongs to, for matching a preference. */
@@ -827,6 +830,7 @@ export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInp
     input.assignments.map((assignment) => [assignment.id, assignment]),
   );
   const employeeById = new Map(input.employees.map((employee) => [employee.id, employee]));
+  const takesNewWork = jobIdTakesNewWork(input.jobs, input.defaultShiftEnabled);
   const engine: CoverageSuggestionInput = {
     matrix: input.matrix,
     coverage: input.coverage,
@@ -847,6 +851,7 @@ export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInp
       return (
         employee != null &&
         assignment != null &&
+        takesNewWork(assignment.jobId) &&
         isEmployeeQualifiedForAssignmentDefinition(employee, {
           assignment,
           shiftCategories: input.shiftCategories,

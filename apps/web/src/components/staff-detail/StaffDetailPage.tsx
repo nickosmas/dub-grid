@@ -1640,6 +1640,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                               jobs,
                               focusAreas,
                               absenceTypes,
+                              defaultShiftEnabled: org?.defaultShiftEnabled,
                             }
                           : null
                       }
