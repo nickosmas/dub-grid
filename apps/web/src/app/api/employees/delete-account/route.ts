@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 const CONFIRMATION = "DELETE ACCOUNT";
 const USED_ELSEWHERE_MESSAGE =
-  "This account is also used outside your organization, so it can't be deleted here.";
+  "This account is also used outside your organization, so it can't be deleted.";
 
 const bodySchema = z.object({
   orgId: z.string().uuid(),

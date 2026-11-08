@@ -2530,8 +2530,7 @@ function JobRow({
                   title={`Archive "${form.name}"?`}
                   message={
                     <>
-                      <strong>{form.name}</strong> is currently{" "}
-                      {dependencyInfo!.summary.toLowerCase()}.{" "}
+                      <strong>{form.name}</strong> is {dependencyInfo!.summary.toLowerCase()}.{" "}
                       {"It stays on past schedules but can't be picked for anything new."}
                     </>
                   }

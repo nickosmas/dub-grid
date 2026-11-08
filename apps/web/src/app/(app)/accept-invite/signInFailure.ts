@@ -35,7 +35,7 @@ export function describeSignInFailure(error: SignInFailure, registerStatus: stri
   const httpStatus = typeof error.status === "number" ? error.status : null;
 
   if (httpStatus === 429 || error.code === "over_request_rate_limit") {
-    return "Too many attempts from here. Wait a minute, then try again.";
+    return "Too many attempts. Wait a minute, then try again.";
   }
 
   // A 5xx from GoTrue (the custom_access_token_hook or its DB connection

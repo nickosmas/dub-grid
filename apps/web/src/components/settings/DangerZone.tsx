@@ -139,7 +139,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
             points: [
               "Billing for the organization is canceled.",
               `Everyone in ${organization.name} loses access.`,
-              "This can't be undone from here.",
+              "This can't be undone.",
             ],
           }}
         />

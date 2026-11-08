@@ -315,7 +315,7 @@ export class MobileNameMismatchError extends Error {
 
   constructor(
     public readonly details: MobileNameMismatchDetails,
-    message = "The user account name does not match the employee record.",
+    message = "The name on the account doesn't match the employee record.",
   ) {
     super(message);
     this.name = "MobileNameMismatchError";
