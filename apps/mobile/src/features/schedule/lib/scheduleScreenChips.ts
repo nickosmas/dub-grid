@@ -204,9 +204,18 @@ export function describeScheduleEntryChanges(entry: MobileScheduleEntry): string
   }
 
   const currentSegments = getScheduleEntrySegments(entry);
+  // Two of the day's shifts can share a name across focus areas.
+  const currentTitle = (segment: MobileScheduleEntrySegment) => {
+    const title = getScheduleSegmentTitle(segment);
+    const area = segment.shiftId === null ? null : segment.displayFocusAreaName?.trim();
+    const shared = currentSegments.some(
+      (other) => other !== segment && getScheduleSegmentTitle(other) === title,
+    );
+    return shared && area ? `${title} in ${area}` : title;
+  };
   if (change.kind === "new") {
     return change.isNewAddition
-      ? currentSegments.map((segment) => `Added ${getScheduleSegmentTitle(segment)}`)
+      ? currentSegments.map((segment) => `Added ${currentTitle(segment)}`)
       : [];
   }
   if (change.kind === "deleted") {
@@ -221,12 +230,12 @@ export function describeScheduleEntryChanges(entry: MobileScheduleEntry): string
     const segmentChange = getScheduleEntrySegmentChange(entry, segment);
     if (!segmentChange) continue;
     if (segmentChange.kind === "new") {
-      lines.push(`Added ${getScheduleSegmentTitle(segment)}`);
+      lines.push(`Added ${currentTitle(segment)}`);
       continue;
     }
     if (segmentChange.previousSegment) {
       lines.push(
-        `${getScheduleSegmentTitle(segment)} was ${summariseScheduleSegment(segmentChange.previousSegment)}`,
+        `${currentTitle(segment)} was ${summariseScheduleSegment(segmentChange.previousSegment)}`,
       );
     }
     for (const removed of segmentChange.removedSegments ?? []) {

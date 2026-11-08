@@ -516,20 +516,36 @@ function joinAssignmentText(
     .join(" / ");
 }
 
+/**
+ * Each shift once, by id: two jobs on one shift name it once, while two
+ * focus areas' shifts that share a name each say where.
+ */
 function joinShiftNames(
   shiftIds: Array<number | null>,
   jobIds: number[],
   assignmentDetailsByPair: Map<string, MobileAssignmentDetails>,
+  focusAreaNameMap: Map<number, string>,
 ): string {
-  const names = jobIds
-    .map(
-      (jobId, index) =>
-        getAssignmentDetailsForPair(assignmentDetailsByPair, shiftIds[index] ?? null, jobId)
-          ?.shiftName ?? "?",
-    )
-    .filter((name, index, values) => values.indexOf(name) === index);
-
-  return names.join(" / ");
+  const shifts = jobIds.map((jobId, index) => {
+    const shiftId = shiftIds[index] ?? null;
+    const details = getAssignmentDetailsForPair(assignmentDetailsByPair, shiftId, jobId);
+    return {
+      key: shiftId != null ? `shift:${shiftId}` : `name:${details?.shiftName ?? "?"}`,
+      name: details?.shiftName ?? "?",
+      focusAreaId: shiftId != null ? (details?.focusAreaId ?? null) : null,
+    };
+  });
+  const distinct = shifts.filter(
+    (shift, index) => shifts.findIndex((other) => other.key === shift.key) === index,
+  );
+  return distinct
+    .map((shift) => {
+      const shared = distinct.some((other) => other !== shift && other.name === shift.name);
+      const area =
+        shared && shift.focusAreaId != null ? focusAreaNameMap.get(shift.focusAreaId) : undefined;
+      return area ? `${shift.name} (${area})` : shift.name;
+    })
+    .join(" / ");
 }
 
 function splitPipeParts(value: string | null | undefined): string[] {
@@ -695,7 +711,12 @@ function buildMobileShiftRequestSegments(input: {
       shiftIds[index] ?? null,
       jobId,
     );
-    const focusAreaId = input.focusAreaId ?? assignmentDetails?.focusAreaId ?? null;
+    // A shift's own focus area, as schedule entries take it; the request's
+    // area stands in only for work without a shift.
+    const focusAreaId =
+      shiftIds[index] != null
+        ? (assignmentDetails?.focusAreaId ?? input.focusAreaId ?? null)
+        : (input.focusAreaId ?? null);
 
     return {
       shiftId: shiftIds[index] ?? null,
@@ -1071,7 +1092,7 @@ export async function fetchMobileScheduleEntries(
       const shiftName =
         absenceTypeId != null
           ? (absence?.name ?? absence?.label ?? "Off")
-          : joinShiftNames(shiftIds, jobIds, assignmentDetailsByPair);
+          : joinShiftNames(shiftIds, jobIds, assignmentDetailsByPair, focusAreaNameMap);
       const startTime =
         absenceTypeId != null
           ? null

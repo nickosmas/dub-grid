@@ -11,14 +11,25 @@ vi.mock("@/lib/published-shifts", async (importOriginal) => ({
 
 import { renderPublishedEmployeeCalendar } from "./calendar-feed";
 
-function makeClient(absenceTypes: Array<{ id: number; label: string }> = []) {
-  const result = { data: absenceTypes, error: null };
-  const builder = {
-    select: vi.fn(() => builder),
-    eq: vi.fn(() => builder),
-    is: vi.fn(() => Promise.resolve(result)),
+function makeClient(
+  absenceTypes: Array<{ id: number; label: string }> = [],
+  tables: Record<string, Array<Record<string, unknown>>> = {},
+) {
+  const builderFor = (rows: Array<Record<string, unknown>>) => {
+    const result = { data: rows, error: null };
+    const builder = {
+      select: vi.fn(() => builder),
+      eq: vi.fn(() => builder),
+      is: vi.fn(() => Promise.resolve(result)),
+      then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
+    };
+    return builder;
   };
-  return { from: vi.fn(() => builder) };
+  return {
+    from: vi.fn((table: string) =>
+      builderFor(table === "absence_types" ? absenceTypes : (tables[table] ?? [])),
+    ),
+  };
 }
 
 beforeEach(() => {
@@ -166,5 +177,41 @@ describe("renderPublishedEmployeeCalendar", () => {
     expect(result).toContain("DTSTART;TZID=America/Los_Angeles:20260903T070000");
     expect(result).toContain("DTEND;TZID=America/Los_Angeles:20260903T110000");
     expect(result).not.toContain("DTSTART;VALUE=DATE:20260903");
+  });
+
+  it("names the shift's focus area, since two areas can share a shift's name", async () => {
+    fetchPublishedShiftRows.mockResolvedValue([
+      {
+        emp_id: "employee-1",
+        date: "2026-09-03",
+        resolvedAssignmentIds: [],
+        resolvedSegments: [
+          { shiftId: 1, jobId: 2, label: "Day Shift", startTime: "07:00", endTime: "15:00" },
+        ],
+        published_absence_type_id: null,
+        published_custom_start_time: null,
+        published_custom_end_time: null,
+      },
+    ]);
+
+    const result = await renderPublishedEmployeeCalendar(
+      makeClient([], {
+        shift_categories: [{ id: 1, focus_area_id: 10 }],
+        focus_areas: [{ id: 10, name: "East Wing" }],
+      }) as never,
+      {
+        id: "employee-1",
+        orgId: "org-1",
+        userId: "user-1",
+        firstName: "Avery",
+        lastName: "Stone",
+        timeZone: "America/Los_Angeles",
+      },
+      12,
+      new Date("2026-09-01T12:00:00.000Z"),
+    );
+
+    expect(result).toContain("SUMMARY:Day Shift · East Wing (DubGrid)");
+    expect(result).toContain("LOCATION:East Wing");
   });
 });

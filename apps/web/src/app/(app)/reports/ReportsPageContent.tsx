@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { capitalizeFirst, pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import type { CSSProperties, ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
@@ -819,24 +819,32 @@ function ReportsContent() {
                   {shiftCategoryOptions.length === 0 ? (
                     <div style={targetEmptyStyle}>No shift categories</div>
                   ) : (
-                    shiftCategoryOptions.map((option) => {
+                    shiftCategoryOptions.map((option, index) => {
                       const id = Number(option.id);
+                      const startsGroup =
+                        option.focusArea != null &&
+                        option.focusArea !== shiftCategoryOptions[index - 1]?.focusArea;
                       return (
-                        <label key={option.id} style={targetCheckStyle}>
-                          <input
-                            checked={selectedShiftCategoryIds.includes(id)}
-                            onChange={(event) => {
-                              resetAppliedReport();
-                              setSelectedShiftCategoryIds((current) =>
-                                event.target.checked
-                                  ? [...current, id]
-                                  : current.filter((value) => value !== id),
-                              );
-                            }}
-                            type="checkbox"
-                          />
-                          {option.label}
-                        </label>
+                        <Fragment key={option.id}>
+                          {startsGroup ? (
+                            <div style={targetGroupHeadingStyle}>{option.focusArea}</div>
+                          ) : null}
+                          <label style={targetCheckStyle}>
+                            <input
+                              checked={selectedShiftCategoryIds.includes(id)}
+                              onChange={(event) => {
+                                resetAppliedReport();
+                                setSelectedShiftCategoryIds((current) =>
+                                  event.target.checked
+                                    ? [...current, id]
+                                    : current.filter((value) => value !== id),
+                                );
+                              }}
+                              type="checkbox"
+                            />
+                            {option.label}
+                          </label>
+                        </Fragment>
                       );
                     })
                   )}
@@ -1182,6 +1190,13 @@ const targetCheckStyle: CSSProperties = {
   alignItems: "center",
   gap: 8,
   fontSize: "var(--dg-fs-body)",
+};
+
+const targetGroupHeadingStyle: CSSProperties = {
+  color: "var(--dg-color-text-muted)",
+  fontSize: "var(--dg-fs-caption)",
+  fontWeight: 600,
+  paddingTop: 4,
 };
 
 const targetEmptyStyle: CSSProperties = {

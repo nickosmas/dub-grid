@@ -172,6 +172,9 @@ import {
   singularLabelNoun,
   DEFAULT_ORGANIZATION_LABELS,
   orderFocusAreasByDepartment,
+  shiftDisplayNamesById,
+  capitalizeFirst,
+  pluralLabelNoun,
 } from "@dubgrid/domain";
 import { planAbsenceRunRemoval } from "./_lib/absence-run-removal";
 import type { ScheduleBuildState } from "@/components/coverage-check/ScheduleBuildSection";
@@ -255,7 +258,7 @@ import {
   computeOutOfWindowDraftGroups,
   countShiftsAddedToPublishedCell,
 } from "@/lib/draft-utils";
-import { exportScheduleCSV, withRestOfDayAbsence } from "@/lib/export-csv";
+import { exportScheduleCSV, withOtherFocusAreas, withRestOfDayAbsence } from "@/lib/export-csv";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
 import {
   getScheduleStartForSpan,
@@ -3166,8 +3169,24 @@ function SchedulerContent({
       const restOfDayAbsenceTypeId = published
         ? (entry.publishedRestOfDayAbsenceTypeId ?? null)
         : (entry.restOfDayAbsenceTypeId ?? null);
+      // Two focus areas can share a shift's name, so work outside the person's
+      // own areas names its area, as the grid marks it.
+      const ownFocusAreaIds =
+        employees.find((employee) => employee.id === empId)?.focusAreaIds ?? [];
+      const otherFocusAreas = [
+        ...new Set(
+          ((published ? entry.publishedSegments : entry.segments) ?? []).flatMap((segment) => {
+            const focusAreaId = shiftCategories.find(
+              (shift) => shift.id === segment.shiftId,
+            )?.focusAreaId;
+            return focusAreaId != null && !ownFocusAreaIds.includes(focusAreaId)
+              ? [focusAreaNameById.get(focusAreaId) ?? ""]
+              : [];
+          }),
+        ),
+      ].filter(Boolean);
       return withRestOfDayAbsence(
-        text,
+        withOtherFocusAreas(text, otherFocusAreas),
         restOfDayAbsenceTypeId != null ? absenceTypeMap.get(restOfDayAbsenceTypeId) : undefined,
         entryAbsenceSpan(
           published
@@ -3188,7 +3207,7 @@ function SchedulerContent({
         ),
       );
     },
-    [absenceTypeMap, shiftNameForKey, shifts],
+    [absenceTypeMap, employees, focusAreaNameById, shiftCategories, shiftNameForKey, shifts],
   );
 
   const getAbsenceTypeIdForKey = useCallback(
@@ -4997,8 +5016,14 @@ function SchedulerContent({
       const general = assignments.find((t) => matchesType(t) && t.focusAreaId == null);
       if (general) return general;
       // 3. Cross-area code — belongs to another focus area; use its own colors.
-      const crossArea = assignments.find((t) => matchesType(t));
-      if (crossArea) return crossArea;
+      // Only when one area has it: two areas' shared label can't be told apart.
+      const crossArea = assignments.filter((t) => matchesType(t));
+      if (
+        crossArea.length > 0 &&
+        crossArea.every((t) => t.focusAreaId === crossArea[0].focusAreaId)
+      ) {
+        return crossArea[0];
+      }
       // 4. Fallback
       return {
         id: 0,
@@ -6684,32 +6709,35 @@ function SchedulerContent({
 
   // The staffing list has room to name every shift's job, even jobs the grid
   // hides, and to spell out absences rather than show their codes.
-  const staffingAssignmentLabelById = useMemo(
-    () =>
-      new Map(
-        allAssignmentDefinitions.map((assignment) => {
-          const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
-          const shift =
-            shiftId != null ? (shiftCategories.find((item) => item.id === shiftId) ?? null) : null;
-          const job =
-            assignment.jobId != null
-              ? (jobs.find((item) => item.id === assignment.jobId) ?? null)
-              : null;
-          const parts = buildShiftDisplayParts({
-            shift,
-            job,
-            assignment,
-            shiftDisplayMode: "name",
-          });
-          const withJob =
-            !parts.secondaryLabel && shift && job && !parts.isShiftOnly
-              ? { ...parts, secondaryLabel: job.name }
-              : parts;
-          return [assignment.id, formatAssignableShiftOptionLabel(withJob)];
-        }),
-      ),
-    [allAssignmentDefinitions, jobs, shiftCategories],
-  );
+  const staffingAssignmentLabelById = useMemo(() => {
+    // Someone's other work can be in another focus area under the same name.
+    const shiftLabelById = shiftDisplayNamesById(shiftCategories, focusAreas);
+    return new Map(
+      allAssignmentDefinitions.map((assignment) => {
+        const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
+        const category =
+          shiftId != null ? (shiftCategories.find((item) => item.id === shiftId) ?? null) : null;
+        const shift = category
+          ? { ...category, name: shiftLabelById.get(category.id) ?? category.name }
+          : null;
+        const job =
+          assignment.jobId != null
+            ? (jobs.find((item) => item.id === assignment.jobId) ?? null)
+            : null;
+        const parts = buildShiftDisplayParts({
+          shift,
+          job,
+          assignment,
+          shiftDisplayMode: "name",
+        });
+        const withJob =
+          !parts.secondaryLabel && shift && job && !parts.isShiftOnly
+            ? { ...parts, secondaryLabel: job.name }
+            : parts;
+        return [assignment.id, formatAssignableShiftOptionLabel(withJob)];
+      }),
+    );
+  }, [allAssignmentDefinitions, focusAreas, jobs, shiftCategories]);
   const staffingAbsenceLabelById = useMemo(
     () =>
       new Map(
@@ -9028,7 +9056,15 @@ function SchedulerContent({
                   // export; this client-side one was handing the same roster to
                   // anyone with the page open.
                   canEditShifts && dates.length > 0 && filteredEmployees.length > 0
-                    ? () => exportScheduleCSV(filteredEmployees, dates, scheduleCsvTextForKey)
+                    ? () =>
+                        exportScheduleCSV(filteredEmployees, dates, scheduleCsvTextForKey, {
+                          focusAreaColumn: capitalizeFirst(
+                            pluralLabelNoun(
+                              org?.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea,
+                            ),
+                          ),
+                          focusAreaNameById,
+                        })
                     : undefined
                 }
                 presenceSlot={
@@ -9940,6 +9976,7 @@ function SchedulerContent({
 
           <PrintLegend
             assignments={assignments}
+            focusAreas={focusAreas}
             shiftDisplayMode={org?.shiftDisplayMode}
             indicators={printedIndicatorTypes}
           />

@@ -125,6 +125,21 @@ describe("a change whose details the organization hides (46f)", () => {
   });
 });
 
+describe("describeScheduleEntryChanges with two shifts of one name", () => {
+  it("names the focus area of each", () => {
+    const otherDay = { ...day, shiftId: 9, displayFocusAreaName: "Memory Care" };
+    const added = entry([day, otherDay], {
+      kind: "new",
+      isNewAddition: true,
+      previousPresentation: null,
+    });
+    expect(describeScheduleEntryChanges(added)).toEqual([
+      "Added Day Shift in Skilled Nursing",
+      "Added Day Shift in Memory Care",
+    ]);
+  });
+});
+
 describe("getScheduleEntrySegmentChange", () => {
   it("passes a new, deleted, or absent change through unchanged", () => {
     const newChange: MobileScheduleEntry["change"] = {

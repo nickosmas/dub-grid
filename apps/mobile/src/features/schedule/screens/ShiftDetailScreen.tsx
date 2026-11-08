@@ -1918,9 +1918,9 @@ function PreviousShiftFooter({
             <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.previousShiftChangeLabel}>
               What changed
             </Text>
-            {changeLines.map((line) => (
+            {changeLines.map((line, index) => (
               <Text
-                key={line}
+                key={`${index}-${line}`}
                 maxFontSizeMultiplier={MAX_FONT_SCALE}
                 style={styles.previousShiftChangeLine}
               >
@@ -2541,7 +2541,11 @@ function SwapOptionCard({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const optionLabel = segmentIndex != null ? getActionSegmentLabel(entry, segmentIndex) : null;
+  // Other people's shifts, from any focus area.
+  const optionLabel =
+    segmentIndex != null
+      ? getActionSegmentLabel(entry, segmentIndex, { alwaysNameFocusArea: true })
+      : null;
 
   return (
     <PressableRow

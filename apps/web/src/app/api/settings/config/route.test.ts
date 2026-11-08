@@ -407,7 +407,10 @@ describe("batch saves", () => {
   type Failures = { name?: string; rpcFocusAreaId?: number; coverageJobId?: number };
 
   /** Records writes; a row named `failures.name` (or a matching rpc or coverage job) is refused. */
-  function batchClient(failures: Failures = {}) {
+  function batchClient(
+    failures: Failures = {},
+    focusAreaRows: Array<{ id: number; name: string }> = [],
+  ) {
     const audits: Array<Record<string, unknown>> = [];
     const writes: Array<{ table: string; op: string; payload: unknown }> = [];
     let nextId = 100;
@@ -458,7 +461,7 @@ describe("batch saves", () => {
           return resolve(
             refused
               ? { data: null, error: { message: "boom" } }
-              : { data: [], count: 0, error: null },
+              : { data: table === "focus_areas" ? focusAreaRows : [], count: 0, error: null },
           );
         };
         return chain;
@@ -485,8 +488,12 @@ describe("batch saves", () => {
     return res;
   }
 
-  async function post(body: Record<string, unknown>, failures: Failures = {}) {
-    const recorded = batchClient(failures);
+  async function post(
+    body: Record<string, unknown>,
+    failures: Failures = {},
+    focusAreaRows: Array<{ id: number; name: string }> = [],
+  ) {
+    const recorded = batchClient(failures, focusAreaRows);
     getServiceClient.mockReturnValue(recorded.client);
     requireOrgPermissions.mockResolvedValue({
       actor: { id: "actor-1", email: "a@example.com" },
@@ -620,6 +627,15 @@ describe("batch saves", () => {
       expect(audits.map((audit) => [audit.action, audit.details])).toEqual([
         ["shift_category.upserted", { name: "Day" }],
         ["shift_category.upserted", { name: "Night" }],
+      ]);
+    });
+
+    it("records each shift's focus area, since two areas can share a shift's name", async () => {
+      const { audits } = await post({ action: "saveShiftCategories", items: [shift("Day")] }, {}, [
+        { id: 1, name: "East Wing" },
+      ]);
+      expect(audits.map((audit) => audit.details)).toEqual([
+        { name: "Day", focusAreaName: "East Wing" },
       ]);
     });
 

@@ -718,7 +718,12 @@ export default function MobileDayView({
               >
                 {Object.entries(tallies).map(([catId, tally]) =>
                   Object.entries(tally).map(([label, count]) => {
-                    const sc = assignments.find((s) => s.label === label || s.name === label);
+                    const matches = (s: AssignmentDefinition) =>
+                      s.label === label || s.name === label;
+                    // Two focus areas can share a label; the tally's shift category tells them apart.
+                    const sc =
+                      assignments.find((s) => String(s.categoryId) === catId && matches(s)) ??
+                      assignments.find(matches);
                     const displayLabel = isNameMode && sc ? sc.name || sc.label : label;
                     return (
                       <MaybeHint

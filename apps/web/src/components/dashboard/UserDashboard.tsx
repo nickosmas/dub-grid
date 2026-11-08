@@ -981,7 +981,7 @@ function getPreviousChangeSummary(input: {
   change: PublishChange | null;
   focusAreaById: Map<number, FocusArea>;
   jobById: Map<number, JobDefinition>;
-  shiftById: Map<number, { abbr?: string | null; name: string }>;
+  shiftById: Map<number, { abbr?: string | null; name: string; focusAreaId?: number | null }>;
 }): string | null {
   const change = input.change;
   if (!change || change.kind === "new") return null;
@@ -1014,7 +1014,11 @@ function getPreviousChangeSummary(input: {
   const stateSummaries = previousSegments.map((segment) => {
     const shift = segment.shiftId != null ? (input.shiftById.get(segment.shiftId) ?? null) : null;
     const job = segment.jobId != null ? (input.jobById.get(segment.jobId) ?? null) : null;
-    return shift?.name ?? job?.name ?? "Shift";
+    // Named as the assignment summaries above are: the focus area follows.
+    const area =
+      shift?.focusAreaId != null ? input.focusAreaById.get(shift.focusAreaId)?.name : undefined;
+    const name = shift?.name ?? job?.name ?? "Shift";
+    return area ? `${name} · ${area}` : name;
   });
   return stateSummaries.length > 0 ? withRestOfDay(stateSummaries) : null;
 }
@@ -1132,6 +1136,7 @@ function buildWorkedSegment(input: {
     findShiftByDisplayLabel({
       rawLabel: rawShiftLabel,
       shiftAbbr: input.rawSegment.shiftAbbr ?? null,
+      focusAreaId,
       shiftById: input.shiftById,
     });
   const shiftName = input.rawSegment.shiftName ?? shift?.name ?? null;
@@ -1363,15 +1368,22 @@ function getLabelSuffixAfterShiftCode(rawLabel: string, shiftAbbr?: string | nul
     .trim();
 }
 
-function findShiftByDisplayLabel(input: {
+export function findShiftByDisplayLabel(input: {
   rawLabel: string | null;
   shiftAbbr: string | null;
-  shiftById: Map<number, { abbr?: string | null; name: string }>;
+  focusAreaId: number | null;
+  shiftById: Map<number, { abbr?: string | null; name: string; focusAreaId?: number | null }>;
 }): { abbr?: string | null; name: string } | null {
   const rawLabel = input.rawLabel?.trim() ?? "";
   const shiftAbbr = input.shiftAbbr?.trim() ?? "";
+  // Focus areas can share a name or code, so the segment's own area wins a tie.
+  const shifts = [...input.shiftById.values()].sort(
+    (left, right) =>
+      Number(right.focusAreaId === input.focusAreaId) -
+      Number(left.focusAreaId === input.focusAreaId),
+  );
 
-  for (const shift of input.shiftById.values()) {
+  for (const shift of shifts) {
     if (shiftAbbr && labelsEqual(shift.abbr, shiftAbbr)) {
       return shift;
     }
@@ -1381,7 +1393,7 @@ function findShiftByDisplayLabel(input: {
     return null;
   }
 
-  for (const shift of input.shiftById.values()) {
+  for (const shift of shifts) {
     if (labelsEqual(rawLabel, shift.name)) {
       return shift;
     }

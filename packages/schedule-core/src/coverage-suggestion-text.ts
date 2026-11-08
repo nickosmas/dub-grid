@@ -10,6 +10,8 @@ export interface CoverageSuggestionTextLookups {
   absenceName: (absenceTypeId: number) => string;
   /** A requirement row as the matrix names it, "Skilled Nursing · Day Shift · Med Aide". */
   rowLabel: (rowKey: string) => string | null;
+  /** The row's focus area, so work elsewhere can be named with its own. */
+  rowFocusAreaId?: (rowKey: string) => number | null;
   /** The shared short date, "Sat, Oct 24". */
   formatDate: (dateKey: string) => string;
 }
@@ -180,7 +182,13 @@ function reasonText(entry: CoverageRuledOut, lookups: CoverageSuggestionTextLook
     case "restOfDayAbsence":
       return `${lookups.absenceName(reason.absenceTypeId)} for part of the day`;
     case "overlap": {
-      const shift = lookups.assignmentName(reason.assignmentId);
+      const rowFocusAreaId =
+        lookups.rowFocusAreaId?.(entry.rowKey) ??
+        lookups.assignmentFocusAreaId(reason.assignmentId);
+      const shift =
+        rowFocusAreaId == null
+          ? lookups.assignmentName(reason.assignmentId)
+          : describeWork(lookups, [reason.assignmentId], rowFocusAreaId);
       if (reason.dateKey === entry.dateKey) return `works ${shift} that day, which overlaps`;
       const date = lookups.formatDate(reason.dateKey);
       return reason.dateKey < entry.dateKey
