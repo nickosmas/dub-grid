@@ -192,7 +192,7 @@ export function PersonActivityTimeline({
                 {searchQuery && <SearchClearButton onClear={() => setSearchQuery("")} />}
               </div>
               <CustomSelect
-                style={{ flex: "1 1 auto" }}
+                style={{ flex: "0 1 auto" }}
                 value={categoryFilter}
                 options={categoryOptions}
                 onChange={setCategoryFilter}
@@ -204,7 +204,7 @@ export function PersonActivityTimeline({
               />
               {organizations ? (
                 <CustomSelect
-                  style={{ flex: "1 1 auto" }}
+                  style={{ flex: "0 1 auto" }}
                   value={organizationFilter}
                   options={[{ value: "all", label: "All organizations" }, ...organizations]}
                   onChange={setOrganizationFilter}

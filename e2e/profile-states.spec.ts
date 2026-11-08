@@ -55,34 +55,38 @@ test.describe("profile states", () => {
     await expect(tryAgain).toHaveCount(0);
   });
 
-  // Account holds what the sidebar's sections used to, under one heading each,
-  // and an old ?section= link opens Account at its heading.
-  const ACCOUNT_MARKERS: Record<string, string> = {
+  // Each setting has a tab of its own, and an old ?section= link opens it.
+  const SECTION_MARKERS: Record<string, string> = {
     profile: "Your details",
-    security: "Sign-in and security",
+    security: "Password and two-factor",
     notifications: "Alerts",
     "data-privacy": "Data and privacy",
   };
 
-  test("keeps every account section under Account, where old links land", async ({ page }) => {
+  test("opens each settings tab from its old section link", async ({ page }) => {
     test.setTimeout(120_000);
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
     await page.waitForLoadState("networkidle");
 
-    for (const [section, heading] of Object.entries(ACCOUNT_MARKERS)) {
+    for (const [section, heading] of Object.entries(SECTION_MARKERS)) {
       await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile?section=${section}`);
       await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible({
         timeout: 15_000,
       });
-      for (const other of Object.values(ACCOUNT_MARKERS)) {
-        await expect(page.getByRole("heading", { name: other, exact: true })).toHaveCount(1);
+      for (const other of Object.values(SECTION_MARKERS).filter((name) => name !== heading)) {
+        await expect(page.getByRole("heading", { name: other, exact: true })).toHaveCount(0);
       }
     }
-    await expect(page.getByText("Product updates").first()).toBeVisible();
+    await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile?tab=alerts`);
+    await expect(page.getByText("Product updates").first()).toBeVisible({ timeout: 15_000 });
+    await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile?tab=security`);
+    await expect(page.getByRole("heading", { name: "Devices", exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Account comes first and is where a plain /profile opens.
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile`);
-    await expect(page.getByRole("heading", { name: "Sign-in and security" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Your details" })).toBeVisible({
       timeout: 15_000,
     });
   });

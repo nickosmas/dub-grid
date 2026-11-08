@@ -1,35 +1,31 @@
 // The tabs of /profile, and where an older ?section= link lands now that the
-// settings sidebar is gone.
+// settings that sat under Account have tabs of their own.
 
-export type ProfileTab = "account" | "schedule";
+export type ProfileTab = "account" | "schedule" | "alerts" | "security" | "privacy";
 
-/** The headings inside Account, which old links scroll to. */
-export type ProfileAccountSection = "details" | "security" | "notifications" | "data-privacy";
-
-const ACCOUNT_SECTIONS: Record<string, ProfileAccountSection> = {
-  profile: "details",
-  details: "details",
+const SECTION_TABS: Record<string, ProfileTab> = {
+  profile: "account",
+  details: "account",
+  overview: "schedule",
   security: "security",
-  notifications: "notifications",
-  "data-privacy": "data-privacy",
+  notifications: "alerts",
+  "data-privacy": "privacy",
 };
 
 export function availableProfileTabs(ctx: {
   hasStaffRecord: boolean;
   isOnSchedule: boolean;
 }): ProfileTab[] {
-  return ctx.hasStaffRecord && ctx.isOnSchedule ? ["account", "schedule"] : ["account"];
+  const schedule: ProfileTab[] = ctx.hasStaffRecord && ctx.isOnSchedule ? ["schedule"] : [];
+  return ["account", ...schedule, "alerts", "security", "privacy"];
 }
 
-/** The tab and Account heading a `?tab=` or `?section=` link means for this viewer. */
+/** The tab a `?tab=` or older `?section=` link means for this viewer. */
 export function resolveProfileLink(
   params: { tab: string | null; section: string | null },
   tabs: readonly ProfileTab[],
-): { tab: ProfileTab; section: ProfileAccountSection | null } {
-  const section = params.section ? ACCOUNT_SECTIONS[params.section] : undefined;
-  if (section) return { tab: "account", section };
+): ProfileTab {
   const asked = params.tab ?? params.section;
-  const wanted = asked === "overview" ? "schedule" : asked;
-  const tab = tabs.find((candidate) => candidate === wanted) ?? tabs[0];
-  return { tab, section: null };
+  const wanted = asked ? (SECTION_TABS[asked] ?? asked) : null;
+  return tabs.find((candidate) => candidate === wanted) ?? tabs[0];
 }

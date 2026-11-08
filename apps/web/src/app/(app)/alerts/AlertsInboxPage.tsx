@@ -999,7 +999,7 @@ function Toolbar({
         value={category}
         options={categoryOptions}
         onChange={onCategoryChange}
-        style={{ flex: "1 1 auto" }}
+        style={{ flex: "0 1 auto" }}
         fontSize="var(--dg-fs-navigation-item)"
         fontWeight="var(--dg-type-control-weight)"
         activeFontWeight="var(--dg-type-control-weight)"
@@ -1011,7 +1011,7 @@ function Toolbar({
         value={priority}
         options={priorityOptions}
         onChange={onPriorityChange}
-        style={{ flex: "1 1 auto" }}
+        style={{ flex: "0 1 auto" }}
         fontSize="var(--dg-fs-navigation-item)"
         fontWeight="var(--dg-type-control-weight)"
         activeFontWeight="var(--dg-type-control-weight)"

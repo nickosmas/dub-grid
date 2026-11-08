@@ -55,7 +55,7 @@ export default function StaffMultiSelect({
   };
 
   return (
-    <div ref={ref} style={{ display: "inline-block", ...style }}>
+    <div ref={ref} style={{ display: "inline-block", minWidth: 0, maxWidth: "100%", ...style }}>
       <Button
         type="button"
         aria-label={ariaLabel}
@@ -84,7 +84,9 @@ export default function StaffMultiSelect({
           borderColor: open ? "var(--dg-color-border-focus)" : "var(--dg-color-border)",
         }}
       >
-        <span style={{ flex: 1, minWidth: 0 }}>{label}</span>
+        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+          {label}
+        </span>
         <ChevronDown
           size={12}
           strokeWidth={2.5}
@@ -155,6 +157,7 @@ export default function StaffMultiSelect({
                       role="option"
                       aria-selected={isChecked}
                       className="dg-menu-item"
+                      title={option.name}
                       onClick={() => toggle(option.id)}
                       style={{
                         width: "100%",
@@ -181,16 +184,7 @@ export default function StaffMultiSelect({
                           <Check size={11} strokeWidth={3} color="var(--dg-color-text-inverse)" />
                         ) : null}
                       </span>
-                      <span
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {option.name}
-                      </span>
+                      <span className="dg-menu-item-label">{option.name}</span>
                     </Button>
                   );
                 })
