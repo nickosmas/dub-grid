@@ -633,8 +633,12 @@ export async function applyStatusChange(
       update.suspended_at = now;
       update.suspended_by = actor.id;
       update.suspended_until = returnDate;
+      update.status_note = note ?? "";
       auditAction = "employee.suspended";
-      auditDetails = returnDate ? { suspendedUntil: returnDate } : {};
+      auditDetails = {
+        ...(returnDate ? { suspendedUntil: returnDate } : {}),
+        ...(note ? { note } : {}),
+      };
       break;
     case "setSuspendedUntil":
       update.suspended_until = returnDate;
@@ -647,6 +651,7 @@ export async function applyStatusChange(
     case "reinstate":
       update.suspended_at = null;
       update.suspended_by = null;
+      update.status_note = "";
       auditAction = "employee.reinstated";
       auditDetails = {};
       break;

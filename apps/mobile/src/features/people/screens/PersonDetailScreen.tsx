@@ -1156,6 +1156,7 @@ export default function PersonDetailScreen() {
         fromReturnDate: person.suspendedUntil ?? null,
         returnDate: choice === "suspend" ? (suspensionEnd ?? undefined) : suspensionEnd,
         startDate: choice === "setSuspendedUntil" ? undefined : (laterStart ?? undefined),
+        note: choice === "suspend" ? inactiveNote.trim() || undefined : undefined,
         fromPlannedStatus: person.plannedStatus ?? null,
       };
       return new Promise<void>((resolve) => {
@@ -2296,7 +2297,7 @@ export default function PersonDetailScreen() {
         )}
         {showChoices && detailsPicked && isAway ? awayDetailFields : null}
         {showChoices && detailsPicked && isSuspended ? suspensionEndField : null}
-        {statusChoice === "markAway" || statusChoice === "archive" ? (
+        {statusChoice === "markAway" || statusChoice === "suspend" || statusChoice === "archive" ? (
           <ProfileTextInput
             editable={!statusMutation.isPending}
             accessibilityLabel="Reason"
@@ -2305,7 +2306,9 @@ export default function PersonDetailScreen() {
             placeholder={
               statusChoice === "archive"
                 ? "Optional, e.g. Left the company"
-                : "Optional, e.g. Family leave"
+                : statusChoice === "suspend"
+                  ? "Optional, e.g. Under review"
+                  : "Optional, e.g. Family leave"
             }
             value={inactiveNote}
             onChangeText={setInactiveNote}

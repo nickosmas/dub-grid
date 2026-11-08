@@ -704,6 +704,8 @@ export function setEmployeeReturnDate(
 export interface SuspensionDates {
   startDate?: string | null;
   until?: string | null;
+  /** An optional reason, kept on their record. */
+  note?: string;
 }
 
 /** Suspends someone's access (51c); a Gridmaster passes fresh proof as the token. */
@@ -712,7 +714,7 @@ export function suspendEmployee(
   orgId: string,
   expectedVersion: number,
   accessToken?: string,
-  { startDate = null, until = null }: SuspensionDates = {},
+  { startDate = null, until = null, note }: SuspensionDates = {},
 ): Promise<Employee> {
   return updateEmployeeStatus(
     {
@@ -722,6 +724,7 @@ export function suspendEmployee(
       expectedVersion,
       ...(startDate ? { startDate } : {}),
       ...(until ? { returnDate: until } : {}),
+      ...(note ? { note } : {}),
     },
     accessToken,
   );
