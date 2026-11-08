@@ -506,15 +506,12 @@ export async function POST(req: NextRequest) {
       );
     }
     if (text.includes("employee not found")) {
-      return NextResponse.json(
-        { error: "The selected employee record no longer exists." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "That employee no longer exists." }, { status: 404 });
     }
     if (text.includes("employee already has a linked user")) {
       return NextResponse.json(
         {
-          error: "That employee record is already linked to a user account.",
+          error: "That employee already has an account.",
         },
         { status: 409 },
       );
@@ -527,7 +524,7 @@ export async function POST(req: NextRequest) {
     }
     if (text.includes("unauthorized") || text.includes("invitation_tier_denied")) {
       return NextResponse.json(
-        { error: "You don't have permission to send invitations here." },
+        { error: "You don't have permission to send invitations." },
         { status: 403 },
       );
     }

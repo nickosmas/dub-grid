@@ -118,7 +118,7 @@ export const RESTORE_OUT_OF_REACH_MESSAGE = "Only a Super Admin can restore a Su
 
 /** Gridmaster's Remove from organization confirmation: it offboards their staff record too (51k). */
 export const REMOVE_FROM_ORGANIZATION_MESSAGE =
-  "They're offboarded there: they lose access now, and their shifts from today on come off the published schedule, except a day that has already started. Their staff record stays, and the organization can restore them.";
+  "They're offboarded from the organization too: they lose access now, and their shifts from today on come off the published schedule, except a day that has already started. Their staff record stays, and the organization can restore them.";
 
 /**
  * Whether this manager may offboard or restore someone with `targetOrgRole`

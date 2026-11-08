@@ -233,7 +233,7 @@ describe("describeSeatBreakdown", () => {
           key: "archived",
           label: "Offboarded staff",
           count: 12,
-          detail: "People who have been offboarded never take a seat.",
+          detail: "Offboarded people never take a seat.",
         },
       ],
     });

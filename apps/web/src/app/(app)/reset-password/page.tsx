@@ -43,8 +43,7 @@ type RecoveryOutcome = "updated" | "updated-unrevoked" | "unconfirmed";
 const OUTCOME_MESSAGES: Record<RecoveryOutcome, { heading: string; message: string }> = {
   updated: {
     heading: "Password updated",
-    message:
-      "Your password has been successfully reset. You can now sign in with your new password.",
+    message: "Your password is reset. Sign in with your new password.",
   },
   "updated-unrevoked": {
     heading: "Password updated",

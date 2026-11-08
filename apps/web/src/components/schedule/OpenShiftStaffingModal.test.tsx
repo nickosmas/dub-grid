@@ -221,8 +221,6 @@ describe("OpenShiftStaffingModal adjacent-day notice", () => {
         adjacentCheckUnverified: true,
       })),
     });
-    expect(
-      screen.getByText(/overnight overlaps with them could not be checked/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/overnight overlaps weren't checked/)).toBeInTheDocument();
   });
 });
