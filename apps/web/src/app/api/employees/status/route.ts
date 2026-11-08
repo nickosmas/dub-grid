@@ -25,7 +25,7 @@ const bodySchema = z.object({
   orgId: z.string().uuid(),
   action: z.enum(STATUS_CHANGE_ACTIONS),
   expectedVersion: z.number().int().min(0),
-  note: z.string().optional(),
+  note: z.string().trim().max(500).optional(),
   /**
    * Mark away: an optional first day back. setReturnDate: the new one, or null
    * to clear it. Suspend, setSuspendedUntil and a planned suspension's

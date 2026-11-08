@@ -143,3 +143,59 @@ describe("useStaffFilters access sort", () => {
     expect(result.current.sorted.map((employee) => employee.id)).toEqual(["a", "b"]);
   });
 });
+
+describe("useStaffFilters suspended tab", () => {
+  const suspended = buildEmployee({
+    id: "su",
+    firstName: "Sam",
+    suspendedAt: "2026-10-26T12:00:00Z",
+  });
+
+  it("counts suspended people without taking them out of Active or All", () => {
+    const { result } = renderHook(() =>
+      useStaffFilters({
+        employees: [USER, suspended],
+        inactiveEmployees: [buildEmployee({ id: "aw", status: "inactive" })],
+        focusAreas: [],
+        certifications: [],
+        roles: [],
+      }),
+    );
+
+    expect(result.current.tabCounts).toEqual({
+      all: 3,
+      active: 2,
+      inactive: 1,
+      suspended: 1,
+      removed: 0,
+    });
+  });
+
+  it("lists only suspended people on the Suspended tab", () => {
+    const { result } = renderHook(() =>
+      useStaffFilters({
+        employees: [USER, suspended],
+        focusAreas: [],
+        certifications: [],
+        roles: [],
+      }),
+    );
+
+    act(() => result.current.setActiveTab("suspended"));
+
+    expect(result.current.sorted.map((employee) => employee.id)).toEqual(["su"]);
+  });
+
+  it("returns to Active when the last suspended person is reinstated", () => {
+    let employees = [USER, suspended];
+    const { result, rerender } = renderHook(() =>
+      useStaffFilters({ employees, focusAreas: [], certifications: [], roles: [] }),
+    );
+    act(() => result.current.setActiveTab("suspended"));
+
+    employees = [USER, { ...suspended, suspendedAt: null }];
+    rerender();
+
+    expect(result.current.activeTab).toBe("active");
+  });
+});

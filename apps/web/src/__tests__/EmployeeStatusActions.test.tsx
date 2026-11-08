@@ -240,6 +240,22 @@ describe("EmployeeStatusActions", () => {
     expect(onSuspend).toHaveBeenCalledWith("emp-1", { startDate: null, until: null });
   });
 
+  it("suspends someone with a trimmed reason", async () => {
+    const user = userEvent.setup();
+    const { onSuspend } = renderActions(makeEmployee());
+
+    const dialog = await openDialog(user);
+    await user.click(within(dialog).getByRole("radio", { name: /^Suspended/ }));
+    await user.type(within(dialog).getByPlaceholderText(/Reason \(optional\)/), "  Under review  ");
+    await user.click(within(dialog).getByRole("button", { name: "Suspend" }));
+
+    expect(onSuspend).toHaveBeenCalledWith("emp-1", {
+      startDate: null,
+      until: null,
+      note: "Under review",
+    });
+  });
+
   it("suspends someone until an end date (51g3)", async () => {
     const user = userEvent.setup();
     const { onSuspend } = renderActions(makeEmployee());

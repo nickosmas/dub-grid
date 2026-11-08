@@ -79,7 +79,7 @@ function run(
     updateEmployeeSuspension: vi.fn(
       async (
         _client: SupabaseClient,
-        input: { suspended: boolean; suspendedUntil?: string | null },
+        input: { suspended: boolean; suspendedUntil?: string | null; statusNote?: string },
       ) =>
         employee({
           ...current,
@@ -326,6 +326,25 @@ describe("updateMobilePersonStatus suspending", () => {
     expect(deps.insertAuditLog).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ action: "employee.suspended" }),
+    );
+  });
+
+  it("keeps the reason on a suspension and in its audit row", async () => {
+    const { deps, result } = run(employee({ userId: "user-9" }), {
+      action: "suspend",
+      note: "Under review",
+    });
+
+    await expect(result).resolves.toMatchObject({ kind: "updated" });
+    expect(deps.updateEmployeeSuspension).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ suspended: true, statusNote: "Under review" }),
+    );
+    expect(deps.insertAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        details: expect.objectContaining({ note: "Under review" }),
+      }),
     );
   });
 

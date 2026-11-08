@@ -1392,11 +1392,17 @@ describe("POST /api/employees/status", () => {
       disableMobilePushTokensForOrg.mockResolvedValue(undefined);
     }
 
-    function post(action: string) {
+    function post(action: string, extra: Record<string, unknown> = {}) {
       return POST(
         new NextRequest("http://localhost/api/employees/status", {
           method: "POST",
-          body: JSON.stringify({ empId: EMP_ID, orgId: ORG_ID, action, expectedVersion: 1 }),
+          body: JSON.stringify({
+            empId: EMP_ID,
+            orgId: ORG_ID,
+            action,
+            expectedVersion: 1,
+            ...extra,
+          }),
         }),
       );
     }
@@ -1428,6 +1434,23 @@ describe("POST /api/employees/status", () => {
         empId: EMP_ID,
         actorId: USER_ID,
       });
+    });
+
+    it("keeps a trimmed reason on a suspension and in its audit row", async () => {
+      arrange({});
+
+      const response = await post("suspend", { note: "  Under review  " });
+
+      expect(response.status).toBe(200);
+      expect(employeeUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status_note: "Under review" }),
+      );
+      expect(auditInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "employee.suspended",
+          details: { note: "Under review", changedFields: ["suspended_at"] },
+        }),
+      );
     });
 
     it("still suspends when signing out fails, which the hook backs up", async () => {
@@ -1515,7 +1538,7 @@ describe("POST /api/employees/status", () => {
 
       expect(response.status).toBe(200);
       expect(employeeUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ suspended_at: null, suspended_by: null }),
+        expect.objectContaining({ suspended_at: null, suspended_by: null, status_note: "" }),
       );
       expect(endUserSessions).not.toHaveBeenCalled();
       expect(auditInsert).toHaveBeenCalledWith(
