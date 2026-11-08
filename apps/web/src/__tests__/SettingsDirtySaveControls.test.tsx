@@ -2912,84 +2912,93 @@ describe("settings dirty save controls", () => {
     expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
   });
 
-  it("scheduled job previews always spell out the full shift and job name", async () => {
-    const user = userEvent.setup();
-    const department = makeDepartment({
-      id: 1,
-      orgId: "org-1",
-      name: "Nursing",
-      type: "scheduled",
-    });
-    const focusArea = makeFocusArea({
-      id: 1,
-      orgId: "org-1",
-      name: "North",
-      departmentId: 1,
-    });
-    const shiftCategory = makeShiftCategory({
-      id: 10,
-      orgId: "org-1",
-      name: "Day Shift",
-      abbr: "D",
-      focusAreaId: 1,
-      sortOrder: 0,
-      startTime: "07:00",
-      endTime: "15:00",
-    });
-    const job: JobDefinition = {
-      id: 22,
-      orgId: "org-1",
-      name: "Supervisor",
-      abbr: "SUP",
-      showOnGrid: true,
-      assignmentMode: "with_shift",
-      focusAreaId: 1,
-      focusAreaIds: [1],
-      departmentIds: [1],
-      applicableShiftIds: [10],
-      eligibleRoleIds: [],
-      requiredCertificationIds: [],
-      color: "#E2E8F0",
-      border: "#CBD5E1",
-      text: "#475569",
-      shiftTimeOverrides: {},
-      shiftColorOverrides: {},
-      defaultStartTime: null,
-      defaultEndTime: null,
-      defaultDurationHours: null,
-      defaultDurationMinutes: null,
-      sortOrder: 0,
-      systemKey: null,
-      archivedAt: null,
-    };
+  it.each([
+    { mode: "code" as const, shift: "D", jobLabel: "SUP", hidden: ["Day Shift", "Supervisor"] },
+    { mode: "name" as const, shift: "Day Shift", jobLabel: "Supervisor", hidden: ["D", "SUP"] },
+  ])(
+    "scheduled job previews follow the $mode display mode",
+    async ({ mode, shift, jobLabel, hidden }) => {
+      const user = userEvent.setup();
+      const department = makeDepartment({
+        id: 1,
+        orgId: "org-1",
+        name: "Nursing",
+        type: "scheduled",
+      });
+      const focusArea = makeFocusArea({
+        id: 1,
+        orgId: "org-1",
+        name: "North",
+        departmentId: 1,
+      });
+      const shiftCategory = makeShiftCategory({
+        id: 10,
+        orgId: "org-1",
+        name: "Day Shift",
+        abbr: "D",
+        focusAreaId: 1,
+        sortOrder: 0,
+        startTime: "07:00",
+        endTime: "15:00",
+      });
+      const job: JobDefinition = {
+        id: 22,
+        orgId: "org-1",
+        name: "Supervisor",
+        abbr: "SUP",
+        showOnGrid: true,
+        assignmentMode: "with_shift",
+        focusAreaId: 1,
+        focusAreaIds: [1],
+        departmentIds: [1],
+        applicableShiftIds: [10],
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: "#E2E8F0",
+        border: "#CBD5E1",
+        text: "#475569",
+        shiftTimeOverrides: {},
+        shiftColorOverrides: {},
+        defaultStartTime: null,
+        defaultEndTime: null,
+        defaultDurationHours: null,
+        defaultDurationMinutes: null,
+        sortOrder: 0,
+        systemKey: null,
+        archivedAt: null,
+      };
 
-    render(
-      <JobsSettings
-        jobs={[job]}
-        orgId="org-1"
-        orgRoles={[]}
-        certifications={[]}
-        departments={[department]}
-        focusAreas={[focusArea]}
-        shiftCategories={[shiftCategory]}
-        roleLabel="Roles"
-        certificationLabel="Certifications"
-        onChange={vi.fn()}
-        canManageScheduleDefinitions
-      />,
-    );
+      render(
+        <JobsSettings
+          jobs={[job]}
+          orgId="org-1"
+          orgRoles={[]}
+          certifications={[]}
+          departments={[department]}
+          focusAreas={[focusArea]}
+          shiftCategories={[shiftCategory]}
+          roleLabel="Roles"
+          certificationLabel="Certifications"
+          onChange={vi.fn()}
+          canManageScheduleDefinitions
+          organization={{ ...baseOrganization, shiftDisplayMode: mode }}
+        />,
+      );
 
-    await user.click(screen.getByText(/1 department.*1 schedule area.*1 shift/i));
+      expect(screen.getAllByText("Nursing · North · Day Shift")).toHaveLength(2);
+      await user.click(screen.getByText("Supervisor"));
 
-    const namePreview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
-    expect(namePreview).not.toBeNull();
-    expect(within(namePreview!).getByText(/^Day Shift$/)).toBeInTheDocument();
-    expect(within(namePreview!).getByText(/^Supervisor$/)).toBeInTheDocument();
-    expect(within(namePreview!).queryByText(/^D$/)).not.toBeInTheDocument();
-    expect(within(namePreview!).queryByText(/^SUP$/)).not.toBeInTheDocument();
-  });
+      const preview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
+      expect(preview).not.toBeNull();
+      expect(within(preview!).getByText(shift)).toBeInTheDocument();
+      expect(within(preview!).getByText(jobLabel)).toBeInTheDocument();
+      for (const text of hidden) {
+        expect(within(preview!).queryByText(text)).not.toBeInTheDocument();
+      }
+    },
+  );
 
-  it("default shift job previews only show the shift's full name", async () => {
+  it("the Shift only preview shows just the shift", async () => {
     const user = userEvent.setup();
     const department = makeDepartment({
       id: 1,
@@ -3056,15 +3065,15 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    expect(screen.queryByText("Default Shift Job")).not.toBeInTheDocument();
-    await user.click(screen.getByText("Default shift job"));
+    expect(screen.queryByText("Default shift job")).not.toBeInTheDocument();
+    expect(screen.getByText("Allow shifts without a job")).toBeInTheDocument();
+    await user.click(screen.getByText("Shift only"));
 
-    const namePreview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
-    expect(namePreview).not.toBeNull();
-    expect(within(namePreview!).getByText(/^Day Shift$/)).toBeInTheDocument();
-    expect(within(namePreview!).queryByText(/^SHIFT$/)).not.toBeInTheDocument();
-    expect(within(namePreview!).queryByText(/^Default shift job$/)).not.toBeInTheDocument();
-    expect(within(namePreview!).queryByText(/^D$/)).not.toBeInTheDocument();
+    const preview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
+    expect(preview).not.toBeNull();
+    expect(within(preview!).getByText(/^D$/)).toBeInTheDocument();
+    expect(within(preview!).queryByText(/^SHIFT$/)).not.toBeInTheDocument();
+    expect(within(preview!).queryByText(/^Default shift job$/)).not.toBeInTheDocument();
   });
 
   it("scheduled jobs can override one shift while still applying to all matching shifts", async () => {
