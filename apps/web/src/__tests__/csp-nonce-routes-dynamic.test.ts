@@ -20,21 +20,12 @@ const APP_DIR = join(__dirname, "..", "app");
 
 // Top-level segments that the middleware serves with the static 'unsafe-inline'
 // CSP (its public-route list) — these are allowed to be statically prerendered.
-const PUBLIC_SEGMENTS = new Set([
-  "login",
-  "goodbye",
-  "privacy",
-  "terms",
-  "cookie-policy",
-  "accept-invite",
-  "request-demo",
-  "forgot-password",
-  "reset-password",
-  "auth", // /auth/* is public
-]);
+// The sign-in pages are public too, but take the nonce policy (F-204), so they
+// are not listed here and must render dynamically like the rest of the app.
+const PUBLIC_SEGMENTS = new Set(["privacy", "terms", "cookie-policy", "request-demo"]);
 
 // Non-route dirs and the root page (the marketing "/" is public + static).
-const IGNORED = new Set(["api", "auth"]);
+const IGNORED = new Set(["api"]);
 
 function isDynamic(file: string): boolean {
   if (!existsSync(file)) return false;

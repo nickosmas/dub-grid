@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { requireSupabasePublishableKey, requireSupabaseUrl } from "@/lib/supabase-keys";
 import { parseInternalDestination } from "@/lib/auth/integrity-contract";
+import { authCookieOptions } from "@/lib/auth/auth-cookie-options";
 
 /**
  * Server-side PKCE code exchange callback.
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
   if (code) {
     const cookieStore = await cookies();
     const supabase = createServerClient(requireSupabaseUrl(), requireSupabasePublishableKey(), {
+      cookieOptions: authCookieOptions(request.nextUrl.protocol),
       cookies: {
         getAll() {
           return cookieStore.getAll();
