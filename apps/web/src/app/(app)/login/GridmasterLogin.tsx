@@ -12,6 +12,7 @@ import { primeSignInQueries } from "@/components/SignInPrefetch";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { markAuthTransition } from "@/lib/auth-transition";
 import { GRIDMASTER_POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
+import { takeReturnDestination } from "@/lib/auth/return-after-sign-in";
 import { DubGridLogo } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { EmailPasswordForm } from "@/components/auth/EmailPasswordForm";
@@ -134,7 +135,7 @@ export default function GridmasterLogin({
         void syncBrowserSessionInBackground(result.session);
         primeSignInQueries(queryClient, result.session.access_token);
         markAuthTransition();
-        router.replace(result.destination);
+        router.replace(takeReturnDestination(result.destination, result.user?.id));
         return;
       }
 
@@ -157,7 +158,7 @@ export default function GridmasterLogin({
       // markAuthTransition() keeps ProtectedRoute from bouncing to /login
       // while the auth context finishes settling after sign-in.
       markAuthTransition();
-      router.replace(result.destination);
+      router.replace(takeReturnDestination(result.destination, result.user?.id));
     } catch (err: unknown) {
       toast.error(getWebAuthRecoveryMessage(err, "We couldn't sign you in. Try again."));
       setLoading(false);
@@ -181,7 +182,7 @@ export default function GridmasterLogin({
       recordBrowserSignInCompleted(),
     ]);
     markAuthTransition();
-    router.replace(destination);
+    router.replace(takeReturnDestination(destination, session?.user?.id));
   }
 
   function handleMFACancel() {

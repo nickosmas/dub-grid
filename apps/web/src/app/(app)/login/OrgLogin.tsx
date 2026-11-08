@@ -46,6 +46,7 @@ import { fetchWithTimeout, settleWithRequestTimeout } from "@/lib/fetch-with-tim
 import { getWebAuthRecoveryMessage } from "@/lib/auth-recovery";
 import { ACTION_SIGN_IN } from "@/lib/action-copy";
 import { POST_LOGIN_DESTINATION } from "@/lib/auth/integrity-contract";
+import { takeReturnDestination } from "@/lib/auth/return-after-sign-in";
 
 const GRIDMASTER_PORTAL_REQUIRED_CODE = "GRIDMASTER_PORTAL_REQUIRED";
 
@@ -417,16 +418,17 @@ export default function OrgLogin({
       // another account is signed in here, because ProtectedRoute would take
       // that account's user as the arrival and render under it.
       if (result.sessionCookieSet && (priorUserId === null || priorUserId === result.user.id)) {
+        const destination = takeReturnDestination(result.destination, result.user.id);
         if (result.didSwitchOrg) {
-          navigateToDashboard(result.destination, true);
+          navigateToDashboard(destination, true);
           return;
         }
         void syncBrowserSessionInBackground(result.session, result.user);
         primeSignInQueries(queryClient, result.session.access_token, {
-          dashboard: result.destination === POST_LOGIN_DESTINATION,
+          dashboard: destination === POST_LOGIN_DESTINATION,
         });
         markAuthTransition();
-        navigateToDashboard(result.destination, false);
+        navigateToDashboard(destination, false);
         return;
       }
 
@@ -458,13 +460,14 @@ export default function OrgLogin({
       // browser-local state the server cannot touch. That holds without a
       // switch too: the response cleared the sandbox cookie and the route
       // tore down any sandbox, so the browser has nothing to exit.
+      const destination = takeReturnDestination(result.destination, result.user.id);
       if (result.didSwitchOrg) {
-        navigateToDashboard(result.destination, true);
+        navigateToDashboard(destination, true);
         return;
       }
 
       markAuthTransition();
-      navigateToDashboard(result.destination, false);
+      navigateToDashboard(destination, false);
     } catch (err: unknown) {
       if (organizationHandoffActiveRef.current) failClosedOrganizationHandoff();
       toast.error(getWebAuthRecoveryMessage(err, "We couldn't sign you in. Try again."));
@@ -521,7 +524,7 @@ export default function OrgLogin({
       // survived the switch, and a surviving sandbox cookie pins every later
       // request to a clone of the org the user just left. Unlike the password
       // path, no login route teardown runs after a second factor.
-      const [destination] = await Promise.all([
+      const [homeDestination] = await Promise.all([
         settleWithRequestTimeout(resolvePostLoginDestination()),
         recordBrowserSignInCompleted(),
         organizationClaims ? startTrialForSuperAdmin(organizationClaims) : null,
@@ -541,7 +544,7 @@ export default function OrgLogin({
       // second factor, so ask again.
       void queryClient.resetQueries();
       markAuthTransition();
-      navigateToDashboard(destination, didSwitchOrg);
+      navigateToDashboard(takeReturnDestination(homeDestination, session.user?.id), didSwitchOrg);
     }
     const promise = proceed();
     mfaProceedRef.current = promise;
