@@ -195,7 +195,7 @@ export function createMfaLifecycleHandler(options: {
       const factor = auth.user.factors?.find((candidate) => candidate.id === input.factorId);
       if (!factor) return reply({ success: true }); // Retry after an already completed deletion.
       if (factor.factor_type !== "totp")
-        return reply({ error: "This factor cannot be changed here." }, 400);
+        return reply({ error: "You can't change this factor." }, 400);
       if (input.action === "cleanup" && factor.status !== "unverified") {
         // Cancel is never permission to remove an enrolled authenticator.
         return reply({ error: "This authenticator is already verified. Refresh its status." }, 409);

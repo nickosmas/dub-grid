@@ -987,7 +987,7 @@ describe("mobileApiRequest", () => {
       headers: new Headers({ "content-type": "application/json" }),
       json: async () => ({
         code: "NAME_MISMATCH",
-        error: "The user account name does not match the employee record.",
+        error: "The name on the account doesn't match the employee record.",
         details: {
           employeeId: "00000000-0000-0000-0000-000000000001",
           userId: "22222222-2222-4222-8222-222222222222",
@@ -1012,7 +1012,7 @@ describe("mobileApiRequest", () => {
     }
 
     expect(thrownError).toBeInstanceOf(Error);
-    expect((thrownError as Error).message).toContain("The user account name does not match");
+    expect((thrownError as Error).message).toContain("The name on the account doesn't match");
     expect(parseMobileNameMismatchError(thrownError)?.details).toMatchObject({
       accountFirstName: "Minnie",
       employeeFirstName: "Mina",

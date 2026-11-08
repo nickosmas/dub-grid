@@ -1120,8 +1120,7 @@ export default function StringListSettings({
                 title={`Archive "${deleteConfirm.item.name}"?`}
                 message={
                   <>
-                    <strong>{deleteConfirm.item.name}</strong> is currently{" "}
-                    {deps!.summary.toLowerCase()}.{" "}
+                    <strong>{deleteConfirm.item.name}</strong> is {deps!.summary.toLowerCase()}.{" "}
                     {"It stays on past schedules but can't be picked for anything new."}
                   </>
                 }

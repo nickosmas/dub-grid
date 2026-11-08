@@ -103,7 +103,7 @@ export function buildTimezoneOptions({
     if (timeZone === detectedTimeZone) tags.push("Local");
 
     const baseLabel = formatTimezoneLabel(timeZone, date);
-    const suffix = tags.length > 0 ? ` — ${tags.join(" · ")}` : "";
+    const suffix = tags.length > 0 ? ` (${tags.join(" · ")})` : "";
 
     return {
       value: timeZone,
