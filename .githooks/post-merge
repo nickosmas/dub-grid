@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Rebuilds generated documentation files the merge driver left pending, from
+# the merged tree, and folds them into the merge commit just made. Git writes
+# that commit's tree before pre-merge-commit could change it, hence here.
+# $1 is 1 for a squash merge, which made no commit to fold into.
+
+set -e
+
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+
+if [ "$1" = "1" ]; then
+  node scripts/git/rebuild-generated.mjs --merging
+else
+  node scripts/git/rebuild-generated.mjs --merging --amend
+fi

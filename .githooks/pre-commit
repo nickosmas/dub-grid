@@ -47,6 +47,10 @@ if [ -n "$LINT_FILES" ]; then
   fi
 fi
 
+# A merge whose conflicts were resolved by hand commits through this hook,
+# not post-merge, so generated files left pending are rebuilt here too.
+node scripts/git/rebuild-generated.mjs
+
 echo "pre-commit: documentation contract"
 if ! npm run docs:check:closed --silent; then
   echo

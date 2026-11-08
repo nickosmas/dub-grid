@@ -1,0 +1,5 @@
+# Generated documentation files rebuild themselves on merge; run
+# `npm run hooks:install` once per clone to enable the driver.
+internal/documentation/accuracy-manifest.json merge=dubgrid-generated
+internal/documentation/generated/app-inventory.json merge=dubgrid-generated
+internal/documentation/generated/app-inventory.md merge=dubgrid-generated

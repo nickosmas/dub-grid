@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:9b15ba47749dc928f084bfcdf27e798b28f385075b44a09cd7aa26aa1f7a2f5f",
+  "sourceDigest": "sha256:d332dab93b320efa2567a22986be543de3f6093cd7ca1d45d2d06b13a2c6e6c7",
   "webRoutes": [
     {
       "id": "web:/",
@@ -8470,7 +8470,7 @@
       "package": "root",
       "workspacePath": ".",
       "name": "hooks:install",
-      "command": "git config core.hooksPath .githooks && echo 'Git hooks enabled (.githooks)'",
+      "command": "node scripts/git/install-hooks.mjs",
       "source": {
         "path": "package.json"
       }

@@ -96,6 +96,16 @@ describe("production migration readiness", () => {
     expect(() => loadMigrationInventory(root)).toThrow(/expected 003, found 004/);
   });
 
+  it("names both files when two migrations share a number", () => {
+    const root = tempDir("dubgrid-migrations-");
+    writeFileSync(join(root, "001_schema.sql"), "SELECT 1;");
+    writeFileSync(join(root, "002_alerts.sql"), "SELECT 2;");
+    writeFileSync(join(root, "002_billing.sql"), "SELECT 3;");
+    expect(() => loadMigrationInventory(root)).toThrow(
+      "Migration number 002 is used twice: 002_alerts.sql, 002_billing.sql. Renumber the newer one to 003",
+    );
+  });
+
   it("rejects ledger gaps, renamed entries, and unknown remote migrations", () => {
     const local = [
       migration("001", "schema"),
