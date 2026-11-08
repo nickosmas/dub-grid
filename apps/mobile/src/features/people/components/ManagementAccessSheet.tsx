@@ -257,7 +257,7 @@ export function ManagementAccessSheet({
                 label="Save access"
                 loading={mutation.isPending}
                 onPress={submit}
-                tone="primary"
+                tone={isRemoval ? "danger" : "primary"}
               />
             }
           >

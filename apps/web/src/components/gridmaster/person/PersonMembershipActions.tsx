@@ -137,7 +137,7 @@ export function PersonMembershipActions({
         </Button>
       ) : null}
       <Button
-        className="dg-btn dg-btn-secondary"
+        className="dg-btn dg-btn-danger"
         onClick={() => setRemoveConfirm(true)}
         disabled={busy}
       >

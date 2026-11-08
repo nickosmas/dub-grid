@@ -25,7 +25,12 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
-import { ProfileList, ProfileNavRow, ProfileSection } from "../components/ProfilePrimitives";
+import {
+  ProfileList,
+  ProfileListAction,
+  ProfileNavRow,
+  ProfileSection,
+} from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 
 type CalendarAction = CalendarSubscribeTarget | "share";
@@ -208,10 +213,10 @@ export default function ProfileCalendarScreen() {
           {isActive ? (
             <ProfileSection>
               <ProfileList>
-                <ProfileNavRow
-                  iconName="close-circle-outline"
+                <ProfileListAction
                   isLast
                   label="Disable subscription"
+                  tone="danger"
                   onPress={() => {
                     if (!isBusy) setPendingConfirmation({ kind: "disable" });
                   }}

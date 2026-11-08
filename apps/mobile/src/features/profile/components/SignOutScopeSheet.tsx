@@ -46,20 +46,18 @@ export function SignOutScopeSheet({
       <ProfileList>
         <ScopeOption
           description={
-            hasOtherSessions
-              ? "Every other device is signed out. You stay signed in here."
-              : "No other active devices are signed in."
+            hasOtherSessions ? "You stay signed in here." : "No other devices are signed in."
           }
           disabled={!hasOtherSessions}
           divider
           iconName="phone-portrait-outline"
-          label="Sign out other devices"
+          label="Other devices"
           onPress={() => onSelect("others")}
         />
         <ScopeOption
-          description="Every device is signed out, including this one. You'll need to sign in again."
+          description="Including this one."
           iconName="log-out-outline"
-          label="Sign out everywhere"
+          label="All devices"
           tone="danger"
           onPress={() => onSelect("global")}
         />

@@ -484,7 +484,7 @@ function AbsenceTypeRow({
                   </>
                 }
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 isLoading={deleting}
                 onConfirm={() => handleDelete(false)}
                 onCancel={() => setShowDeleteConfirm(false)}
@@ -498,7 +498,7 @@ function AbsenceTypeRow({
                 title={`Archive "${form.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 isLoading={deleting}
                 onConfirm={() => handleDelete(false)}
                 onCancel={() => setShowDeleteConfirm(false)}

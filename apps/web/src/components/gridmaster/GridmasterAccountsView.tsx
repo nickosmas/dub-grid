@@ -447,12 +447,16 @@ export default function GridmasterAccountsView({
                             </Button>
                           )}
                           <Button
-                            className="dg-btn dg-btn-secondary"
+                            className={
+                              account.deactivatedAt
+                                ? "dg-btn dg-btn-secondary"
+                                : "dg-btn dg-btn-danger"
+                            }
                             style={{
                               fontSize: "var(--dg-fs-caption)",
-                              color: account.deactivatedAt
-                                ? "var(--dg-color-success, green)"
-                                : "var(--dg-color-warning, orange)",
+                              ...(account.deactivatedAt
+                                ? { color: "var(--dg-color-success, green)" }
+                                : null),
                             }}
                             onClick={() => setActivationConfirm(account)}
                             disabled={isSelf || isLoading}
@@ -461,10 +465,7 @@ export default function GridmasterAccountsView({
                           </Button>
                           <Button
                             className="dg-btn dg-btn-secondary"
-                            style={{
-                              fontSize: "var(--dg-fs-caption)",
-                              color: "var(--dg-color-danger)",
-                            }}
+                            style={{ fontSize: "var(--dg-fs-caption)" }}
                             onClick={() => {
                               setDemoteTarget(account);
                               setDemoteOrgId(organizations[0]?.id ?? "");

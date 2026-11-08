@@ -76,7 +76,7 @@ const VARIANTS: Record<BulkStatusAction, "danger" | "warning" | "info"> = {
   reinstate: "info",
   restore: "info",
   markAway: "warning",
-  suspend: "warning",
+  suspend: "danger",
   archive: "danger",
 };
 

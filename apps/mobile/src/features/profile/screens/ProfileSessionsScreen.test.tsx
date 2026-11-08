@@ -213,15 +213,13 @@ describe("ProfileSessionsScreen", () => {
     render(<ProfileSessionsScreen />);
 
     // Neither destructive action is on the page until it is asked for.
-    expect(screen.queryByRole("button", { name: "Sign out everywhere" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "All devices" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out devices" }));
 
-    expect(
-      screen.getByText("Every other device is signed out. You stay signed in here."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("You stay signed in here.")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    fireEvent.click(screen.getByRole("button", { name: "All devices" }));
 
     expect(screen.getByText("Sign out all devices?")).toBeInTheDocument();
 
@@ -243,7 +241,7 @@ describe("ProfileSessionsScreen", () => {
     render(<ProfileSessionsScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out devices" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sign out other devices" }));
+    fireEvent.click(screen.getByRole("button", { name: "Other devices" }));
 
     await act(async () => {
       fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
@@ -262,7 +260,7 @@ describe("ProfileSessionsScreen", () => {
     render(<ProfileSessionsScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out devices" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    fireEvent.click(screen.getByRole("button", { name: "All devices" }));
     await act(async () => {
       fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
@@ -279,9 +277,9 @@ describe("ProfileSessionsScreen", () => {
     render(<ProfileSessionsScreen />);
     fireEvent.click(screen.getByRole("button", { name: "Sign out devices" }));
 
-    expect(screen.getByRole("button", { name: "Sign out other devices" })).toBeDisabled();
-    expect(screen.getByText("No other active devices are signed in.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign out everywhere" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Other devices" })).toBeDisabled();
+    expect(screen.getByText("No other devices are signed in.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All devices" })).not.toBeDisabled();
   });
 
   it("collapses stale sessions behind a disclosure instead of listing them", () => {

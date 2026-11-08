@@ -424,7 +424,7 @@ function IndicatorRow({
                   </>
                 }
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 isLoading={deleting}
                 onConfirm={() => handleDelete(false)}
                 onCancel={() => setShowDeleteConfirm(false)}
@@ -438,7 +438,7 @@ function IndicatorRow({
                 title={`Archive "${trimmedName || "schedule note"}"?`}
                 message="Notes already placed stay, but it can't be picked for anything new."
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 isLoading={deleting}
                 onConfirm={() => handleDelete(false)}
                 onCancel={() => setShowDeleteConfirm(false)}
