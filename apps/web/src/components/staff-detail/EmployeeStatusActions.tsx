@@ -950,7 +950,7 @@ export function EmployeeStatusActions({
           !suspendsNow
         }
         variant={
-          choice === "archive" || offboardsNow
+          choice === "archive" || choice === "suspend" || offboardsNow || suspendsNow
             ? "danger"
             : ordinary || (returnDay && !cancellingPlan)
               ? "info"

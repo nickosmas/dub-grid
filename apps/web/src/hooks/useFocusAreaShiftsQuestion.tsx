@@ -54,7 +54,7 @@ export function useFocusAreaShiftsQuestion() {
         confirmLabel={question.clearLabel}
         secondaryConfirmLabel={question.keepLabel}
         secondaryConfirmTone="neutral"
-        variant="warning"
+        variant="danger"
         onConfirm={() => answer("clear")}
         onSecondaryConfirm={() => answer("keep")}
         onCancel={() => answer(null)}

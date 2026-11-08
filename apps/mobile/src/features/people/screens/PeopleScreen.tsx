@@ -1002,6 +1002,7 @@ export default function PeopleScreen() {
                       compact
                       disabled={resolveRequestMutation.isPending}
                       label="Approve"
+                      tone={request.type === "account_deletion" ? "danger" : "primary"}
                       onPress={() => {
                         setProfileRequestConfirmation({ request, action: "approve" });
                       }}
@@ -1014,6 +1015,7 @@ export default function PeopleScreen() {
                         compact
                         disabled={resolveRequestMutation.isPending}
                         label="Approve"
+                        tone={request.type === "account_deletion" ? "danger" : "primary"}
                         onPress={() => {
                           setProfileRequestConfirmation({
                             request,

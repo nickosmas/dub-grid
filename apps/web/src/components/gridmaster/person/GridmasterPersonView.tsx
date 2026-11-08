@@ -263,7 +263,7 @@ export default function GridmasterPersonView({
       </Button>
       {primaryOrgId && !terminated ? (
         <Button
-          className="dg-btn dg-btn-secondary"
+          className={deactivated ? "dg-btn dg-btn-secondary" : "dg-btn dg-btn-danger"}
           onClick={() => setDialog("deactivate")}
           disabled={busy}
         >

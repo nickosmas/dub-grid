@@ -273,7 +273,11 @@ export function StaffContextBar({
               <Button
                 key={plan.action}
                 onClick={() => onBulkStatus?.(plan)}
-                className="dg-btn dg-btn-secondary dg-btn-sm dg-tabular-nums"
+                className={`dg-btn dg-btn-sm dg-tabular-nums ${
+                  plan.action === "suspend" || plan.action === "archive"
+                    ? "dg-btn-danger"
+                    : "dg-btn-secondary"
+                }`}
               >
                 {describeStatusAction(plan.action, "").label} ({plan.eligible.length})
               </Button>

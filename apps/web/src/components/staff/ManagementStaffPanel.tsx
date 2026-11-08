@@ -1068,7 +1068,7 @@ export function ManagementStaffPanel({
                   <Button
                     onClick={handleRevoke}
                     disabled={revoking}
-                    className="dg-btn dg-btn-ghost"
+                    className="dg-btn dg-btn-danger"
                     style={{ width: "100%", color: "var(--dg-color-danger)" }}
                   >
                     <ButtonLoading loading={revoking} spinnerSize={14}>

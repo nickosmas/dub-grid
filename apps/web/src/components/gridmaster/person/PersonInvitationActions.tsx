@@ -69,11 +69,7 @@ export function PersonInvitationActions({
       >
         Resend
       </Button>
-      <Button
-        className="dg-btn dg-btn-secondary"
-        onClick={() => setConfirm("revoke")}
-        disabled={busy}
-      >
+      <Button className="dg-btn dg-btn-danger" onClick={() => setConfirm("revoke")} disabled={busy}>
         Revoke
       </Button>
       {confirm && (

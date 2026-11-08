@@ -370,7 +370,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               type="button"
               onClick={() => setPendingSessionSignOut("others")}
               disabled={signingOut !== null || otherSessionCount === 0}
-              className="dg-btn dg-btn-secondary w-full"
+              className="dg-btn dg-btn-danger w-full"
             >
               <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
                 Sign out other devices

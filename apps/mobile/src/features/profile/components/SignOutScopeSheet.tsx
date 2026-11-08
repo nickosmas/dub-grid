@@ -54,6 +54,7 @@ export function SignOutScopeSheet({
           divider
           iconName="phone-portrait-outline"
           label="Sign out other devices"
+          tone="danger"
           onPress={() => onSelect("others")}
         />
         <ScopeOption
