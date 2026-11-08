@@ -1035,7 +1035,7 @@ function ReportsContent() {
 // of the row so the toolbar spans the page.
 const controlLabelStyle: CSSProperties = {
   display: "grid",
-  flex: "0 1 auto",
+  flex: "1 1 auto",
   maxWidth: "100%",
   gap: 6,
   color: "var(--dg-type-field-title-color)",

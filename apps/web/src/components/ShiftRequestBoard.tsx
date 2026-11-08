@@ -1027,9 +1027,9 @@ export default function ShiftRequestBoard({
         >
           {activeTab === "history" ? (
             <div
-              // Each filter is as wide as its own value, wrapping as needed,
-              // rather than four equal tracks that clip the date range and
-              // pad "All types".
+              // Each filter is at least as wide as its own value and shares
+              // the leftover, wrapping as needed, rather than four equal
+              // tracks that clip the date range and pad "All types".
               style={{
                 display: "flex",
                 flexWrap: "wrap",
@@ -1039,7 +1039,7 @@ export default function ShiftRequestBoard({
             >
               <DateRangePicker
                 id="request-history-dates"
-                style={{ flex: "0 1 auto" }}
+                style={{ flex: "1 1 auto" }}
                 allowClear
                 label="Shift dates"
                 onChange={(next) => {
@@ -1050,7 +1050,7 @@ export default function ShiftRequestBoard({
                 value={{ from: historyFrom, to: historyTo }}
               />
               <CustomSelect
-                style={{ flex: "0 1 auto" }}
+                style={{ flex: "1 1 auto" }}
                 ariaLabel="Request type"
                 fontSize="var(--dg-fs-caption)"
                 onChange={setHistoryType}
@@ -1063,7 +1063,7 @@ export default function ShiftRequestBoard({
                 value={historyType}
               />
               <CustomSelect
-                style={{ flex: "0 1 auto" }}
+                style={{ flex: "1 1 auto" }}
                 ariaLabel="Outcome"
                 fontSize="var(--dg-fs-caption)"
                 onChange={setHistoryStatus}
@@ -1077,7 +1077,7 @@ export default function ShiftRequestBoard({
                 value={historyStatus}
               />
               <StaffMultiSelect
-                style={{ flex: "0 1 auto" }}
+                style={{ flex: "1 1 auto" }}
                 onChange={setHistoryStaff}
                 options={staffOptions}
                 value={historyStaff}

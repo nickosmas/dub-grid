@@ -679,7 +679,7 @@ export default function AddEmployeeModal({
                             value={row.role}
                             options={roleOptions}
                             onChange={(role) => updateRow(row._id, { role })}
-                            style={{ flex: "0 1 auto" }}
+                            style={{ flex: 1, minWidth: 0 }}
                             fontSize={12}
                           />
                         </div>

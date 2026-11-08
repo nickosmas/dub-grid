@@ -375,7 +375,7 @@ export default function CoveragePanel({
                 />
               )}
               <CustomSelect
-                style={{ flex: "0 1 auto" }}
+                style={{ flex: "1 1 180px" }}
                 value={filterFocusArea === "all" ? "all" : String(filterFocusArea)}
                 options={[
                   { value: "all", label: `All ${pluralLabelNoun(focusAreaLabel)}` },

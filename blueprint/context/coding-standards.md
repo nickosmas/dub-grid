@@ -109,9 +109,12 @@
   labels or variants make a peer larger within a row.
 - Dropdowns are never wider than they need to be (owner, 2026-11-07). A
   trigger (`CustomSelect`, `StaffMultiSelect`, `DateRangePicker`) sizes to
-  its label and truncates in a narrow row; in a toolbar or filter row only the
-  search field takes the leftover width. Give a dropdown `width: 100%` only
-  when it lines up with other fields in a form. Menus size to their longest
+  its label and truncates in a narrow row; in a toolbar with a search field
+  only the search field takes the leftover width. They take the rest of the
+  row (owner, 2026-11-08) when they are a set of filters with no search field
+  (Reports, Requests history), fill a slot in a narrow panel or a form row, or
+  sit in a filter row that has wrapped on a phone (`dg-filter-row`). A lone
+  setting under its description hugs its label. Menus size to their longest
   option, one line each.
 - Button labels never wrap on either platform. Keep them to one line. Web
   truncates rather than creating a second line. Mobile fits the label to the
