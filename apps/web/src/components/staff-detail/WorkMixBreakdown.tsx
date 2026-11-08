@@ -54,9 +54,9 @@ export function WorkMixBreakdown({
   if (total === 0) return null;
 
   const details = (item: WorkMixEntry) =>
-    [showFocusArea ? item.focusAreaName : null, item.jobName].filter(Boolean).join(" · ");
+    [item.jobName, showFocusArea ? item.focusAreaName : null].filter(Boolean).join(" · ");
   const describe = (item: WorkMixEntry) =>
-    `${item.shiftName}${showFocusArea && item.focusAreaName ? ` in ${item.focusAreaName}` : ""}${item.jobName ? ` as ${item.jobName}` : ""}: ${item.count} ${item.count === 1 ? "shift" : "shifts"}, ${item.share}%`;
+    `${item.shiftName}${item.jobName ? ` as ${item.jobName}` : ""}${showFocusArea && item.focusAreaName ? ` in ${item.focusAreaName}` : ""}: ${item.count} ${item.count === 1 ? "shift" : "shifts"}, ${item.share}%`;
 
   return (
     <div className="flex flex-col gap-3" aria-label={`${title} ${periodPhrase}`} role="group">

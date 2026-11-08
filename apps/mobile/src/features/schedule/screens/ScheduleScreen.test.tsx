@@ -573,8 +573,9 @@ describe("ScheduleScreen", () => {
     // posted pickup.
     expect(screen.getAllByRole("button", { name: "Claim" })).toHaveLength(2);
     const openShiftCarouselText = screen.getByLabelText("Open shifts carousel").textContent ?? "";
-    expect(openShiftCarouselText.indexOf("Skilled Nursing")).toBeLessThan(
-      openShiftCarouselText.indexOf("Nurse"),
+    // Shift, job, then focus area.
+    expect(openShiftCarouselText.indexOf("Nurse")).toBeLessThan(
+      openShiftCarouselText.indexOf("Skilled Nursing"),
     );
 
     expect(screen.getByText("Your week")).toBeInTheDocument();
@@ -1349,9 +1350,9 @@ describe("ScheduleScreen", () => {
     expect(todayRow.getByLabelText("Shift 2 · Edited")).toBeInTheDocument();
     expect(
       todayRow.getByLabelText(
-        "Previous shift: Evening Shift · 2:00 PM - 11:00 PM · Skilled Nursing",
+        "Previous shift: Evening Shift · Skilled Nursing · 2:00 PM - 11:00 PM",
       ),
-    ).toHaveTextContent("Was Evening Shift · 2:00 PM - 11:00 PM · Skilled Nursing");
+    ).toHaveTextContent("Was Evening Shift · Skilled Nursing · 2:00 PM - 11:00 PM");
     expect(todayRow.queryByLabelText(/Previous shift: Day Shift/)).toBeNull();
 
     personal.unmount();
@@ -1616,9 +1617,9 @@ describe("ScheduleScreen", () => {
     expect(within(todayRow).queryByLabelText("Shift deleted")).toBeNull();
     expect(
       within(todayRow).getByLabelText(
-        "Previous shift: Day Shift · 7:00 AM - 3:00 PM · Skilled Nursing",
+        "Previous shift: Day Shift · Skilled Nursing · 7:00 AM - 3:00 PM",
       ),
-    ).toHaveTextContent("Was Day Shift · 7:00 AM - 3:00 PM · Skilled Nursing");
+    ).toHaveTextContent("Was Day Shift · Skilled Nursing · 7:00 AM - 3:00 PM");
   });
 
   it("renders a deleted entry as one quiet Was line beneath an active shift", () => {
@@ -1661,9 +1662,9 @@ describe("ScheduleScreen", () => {
     expect(todayRow.getByText("Day Shift")).toBeInTheDocument();
     expect(
       todayRow.getByLabelText(
-        "Previous shift: Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing",
+        "Previous shift: Evening Shift · Skilled Nursing · 3:00 PM - 11:00 PM",
       ),
-    ).toHaveTextContent("Was Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing");
+    ).toHaveTextContent("Was Evening Shift · Skilled Nursing · 3:00 PM - 11:00 PM");
     expect(todayRow.queryByLabelText("Shift deleted")).toBeNull();
   });
 
@@ -1773,10 +1774,10 @@ describe("ScheduleScreen", () => {
     expect(todayRow.getAllByLabelText(/Previous shift:/)).toHaveLength(1);
     expect(
       todayRow.getByLabelText(
-        "Previous shift: Day Shift · 7:00 AM - 3:00 PM · Skilled Nursing; Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing",
+        "Previous shift: Day Shift · Skilled Nursing · 7:00 AM - 3:00 PM; Evening Shift · Skilled Nursing · 3:00 PM - 11:00 PM",
       ),
     ).toHaveTextContent(
-      "Was Day Shift · 7:00 AM - 3:00 PM · Skilled Nursing; Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing",
+      "Was Day Shift · Skilled Nursing · 7:00 AM - 3:00 PM; Evening Shift · Skilled Nursing · 3:00 PM - 11:00 PM",
     );
   });
 
@@ -1850,9 +1851,9 @@ describe("ScheduleScreen", () => {
     expect(within(deletedDay).queryByLabelText("Shift deleted")).toBeNull();
     expect(
       within(deletedDay).getByLabelText(
-        "Previous shift: Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing",
+        "Previous shift: Evening Shift · Skilled Nursing · 3:00 PM - 11:00 PM",
       ),
-    ).toHaveTextContent("Was Evening Shift · 3:00 PM - 11:00 PM · Skilled Nursing");
+    ).toHaveTextContent("Was Evening Shift · Skilled Nursing · 3:00 PM - 11:00 PM");
   });
 
   it("shows the first shift in the week on the top card after next-week navigation", () => {

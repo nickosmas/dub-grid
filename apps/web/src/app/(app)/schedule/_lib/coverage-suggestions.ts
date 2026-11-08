@@ -862,7 +862,7 @@ export function buildCoverageSuggestionInput(input: CoverageSuggestionAdapterInp
     workLimit: workLimitWith(input),
   };
   const rowLabels = new Map(
-    input.matrix.rows.map((row) => [row.rowKey, `${row.focusAreaName} · ${row.rowLabel}`]),
+    input.matrix.rows.map((row) => [row.rowKey, `${row.rowLabel} · ${row.focusAreaName}`]),
   );
   const rowFocusAreaIds = new Map(input.matrix.rows.map((row) => [row.rowKey, row.focusAreaId]));
   const text: CoverageSuggestionTextLookups = {

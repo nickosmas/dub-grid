@@ -162,13 +162,13 @@ describe("CoveragePanel", () => {
 
     expect(screen.getByRole("dialog", { name: "Schedule Builder" })).toBeInTheDocument();
     expect(screen.getByText("1 shift short · 0 over")).toBeInTheDocument();
-    const wednesday = cell(/North Wing, Day Shift · Med Aide, Wednesday, October 28/);
+    const wednesday = cell(/Day Shift · Med Aide, North Wing, Wednesday, October 28/);
     expect(wednesday).toHaveTextContent("2/3");
     expect(wednesday).toHaveAccessibleName(
-      "North Wing, Day Shift · Med Aide, Wednesday, October 28: 2 of 3 staffed, short 1, published 3 of 3",
+      "Day Shift · Med Aide, North Wing, Wednesday, October 28: 2 of 3 staffed, short 1, published 3 of 3",
     );
     expect(cell(/Monday, October 26/)).toHaveAccessibleName(
-      "North Wing, Day Shift · Med Aide, Monday, October 26: 1 of 3 staffed, short 2, already started, not counted",
+      "Day Shift · Med Aide, North Wing, Monday, October 26: 1 of 3 staffed, short 2, already started, not counted",
     );
     expect(screen.getByText("needs 3")).toBeInTheDocument();
   });
@@ -230,7 +230,7 @@ describe("CoveragePanel", () => {
     const cells = within(region).getAllByRole("button");
     expect(cells).toHaveLength(3);
     for (const button of cells) {
-      expect(button).toHaveAccessibleName(/North Wing, Day Shift · Med Aide, .+ staffed/);
+      expect(button).toHaveAccessibleName(/Day Shift · Med Aide, North Wing, .+ staffed/);
     }
     expect(within(region).getByText("Staff short")).toBeInTheDocument();
   });
@@ -247,7 +247,7 @@ describe("CoveragePanel", () => {
 
       fireEvent.click(cell(/Wednesday, October 28/));
 
-      expect(detail().getByRole("heading")).toHaveTextContent("North Wing · Day Shift · Med Aide");
+      expect(detail().getByRole("heading")).toHaveTextContent("Day Shift · Med Aide · North Wing");
       expect(detail().getByText("Wed, Oct 28")).toBeInTheDocument();
       expect(detail().getByText("Short 1")).toBeInTheDocument();
       expect(detail().getByText("3/3")).toBeInTheDocument();
@@ -446,7 +446,7 @@ describe("CoveragePanel", () => {
           kind === "pattern"
             ? []
             : [
-                `Wed, Oct 28 · North Wing · Day Shift · Med Aide: 2/3 staffed now, 3/3 after (${id})`,
+                `Wed, Oct 28 · Day Shift · Med Aide · North Wing: 2/3 staffed now, 3/3 after (${id})`,
               ],
       },
     });
@@ -505,7 +505,7 @@ describe("CoveragePanel", () => {
       expect(day().getByText("Outcome a")).toBeInTheDocument();
       expect(
         day().getByText(
-          "Wed, Oct 28 · North Wing · Day Shift · Med Aide: 2/3 staffed now, 3/3 after (a)",
+          "Wed, Oct 28 · Day Shift · Med Aide · North Wing: 2/3 staffed now, 3/3 after (a)",
         ),
       ).toBeInTheDocument();
       expect(day().getByText("Detail e")).toBeInTheDocument();

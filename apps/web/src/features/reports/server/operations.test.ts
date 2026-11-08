@@ -731,7 +731,7 @@ describe("operations reports", () => {
     });
     const avery = payload.reports.staffHours.find((row) => row.employeeName === "Avery Ng");
 
-    expect(avery?.shiftBreakdown).toBe("Day (North) (1, 8h); Day (South) (1, 6h)");
+    expect(avery?.shiftBreakdown).toBe("Day · North (1, 8h); Day · South (1, 6h)");
     expect(avery?.jobBreakdown).toBe("Caregiver (2, 14h)");
     expect(
       payload.reports.scheduleMatrix.rows.find((row) => row.employeeName === "Avery Ng"),
@@ -739,7 +739,7 @@ describe("operations reports", () => {
       focusAreas: "North",
       cells: {
         "2026-05-03": "DAY Caregiver / Late / Training",
-        "2026-05-04": "DAY Caregiver (South)",
+        "2026-05-04": "DAY Caregiver · South",
       },
     });
     expect(payload.filterOptions.shiftCategories).toEqual([
@@ -1302,19 +1302,19 @@ describe("operations reports", () => {
         headers: [
           "Staff member",
           "Date",
-          "Schedule area",
           "Shift",
           "Job",
+          "Schedule area",
           "Start time",
           "End time",
           "Mentoring hours",
         ],
-        firstRow: ["Avery Ng", "May 3, 2026", "North", "Day", "Caregiver", "7:00 AM", "3:00 PM", 8],
+        firstRow: ["Avery Ng", "May 3, 2026", "Day", "Caregiver", "North", "7:00 AM", "3:00 PM", 8],
       },
       {
         report: "coverage",
-        headers: ["Date", "Schedule area", "Shift", "Job", "Required", "Scheduled", "Open slots"],
-        firstRow: ["May 3, 2026", "North", "Day", "Caregiver", 2, 1, 1],
+        headers: ["Date", "Shift", "Job", "Schedule area", "Required", "Scheduled", "Open slots"],
+        firstRow: ["May 3, 2026", "Day", "Caregiver", "North", 2, 1, 1],
       },
       {
         report: "shift-period-summary",

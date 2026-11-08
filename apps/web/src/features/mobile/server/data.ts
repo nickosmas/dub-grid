@@ -543,7 +543,7 @@ function joinShiftNames(
       const shared = distinct.some((other) => other !== shift && other.name === shift.name);
       const area =
         shared && shift.focusAreaId != null ? focusAreaNameMap.get(shift.focusAreaId) : undefined;
-      return area ? `${shift.name} (${area})` : shift.name;
+      return area ? `${shift.name} · ${area}` : shift.name;
     })
     .join(" / ");
 }

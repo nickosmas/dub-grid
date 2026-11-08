@@ -172,7 +172,7 @@ import {
   singularLabelNoun,
   DEFAULT_ORGANIZATION_LABELS,
   orderFocusAreasByDepartment,
-  shiftDisplayNamesById,
+  sharedShiftFocusAreasById,
   capitalizeFirst,
   pluralLabelNoun,
 } from "@dubgrid/domain";
@@ -6710,16 +6710,15 @@ function SchedulerContent({
   // The staffing list has room to name every shift's job, even jobs the grid
   // hides, and to spell out absences rather than show their codes.
   const staffingAssignmentLabelById = useMemo(() => {
-    // Someone's other work can be in another focus area under the same name.
-    const shiftLabelById = shiftDisplayNamesById(shiftCategories, focusAreas);
+    // Someone's other work can be in another focus area under the same name,
+    // which follows the shift and job.
+    const sharedFocusAreaById = sharedShiftFocusAreasById(shiftCategories, focusAreas);
     return new Map(
       allAssignmentDefinitions.map((assignment) => {
         const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
         const category =
           shiftId != null ? (shiftCategories.find((item) => item.id === shiftId) ?? null) : null;
-        const shift = category
-          ? { ...category, name: shiftLabelById.get(category.id) ?? category.name }
-          : null;
+        const shift = category;
         const job =
           assignment.jobId != null
             ? (jobs.find((item) => item.id === assignment.jobId) ?? null)
@@ -6734,7 +6733,9 @@ function SchedulerContent({
           !parts.secondaryLabel && shift && job && !parts.isShiftOnly
             ? { ...parts, secondaryLabel: job.name }
             : parts;
-        return [assignment.id, formatAssignableShiftOptionLabel(withJob)];
+        const label = formatAssignableShiftOptionLabel(withJob);
+        const area = category ? sharedFocusAreaById.get(category.id) : undefined;
+        return [assignment.id, area ? `${label} · ${area}` : label];
       }),
     );
   }, [allAssignmentDefinitions, focusAreas, jobs, shiftCategories]);

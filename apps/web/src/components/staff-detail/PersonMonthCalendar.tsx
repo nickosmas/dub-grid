@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { shiftDisplayName } from "@dubgrid/domain";
+import { sharedShiftFocusArea } from "@dubgrid/domain";
 import { addDaysToIsoDate } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
@@ -34,6 +34,8 @@ interface PersonMonthCalendarProps {
 interface CalendarPill {
   key: string;
   name: string;
+  /** Leads the card when another focus area has a shift by this name. */
+  focusArea: string | null;
   detail: string | null;
   background: string;
   border: string;
@@ -124,19 +126,23 @@ export function PersonMonthCalendar({
         );
         const shift =
           assignment.shiftId != null ? lookups.shiftById.get(assignment.shiftId) : undefined;
-        const name = shift
-          ? shiftDisplayName(
+        const name = shift?.name ?? assignment.name;
+        const focusArea = shift
+          ? sharedShiftFocusArea(
               shift,
               [...lookups.shiftById.values()],
               (id) => lookups.focusAreaById.get(id)?.name,
             )
-          : assignment.name;
+          : null;
         const job =
           assignment.jobId != null ? lookups.jobById.get(assignment.jobId)?.name : undefined;
+        const jobDetail =
+          job && job.trim().toLowerCase() !== name.trim().toLowerCase() ? job : null;
         return {
           key: `shift-${assignment.id}`,
           name,
-          detail: job && job.trim().toLowerCase() !== name.trim().toLowerCase() ? job : null,
+          focusArea,
+          detail: jobDetail,
           background: colors.color,
           border: draftBorder ? `2px dashed ${draftBorder}` : FILLED_PILL_BORDER,
           text: colors.text,
@@ -151,6 +157,7 @@ export function PersonMonthCalendar({
       pills.push({
         key: `absence-${absence.id}`,
         name: absence.name || absence.label,
+        focusArea: null,
         detail: null,
         background: fill.background,
         border: draftBorder ? `2px dashed ${draftBorder}` : FILLED_PILL_BORDER,
@@ -241,7 +248,9 @@ export function PersonMonthCalendar({
                     {pills.map((pill) => (
                       <MaybeHint
                         key={pill.key}
-                        content={pill.detail ? `${pill.name}, ${pill.detail}` : pill.name}
+                        content={[pill.name, pill.detail, pill.focusArea]
+                          .filter(Boolean)
+                          .join(", ")}
                       >
                         <div
                           data-calendar-pill=""
@@ -257,9 +266,11 @@ export function PersonMonthCalendar({
                           <div className="truncate text-[length:var(--dg-type-badge-size)] font-semibold">
                             {pill.name}
                           </div>
-                          {pill.detail ? (
+                          {/* A day card has two lines, so the job and a shared
+                              name's focus area share the second. */}
+                          {pill.detail || pill.focusArea ? (
                             <div className="truncate text-[length:var(--dg-type-metadata-size)] font-medium opacity-80">
-                              {pill.detail}
+                              {[pill.detail, pill.focusArea].filter(Boolean).join(" · ")}
                             </div>
                           ) : null}
                         </div>

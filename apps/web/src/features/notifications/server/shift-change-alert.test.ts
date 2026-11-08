@@ -55,18 +55,18 @@ describe("buildShiftChangeAlert", () => {
     expect(alert).toEqual({
       title: "Your schedule for Thu, Oct 22 changed",
       message:
-        "Thu, Oct 22: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing → Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Memory Care",
+        "Thu, Oct 22: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs) → Day Shift · Registered Nurse · Memory Care · 7:00 AM - 3:00 PM (8 hrs)",
       metadata: { date: "2026-10-22", dates: ["2026-10-22"], publishHistoryId: "h-1" },
       email: {
         intro: "The latest published schedule changed these days for you.",
         details: [
           {
             label: "Thu, Oct 22 Before",
-            value: "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+            value: "Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
           },
           {
             label: "Thu, Oct 22 After",
-            value: "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Memory Care",
+            value: "Day Shift · Registered Nurse · Memory Care · 7:00 AM - 3:00 PM (8 hrs)",
           },
         ],
         closing: "Open the schedule in DubGrid to see your whole week.",
@@ -87,12 +87,12 @@ describe("buildShiftChangeAlert", () => {
     });
 
     expect(alert?.message).toBe(
-      "Fri, Oct 23: New: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+      "Fri, Oct 23: New: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
     );
     expect(alert?.email.details).toEqual([
       {
         label: "Fri, Oct 23 New",
-        value: "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+        value: "Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
       },
     ]);
   });
@@ -106,7 +106,7 @@ describe("buildShiftChangeAlert", () => {
 
     expect(alert?.title).toBe("Your schedule changed on 2 days");
     expect(alert?.message.split("\n")).toEqual([
-      "Tue, Oct 20: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing → No shift",
+      "Tue, Oct 20: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs) → No shift",
       expect.stringMatching(/^Thu, Oct 22: /),
     ]);
     expect(alert?.metadata.date).toBe("2026-10-20");
@@ -124,12 +124,12 @@ describe("buildShiftChangeAlert", () => {
       {
         label: "Sat, Oct 24 Before (16 hrs)",
         value:
-          "Shift 1: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing; Shift 2: Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing (removed)",
+          "Shift 1: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs); Shift 2: Evening Shift · Registered Nurse · Skilled Nursing · 3:00 PM - 11:00 PM (8 hrs) (removed)",
       },
       {
         label: "Sat, Oct 24 After (5 hrs)",
         value:
-          "Shift 1: Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (5 hrs) · Skilled Nursing; Absence: Sick (part of day) (added)",
+          "Shift 1: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 12:00 PM (5 hrs); Absence: Sick (part of day) (added)",
       },
     ]);
   });

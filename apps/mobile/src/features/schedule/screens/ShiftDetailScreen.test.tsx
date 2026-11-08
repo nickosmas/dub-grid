@@ -508,8 +508,9 @@ describe("ShiftDetailScreen", () => {
     expect(detailCardText).toBeDefined();
     expect(detailCardText!.indexOf("Day Shift")).toBeLessThan(detailCardText!.indexOf("Mentor"));
     expect(detailCardText!.indexOf("Mentor")).toBeLessThan(detailCardText!.indexOf("ICU"));
-    expect(detailCardText!.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(
-      detailCardText!.indexOf("ICU"),
+    // The focus area comes before the time.
+    expect(detailCardText!.indexOf("ICU")).toBeLessThan(
+      detailCardText!.indexOf("7:00 AM - 3:00 PM"),
     );
     expect(
       within(screen.getByTestId("shift-detail-card")).queryByText("Focus area"),
@@ -776,8 +777,8 @@ describe("ShiftDetailScreen", () => {
     );
     expect(detailCardText!.indexOf("Supervisor")).toBeLessThan(detailCardText!.indexOf("Bri Shaw"));
     expect(detailCardText!.indexOf("Bri Shaw")).toBeLessThan(detailCardText!.indexOf("Emergency"));
-    expect(detailCardText!.indexOf("7:00 AM - 3:00 PM")).toBeLessThan(
-      detailCardText!.indexOf("Emergency"),
+    expect(detailCardText!.indexOf("Emergency")).toBeLessThan(
+      detailCardText!.indexOf("7:00 AM - 3:00 PM"),
     );
     expect(detailCardText!.indexOf("Bri Shaw")).toBeGreaterThan(
       detailCardText!.indexOf("Day Shift"),
@@ -2372,8 +2373,8 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("You give")).toBeInTheDocument();
     expect(screen.getByText("You get")).toBeInTheDocument();
     expect(screen.getByText("From Chris Hall")).toBeInTheDocument();
-    expect(screen.getByText("7:00 AM - 3:00 PM · ICU")).toBeInTheDocument();
-    expect(screen.getByText("3:00 PM - 11:00 PM · Emergency")).toBeInTheDocument();
+    expect(screen.getByText("ICU · 7:00 AM - 3:00 PM")).toBeInTheDocument();
+    expect(screen.getByText("Emergency · 3:00 PM - 11:00 PM")).toBeInTheDocument();
     expect(screen.queryByLabelText("Eligible swap dates")).not.toBeInTheDocument();
     expect(screen.queryByText("Back to eligible teammates")).not.toBeInTheDocument();
     expect(screen.getAllByText("Back")).toHaveLength(1);
@@ -2611,7 +2612,7 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Drop shift"));
     expect(
       screen.getByRole("button", {
-        name: /Shift 1: Day Shift \(7:00 AM - 3:00 PM\) · In progress/i,
+        name: /Shift 1: Day Shift · 7:00 AM - 3:00 PM · In progress/i,
       }),
     ).toBeDisabled();
     fireEvent.click(screen.getByText("Offer for pickup"));

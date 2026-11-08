@@ -95,7 +95,7 @@ export function exportScheduleCSV(
 
 /** A cell's text naming the focus areas of work outside the person's own, as the grid marks it. */
 export function withOtherFocusAreas(text: string, otherFocusAreaNames: string[]): string {
-  return otherFocusAreaNames.length > 0 ? `${text} (${otherFocusAreaNames.join(", ")})` : text;
+  return otherFocusAreaNames.length > 0 ? `${text} · ${otherFocusAreaNames.join(", ")}` : text;
 }
 
 /** Hands the browser a CSV file to save. */

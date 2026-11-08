@@ -43,6 +43,8 @@ export type ShiftmateSegmentGroup = {
   key: string;
   label: string;
   title: string;
+  /** Under the title when the day's other half has the same name. */
+  focusArea: string | null;
   timeRange: string | null;
   entries: ShiftmateSegmentMatch[];
 };
@@ -138,13 +140,6 @@ export function getSegmentTitle(segment: MobileScheduleEntrySegment): string {
   return segment.shiftName?.trim() || segment.label?.trim() || "Shift";
 }
 
-/** "Day Shift in East Wing": two focus areas can share a shift's name. */
-export function getSegmentTitleWithFocusArea(segment: MobileScheduleEntrySegment): string {
-  const title = getSegmentTitle(segment);
-  const area = segment.displayFocusAreaName?.trim();
-  return area ? `${title} in ${area}` : title;
-}
-
 export function getSegmentTimeKey(segment: MobileScheduleEntrySegment): string {
   return `${segment.startTime ?? segment.shiftStartTime ?? ""}-${
     segment.endTime ?? segment.shiftEndTime ?? ""
@@ -236,7 +231,14 @@ export function buildShiftmateSegmentGroups(
     return {
       key: `${segmentIndex}-${getSegmentTitle(sourceSegment)}-${getSegmentTimeKey(sourceSegment)}`,
       label: `Shift ${segmentIndex + 1}`,
-      title: getSegmentTitleWithFocusArea(sourceSegment),
+      title: getSegmentTitle(sourceSegment),
+      focusArea:
+        (splitSegments.some(
+          (other) =>
+            other !== sourceSegment && getSegmentTitle(other) === getSegmentTitle(sourceSegment),
+        ) &&
+          sourceSegment.displayFocusAreaName?.trim()) ||
+        null,
       timeRange: getScheduleEntrySegmentTimeRange(sourceSegment),
       entries,
     };
@@ -281,10 +283,10 @@ export function getActionSegmentLabel(
   const name = nameOf(option.segment);
   const shared = options.some((other) => other !== option && nameOf(other.segment) === name);
   const area = alwaysNameFocusArea || shared ? option.segment.displayFocusAreaName?.trim() : null;
-  const title = area ? `${name} in ${area}` : name;
   const timeRange = getScheduleEntrySegmentTimeRange(option.segment);
 
-  return timeRange ? `${title} (${timeRange})` : title;
+  // Shift, then focus area, then time, as every shift is named.
+  return [name, area, timeRange].filter(Boolean).join(" · ");
 }
 
 export function getCurrentDateTimeParts(timeZone?: string | null): {

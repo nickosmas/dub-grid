@@ -220,7 +220,7 @@ async function exportSchedule(
     const text = publishedCellText(entry, absenceTypeById);
     shiftIndex.set(
       `${entry.empId}:${entry.date}`,
-      otherAreas.length > 0 ? `${text} (${otherAreas.join(", ")})` : text,
+      otherAreas.length > 0 ? `${text} · ${otherAreas.join(", ")}` : text,
     );
   }
 

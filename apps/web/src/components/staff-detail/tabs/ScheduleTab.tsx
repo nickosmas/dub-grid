@@ -406,6 +406,11 @@ function WeekPill({ pill }: { pill: DayPill }) {
           {pill.jobName}
         </span>
       ) : null}
+      {pill.focusArea ? (
+        <span className="mt-px text-[length:var(--dg-type-metadata-size)] font-medium leading-[1.25] opacity-80">
+          {pill.focusArea}
+        </span>
+      ) : null}
       {pill.time ? (
         <span className="dg-tabular-nums mt-px whitespace-nowrap text-[length:var(--dg-type-metadata-size)] leading-[1.25]">
           {pill.time}

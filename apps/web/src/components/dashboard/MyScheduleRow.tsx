@@ -1,4 +1,4 @@
-import { capitalizeFirst, shiftDisplayNamesById } from "@dubgrid/domain";
+import { capitalizeFirst, sharedShiftFocusAreasById } from "@dubgrid/domain";
 import { layoutEntryAbsence } from "@/lib/absence-pill";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -106,6 +106,7 @@ type MyScheduleRowProps = Pick<
 
 type MyScheduleShift = {
   label: string;
+  sharedFocusArea: string | null;
   jobName: string | null;
   timeRange: string | null;
   background: string;
@@ -154,12 +155,21 @@ function resolveShiftJobName(
 function resolveShiftDisplayName(
   segment: Partial<ShiftJobSegment>,
   assignment: AssignmentDefinition | null,
-  shiftLabelById: Map<number, string>,
+  shiftById: Map<number, ShiftCategory>,
 ): string | null {
-  const shiftId = segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
-  // The label names the focus area when another area has a shift by this name.
-  if (shiftId != null && shiftLabelById.has(shiftId)) return shiftLabelById.get(shiftId)!;
-  return segment.shiftName ?? null;
+  if (segment.shiftName) return segment.shiftName;
+
+  const shiftId = resolveShiftId(segment, assignment);
+  if (shiftId == null) return null;
+
+  return shiftById.get(shiftId)?.name ?? null;
+}
+
+function resolveShiftId(
+  segment: Partial<ShiftJobSegment>,
+  assignment: AssignmentDefinition | null,
+): number | null {
+  return segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
 }
 
 type MyScheduleDay = {
@@ -195,7 +205,8 @@ function buildWorkedShifts(input: {
   entry: ScheduleCellStateEntry;
   assignmentById: Map<number, AssignmentDefinition>;
   jobById: Map<number, JobDefinition>;
-  shiftLabelById: Map<number, string>;
+  shiftById: Map<number, ShiftCategory>;
+  sharedFocusAreaByShiftId: Map<number, string>;
   isDarkTheme: boolean;
 }): MyScheduleShift[] {
   const { entry } = input;
@@ -232,15 +243,19 @@ function buildWorkedShifts(input: {
         )
       : null;
     const label =
-      resolveShiftDisplayName(segment, assignment, input.shiftLabelById) ||
+      resolveShiftDisplayName(segment, assignment, input.shiftById) ||
       assignment?.name ||
       assignment?.label ||
       segment.label ||
       entry.label ||
       "Shift";
     const jobName = resolveShiftJobName(segment, assignment, input.jobById);
+    const shiftId = resolveShiftId(segment, assignment);
     shifts.push({
       label,
+      // Under the name, when another focus area has a shift by this name.
+      sharedFocusArea:
+        shiftId != null ? (input.sharedFocusAreaByShiftId.get(shiftId) ?? null) : null,
       // Shiftless jobs (no shift attached) can resolve the same name for
       // both the shift label above and the job name here — don't show a
       // job line that just repeats the shift line verbatim.
@@ -312,7 +327,7 @@ function buildMyScheduleDay(input: {
   absenceTypeById: Map<number, AbsenceType>;
   jobById: Map<number, JobDefinition>;
   shiftById: Map<number, ShiftCategory>;
-  shiftLabelById: Map<number, string>;
+  sharedFocusAreaByShiftId: Map<number, string>;
   isDarkTheme: boolean;
   recentPublishedChanges: Map<string, PublishChange>;
   publishedAssignmentIdByPair: Map<string, number>;
@@ -382,6 +397,7 @@ function buildMyScheduleDay(input: {
     const resolved = absence ? absenceStripeFill(absence.color, input.isDarkTheme) : null;
     return {
       label: absence?.name ?? fallbackLabel,
+      sharedFocusArea: null,
       jobName: null,
       timeRange: null,
       background: resolved?.background ?? "var(--dg-color-bg-secondary)",
@@ -414,7 +430,8 @@ function buildMyScheduleDay(input: {
     entry: displayEntry,
     assignmentById: input.assignmentById,
     jobById: input.jobById,
-    shiftLabelById: input.shiftLabelById,
+    shiftById: input.shiftById,
+    sharedFocusAreaByShiftId: input.sharedFocusAreaByShiftId,
     isDarkTheme: input.isDarkTheme,
   });
   // A shift removed in the last publish has no cell left, so no notes either.
@@ -491,7 +508,7 @@ function buildMyScheduleDays(input: {
   absenceTypeById: Map<number, AbsenceType>;
   jobById: Map<number, JobDefinition>;
   shiftById: Map<number, ShiftCategory>;
-  shiftLabelById: Map<number, string>;
+  sharedFocusAreaByShiftId: Map<number, string>;
   periodDates: Date[];
   isDarkTheme: boolean;
   recentPublishedChanges: Map<string, PublishChange>;
@@ -509,7 +526,7 @@ function buildMyScheduleDays(input: {
       absenceTypeById: input.absenceTypeById,
       jobById: input.jobById,
       shiftById: input.shiftById,
-      shiftLabelById: input.shiftLabelById,
+      sharedFocusAreaByShiftId: input.sharedFocusAreaByShiftId,
       isDarkTheme: input.isDarkTheme,
       recentPublishedChanges: input.recentPublishedChanges,
       publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
@@ -727,6 +744,22 @@ function ShiftPill({
       >
         {jobName ?? " "}
       </div>
+      {/* Shift, job, then the focus area when another area shares the name. */}
+      {shift.sharedFocusArea ? (
+        <div
+          data-shared-focus-area=""
+          style={{
+            fontSize: "var(--dg-type-metadata-size)",
+            fontWeight: 500,
+            marginTop: 1,
+            opacity: 0.8,
+            lineHeight: 1.25,
+            overflowWrap: "break-word",
+          }}
+        >
+          {shift.sharedFocusArea}
+        </div>
+      ) : null}
       {/* The note icon (a stack when there are several) ends the time row,
           so a pill with notes is no taller. */}
       <div
@@ -916,8 +949,8 @@ export default function MyScheduleRow({
     () => new Map(shiftCategories.map((shift) => [shift.id, shift])),
     [shiftCategories],
   );
-  const shiftLabelById = useMemo(
-    () => shiftDisplayNamesById(shiftCategories, focusAreas),
+  const sharedFocusAreaByShiftId = useMemo(
+    () => sharedShiftFocusAreasById(shiftCategories, focusAreas),
     [shiftCategories, focusAreas],
   );
   const shiftChangeResolvers = useMemo(
@@ -941,7 +974,7 @@ export default function MyScheduleRow({
             absenceTypeById,
             jobById,
             shiftById,
-            shiftLabelById,
+            sharedFocusAreaByShiftId,
             periodDates,
             isDarkTheme,
             recentPublishedChanges,
@@ -958,7 +991,7 @@ export default function MyScheduleRow({
       absenceTypeById,
       jobById,
       shiftById,
-      shiftLabelById,
+      sharedFocusAreaByShiftId,
       periodDates,
       isDarkTheme,
       recentPublishedChanges,

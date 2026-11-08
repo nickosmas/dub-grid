@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { DAY_LABELS } from "@/lib/constants";
-import { shiftDisplayName } from "@dubgrid/domain";
+import { sharedShiftFocusArea } from "@dubgrid/domain";
 import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import {
@@ -27,6 +27,8 @@ import type {
 export type DayPill = {
   key: string;
   name: string;
+  /** Shown under the name when another focus area has a shift by this name. */
+  focusArea: string | null;
   jobName: string | null;
   /** "7:00 AM - 3:30 PM", when the pattern sets times. */
   time: string | null;
@@ -69,6 +71,7 @@ export function buildDayPills(
       {
         key: `${recurringShift.id}-absence`,
         name: absence?.name || absence?.label || recurringShift.shiftLabel,
+        focusArea: null,
         jobName: null,
         time: null,
         background: resolved?.background ?? NEUTRAL_PILL.background,
@@ -83,6 +86,7 @@ export function buildDayPills(
       {
         key: `${recurringShift.id}-0`,
         name: recurringShift.presentation?.shiftName || recurringShift.shiftLabel,
+        focusArea: null,
         jobName: null,
         time: formatScheduleTimeRange(
           recurringShift.presentation?.startTime ?? null,
@@ -111,10 +115,11 @@ export function buildDayPills(
     // exactly as the dashboard's schedule row does.
     const shiftId = segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
     const shift = shiftId != null ? shiftById.get(shiftId) : undefined;
+    const focusArea =
+      shift && lookups.focusAreaName
+        ? sharedShiftFocusArea(shift, [...shiftById.values()], lookups.focusAreaName)
+        : null;
     const name =
-      (shift && lookups.focusAreaName
-        ? shiftDisplayName(shift, [...shiftById.values()], lookups.focusAreaName)
-        : null) ||
       segment.shiftName ||
       shift?.name ||
       assignment?.name ||
@@ -127,6 +132,7 @@ export function buildDayPills(
     return {
       key: `${recurringShift.id}-${index}`,
       name,
+      focusArea,
       // A shiftless job resolves the same text into both lines; one of them is
       // enough.
       jobName: jobName && normalizeName(jobName) !== normalizeName(name) ? jobName : null,
@@ -223,6 +229,11 @@ export function RecurringScheduleCard({
                             {pill.jobName ? (
                               <span className="text-[length:var(--dg-type-metadata-size)] font-medium opacity-80">
                                 {pill.jobName}
+                              </span>
+                            ) : null}
+                            {pill.focusArea ? (
+                              <span className="text-[length:var(--dg-type-metadata-size)] font-medium opacity-80">
+                                {pill.focusArea}
                               </span>
                             ) : null}
                           </div>
