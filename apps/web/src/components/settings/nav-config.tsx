@@ -184,7 +184,7 @@ export function buildNavGroups(
     if (perms.canManageOrgSettings)
       schedItems.push({
         id: "org-display",
-        label: "Shift Display Mode",
+        label: "Schedule Display",
         Icon: DisplayIcon,
         description: "How shifts look on the schedule, and what staff see after a publish.",
       });
