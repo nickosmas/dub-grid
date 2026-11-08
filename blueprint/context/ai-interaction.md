@@ -88,9 +88,10 @@ something done.
     workflow files changed. Then it archives the spec to `blueprint/history/features/NN-name.md` (or
     `blueprint/history/fixes/`), checks the feature off in `blueprint/build-plan.md`, and
     resets `blueprint/context/current-feature.md` to its stub.
-11. **Feature commit** - `/complete` squash-merges the work branch (step work
-    plus the logging changes) into `dev` as one conventional feature commit,
-    then deletes the branch.
+11. **Feature commit** - `/complete` pushes the work branch (step work plus
+    the logging changes) and opens a pull request into `dev`, which
+    squash-merges as one conventional feature commit once every check is
+    green, then deletes the branch.
 12. **Release PR** - Keep `main` untouched during development. After work
     merges into `dev`, create or update a PR from `dev` to `main` after
     auditing the diff and included commits, and merge it once every GitHub
@@ -135,12 +136,13 @@ decisions.
 
 Build every feature, fix, and rollback on its own branch cut from `dev`, named
 with the prefix in `blueprint/config.json`, and squash-merge it back into `dev`
-through `/complete`. Where a Blueprint skill names `main` or the default branch
+through a pull request opened by `/complete`. Where a Blueprint skill names `main` or the default branch
 as the merge target, read `dev`. Never work on `main`; it is reserved for an
 explicitly requested release PR from `dev`.
 
-Every session that edits files creates its work branch in its own worktree,
-squashes it onto `dev` there, and pushes with `HEAD:dev` after a separate yes.
+Every session that edits files creates its work branch in its own worktree
+and lands it through a pull request into `dev`; nothing pushes to `dev`
+directly. Update a branch by merging `origin/dev` into it, not by rebasing.
 Never switch the shared checkout off `dev`. An editor-embedded agent keeps its
 worktree inside the workspace (for example `.claude/worktrees/`) so the user
 can still see it. See "Several agents share this

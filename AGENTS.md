@@ -39,15 +39,23 @@ its own local branch cut from `dev`, named with the matching prefix from
 `blueprint/config.json` (`git.featureBranchPrefix`, `git.fixBranchPrefix`,
 `git.rollbackBranchPrefix`) plus a short name from the spec, for example
 `feature/42d-secondary-surfaces` or `fix/mobile-online-flag`. Configured
-checkpoint commits go on that branch. `/complete` squash-merges it into `dev` as
-one conventional commit and deletes it. Wherever a Blueprint skill names `main`
-or the default branch as the target of that merge, read `dev`; each workflow
-skill repeats this in a one-line **DubGrid** note under its title.
+checkpoint commits go on that branch. `/complete` pushes it and opens a pull
+request into `dev`, which squash-merges as one conventional commit and deletes
+the branch. Wherever a Blueprint skill names `main` or the default branch as
+the target of that merge, read `dev`; each workflow skill repeats this in a
+one-line **DubGrid** note under its title.
+
+`dev` on GitHub changes only through a merged pull request (owner, 2026-11-08).
+Never push to `dev` directly, `HEAD:dev` included: a direct push lands untested
+and moves the base under every open pull request. Where a skill squash-merges
+into `dev` locally and then pushes `dev`, push the work branch and open a pull
+request instead. Bring a branch up to date by merging `origin/dev` into it,
+never by rebasing it once it is pushed, so nothing is force-pushed and the merge
+hooks below can repair generated files.
 
 Do not develop on `main`. Keep `main` for an explicitly requested release PR
 whose head is `dev`; preparing that PR does not authorize a checkout, merge,
-rewrite, or push of `main`. Pushing `dev` needs its own explicit yes, as the
-Blueprint skills already require.
+rewrite, or push of `main`.
 
 A release PR merges only once every GitHub check on it is green: no pending,
 no failing, no skipped-by-cancel. A merge authorization given before the
@@ -115,19 +123,18 @@ ln -s "$R/apps/web/node_modules" "$W/apps/web/node_modules"
 ln -s "$R/apps/mobile/node_modules" "$W/apps/mobile/node_modules"
 # /implement: edit, type-check, test and checkpoint-commit inside $W
 git -C "$W" add -- <exact paths> && git -C "$W" commit
-# /complete: squash the branch onto dev as one commit, still inside $W
-git -C "$W" checkout -q --detach dev
-git -C "$W" merge --squash "$B" && git -C "$W" commit
-git branch -D "$B"                              # squashed, so -d cannot see it merged
-# push only after a separate yes
-git -C "$W" fetch -q origin && git -C "$W" rebase origin/dev   # commit first: rebase
-git -C "$W" push origin HEAD:dev                               # refuses a dirty tree
+# /complete: the work commit goes on the branch, then a pull request into dev
+git -C "$W" fetch -q origin && git -C "$W" merge origin/dev    # catch up: merge, never rebase
+git -C "$W" push -u origin "$B"
+gh pr create --base dev --head "$B"             # conventional title, as the squash commit
+gh pr checks <n> --watch --fail-fast            # then read every check: all pass
+gh pr merge <n> --squash --delete-branch        # a separate command, never chained
 git merge --ff-only origin/dev                  # in the repo root: keep it current
-git worktree remove --force "$W" && git worktree prune
+git worktree remove --force "$W" && git worktree prune && git branch -D "$B"
 ```
 
-Without a push, fast-forward the root's `dev` to the squash commit instead
-(`git merge --ff-only <sha>` in the repo root), so the next session sees it.
+When `dev` moves before the pull request merges, merge `origin/dev` into the
+branch again and push; the checks rerun against the combined code.
 
 Never switch the repo root off `dev`: every session sharing that tree would
 move with it. An editor-embedded agent (Cursor, Copilot, Zed, Windsurf, the
@@ -138,15 +145,23 @@ A cloud session in its own container is already isolated and pushes a
 `claude/*` branch instead, per `CONTRIBUTING.md`; it follows the first rule
 only.
 
-The squash step detaches because git allows a branch in one worktree only, and
-`dev` is already checked out at the repo root. Detaching creates no extra
-branch, and pushing `HEAD:dev` lands the squash commit on `dev`.
+Cut the branch from `origin/dev` after a fetch: every change reaches `dev`
+through a pull request, so GitHub holds the current `dev`. Never force-push. A
+merge conflict means another session touched the same files, so resolve it
+deliberately; in the shared checkout that edit would have overwritten your work
+silently.
 
-Cut the branch from local `dev` rather than `origin/dev`: other sessions
-often hold unpushed commits there. Rebase onto `origin/dev` before pushing and
-never force-push. A rebase conflict means another session touched the same
-files, so resolve it deliberately; in the shared checkout that edit would have
-overwritten your work silently.
+Generated files resolve themselves. Run `npm run hooks:install` once per clone
+(worktrees share it): it enables `.githooks` and the `dubgrid-generated` merge
+driver that `.gitattributes` names for the documentation inventory and the
+accuracy manifest. The driver takes this branch's copy of a file both sides
+changed, and the `post-merge` hook (or `pre-commit`, after you resolve other
+conflicts by hand) rebuilds it from the merged code into the merge commit: the
+inventory is
+regenerated and each conflicting page's evidence fingerprint is recorded again.
+A conflict in any other part of the manifest is left for you to resolve.
+GitHub's Update branch button cannot run the driver, so update branches
+locally.
 
 Symlink `node_modules` per workspace and never run `npm install` inside the
 worktree. Hooks run there normally, so the pre-commit and pre-push gates still
@@ -156,7 +171,7 @@ Verify a commit from inside the worktree, never from the main checkout. That
 tree carries other sessions' uncommitted changes, so it can pass while the
 commit on its own does not.
 
-Fast-forward the main checkout after pushing. The Blueprint reads its state
+Fast-forward the main checkout after a merge. The Blueprint reads its state
 from there, not from your worktree: `blueprint/context/current-feature.md` is
 loaded into every session by `CLAUDE.md`, and `blueprint/build-plan.md` and
 `blueprint/history/` drive the next step. Skipping the merge leaves the next
@@ -164,8 +179,8 @@ session working from a stale spec. Check first whether it will be refused, and
 report it rather than leaving the tree behind if so:
 
 ```bash
-git -C "$W" diff --name-only dev..HEAD > /tmp/mine.lst
-git diff --name-only | grep -Fxf /tmp/mine.lst   # any hit blocks --ff-only
+git fetch -q origin && git diff --name-only dev..origin/dev > /tmp/incoming.lst
+git diff --name-only | grep -Fxf /tmp/incoming.lst   # any hit blocks --ff-only
 ```
 
 `blueprint/.state/run.json` is the exception: it is gitignored, so it cannot

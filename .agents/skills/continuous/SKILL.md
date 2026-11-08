@@ -7,7 +7,9 @@ description: Explicit multi-feature Blueprint mode that builds every remaining p
 
 **DubGrid:** work branches are cut from `dev` and merge into `dev`. Wherever
 this skill says `main` or the default branch, read `dev`; `main` only takes
-a release PR from `dev`.
+a release PR from `dev`. Where it squash-merges locally and pushes, push the
+work branch and open a pull request into `dev` instead: `dev` changes only
+through a merged pull request (see "DubGrid Git policy" in `AGENTS.md`).
 
 **First action:** Before project inspection, preflight, or any other tool call,
 publish `running` to `blueprint/.state/run.json` using the dashboard activity
