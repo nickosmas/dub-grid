@@ -74,6 +74,7 @@ import {
   changedElsewhereMessage,
   pluralLabelNoun,
   singularLabelNoun,
+  shiftDisplayName,
   DEFAULT_ORGANIZATION_LABELS,
 } from "@dubgrid/domain";
 
@@ -973,24 +974,15 @@ function JobRow({
       ),
     [activeShifts, form.focusAreaIds],
   );
-  const shiftNameCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const shift of availableShifts) {
-      counts.set(shift.name, (counts.get(shift.name) ?? 0) + 1);
-    }
-    return counts;
-  }, [availableShifts]);
   const shiftLabelById = useMemo(
     () =>
       new Map(
-        activeShifts.map((shift) => {
-          const focusAreaName =
-            shift.focusAreaId != null ? focusAreaNameById.get(shift.focusAreaId) : null;
-          const shouldPrefix = focusAreaName != null && (shiftNameCounts.get(shift.name) ?? 0) > 1;
-          return [shift.id, shouldPrefix ? `${focusAreaName} · ${shift.name}` : shift.name];
-        }),
+        activeShifts.map((shift) => [
+          shift.id,
+          shiftDisplayName(shift, activeShifts, (id) => focusAreaNameById.get(id)),
+        ]),
       ),
-    [activeShifts, focusAreaNameById, shiftNameCounts],
+    [activeShifts, focusAreaNameById],
   );
   const selectedShifts = useMemo(
     () => availableShifts.filter((shift) => form.applicableShiftIds.includes(shift.id)),

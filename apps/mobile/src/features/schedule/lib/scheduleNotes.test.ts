@@ -95,6 +95,20 @@ describe("scheduleNoteGroups", () => {
     ]);
   });
 
+  it("names each half's focus area when both are a Day Shift", () => {
+    const otherDay = {
+      ...day,
+      shiftId: 36,
+      focusAreaId: 22,
+      displayFocusAreaName: "Memory Care",
+    };
+    const notes = [onShift(1, 34), { ...onShift(2, 36), focusAreaId: 22 }];
+    expect(scheduleNoteGroups(notes, [day, otherDay]).map((group) => group.title)).toEqual([
+      "Day Shift in Skilled Nursing",
+      "Day Shift in Memory Care",
+    ]);
+  });
+
   it("titles a half without a shift name by its focus area", () => {
     const unnamed = { ...evening, shiftName: "" };
     expect(scheduleNoteGroups([onShift(1, 35)], [day, unnamed])[0]?.title).toBe("Skilled Nursing");

@@ -4,6 +4,14 @@ interface ExportEmployee {
   id: string;
   firstName: string | null;
   lastName: string | null;
+  focusAreaIds?: number[];
+}
+
+interface ScheduleCsvOptions {
+  /** The org's word for its focus areas, heading a column of each person's. */
+  focusAreaColumn?: string;
+  focusAreaNameById?: ReadonlyMap<number, string>;
+  filename?: string;
 }
 
 const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -46,23 +54,48 @@ export function withRestOfDayAbsence(
  * Exports the schedule as a CSV file. Rows = employees, columns = dates.
  * Each cell contains the shift code label(s) or absence type label.
  */
+/** The schedule as CSV text: a row per person, with their focus areas when asked. */
+export function buildScheduleCsv(
+  employees: ExportEmployee[],
+  dates: Date[],
+  shiftForKey: (empId: string, date: Date) => string | null,
+  options: Omit<ScheduleCsvOptions, "filename"> = {},
+): string {
+  const { focusAreaColumn, focusAreaNameById } = options;
+  const headerRow = [
+    "Employee",
+    ...(focusAreaColumn ? [focusAreaColumn] : []),
+    ...dates.map(formatDateHeader),
+  ].map(escapeCSVField);
+
+  const dataRows = employees.map((emp) => {
+    const name = formatEmployeeName(emp);
+    const areas = (emp.focusAreaIds ?? [])
+      .map((id) => focusAreaNameById?.get(id))
+      .filter(Boolean)
+      .join("; ");
+    const cells = dates.map((date) => shiftForKey(emp.id, date) ?? "");
+    return [name, ...(focusAreaColumn ? [areas] : []), ...cells].map(escapeCSVField);
+  });
+
+  return [headerRow, ...dataRows].map((row) => row.join(",")).join("\r\n");
+}
+
 export function exportScheduleCSV(
   employees: ExportEmployee[],
   dates: Date[],
   shiftForKey: (empId: string, date: Date) => string | null,
-  filename?: string,
+  options: ScheduleCsvOptions = {},
 ): void {
-  const headerRow = ["Employee", ...dates.map(formatDateHeader)].map(escapeCSVField);
+  downloadCsvFile(
+    buildScheduleCsv(employees, dates, shiftForKey, options),
+    options.filename ?? `schedule-${new Date().toISOString().slice(0, 10)}.csv`,
+  );
+}
 
-  const dataRows = employees.map((emp) => {
-    const name = formatEmployeeName(emp);
-    const cells = dates.map((date) => shiftForKey(emp.id, date) ?? "");
-    return [name, ...cells].map(escapeCSVField);
-  });
-
-  const csvContent = [headerRow, ...dataRows].map((row) => row.join(",")).join("\r\n");
-
-  downloadCsvFile(csvContent, filename ?? `schedule-${new Date().toISOString().slice(0, 10)}.csv`);
+/** A cell's text naming the focus areas of work outside the person's own, as the grid marks it. */
+export function withOtherFocusAreas(text: string, otherFocusAreaNames: string[]): string {
+  return otherFocusAreaNames.length > 0 ? `${text} (${otherFocusAreaNames.join(", ")})` : text;
 }
 
 /** Hands the browser a CSV file to save. */

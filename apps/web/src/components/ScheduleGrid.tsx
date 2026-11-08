@@ -29,7 +29,7 @@ import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import { formatReturnDate, type StatusMarkKind } from "@dubgrid/domain";
+import { formatReturnDate, shiftDisplayName, type StatusMarkKind } from "@dubgrid/domain";
 import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import {
   formatShiftChangeHours,
@@ -1548,12 +1548,22 @@ const SectionBlock = memo(function SectionBlock({
         const rightLabel = categoryById.get(rightCategoryId)?.name ?? `Category ${rightCategoryId}`;
         return leftLabel.localeCompare(rightLabel);
       })
-      .map(([categoryId, counts]) => ({
-        categoryId,
-        label: categoryById.get(categoryId)?.name ?? `Category ${categoryId}`,
-        counts,
-      }));
-  }, [dailyTotals, categoryById, weekDates.length]);
+      .map(([categoryId, counts]) => {
+        const category = categoryById.get(categoryId);
+        return {
+          categoryId,
+          // A guest's shift from another area can share this section's shift name.
+          label: category
+            ? shiftDisplayName(
+                category,
+                shiftCategories,
+                (id) => focusAreas.find((fa) => fa.id === id)?.name,
+              )
+            : `Category ${categoryId}`,
+          counts,
+        };
+      });
+  }, [dailyTotals, categoryById, weekDates.length, shiftCategories, focusAreas]);
 
   const hasAnyTotals = totalRows.length > 0;
 
@@ -5030,7 +5040,7 @@ const SectionBlock = memo(function SectionBlock({
                 const isLastRow = rowIndex === totalRows.length - 1;
                 return (
                   <div
-                    key={`total-row-${row.label}`}
+                    key={`total-row-${row.categoryId}`}
                     className="dg-row-enter"
                     data-tally-row={`category-${row.categoryId}`}
                     style={{

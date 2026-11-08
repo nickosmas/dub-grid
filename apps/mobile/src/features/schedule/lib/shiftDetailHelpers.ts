@@ -138,6 +138,13 @@ export function getSegmentTitle(segment: MobileScheduleEntrySegment): string {
   return segment.shiftName?.trim() || segment.label?.trim() || "Shift";
 }
 
+/** "Day Shift in East Wing": two focus areas can share a shift's name. */
+export function getSegmentTitleWithFocusArea(segment: MobileScheduleEntrySegment): string {
+  const title = getSegmentTitle(segment);
+  const area = segment.displayFocusAreaName?.trim();
+  return area ? `${title} in ${area}` : title;
+}
+
 export function getSegmentTimeKey(segment: MobileScheduleEntrySegment): string {
   return `${segment.startTime ?? segment.shiftStartTime ?? ""}-${
     segment.endTime ?? segment.shiftEndTime ?? ""
@@ -229,7 +236,7 @@ export function buildShiftmateSegmentGroups(
     return {
       key: `${segmentIndex}-${getSegmentTitle(sourceSegment)}-${getSegmentTimeKey(sourceSegment)}`,
       label: `Shift ${segmentIndex + 1}`,
-      title: getSegmentTitle(sourceSegment),
+      title: getSegmentTitleWithFocusArea(sourceSegment),
       timeRange: getScheduleEntrySegmentTimeRange(sourceSegment),
       entries,
     };
@@ -252,7 +259,16 @@ export function getActionSegmentOptions(entry: MobileScheduleEntry) {
   return getSortedEntrySegments(entry).map((segment, index) => ({ segment, segmentIndex: index }));
 }
 
-export function getActionSegmentLabel(entry: MobileScheduleEntry, segmentIndex: number): string {
+/**
+ * "Day Shift (7:00 AM - 3:00 PM)", naming the focus area when another of the
+ * day's shifts has the same name, or always with `alwaysNameFocusArea` for
+ * lists of other people's shifts, which can come from any focus area.
+ */
+export function getActionSegmentLabel(
+  entry: MobileScheduleEntry,
+  segmentIndex: number,
+  { alwaysNameFocusArea = false }: { alwaysNameFocusArea?: boolean } = {},
+): string {
   const options = getActionSegmentOptions(entry);
   const option = options[segmentIndex] ?? options[0] ?? null;
 
@@ -260,10 +276,12 @@ export function getActionSegmentLabel(entry: MobileScheduleEntry, segmentIndex: 
     return getScheduleEntryTitle(entry);
   }
 
-  const title =
-    option.segment.shiftName?.trim() ||
-    option.segment.label?.trim() ||
-    getScheduleEntryTitle(entry);
+  const nameOf = (segment: MobileScheduleEntrySegment) =>
+    segment.shiftName?.trim() || segment.label?.trim() || getScheduleEntryTitle(entry);
+  const name = nameOf(option.segment);
+  const shared = options.some((other) => other !== option && nameOf(other.segment) === name);
+  const area = alwaysNameFocusArea || shared ? option.segment.displayFocusAreaName?.trim() : null;
+  const title = area ? `${name} in ${area}` : name;
   const timeRange = getScheduleEntrySegmentTimeRange(option.segment);
 
   return timeRange ? `${title} (${timeRange})` : title;

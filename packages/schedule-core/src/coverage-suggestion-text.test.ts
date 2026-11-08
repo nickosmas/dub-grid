@@ -289,6 +289,24 @@ describe("describeCoverageRuledOut", () => {
     expect(describeCoverageRuledOut(entry(reason), LOOKUPS)).toBe(line);
   });
 
+  it("names the focus area of overlapping work outside the row's own", () => {
+    const lookups = { ...LOOKUPS, rowFocusAreaId: () => 1 };
+    expect(
+      describeCoverageRuledOut(
+        entry({ kind: "overlap", dateKey: MON, assignmentId: EVE_SC }),
+        lookups,
+      ),
+    ).toBe("Ana Crawford: works Evening Shift in Sheltered Care that day, which overlaps");
+    expect(
+      describeCoverageRuledOut(
+        entry({ kind: "overlap", dateKey: TUE, assignmentId: DAY_CN }),
+        lookups,
+      ),
+    ).toBe(
+      "Ana Crawford: works Day Shift · Charge Nurse on Tue, Oct 27, which starts before this one ends",
+    );
+  });
+
   it("names a pickup request and an unknown person", () => {
     expect(
       describeCoverageRuledOut(

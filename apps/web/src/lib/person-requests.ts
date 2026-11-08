@@ -38,9 +38,17 @@ function formatDay(date: string): string {
   return DAY.format(new Date(`${date}T00:00:00Z`));
 }
 
-function shiftNames(segments: ShiftJobSegment[] | null | undefined, fallback: string | null) {
+function shiftNames(
+  segments: ShiftJobSegment[] | null | undefined,
+  fallback: string | null,
+  shiftLabelById: ReadonlyMap<number, string> | undefined,
+) {
   const names = (segments ?? [])
-    .map((segment) => segment.shiftName)
+    .map(
+      (segment) =>
+        (segment.shiftId != null ? shiftLabelById?.get(segment.shiftId) : undefined) ??
+        segment.shiftName,
+    )
     .filter((name): name is string => Boolean(name));
   return names.length > 0 ? names.join(", ") : fallback;
 }
@@ -79,7 +87,11 @@ export function buildPersonRequestRows(
   shiftRequests: readonly ShiftRequest[],
   profileRequests: readonly ProfileChangeRequest[],
   nameOfUser: (userId: string) => string | null,
-  labels: { focusAreaLabel?: string } = {},
+  labels: {
+    focusAreaLabel?: string;
+    /** Shift names with their focus area where another area shares the name. */
+    shiftLabelById?: ReadonlyMap<number, string>;
+  } = {},
 ): PersonRequestRow[] {
   const rows: PersonRequestRow[] = [];
 
@@ -87,8 +99,8 @@ export function buildPersonRequestRows(
     const isTarget = request.targetEmpId === employeeId && request.requesterEmpId !== employeeId;
     const ownDate = isTarget ? request.targetShiftDate : request.requesterShiftDate;
     const ownShift = isTarget
-      ? shiftNames(request.targetSegments, request.targetShiftLabel)
-      : shiftNames(request.requesterSegments, request.requesterShiftLabel);
+      ? shiftNames(request.targetSegments, request.targetShiftLabel, labels.shiftLabelById)
+      : shiftNames(request.requesterSegments, request.requesterShiftLabel, labels.shiftLabelById);
     const other = isTarget ? request.requesterName : request.targetName;
     rows.push({
       key: `shift-${request.id}`,

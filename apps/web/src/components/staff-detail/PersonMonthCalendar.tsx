@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { shiftDisplayName } from "@dubgrid/domain";
 import { addDaysToIsoDate } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
@@ -123,7 +124,13 @@ export function PersonMonthCalendar({
         );
         const shift =
           assignment.shiftId != null ? lookups.shiftById.get(assignment.shiftId) : undefined;
-        const name = shift?.name ?? assignment.name;
+        const name = shift
+          ? shiftDisplayName(
+              shift,
+              [...lookups.shiftById.values()],
+              (id) => lookups.focusAreaById.get(id)?.name,
+            )
+          : assignment.name;
         const job =
           assignment.jobId != null ? lookups.jobById.get(assignment.jobId)?.name : undefined;
         return {

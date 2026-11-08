@@ -648,6 +648,7 @@ export function buildActivityFeed(
       description: describeShiftRequestActivity({
         type: req.type,
         shiftName: getShiftRequestDisplayShiftName(req),
+        focusAreaName: req.requesterPresentation?.focusAreaName ?? null,
         requesterName: req.requesterName,
         status: req.status,
       }),
