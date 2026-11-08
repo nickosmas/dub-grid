@@ -864,7 +864,7 @@ function ShiftCategoriesSettings({
                   </>
                 }
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 isLoading={deleting === confirmDeleteId}
                 onConfirm={() => handleDelete(cat, false)}
                 onCancel={() => setConfirmDeleteId(null)}
@@ -878,7 +878,7 @@ function ShiftCategoriesSettings({
                 title={`Archive "${cat.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 isLoading={deleting === confirmDeleteId}
                 onConfirm={() => handleDelete(cat, false)}
                 onCancel={() => setConfirmDeleteId(null)}

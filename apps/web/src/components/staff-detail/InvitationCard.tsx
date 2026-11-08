@@ -109,7 +109,7 @@ export function InvitationCard({
               <Button
                 key={action.key}
                 type="button"
-                className="dg-btn dg-btn-secondary dg-btn-sm"
+                className={`dg-btn dg-btn-sm ${action.key === "revoke" ? "dg-btn-danger" : "dg-btn-secondary"}`}
                 disabled={disabled}
                 title={disabledReason}
                 onClick={action.onClick}

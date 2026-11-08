@@ -2145,12 +2145,12 @@ export default function PersonDetailScreen() {
                   loading={statusMutation.isPending}
                   onPress={() => confirmStatusAction()}
                   tone={
-                    statusChoice === "archive" || offboardsNow
+                    statusChoice === "archive" ||
+                    statusChoice === "suspend" ||
+                    offboardsNow ||
+                    suspendsNow
                       ? "danger"
-                      : statusChoice === "markAway" ||
-                          statusChoice === "suspend" ||
-                          startsNow ||
-                          suspendsNow
+                      : statusChoice === "markAway" || startsNow
                         ? "warning"
                         : "primary"
                   }
