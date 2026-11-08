@@ -1599,6 +1599,12 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   padding-bottom: 8px;
   border-bottom: 2px solid var(--dg-color-text-primary);
 }
+.print-legend__group {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dg-color-text-secondary);
+  margin: 12px 0 6px;
+}
 .print-legend__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

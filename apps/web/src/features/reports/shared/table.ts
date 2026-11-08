@@ -399,6 +399,7 @@ export function buildOperationsReportPreviewTable(
           { label: "Absence type" },
           { label: "Status" },
           { label: "Dropped shift" },
+          { label: capitalizeFirst(terms.focusArea) },
           { label: "Shift time" },
           { label: "Called off at" },
           { label: "Notice given" },
@@ -413,6 +414,7 @@ export function buildOperationsReportPreviewTable(
           formatListValue(row.absenceType, "No absence type"),
           formatKnownReportValue(row.status),
           formatListValue(row.droppedShift, "-"),
+          formatListValue(row.droppedShiftFocusArea, "-"),
           formatListValue(row.droppedShiftTime, "-"),
           row.submittedAt ? formatReportTimestampForDisplay(row.submittedAt) : "-",
           formatNoticeHours(row.noticeHours),
@@ -502,6 +504,7 @@ export function buildOperationsReportPreviewTable(
         title: "Schedule matrix",
         columns: [
           { label: "Employee" },
+          { label: capitalizeFirst(terms.focusAreas) },
           ...payload.reports.scheduleMatrix.dates.map((date) => ({
             label: formatReportDateForDisplay(date),
           })),
@@ -510,6 +513,7 @@ export function buildOperationsReportPreviewTable(
           .filter((row) => payload.reports.scheduleMatrix.dates.some((date) => row.cells[date]))
           .map((row) => [
             row.employeeName,
+            formatListValue(row.focusAreas, `No ${terms.focusAreas}`),
             ...payload.reports.scheduleMatrix.dates.map((date) => row.cells[date] ?? ""),
           ]),
         emptyText: "No published schedule for this range",

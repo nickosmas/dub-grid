@@ -52,12 +52,20 @@ export function ActionQueueRow({ request }: { request: MobileShiftRequest }) {
             {REQUEST_TYPE_LABEL[request.type]}
           </Text>
           {" · "}
-          {request.requesterPresentation.label} shift · {formatUsDate(request.requesterShiftDate)}
+          {describeRequestShift(request)} · {formatUsDate(request.requesterShiftDate)}
         </Text>
       </View>
       <Ionicons color={mobileColors.textMuted} name="chevron-forward" size={16} />
     </PressableRow>
   );
+}
+
+/** "Day Shift in East Wing": the approvals list mixes focus areas, which can share a name. */
+function describeRequestShift(request: MobileShiftRequest): string {
+  const presentation = request.requesterPresentation;
+  const shift = presentation.shiftName?.trim() || `${presentation.label} shift`;
+  const area = presentation.focusAreaName?.trim();
+  return area ? `${shift} in ${area}` : shift;
 }
 
 export function ActionQueueCard({

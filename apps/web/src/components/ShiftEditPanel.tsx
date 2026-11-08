@@ -1127,6 +1127,21 @@ export default function ShiftEditPanel({
   const primaryFocusAreaId = modal.empFocusAreaIds[0] ?? 0;
   const [activeTab] = useState<number>(primaryFocusAreaId);
 
+  // Focus areas can share a label, so one known only by label prefers the
+  // section the cell was opened in, then an org-wide one.
+  function assignmentByLabel(label: string | null | undefined): AssignmentDefinition | undefined {
+    if (!label) return undefined;
+    const matches = assignments.filter(
+      (candidate) => candidate.label === label || candidate.name === label,
+    );
+    const areaId = modal.activeFocusAreaId ?? primaryFocusAreaId;
+    return (
+      matches.find((candidate) => candidate.focusAreaId === areaId) ??
+      matches.find((candidate) => candidate.focusAreaId == null) ??
+      matches[0]
+    );
+  }
+
   const currentLabels =
     typeof currentShift === "string" && currentShift
       ? currentShift.split("/").filter((l) => l !== "OFF")
@@ -1148,7 +1163,7 @@ export default function ShiftEditPanel({
     const id = currentAssignmentIds[index];
     return id != null
       ? assignments.find((candidate) => candidate.id === id)
-      : assignments.find((candidate) => candidate.label === currentLabels[index]);
+      : assignmentByLabel(currentLabels[index]);
   }
 
   /** The cell's shifts with their scheduled and custom times, or null when one has no times. */
@@ -1395,9 +1410,7 @@ export default function ShiftEditPanel({
   ) {
     const assignment =
       (codeId != null ? assignments.find((candidate) => candidate.id === codeId) : undefined) ??
-      assignments.find(
-        (candidate) => candidate.label === fallbackLabel || candidate.name === fallbackLabel,
-      ) ??
+      assignmentByLabel(fallbackLabel) ??
       null;
 
     if (!assignment) {
@@ -1477,7 +1490,7 @@ export default function ShiftEditPanel({
       if (byId) return byId;
     }
     return (
-      assignments.find((st) => st.label === label) ?? {
+      assignmentByLabel(label) ?? {
         color: "var(--dg-color-bg)",
         border: "var(--dg-color-border)",
         text: "var(--dg-color-text-muted)",
@@ -3318,7 +3331,7 @@ export default function ShiftEditPanel({
             preview.assignment ??
             (currentAssignmentIds[i] != null
               ? assignments.find((st) => st.id === currentAssignmentIds[i])
-              : assignments.find((st) => st.label === label));
+              : assignmentByLabel(label));
           const shiftFaId = assignment?.focusAreaId;
           const focusAreaLabel =
             shiftFaId != null ? (focusAreaNameById.get(shiftFaId) ?? null) : null;
@@ -4580,7 +4593,7 @@ export default function ShiftEditPanel({
                   const matchedCode =
                     currentAssignmentIds[0] != null
                       ? assignments.find((st) => st.id === currentAssignmentIds[0])
-                      : assignments.find((st) => st.label === currentLabels[0]);
+                      : assignmentByLabel(currentLabels[0]);
                   const defaults = resolveDefaultTimes(matchedCode);
                   const singleCustomStart = getFirstTimeSegment(customStartTime);
                   const singleCustomEnd = getFirstTimeSegment(customEndTime);

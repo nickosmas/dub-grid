@@ -571,6 +571,7 @@ describe("operations reports", () => {
           kind: "calloff",
           employeeName: "Avery Ng",
           droppedShift: "Day",
+          droppedShiftFocusArea: "North",
           droppedShiftTime: "7:00 AM - 3:30 PM",
           submittedAt: "2026-05-02T18:00:00.000Z",
           noticeHours: 20,
@@ -583,6 +584,7 @@ describe("operations reports", () => {
     const calloffRow = table.rows.find((row) => row[0] === "Call-off")!;
     expect(calloffRow.slice(5)).toEqual([
       "Day",
+      "North",
       "7:00 AM - 3:30 PM",
       "May 2, 2026, 6:00 PM UTC",
       "20 hours before",
@@ -688,6 +690,62 @@ describe("operations reports", () => {
         participation: "initiated",
         shiftCategories: "Day",
       }),
+    ]);
+  });
+
+  it("keeps two shifts with the same name in different focus areas apart", () => {
+    const base = buildSource();
+    const source = buildSource({
+      focusAreas: [
+        { id: 10, name: "North" },
+        { id: 11, name: "South" },
+      ],
+      shiftCategories: [
+        { id: 60, name: "Day", focus_area_id: 10 },
+        { id: 61, name: "Night", focus_area_id: 10 },
+        { id: 62, name: "Day", focus_area_id: 11 },
+      ],
+      shiftRequests: [],
+      publishedRows: [
+        base.publishedRows[0],
+        {
+          ...base.publishedRows[0],
+          date: "2026-05-04",
+          focus_area_id: 11,
+          resolvedSegments: [
+            {
+              shiftId: 62,
+              jobId: 70,
+              label: "DAY Caregiver",
+              startTime: "07:00",
+              endTime: "13:00",
+            },
+          ],
+        },
+      ],
+    });
+
+    const payload = buildOperationsReportPayload(source, {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+    const avery = payload.reports.staffHours.find((row) => row.employeeName === "Avery Ng");
+
+    expect(avery?.shiftBreakdown).toBe("Day (North) (1, 8h); Day (South) (1, 6h)");
+    expect(avery?.jobBreakdown).toBe("Caregiver (2, 14h)");
+    expect(
+      payload.reports.scheduleMatrix.rows.find((row) => row.employeeName === "Avery Ng"),
+    ).toMatchObject({
+      focusAreas: "North",
+      cells: {
+        "2026-05-03": "DAY Caregiver / Late / Training",
+        "2026-05-04": "DAY Caregiver (South)",
+      },
+    });
+    expect(payload.filterOptions.shiftCategories).toEqual([
+      { id: "60", label: "Day", focusArea: "North" },
+      { id: "61", label: "Night", focusArea: "North" },
+      { id: "62", label: "Day", focusArea: "South" },
     ]);
   });
 
@@ -1137,7 +1195,7 @@ describe("operations reports", () => {
       "#1002,Blake Diaz,Away,blake@example.com,Not linked,Pending invitation (blake@example.com),Invitation pending",
     );
     expect(buildOperationsReportCsv(payload, "schedule-matrix")).toContain(
-      'Employee,"May 3, 2026","May 4, 2026"',
+      'Employee,Schedule areas,"May 3, 2026","May 4, 2026"',
     );
   });
 
@@ -1319,6 +1377,7 @@ describe("operations reports", () => {
           "Absence type",
           "Status",
           "Dropped shift",
+          "Schedule area",
           "Shift time",
           "Called off at",
           "Notice given",
@@ -1334,6 +1393,7 @@ describe("operations reports", () => {
           "May 3, 2026",
           "Sick",
           "Approved",
+          "-",
           "-",
           "-",
           "May 2, 2026, 10:00 AM UTC",
@@ -1414,8 +1474,8 @@ describe("operations reports", () => {
       },
       {
         report: "schedule-matrix",
-        headers: ["Employee", "May 3, 2026", "May 4, 2026"],
-        firstRow: ["Avery Ng", "DAY Caregiver / Late / Training", ""],
+        headers: ["Employee", "Schedule areas", "May 3, 2026", "May 4, 2026"],
+        firstRow: ["Avery Ng", "North", "DAY Caregiver / Late / Training", ""],
       },
       {
         report: "shift-notes",

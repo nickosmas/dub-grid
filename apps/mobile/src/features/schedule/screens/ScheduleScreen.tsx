@@ -279,10 +279,28 @@ function sortTeamScheduleShiftRows(rows: TeamScheduleShiftRow[]): TeamScheduleSh
   });
 }
 
+/**
+ * Titles two different shifts share in this view, such as two focus areas'
+ * Day Shift; a group with one of them names its focus area.
+ */
+function getSharedTeamShiftTitles(entries: ReadonlyArray<MobileScheduleEntry>): Set<string> {
+  const keysByTitle = new Map<string, Set<string>>();
+  for (const entry of entries) {
+    for (const segment of getTeamScheduleEntrySegmentsForCards(entry)) {
+      const title = getTeamShiftSegmentTitle(segment);
+      const keys = keysByTitle.get(title) ?? new Set<string>();
+      keys.add(getTeamShiftSegmentGroupKey(segment, title));
+      keysByTitle.set(title, keys);
+    }
+  }
+  return new Set([...keysByTitle].filter(([, keys]) => keys.size > 1).map(([title]) => title));
+}
+
 function buildTeamScheduleShiftGroupsForView(
   entries: ReadonlyArray<MobileScheduleEntry>,
 ): TeamScheduleShiftGroup[] {
   const groups = new Map<string, TeamScheduleShiftGroup>();
+  const sharedTitles = getSharedTeamShiftTitles(entries);
 
   for (const entry of sortScheduleEntries(entries)) {
     const segments = getTeamScheduleEntrySegmentsForCards(entry);
@@ -314,13 +332,14 @@ function buildTeamScheduleShiftGroupsForView(
     }
 
     const segmentGroups = segments.map((segment) => {
-      const title = getTeamShiftSegmentTitle(segment);
+      const name = getTeamShiftSegmentTitle(segment);
+      const area = sharedTitles.has(name) ? segment.displayFocusAreaName?.trim() : null;
       return {
-        key: getTeamShiftSegmentGroupKey(segment, title),
+        key: getTeamShiftSegmentGroupKey(segment, name),
         segment,
         sortKey: getTeamShiftSegmentSortKey(entry, segment),
         timeRange: getTeamShiftSegmentTimeRange(segment),
-        title,
+        title: area ? `${name} in ${area}` : name,
       };
     });
 
@@ -337,9 +356,8 @@ function buildTeamScheduleShiftGroupsForView(
       const alternateShiftTitles = segmentGroups
         .filter((candidate) => candidate.key !== segmentGroup.key)
         .map((candidate) => candidate.title)
-        .filter(
-          (title, index, titles) => title !== segmentGroup.title && titles.indexOf(title) === index,
-        );
+        // Kept even when it repeats this group's name: it is another shift.
+        .filter((title, index, titles) => titles.indexOf(title) === index);
       const existingRow = group.rows.find((row) => row.entry === entry);
 
       if (existingRow) {

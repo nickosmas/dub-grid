@@ -131,7 +131,10 @@ function who(d: AuditDetails, ctx: AuditContext, fallback: string): string {
 /** The name a config record was saved under, quoted, or a neutral noun. */
 function named(d: AuditDetails, noun: string): string {
   const name = d.text("name", "label");
-  return name ? `${noun} "${name}"` : `a ${noun}`;
+  // Shifts carry their focus area: two areas can share a shift's name.
+  const area = d.text("focusAreaName");
+  if (!name) return `a ${noun}`;
+  return area ? `${noun} "${name}" in ${area}` : `${noun} "${name}"`;
 }
 
 /**

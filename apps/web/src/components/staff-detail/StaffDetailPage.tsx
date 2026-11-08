@@ -36,6 +36,7 @@ import {
   correctionReasonLabel,
   isSelfAction,
   removedFocusAreaIds,
+  shiftDisplayNamesById,
   SELF_ACTION_FORBIDDEN_MESSAGE,
   SelfActionForbiddenError,
 } from "@dubgrid/domain";
@@ -1000,11 +1001,16 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       shiftRequestsQuery.data,
       profileRequestsQuery.data ?? [],
       nameOfUser,
-      { focusAreaLabel: org?.focusAreaLabel },
+      {
+        focusAreaLabel: org?.focusAreaLabel,
+        shiftLabelById: shiftDisplayNamesById(shiftCategories, focusAreas),
+      },
     );
   }, [
     directory,
     employeeId,
+    focusAreas,
+    shiftCategories,
     org?.focusAreaLabel,
     profileRequestsQuery.data,
     shiftRequestsQuery.data,

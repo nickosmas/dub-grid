@@ -672,7 +672,12 @@ export default function ShiftRequestBoard({
       joinShiftJobSegmentNames(req.requesterSegments ?? []) ||
       joinAssignmentNames(req.requesterAssignmentDefinitionIds, assignmentNameMap) ||
       req.requesterShiftLabel;
-    const requestLabel = `${requesterFullLabel} on ${formatShiftDate(req.requesterShiftDate)}`;
+    const requesterFocusAreaId =
+      req.requesterFocusAreaId ?? req.requesterPresentation?.focusAreaId ?? null;
+    const requesterFocusArea =
+      requesterFocusAreaId != null ? focusAreaNameMap?.get(requesterFocusAreaId) : undefined;
+    // The dialog covers the card, so it names the focus area itself.
+    const requestLabel = `${requesterFullLabel}${requesterFocusArea ? ` (${requesterFocusArea})` : ""} on ${formatShiftDate(req.requesterShiftDate)}`;
     const requestTitle = (verb: string) => `${verb} the request for ${requestLabel}?`;
 
     // Claim button: open pickup that isn't mine
