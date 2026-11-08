@@ -196,7 +196,7 @@ export default function ProfileSessionsScreen() {
         ? `Sign out ${formatSessionDeviceLabel(pendingConfirmation.session)}?`
         : "Sign out this device?";
   const confirmationBody = isGlobalConfirmation
-    ? "This device is signed out too."
+    ? "You'll need to sign in again here."
     : isScopeConfirmation
       ? undefined
       : "It will lose access right away.";

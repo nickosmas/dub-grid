@@ -8681,7 +8681,7 @@ function SchedulerContent({
                 <div className="dg-draft-banner-actions">
                   <Button
                     type="button"
-                    className="dg-btn dg-btn-danger"
+                    className="dg-btn dg-btn-secondary"
                     onClick={handleSelectVisibleBulkDeleteEntries}
                     disabled={visibleBulkDeleteTargets.length === 0}
                     style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
@@ -8704,7 +8704,7 @@ function SchedulerContent({
                   </Button>
                   <Button
                     type="button"
-                    className="dg-btn dg-btn-danger-filled"
+                    className="dg-btn dg-btn-danger"
                     onClick={() => setShowBulkDeleteReview(true)}
                     disabled={bulkDeleteSelectedKeys.size === 0}
                     style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}

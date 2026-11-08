@@ -87,7 +87,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
           }}
         >
           <Button
-            className="dg-btn dg-btn-danger-filled"
+            className="dg-btn dg-btn-danger"
             onClick={() => setConfirmOpen(true)}
             disabled={isInSandbox}
             title={

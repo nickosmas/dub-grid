@@ -1125,7 +1125,7 @@ export default function StringListSettings({
                   </>
                 }
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 onConfirm={() => {
                   handleRemove(deleteConfirm.idx, false);
                   setDeleteConfirm(null);
@@ -1149,7 +1149,7 @@ export default function StringListSettings({
                 title={`Archive "${deleteConfirm.item.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 onConfirm={() => {
                   handleRemove(deleteConfirm.idx, false);
                   setDeleteConfirm(null);

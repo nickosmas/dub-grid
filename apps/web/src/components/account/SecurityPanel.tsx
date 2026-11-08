@@ -359,31 +359,41 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
 
       <div className="dg-card-body">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div>
-            <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
-              Sessions
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
+                Other devices
+              </div>
+              <p className="dg-card-description">You stay signed in here.</p>
             </div>
-            <p className="dg-card-description">Sign out of devices you&apos;re not using.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
               onClick={() => setPendingSessionSignOut("others")}
               disabled={signingOut !== null || otherSessionCount === 0}
-              className="dg-btn dg-btn-secondary w-full"
+              className="dg-btn dg-btn-secondary dg-btn-sm self-start"
+              aria-label="Sign out other devices"
             >
               <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
-                Sign out other devices
+                Sign out
               </ButtonLoading>
             </Button>
+          </div>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
+                All devices
+              </div>
+              <p className="dg-card-description">Including this one.</p>
+            </div>
             <Button
               type="button"
               onClick={() => setPendingSessionSignOut("global")}
               disabled={signingOut !== null}
-              className="dg-btn dg-btn-danger w-full"
+              className="dg-btn dg-btn-danger dg-btn-sm self-start"
+              aria-label="Sign out all devices"
             >
               <ButtonLoading loading={signingOut === "global"} spinnerSize={14}>
-                Sign out everywhere
+                Sign out
               </ButtonLoading>
             </Button>
           </div>
@@ -418,16 +428,12 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       {pendingSessionSignOut && !stepUp.dialog && (
         <ConfirmDialog
           title={
-            pendingSessionSignOut === "others" ? "Sign out other devices?" : "Sign out everywhere?"
+            pendingSessionSignOut === "others" ? "Sign out other devices?" : "Sign out all devices?"
           }
           message={
-            pendingSessionSignOut === "others"
-              ? "You'll stay signed in on this device."
-              : "This device is signed out too, so you'll need to sign in again."
+            pendingSessionSignOut === "global" ? "You'll need to sign in again here." : undefined
           }
-          confirmLabel={
-            pendingSessionSignOut === "others" ? "Sign out other devices" : "Sign out everywhere"
-          }
+          confirmLabel="Sign out"
           variant="danger"
           isLoading={signingOut === pendingSessionSignOut}
           onConfirm={() => handleSessionSignOut(pendingSessionSignOut)}

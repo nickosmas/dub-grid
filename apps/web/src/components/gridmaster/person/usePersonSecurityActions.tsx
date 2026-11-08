@@ -26,6 +26,7 @@ interface Pending {
   points?: string[];
   confirmLabel: string;
   success: string;
+  destructive?: boolean;
 }
 
 /** The buttons and the one confirmation behind each Security and Sessions action. */
@@ -62,7 +63,11 @@ export function usePersonSecurityActions(userId: string | null, onChanged: () =>
 
   function button(label: string, next: Pending): ReactNode {
     return (
-      <Button className="dg-btn dg-btn-secondary" disabled={busy} onClick={() => setPending(next)}>
+      <Button
+        className={next.destructive ? "dg-btn dg-btn-danger" : "dg-btn dg-btn-secondary"}
+        disabled={busy}
+        onClick={() => setPending(next)}
+      >
         {label}
       </Button>
     );
@@ -77,7 +82,7 @@ export function usePersonSecurityActions(userId: string | null, onChanged: () =>
           message={securityConfirm.message}
           summary={securityConfirm.points ? { points: securityConfirm.points } : undefined}
           confirmLabel={securityConfirm.confirmLabel}
-          variant="warning"
+          variant={securityConfirm.destructive ? "danger" : "warning"}
           isLoading={busy}
           onConfirm={confirm}
           onCancel={() => setPending(null)}
@@ -100,6 +105,7 @@ export function usePersonSecurityActions(userId: string | null, onChanged: () =>
         message: "The device has to sign in again, and their other sessions stay signed in.",
         confirmLabel: "End session",
         success: "Session ended",
+        destructive: true,
       }),
     renderDeviceActions: (device: GridmasterKnownDevice) =>
       button("Forget", {
@@ -111,6 +117,7 @@ export function usePersonSecurityActions(userId: string | null, onChanged: () =>
         ],
         confirmLabel: "Forget device",
         success: "Device forgotten",
+        destructive: true,
       }),
     renderPushActions: (device: GridmasterPushDevice) =>
       button("Turn off", {
@@ -120,6 +127,7 @@ export function usePersonSecurityActions(userId: string | null, onChanged: () =>
           "If the app is still signed in, it turns them back on the next time it opens, so end its session for a lost phone.",
         confirmLabel: "Turn off",
         success: "Push notifications turned off for that device",
+        destructive: true,
       }),
     renderFeedActions: (feed: GridmasterCalendarFeed) =>
       button("Revoke", {
@@ -128,6 +136,7 @@ export function usePersonSecurityActions(userId: string | null, onChanged: () =>
         message: "Its link stops working now, and they can create a new one from their profile.",
         confirmLabel: "Revoke",
         success: "Calendar feed revoked",
+        destructive: true,
       }),
     loginLockActions: button("Clear sign-in lock", {
       input: { action: "clearLoginLock" },

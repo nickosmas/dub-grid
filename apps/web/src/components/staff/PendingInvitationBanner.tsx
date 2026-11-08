@@ -85,7 +85,7 @@ export function PendingInvitationBanner({
             <Button
               disabled={isInSandbox}
               onClick={() => setPendingAction("revoke")}
-              className="dg-btn dg-btn-secondary dg-btn-xs"
+              className="dg-btn dg-btn-danger dg-btn-xs"
               title={
                 isInSandbox ? "Revoking invitations isn't available in sandbox mode." : undefined
               }

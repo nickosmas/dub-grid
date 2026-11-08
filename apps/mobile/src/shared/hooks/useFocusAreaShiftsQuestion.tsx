@@ -74,7 +74,7 @@ export function useFocusAreaShiftsQuestion() {
     <ConfirmationModal
       body={question.message}
       confirmLabel={question.clearLabel}
-      confirmTone="warning"
+      confirmTone="danger"
       onCancel={() => answer(null)}
       onConfirm={() => answer("clear")}
       secondaryAction={{ label: question.keepLabel, onPress: () => answer("keep") }}

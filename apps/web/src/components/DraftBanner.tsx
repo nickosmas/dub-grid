@@ -61,7 +61,7 @@ export default function DraftBanner({
             data-tour="draft-banner-discard"
             onClick={onCancel}
             disabled={isDisabled}
-            className="dg-btn dg-btn-secondary dg-btn-sm"
+            className="dg-btn dg-btn-danger dg-btn-sm"
             style={{ color: "var(--dg-color-danger-dark)" }}
           >
             <ButtonLoading loading={Boolean(isCanceling)} spinnerSize={12}>

@@ -1227,7 +1227,7 @@ function DepartmentSection({
                   </>
                 }
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 onConfirm={() => {
                   handleRemove(deleteConfirm.idx, false);
                   setDeleteConfirm(null);
@@ -1251,7 +1251,7 @@ function DepartmentSection({
                 title={`Archive "${deleteConfirm.dept.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 onConfirm={() => {
                   handleRemove(deleteConfirm.idx, false);
                   setDeleteConfirm(null);
@@ -1292,7 +1292,7 @@ function DepartmentSection({
                   </>
                 }
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 onConfirm={() => {
                   handleFARemove(faDeleteConfirm.faId, false);
                   setFaDeleteConfirm(null);
@@ -1308,7 +1308,7 @@ function DepartmentSection({
                 title={`Archive "${faDeleteConfirm.fa.name}"?`}
                 message="It stays on past schedules but can't be picked for anything new."
                 confirmLabel="Archive"
-                variant="warning"
+                variant="danger"
                 onConfirm={() => {
                   handleFARemove(faDeleteConfirm.faId, false);
                   setFaDeleteConfirm(null);
