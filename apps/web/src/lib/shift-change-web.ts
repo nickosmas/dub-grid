@@ -265,13 +265,21 @@ export function describeMentoringChanges(
       segment.isMentored ?? false,
     ]),
   );
-  return after.segments.flatMap((segment) => {
+  const named = after.segments.map((segment) => {
+    const resolved = resolvers.segment(segment.shiftId, segment.jobId);
+    return { resolved, name: resolved?.shiftName ?? resolved?.jobName ?? UNKNOWN_SHIFT_NAME };
+  });
+  return after.segments.flatMap((segment, index) => {
     const was = wasMentored.get(buildShiftJobPairKey(segment.shiftId, segment.jobId));
     const now = segment.isMentored ?? false;
     if (was === undefined || was === now) return [];
-    const resolved = resolvers.segment(segment.shiftId, segment.jobId);
-    const name = resolved?.shiftName ?? resolved?.jobName ?? UNKNOWN_SHIFT_NAME;
-    return [now ? `${name} is now mentored.` : `${name} is no longer mentored.`];
+    const { resolved, name } = named[index];
+    // Two shifts of one day can share a name across focus areas.
+    const shared = named.some((other, otherIndex) => otherIndex !== index && other.name === name);
+    const area =
+      shared && resolved?.focusAreaId != null ? resolvers.focusArea(resolved.focusAreaId) : null;
+    const subject = area ? `${name} in ${area}` : name;
+    return [now ? `${subject} is now mentored.` : `${subject} is no longer mentored.`];
   });
 }
 

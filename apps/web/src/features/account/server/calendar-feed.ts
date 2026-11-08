@@ -33,7 +33,7 @@ export async function renderPublishedEmployeeCalendar(
   now = new Date(),
 ): Promise<string> {
   const range = getCalendarRange(weeks, employee.timeZone, now);
-  const [shifts, absenceTypesResult] = await Promise.all([
+  const [shifts, absenceTypesResult, shiftCategoriesResult, focusAreasResult] = await Promise.all([
     fetchPublishedShiftRows(client, {
       orgId: employee.orgId,
       employeeId: employee.id,
@@ -44,8 +44,40 @@ export async function renderPublishedEmployeeCalendar(
       .select("id, label")
       .eq("org_id", employee.orgId)
       .is("archived_at", null),
+    client.from("shift_categories").select("id, focus_area_id").eq("org_id", employee.orgId),
+    client.from("focus_areas").select("id, name").eq("org_id", employee.orgId),
   ]);
   if (absenceTypesResult.error) throw absenceTypesResult.error;
+  if (shiftCategoriesResult.error) throw shiftCategoriesResult.error;
+  if (focusAreasResult.error) throw focusAreasResult.error;
+
+  const focusAreaNameById = new Map(
+    (focusAreasResult.data ?? []).map((row: Record<string, unknown>) => [
+      row.id as number,
+      row.name as string,
+    ]),
+  );
+  const shiftFocusAreaById = new Map(
+    (shiftCategoriesResult.data ?? []).map((row: Record<string, unknown>) => [
+      row.id as number,
+      row.focus_area_id as number | null,
+    ]),
+  );
+  // A calendar shows one shift at a time, so it always says where: two focus
+  // areas can share a shift's name.
+  const focusAreasOf = (segments: ReadonlyArray<{ shiftId: number | null }> | undefined) =>
+    [
+      ...new Set(
+        (segments ?? [])
+          .map((segment) =>
+            segment.shiftId != null ? shiftFocusAreaById.get(segment.shiftId) : null,
+          )
+          .filter((id): id is number => id != null),
+      ),
+    ]
+      .map((id) => focusAreaNameById.get(id))
+      .filter((name): name is string => Boolean(name))
+      .join(", ");
 
   const absenceTypeById = new Map(
     (absenceTypesResult.data ?? []).map((row: Record<string, unknown>) => [
@@ -73,7 +105,8 @@ export async function renderPublishedEmployeeCalendar(
       if (!entry.startTime || !entry.endTime) return [];
       // The absence for the rest of the day rides on the shift's own event;
       // an all-day event would claim the hours worked.
-      const text = publishedCellText(entry, absenceTypeById);
+      const areas = focusAreasOf(entry.segments);
+      const text = [publishedCellText(entry, absenceTypeById), areas].filter(Boolean).join(" · ");
       const endDate =
         entry.endTime <= entry.startTime ? addDaysToIsoDate(entry.date, 1) : entry.date;
       return [
@@ -84,6 +117,7 @@ export async function renderPublishedEmployeeCalendar(
           dtend: { date: endDate, time: entry.endTime },
           timeZone: employee.timeZone,
           description: `${employee.firstName} ${employee.lastName}: ${text}`,
+          ...(areas ? { location: areas } : {}),
         },
       ];
     });

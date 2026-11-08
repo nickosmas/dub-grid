@@ -10,7 +10,8 @@ import CustomSelect from "@/components/CustomSelect";
 import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 import { EmptyState } from "@/components/EmptyState";
 import { ListRowsSkeleton, MonthCalendarSkeleton } from "@/components/LoadingSkeletons";
-import { describePreference, shiftLabel } from "@/components/staff/PreferencesModal";
+import { shiftDisplayName } from "@dubgrid/domain";
+import { describePreference } from "@/components/staff/PreferencesModal";
 import { fetchJobPreferences, fetchShiftPreferences } from "@/features/schedule/client";
 import { DAY_LABELS } from "@/lib/constants";
 import { downloadCsvFile } from "@/lib/export-csv";
@@ -291,8 +292,9 @@ function RecurringWeekCard({
       absenceTypeById: new Map(absenceTypes.map((absence) => [absence.id, absence])),
       shiftById: new Map(shiftCategories.map((shift) => [shift.id, shift])),
       jobById: new Map(jobs.map((job) => [job.id, job])),
+      focusAreaName: (id: number) => focusAreas.find((area) => area.id === id)?.name,
     }),
-    [absenceTypes, assignments, jobs, shiftCategories],
+    [absenceTypes, assignments, focusAreas, jobs, shiftCategories],
   );
   const shiftPreferenceQuery = useQuery({
     queryKey: [...queryKeys.recurringShifts.preferences(orgId ?? "none"), employeeId],
@@ -309,7 +311,7 @@ function RecurringWeekCard({
     const focusAreaName = (id: number) => focusAreas.find((area) => area.id === id)?.name;
     return (id: number) => {
       const shift = byId.get(id);
-      return shift ? shiftLabel(shift, shiftCategories, focusAreaName) : undefined;
+      return shift ? shiftDisplayName(shift, shiftCategories, focusAreaName) : undefined;
     };
   }, [focusAreas, shiftCategories]);
   const jobName = (id: number) => jobs.find((job) => job.id === id)?.name;

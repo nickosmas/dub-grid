@@ -1,4 +1,4 @@
-import { capitalizeFirst } from "@dubgrid/domain";
+import { capitalizeFirst, shiftDisplayNamesById } from "@dubgrid/domain";
 import { layoutEntryAbsence } from "@/lib/absence-pill";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -154,14 +154,12 @@ function resolveShiftJobName(
 function resolveShiftDisplayName(
   segment: Partial<ShiftJobSegment>,
   assignment: AssignmentDefinition | null,
-  shiftById: Map<number, ShiftCategory>,
+  shiftLabelById: Map<number, string>,
 ): string | null {
-  if (segment.shiftName) return segment.shiftName;
-
   const shiftId = segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
-  if (shiftId == null) return null;
-
-  return shiftById.get(shiftId)?.name ?? null;
+  // The label names the focus area when another area has a shift by this name.
+  if (shiftId != null && shiftLabelById.has(shiftId)) return shiftLabelById.get(shiftId)!;
+  return segment.shiftName ?? null;
 }
 
 type MyScheduleDay = {
@@ -197,7 +195,7 @@ function buildWorkedShifts(input: {
   entry: ScheduleCellStateEntry;
   assignmentById: Map<number, AssignmentDefinition>;
   jobById: Map<number, JobDefinition>;
-  shiftById: Map<number, ShiftCategory>;
+  shiftLabelById: Map<number, string>;
   isDarkTheme: boolean;
 }): MyScheduleShift[] {
   const { entry } = input;
@@ -234,7 +232,7 @@ function buildWorkedShifts(input: {
         )
       : null;
     const label =
-      resolveShiftDisplayName(segment, assignment, input.shiftById) ||
+      resolveShiftDisplayName(segment, assignment, input.shiftLabelById) ||
       assignment?.name ||
       assignment?.label ||
       segment.label ||
@@ -314,6 +312,7 @@ function buildMyScheduleDay(input: {
   absenceTypeById: Map<number, AbsenceType>;
   jobById: Map<number, JobDefinition>;
   shiftById: Map<number, ShiftCategory>;
+  shiftLabelById: Map<number, string>;
   isDarkTheme: boolean;
   recentPublishedChanges: Map<string, PublishChange>;
   publishedAssignmentIdByPair: Map<string, number>;
@@ -415,7 +414,7 @@ function buildMyScheduleDay(input: {
     entry: displayEntry,
     assignmentById: input.assignmentById,
     jobById: input.jobById,
-    shiftById: input.shiftById,
+    shiftLabelById: input.shiftLabelById,
     isDarkTheme: input.isDarkTheme,
   });
   // A shift removed in the last publish has no cell left, so no notes either.
@@ -492,6 +491,7 @@ function buildMyScheduleDays(input: {
   absenceTypeById: Map<number, AbsenceType>;
   jobById: Map<number, JobDefinition>;
   shiftById: Map<number, ShiftCategory>;
+  shiftLabelById: Map<number, string>;
   periodDates: Date[];
   isDarkTheme: boolean;
   recentPublishedChanges: Map<string, PublishChange>;
@@ -509,6 +509,7 @@ function buildMyScheduleDays(input: {
       absenceTypeById: input.absenceTypeById,
       jobById: input.jobById,
       shiftById: input.shiftById,
+      shiftLabelById: input.shiftLabelById,
       isDarkTheme: input.isDarkTheme,
       recentPublishedChanges: input.recentPublishedChanges,
       publishedAssignmentIdByPair: input.publishedAssignmentIdByPair,
@@ -915,6 +916,10 @@ export default function MyScheduleRow({
     () => new Map(shiftCategories.map((shift) => [shift.id, shift])),
     [shiftCategories],
   );
+  const shiftLabelById = useMemo(
+    () => shiftDisplayNamesById(shiftCategories, focusAreas),
+    [shiftCategories, focusAreas],
+  );
   const shiftChangeResolvers = useMemo(
     () =>
       buildShiftChangeResolvers({
@@ -936,6 +941,7 @@ export default function MyScheduleRow({
             absenceTypeById,
             jobById,
             shiftById,
+            shiftLabelById,
             periodDates,
             isDarkTheme,
             recentPublishedChanges,
@@ -952,6 +958,7 @@ export default function MyScheduleRow({
       absenceTypeById,
       jobById,
       shiftById,
+      shiftLabelById,
       periodDates,
       isDarkTheme,
       recentPublishedChanges,

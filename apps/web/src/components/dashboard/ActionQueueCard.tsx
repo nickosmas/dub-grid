@@ -42,10 +42,15 @@ const URGENCY_DOT: Record<string, string> = {
 function getRequestShiftName(
   request: ShiftRequest,
   assignmentNameMap: Map<number, string>,
+  shiftLabelById: ReadonlyMap<number, string> | undefined,
 ): string {
   const segmentNames =
     request.requesterPresentation?.segments
-      ?.map((segment) => segment.shiftName?.trim())
+      ?.map(
+        (segment) =>
+          (segment.shiftId != null ? shiftLabelById?.get(segment.shiftId) : undefined) ??
+          segment.shiftName?.trim(),
+      )
       .filter((name): name is string => Boolean(name)) ?? [];
   const uniqueSegmentNames = [...new Set(segmentNames)];
 
@@ -81,6 +86,7 @@ export function buildActionItems({
   onRespond,
   onClaim,
   assignmentNameMap,
+  shiftLabelById,
 }: {
   isAdmin: boolean;
   pendingApproval: ShiftRequest[];
@@ -94,13 +100,15 @@ export function buildActionItems({
   onRespond?: (id: string, empId: string, accept: boolean) => Promise<boolean>;
   onClaim?: (id: string, empId: string) => Promise<boolean>;
   assignmentNameMap: Map<number, string>;
+  /** Shift names with their focus area where another area shares the name. */
+  shiftLabelById?: ReadonlyMap<number, string>;
 }): ActionItem[] {
   const items: ActionItem[] = [];
 
   if (isAdmin) {
     // Pending approvals
     for (const req of pendingApproval.slice(0, 3)) {
-      const shiftName = getRequestShiftName(req, assignmentNameMap);
+      const shiftName = getRequestShiftName(req, assignmentNameMap, shiftLabelById);
       items.push({
         id: `approval-${req.id}`,
         type: "approval",
@@ -148,7 +156,7 @@ export function buildActionItems({
   } else {
     // User: swap proposals
     for (const req of swapProposals.slice(0, 3)) {
-      const shiftName = getRequestShiftName(req, assignmentNameMap);
+      const shiftName = getRequestShiftName(req, assignmentNameMap, shiftLabelById);
       items.push({
         id: `swap-${req.id}`,
         type: "swap_proposal",
@@ -174,7 +182,7 @@ export function buildActionItems({
 
     // User: open pickups
     for (const req of openPickups.slice(0, 3)) {
-      const shiftName = getRequestShiftName(req, assignmentNameMap);
+      const shiftName = getRequestShiftName(req, assignmentNameMap, shiftLabelById);
       items.push({
         id: `pickup-${req.id}`,
         type: "pickup",

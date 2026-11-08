@@ -43,6 +43,8 @@ function createServiceClientMock(
     employees?: Array<Record<string, unknown>>;
     internalIds?: string[];
     absenceTypes?: Array<Record<string, unknown>>;
+    focusAreas?: Array<Record<string, unknown>>;
+    shiftCategories?: Array<Record<string, unknown>>;
   } = {},
 ) {
   const orgIdFilters: string[] = [];
@@ -61,7 +63,13 @@ function createServiceClientMock(
             ? (tables.internalIds ?? []).map((id) => ({ id }))
             : table === "absence_types"
               ? (tables.absenceTypes ?? [])
-              : [];
+              : table === "focus_areas"
+                ? (tables.focusAreas ?? [])
+                : table === "shift_categories"
+                  ? (tables.shiftCategories ?? [])
+                  : table === "organizations"
+                    ? [{ focus_area_label: "Wings" }]
+                    : [];
       const query = {
         select() {
           return query;
@@ -85,6 +93,9 @@ function createServiceClientMock(
         },
         limit() {
           return query;
+        },
+        maybeSingle() {
+          return Promise.resolve({ data: rows[0] ?? null, error: null });
         },
         then<TResult1 = unknown, TResult2 = never>(
           onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
@@ -229,7 +240,61 @@ describe("GET /api/export", () => {
 
     const csv = await (await GET(new NextRequest(url))).text();
 
-    expect(csv).toContain("Rosa Member,D / Sick,Sick");
+    expect(csv).toContain("Rosa Member,,D / Sick,Sick");
+  });
+
+  it("names each person's focus areas and the area of work outside them", async () => {
+    const { serviceClient } = createServiceClientMock({
+      employees: [
+        { id: "e1", first_name: "Rosa", last_name: "Member", user_id: null, focus_area_ids: [10] },
+      ],
+      focusAreas: [
+        { id: 10, name: "East Wing" },
+        { id: 20, name: "West Wing" },
+      ],
+      shiftCategories: [
+        { id: 1, focus_area_id: 10 },
+        { id: 2, focus_area_id: 20 },
+      ],
+    });
+    requireOrgPermissions.mockResolvedValue({
+      orgId: REQUESTED_ORG_ID,
+      serviceClient,
+      actor: { id: "user-1" },
+      permissions: { isGridmaster: false },
+    });
+    const segment = (shiftId: number) => ({
+      shiftId,
+      jobId: 3,
+      label: "Day Shift",
+      startTime: "07:00",
+      endTime: "15:00",
+    });
+    fetchPublishedShiftRows.mockResolvedValue(
+      [
+        ["2026-05-04", 1],
+        ["2026-05-05", 2],
+      ].map(([date, shiftId]) => ({
+        emp_id: "e1",
+        date,
+        resolvedAssignmentIds: [],
+        resolvedSegments: [segment(shiftId as number)],
+        published_absence_type_id: null,
+        published_custom_start_time: null,
+        published_custom_end_time: null,
+      })),
+    );
+    const url = new URL("http://localhost/api/export");
+    url.searchParams.set("type", "schedule");
+    url.searchParams.set("orgId", REQUESTED_ORG_ID);
+    url.searchParams.set("startDate", "2026-05-04");
+    url.searchParams.set("endDate", "2026-05-05");
+    const { GET } = await import("./route");
+
+    const csv = await (await GET(new NextRequest(url))).text();
+
+    expect(csv.split("\n")[0]).toMatch(/^Employee,Wings,/);
+    expect(csv).toContain("Rosa Member,East Wing,Day Shift,Day Shift (West Wing)");
   });
 
   it("refuses a schedule range that is not a calendar date", async () => {
