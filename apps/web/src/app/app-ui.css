@@ -1787,6 +1787,87 @@ button.dg-cc-sg-main {
   border-top-color: var(--dg-color-border);
   background: transparent;
 }
+/* Unsaved changes: sticky at the end of the section it saves (UnsavedChangesScope),
+   so it floats while the section is in view and rests flat under it at its end.
+   One inset on every side, corners concentric with the buttons', and the label
+   as far from the left edge as the button text is from the right. */
+.dg-unsaved-bar {
+  --dg-unsaved-bar-inset: 8px;
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dg-unsaved-bar-inset) 16px;
+  padding: var(--dg-unsaved-bar-inset);
+  border: 1px solid var(--dg-color-border);
+  border-radius: calc(var(--dg-btn-radius) + var(--dg-unsaved-bar-inset) + 1px);
+  background: var(--dg-color-surface);
+  box-shadow: none;
+  transition:
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+  animation: dg-unsaved-bar-in 180ms ease-out;
+}
+.dg-unsaved-bar[data-floating] {
+  border-color: var(--dg-color-border-strong);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.dark .dg-unsaved-bar[data-floating] {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.dg-unsaved-bar__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-left: var(--dg-btn-px-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--dg-color-text-primary);
+}
+.dg-unsaved-bar__label::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--dg-color-warning);
+}
+.dg-unsaved-bar__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dg-unsaved-bar-inset);
+}
+.dg-unsaved-bar__actions > .dg-btn {
+  min-width: 0;
+}
+.dg-unsaved-bar__actions:has(> :only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 479px) {
+  .dg-unsaved-bar__actions {
+    flex: 1 1 100%;
+  }
+}
+@keyframes dg-unsaved-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dg-unsaved-bar {
+    animation: none;
+    transition: none;
+  }
+}
 /* The modal's footer is that strip, pulled out through the side padding so the
    line reaches both edges; the strip closes the modal, so it takes no padding
    underneath. */

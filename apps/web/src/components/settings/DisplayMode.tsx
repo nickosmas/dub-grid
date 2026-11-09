@@ -7,12 +7,11 @@ import { singularLabelNoun } from "@dubgrid/domain";
 import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { UnsavedChangesBar, UnsavedChangesScope } from "@/components/ui/UnsavedChangesBar";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { resolveJobColorsForShift } from "@/lib/job-placement";
 import { useTheme } from "next-themes";
 import { FILLED_PILL_BORDER, resolveShiftPillColors } from "@/lib/colors";
-import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Switch } from "@/components/ui/switch";
 import { changedElsewhereMessage } from "@dubgrid/domain";
 
@@ -456,7 +455,7 @@ export default function DisplayMode({
   const modes = DISPLAY_MODES;
 
   return (
-    <div>
+    <UnsavedChangesScope>
       <div
         style={{
           borderRadius: "var(--dg-radius-lg)",
@@ -686,32 +685,15 @@ export default function DisplayMode({
           disabled={saving}
           ariaLabel="Show staff who published"
         />
-
-        <div
-          className="dg-footer-bar"
-          style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}
-        >
-          {isModified ? (
-            <Button
-              type="button"
-              onClick={handleCancel}
-              disabled={saving}
-              className="dg-btn dg-btn-secondary"
-            >
-              {EDITOR_ACTION_LABELS.cancel}
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={!isModified || saving}
-            className="dg-btn dg-btn-primary"
-          >
-            <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
-          </Button>
-        </div>
       </div>
-    </div>
+      {isModified ? (
+        <UnsavedChangesBar
+          saving={saving}
+          onDiscard={handleCancel}
+          onSave={() => void handleSave()}
+        />
+      ) : null}
+    </UnsavedChangesScope>
   );
 }
 

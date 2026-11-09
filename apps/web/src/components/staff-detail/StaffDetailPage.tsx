@@ -100,7 +100,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import EditEmployeePanel, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
-import { UnsavedChangesBar } from "@/components/ui/UnsavedChangesBar";
+import { UnsavedChangesBar, UnsavedChangesScope } from "@/components/ui/UnsavedChangesBar";
 import { SpanTabs } from "@/components/ui/span-tabs";
 import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import { usePersonPeriod } from "@/hooks/usePersonPeriod";
@@ -1486,31 +1486,40 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 {/* Stays mounted so a draft survives a look at another tab. */}
                 <div hidden={activeTab !== "account"} className="flex flex-col gap-4">
                   {canEditDetails ? (
-                    <EditEmployeePanel
-                      ref={detailsEditorRef}
-                      sectioned
-                      persistent
-                      hideActions
-                      flushHorizontal
-                      employee={employee}
-                      orgId={orgId ?? undefined}
-                      focusAreas={focusAreas}
-                      certifications={certifications}
-                      roles={orgRoles}
-                      focusAreaLabel={org?.focusAreaLabel}
-                      certificationLabel={org?.certificationLabel}
-                      roleLabel={org?.roleLabel}
-                      isManagementUser={directoryPerson?.isManagementUser}
-                      onSave={handleSaveEmployee}
-                      onCancel={() => undefined}
-                      onDirtyChange={setDetailsDirty}
-                      onSaveBlockedChange={setDetailsSaveBlocked}
-                      pendingInvitation={pendingInvite ?? undefined}
-                      onSaveWithReinvite={handleSaveEmployeeWithReinvite}
-                      onMoveToNewEmail={
-                        canMoveToNewEmail ? () => setMovingToNewEmail(true) : undefined
-                      }
-                    />
+                    <UnsavedChangesScope>
+                      <EditEmployeePanel
+                        ref={detailsEditorRef}
+                        sectioned
+                        persistent
+                        hideActions
+                        flushHorizontal
+                        employee={employee}
+                        orgId={orgId ?? undefined}
+                        focusAreas={focusAreas}
+                        certifications={certifications}
+                        roles={orgRoles}
+                        focusAreaLabel={org?.focusAreaLabel}
+                        certificationLabel={org?.certificationLabel}
+                        roleLabel={org?.roleLabel}
+                        isManagementUser={directoryPerson?.isManagementUser}
+                        onSave={handleSaveEmployee}
+                        onCancel={() => undefined}
+                        onDirtyChange={setDetailsDirty}
+                        onSaveBlockedChange={setDetailsSaveBlocked}
+                        pendingInvitation={pendingInvite ?? undefined}
+                        onSaveWithReinvite={handleSaveEmployeeWithReinvite}
+                        onMoveToNewEmail={
+                          canMoveToNewEmail ? () => setMovingToNewEmail(true) : undefined
+                        }
+                      />
+                      {detailsDirty ? (
+                        <UnsavedChangesBar
+                          saveDisabled={detailsSaveBlocked}
+                          onDiscard={() => detailsEditorRef.current?.requestDismiss()}
+                          onSave={() => void detailsEditorRef.current?.save()}
+                        />
+                      ) : null}
+                    </UnsavedChangesScope>
                   ) : (
                     <WorkCard
                       employee={employee}
@@ -1559,13 +1568,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                           queryKey: queryKeys.org.users(orgId),
                         });
                       }}
-                    />
-                  ) : null}
-                  {canEditDetails && detailsDirty ? (
-                    <UnsavedChangesBar
-                      saveDisabled={detailsSaveBlocked}
-                      onDiscard={() => detailsEditorRef.current?.requestDismiss()}
-                      onSave={() => void detailsEditorRef.current?.save()}
                     />
                   ) : null}
                 </div>
