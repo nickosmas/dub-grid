@@ -465,6 +465,55 @@ describe("PUT /api/organizations/settings", () => {
     );
   });
 
+  describe("allowing shifts without a job, from Settings > Jobs", () => {
+    beforeEach(() => {
+      membershipMaybeSingle.mockResolvedValue({
+        data: { org_role: "admin", admin_permissions: { canManageScheduleDefinitions: true } },
+        error: null,
+      });
+    });
+
+    it("lets someone who manages shifts and jobs change it on its own", async () => {
+      const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00");
+      organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
+      organizationUpdateMaybeSingle.mockResolvedValueOnce({
+        data: makeOrganizationRow("2026-04-15T18:10:00.000000+00:00", {
+          default_shift_enabled: false,
+        }),
+        error: null,
+      });
+
+      const response = await PUT(
+        makeRequest({
+          orgId: currentRow.id,
+          expectedUpdatedAt: currentRow.updated_at,
+          defaultShiftEnabled: false,
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(organizationUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ default_shift_enabled: false }),
+      );
+    });
+
+    it("still needs organization settings for anything else in the same save", async () => {
+      const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00");
+
+      const response = await PUT(
+        makeRequest({
+          orgId: currentRow.id,
+          expectedUpdatedAt: currentRow.updated_at,
+          defaultShiftEnabled: false,
+          name: "Acme North",
+        }),
+      );
+
+      expect(response.status).toBe(403);
+      expect(organizationUpdate).not.toHaveBeenCalled();
+    });
+  });
+
   describe("organization labels", () => {
     async function saveLabels(
       currentOverrides: Record<string, unknown>,

@@ -23,11 +23,24 @@ Shifts are set per schedule area. Select **+ Add Shift** in a schedule area and 
 
 ## Jobs
 
-**Settings > Jobs** has up to three groups:
+**Settings > Jobs** has three cards:
 
+- **Allow shifts without a job** lets staff be scheduled with just a shift, like Day Shift. While it's on, its **Shift only** row decides where those shifts go, who qualifies, and their times and colors. The schedule shows the shift alone.
 - **Scheduled Jobs**, worked on a shift.
 - **General Jobs**, worked without a shift, with a default length or fixed default times (fixed times win).
-- **Default Shift Job**, used when **Shift-only assignments** is on, letting staff be scheduled with just a shift and no job. It's hidden on the schedule but still decides where the shift goes, who qualifies, and its times and colors.
+
+Each row names the departments, schedule areas, and shifts a job is worked in: up to three of each, then how many more.
+
+### Turning off shifts without a job
+
+Turning **Allow shifts without a job** off stops new ones and keeps the ones you have. The confirmation counts what stays.
+
+- Shifts already scheduled without a job stay on the schedule, count toward coverage, and can still be edited, swapped, or called off. Change them if they need a job.
+- Nobody new is scheduled on one: not from the shift picker, Auto-build, a recurring schedule, copy and paste, dragging, or importing a previous schedule. An open shift that only a shift without a job could fill isn't offered.
+- Recurring days that use one wait, with a note on the Recurring Shifts page and the person's schedule, until you allow them again or give them a job.
+- Coverage requirements for one stay in **Settings > Coverage** with a note. They still count, and Auto-build won't fill them.
+
+Turning it back on picks everything up again.
 
 For each job:
 
@@ -37,7 +50,7 @@ For each job:
 | **Grid abbreviation**  | Up to 6 characters, unique. Required when the schedule shows short codes.                                                                                                                                                                                   |
 | **Color**              | Choose from the presets.                                                                                                                                                                                                                                    |
 | Placement              | The departments, schedule areas, and shifts it's worked in.                                                                                                                                                                                                 |
-| **Per-shift Settings** | A different color or times for particular shifts.                                                                                                                                                                                                           |
+| **Per-shift Settings** | A different color or times for particular shifts, with a preview of each as the schedule shows it.                                                                                                                                                          |
 | **Eligibility**        | Which roles and certifications can work it. **Require both** needs a matching role and certification; **Allow either** accepts one or the other. Leave a list empty to let anyone through on that side. Only roles set to count for job eligibility appear. |
 
 A scheduled job needs a department with a schedule area and a shift to go in. Jobs are listed by how much qualification they need.
@@ -56,4 +69,4 @@ Removing a shift, job, or absence that's in use archives it: its history stays, 
 
 ## Who can do what
 
-People with permission to view shifts and jobs can see these sections. Changing them, including turning shift-only assignments on or off, needs permission to manage shifts and jobs. Super Admins can do both.
+People with permission to view shifts and jobs can see these sections. Changing them, including allowing shifts without a job, needs permission to manage shifts and jobs. Super Admins can do both.

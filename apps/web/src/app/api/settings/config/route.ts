@@ -1891,6 +1891,7 @@ export async function GET(req: NextRequest) {
     checkAbsenceTypeDependencies: "scheduleDefinitionsRead",
     fetchIndicatorTypes: "indicatorTypesRead",
     checkIndicatorTypeDependencies: "indicatorTypesRead",
+    fetchShiftWithoutJobUsage: "scheduleDefinitionsRead",
   };
 
   const permission = permissionByAction[action];
@@ -1971,6 +1972,22 @@ export async function GET(req: NextRequest) {
         });
       case "checkJobDependencies":
         return NextResponse.json(await checkJobDependenciesForOrg(Number(itemId), effectiveOrgId));
+      case "fetchShiftWithoutJobUsage": {
+        const { data, error } = await getServiceClient()
+          .rpc("shift_without_job_usage", { p_org_id: effectiveOrgId })
+          .single();
+        if (error) throw error;
+        const usage = data as {
+          upcoming_shifts: number;
+          recurring_days: number;
+          coverage_requirements: number;
+        };
+        return NextResponse.json({
+          upcomingShifts: usage.upcoming_shifts,
+          recurringDays: usage.recurring_days,
+          coverageRequirements: usage.coverage_requirements,
+        });
+      }
       case "fetchCoverageRequirements":
         return NextResponse.json({
           items: await fetchCoverageRequirementsForOrg(effectiveOrgId),

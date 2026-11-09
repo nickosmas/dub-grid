@@ -63,7 +63,16 @@ jobs:
       - run: npm ci --ignore-scripts
       # Seeding needs @prisma/engines binaries, which only arrive via the
       # allowlisted rebuild now that install scripts are off by default.
-      - run: npm run deps:rebuild
+      # A postinstall download (Prisma engines, Sentry CLI) can drop mid-transfer
+      # with "Error: aborted", which failed a whole Playwright shard before any
+      # test ran (#441); retry the download rather than the job.
+      - run: |
+          for attempt in 1 2 3; do
+            npm run deps:rebuild && exit 0
+            echo "deps:rebuild failed (attempt $attempt of 3)"
+            sleep $((attempt * 10))
+          done
+          exit 1
 
       # The Ubuntu mirror can serve one runner at 65 kB/s while others in the same
       # minute get 8 MB/s, which ran a shard into the job limit before any test.

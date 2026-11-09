@@ -14,6 +14,8 @@ import { shiftDisplayName } from "@dubgrid/domain";
 import { describePreference } from "@/components/staff/PreferencesModal";
 import { fetchJobPreferences, fetchShiftPreferences } from "@/features/schedule/client";
 import { DAY_LABELS } from "@/lib/constants";
+import { Banner } from "@/components/ui/Banner";
+import { countPausedRecurringDays, pausedRecurringDaysMessage } from "@/lib/system-jobs";
 import { downloadCsvFile } from "@/lib/export-csv";
 import { queryKeys } from "@/lib/query-keys";
 import { buildScheduleWeeks } from "@/lib/schedule-rows";
@@ -69,6 +71,8 @@ interface ScheduleTabProps {
     jobs: JobDefinition[];
     focusAreas: FocusArea[];
     absenceTypes: AbsenceType[];
+    /** Settings > Jobs; false notes the days that won't fill. */
+    defaultShiftEnabled?: boolean;
   } | null;
 }
 
@@ -283,6 +287,7 @@ function RecurringWeekCard({
   jobs,
   focusAreas,
   absenceTypes,
+  defaultShiftEnabled,
 }: NonNullable<ScheduleTabProps["recurringSchedule"]> & { employeeId: string }) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -331,6 +336,8 @@ function RecurringWeekCard({
     .filter((shift) => shift.effectiveUntil)
     .map((shift) => `${DAY_LABELS[shift.dayOfWeek]} until ${shift.effectiveUntil}`);
 
+  const pausedDays = countPausedRecurringDays(recurringShifts, jobs, defaultShiftEnabled);
+
   if (recurringShifts.length === 0 && preferences.length === 0) return null;
 
   return (
@@ -347,6 +354,11 @@ function RecurringWeekCard({
         ) : null}
       </div>
       <div className="dg-card-body">
+        {pausedDays > 0 ? (
+          <Banner tone="warning" className="mb-3">
+            {pausedRecurringDaysMessage(pausedDays)}
+          </Banner>
+        ) : null}
         {recurringShifts.length === 0 ? null : (
           <div className="dg-no-scrollbar overflow-x-auto">
             <div className="grid min-w-[700px] grid-cols-7 gap-2.5">

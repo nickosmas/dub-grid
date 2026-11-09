@@ -75,10 +75,28 @@ describe("summarizeImportPreviousOutcomes", () => {
       disqualifiedFocusArea: 0,
       disqualifiedRole: 0,
       disqualifiedCert: 0,
+      skippedShiftWithoutJob: 0,
       skippedOther: 0,
       totalSource: 0,
       totalSkipped: 0,
     });
+  });
+});
+
+describe("a shift without a job, while they're off", () => {
+  it("is counted and named apart from other reasons", () => {
+    const outcomes = [
+      row({ outcome: "skipped", reason: "shift_without_job_off" }),
+      row({ outcome: "skipped", reason: "shift_without_job_off" }),
+    ];
+    const breakdown = summarizeImportPreviousOutcomes(outcomes);
+
+    expect(breakdown.skippedShiftWithoutJob).toBe(2);
+    expect(breakdown.skippedOther).toBe(0);
+    expect(getSkipReasonLabel("shift_without_job_off")).toBe("Shifts without a job are off");
+    expect(formatImportPreviousSkipDescription(outcomes, breakdown, new Map())).toMatch(
+      /^2 shifts without a job, which are off/,
+    );
   });
 });
 

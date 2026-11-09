@@ -210,6 +210,8 @@ export type ImportPreviousBreakdown = {
   disqualifiedFocusArea: number;
   disqualifiedRole: number;
   disqualifiedCert: number;
+  /** Shifts without a job, while Settings > Jobs has them off. */
+  skippedShiftWithoutJob: number;
   /** Catch-all for any reason code we don't already model. Keeps the total
    * equal to outcomes.length even if the server grows a new reason. */
   skippedOther: number;
@@ -228,6 +230,7 @@ export function summarizeImportPreviousOutcomes(
     disqualifiedFocusArea: 0,
     disqualifiedRole: 0,
     disqualifiedCert: 0,
+    skippedShiftWithoutJob: 0,
     skippedOther: 0,
     totalSource: outcomes.length,
     totalSkipped: 0,
@@ -258,6 +261,9 @@ export function summarizeImportPreviousOutcomes(
       case "disqualified:cert":
         breakdown.disqualifiedCert += 1;
         break;
+      case "shift_without_job_off":
+        breakdown.skippedShiftWithoutJob += 1;
+        break;
       default:
         breakdown.skippedOther += 1;
     }
@@ -279,6 +285,8 @@ export function getSkipReasonLabel(reason: string | null): string {
       return "Employee no longer active";
     case "source_has_no_content":
       return "Source cell had no usable content";
+    case "shift_without_job_off":
+      return "Shifts without a job are off";
     default:
       if (reason?.startsWith("disqualified:")) return "Qualification change";
       return "Skipped for other reasons";
@@ -318,6 +326,11 @@ export function formatImportPreviousSkipDescription(
   if (breakdown.skippedSourceEmpty > 0) {
     reasons.push(
       `${breakdown.skippedSourceEmpty} source cell${breakdown.skippedSourceEmpty === 1 ? "" : "s"} had no usable content`,
+    );
+  }
+  if (breakdown.skippedShiftWithoutJob > 0) {
+    reasons.push(
+      `${breakdown.skippedShiftWithoutJob} shift${breakdown.skippedShiftWithoutJob === 1 ? "" : "s"} without a job, which are off`,
     );
   }
   if (breakdown.skippedOther > 0) {

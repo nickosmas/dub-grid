@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:3a525aed8188e749fdc2ad841b07933c0d7e71ba404db27dca8b2c9faaa35e48",
+  "sourceDigest": "sha256:ace7f22f36ca30b75d4f89800ba30fff107c0f37e9f38b7ee2333553b2669e45",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5120,6 +5120,16 @@
       "sha256": "9e5f370685cdf1b2f5d6da54990a6044bc87c6e629bddc80dafe9d095ed1f273",
       "source": {
         "path": "supabase/migrations/128_web_session_idle_limit.sql"
+      }
+    },
+    {
+      "id": "migration:129_shift_without_job_off.sql",
+      "version": "129",
+      "name": "shift_without_job_off",
+      "file": "129_shift_without_job_off.sql",
+      "sha256": "8521a355071eba74619e9d7b62e1e650bf9497f932b872c6dd543d2e6dd01dd3",
+      "source": {
+        "path": "supabase/migrations/129_shift_without_job_off.sql"
       }
     }
   ],

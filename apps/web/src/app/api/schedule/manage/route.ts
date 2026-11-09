@@ -42,6 +42,7 @@ import { formatDateKey, iterateDateRange } from "@/lib/utils";
 import { RECURRING_SHIFT_COLS, fetchAllRows } from "@/lib/db/shared";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { fetchOrgToday } from "@/features/employees/server/org-today";
+import { DEFAULT_SHIFT_JOB_SYSTEM_KEY } from "@/lib/system-jobs";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import logger from "@/lib/logger";
 import type {
@@ -378,10 +379,43 @@ function isPastDayDraftRefusal(error: unknown): boolean {
   return typeof message === "string" && message.includes("Past days are corrected, not drafted");
 }
 
+/** 129 refuses a new shift without a job while the organization has them off. */
+function isShiftWithoutJobRefusal(error: unknown): boolean {
+  const message = error && typeof error === "object" && "message" in error ? error.message : null;
+  return (
+    typeof message === "string" &&
+    message.includes("Shifts without a job are off for this organization")
+  );
+}
+
 type ScheduleServiceClient = Extract<
   Awaited<ReturnType<typeof requireOrgPermissions>>,
   { serviceClient: unknown }
 >["serviceClient"];
+
+/**
+ * The default shift job's id while the organization has shifts without a job
+ * turned off (Settings > Jobs), else null: no new work may use it.
+ */
+async function fetchJobTakingNoNewWork(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+): Promise<number | null> {
+  const [orgResult, jobResult] = await Promise.all([
+    serviceClient.from("organizations").select("default_shift_enabled").eq("id", orgId).single(),
+    serviceClient
+      .from("jobs")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("system_key", DEFAULT_SHIFT_JOB_SYSTEM_KEY)
+      .maybeSingle(),
+  ]);
+  if (orgResult.error) throw orgResult.error;
+  if (jobResult.error) throw jobResult.error;
+  return orgResult.data?.default_shift_enabled === false && jobResult.data
+    ? jobResult.data.id
+    : null;
+}
 
 /**
  * Strips the unpublished half of a cell for a caller who may not see drafts.
@@ -994,9 +1028,17 @@ function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
  */
 function cellWriteRefusal(error: unknown): {
   error: string;
-  code: "PAST_DAY" | "ABSENCE_TIMES" | "SHIFT_OVERLAP";
+  code: "PAST_DAY" | "ABSENCE_TIMES" | "SHIFT_OVERLAP" | "SHIFT_WITHOUT_JOB_OFF";
   status: 409 | 422;
 } | null {
+  if (isShiftWithoutJobRefusal(error)) {
+    return {
+      error:
+        "Shifts without a job are turned off. Choose a job, or allow them in Settings under Jobs.",
+      code: "SHIFT_WITHOUT_JOB_OFF",
+      status: 422,
+    };
+  }
   if (isPastDayDraftRefusal(error)) {
     return {
       error: "This day has passed. Open it to correct it instead.",
@@ -2286,7 +2328,7 @@ export async function POST(req: NextRequest) {
             .order("id", { ascending: true })
             .range(from, to);
 
-        const [recurringResult, cells, todayKey] = await Promise.all([
+        const [recurringResult, cells, todayKey, pausedJobId] = await Promise.all([
           auth.serviceClient
             .from("recurring_shifts")
             .select(
@@ -2301,6 +2343,7 @@ export async function POST(req: NextRequest) {
           // empty and overwritten by the recurring fill below.
           fetchAllRows<DbScheduleCell>(buildExistingCellsPage),
           fetchOrgToday(auth.serviceClient, data.orgId),
+          fetchJobTakingNoNewWork(auth.serviceClient, data.orgId),
         ]);
         const { data: recurringRows, error: recurringError } = recurringResult;
         if (recurringError) {
@@ -2432,6 +2475,14 @@ export async function POST(req: NextRequest) {
             const cellKey = `${template.emp_id}_${dateKey}`;
             const existingCell = cellsByKey.get(cellKey);
             if (existingCell && cellBlocksRecurringFill(existingCell)) {
+              continue;
+            }
+            // Paused while shifts without a job are off; 129 would refuse it.
+            if (
+              pausedJobId != null &&
+              template.state.kind === "worked" &&
+              template.state.segments.some((segment) => segment.jobId === pausedJobId)
+            ) {
               continue;
             }
 
