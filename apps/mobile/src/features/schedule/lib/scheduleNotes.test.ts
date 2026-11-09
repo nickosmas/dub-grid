@@ -104,8 +104,8 @@ describe("scheduleNoteGroups", () => {
     };
     const notes = [onShift(1, 34), { ...onShift(2, 36), focusAreaId: 22 }];
     expect(scheduleNoteGroups(notes, [day, otherDay]).map((group) => group.title)).toEqual([
-      "Day Shift in Skilled Nursing",
-      "Day Shift in Memory Care",
+      "Day Shift · Skilled Nursing",
+      "Day Shift · Memory Care",
     ]);
   });
 

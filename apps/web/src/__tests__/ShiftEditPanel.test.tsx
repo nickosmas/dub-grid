@@ -3071,15 +3071,15 @@ describe("ShiftEditPanel", () => {
       );
       const teammateRow = screen.getByRole("button", { name: /Bob Jones/i });
       expect(teammateRow).toHaveTextContent("Evening Shift · Supervisor");
-      expect(teammateRow).toHaveTextContent("3:00 PM - 11:00 PM · South");
+      expect(teammateRow).toHaveTextContent("South · 3:00 PM - 11:00 PM");
       expect(teammateRow).not.toHaveTextContent(/Shift 1/);
       expect(screen.queryByText("Night")).not.toBeInTheDocument();
 
       await user.click(teammateRow);
       expect(screen.getByText("You get")).toBeInTheDocument();
       expect(screen.getAllByText("Day Shift · Supervisor").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("7:00 AM - 3:00 PM · North").length).toBeGreaterThan(0);
-      expect(screen.getByText("3:00 PM - 11:00 PM · South")).toBeInTheDocument();
+      expect(screen.getAllByText("North · 7:00 AM - 3:00 PM").length).toBeGreaterThan(0);
+      expect(screen.getByText("South · 3:00 PM - 11:00 PM")).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Request swap" }));
 

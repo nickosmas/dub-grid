@@ -1423,6 +1423,10 @@ export function OpenShiftCard({
             </Text>
           </View>
         </View>
+        {/* Shift and job, then its focus area, then when. */}
+        {splitSegments.length <= 1 && focusAreaName ? (
+          <Text style={styles.openShiftContextText}>{focusAreaName}</Text>
+        ) : null}
         {showDate ? <Text style={styles.metaText}>{openShift.date}</Text> : null}
         {splitSegments.length > 1 ? (
           <View style={styles.splitShiftPanel}>
@@ -1439,8 +1443,6 @@ export function OpenShiftCard({
               variant="compact"
             />
           </View>
-        ) : focusAreaName ? (
-          <Text style={styles.openShiftContextText}>{focusAreaName}</Text>
         ) : null}
         <Text style={styles.metaText}>
           {openShift.needed} teammate{openShift.needed === 1 ? "" : "s"} needed

@@ -863,6 +863,17 @@ function ShiftDetailHoverCard({
                       {entry.jobName}
                     </div>
                   ) : null}
+                  {entry.focusAreaName ? (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {entry.focusAreaName}
+                    </div>
+                  ) : null}
                   {entry.timeLabel ? (
                     <div
                       className="dg-tabular-nums"
@@ -873,17 +884,6 @@ function ShiftDetailHoverCard({
                     >
                       {entry.timeLabel}
                       {entry.isCustomTime ? " · Custom time" : ""}
-                    </div>
-                  ) : null}
-                  {entry.focusAreaName ? (
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        color: "var(--dg-color-text-muted)",
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      {entry.focusAreaName}
                     </div>
                   ) : null}
                   {entry.isMentored ? (

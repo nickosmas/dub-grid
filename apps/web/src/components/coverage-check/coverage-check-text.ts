@@ -51,7 +51,7 @@ export function cellAccessibleName(args: {
 }): string {
   const { cell } = args;
   const parts = [
-    `${args.focusAreaName}, ${args.rowLabel}, ${formatLongDate(args.date)}: ${formatCoverageNumber(
+    `${args.rowLabel}, ${args.focusAreaName}, ${formatLongDate(args.date)}: ${formatCoverageNumber(
       cell.draft.actual,
     )} of ${formatCoverageNumber(cell.draft.required)} staffed, ${describeCellState(
       cell,

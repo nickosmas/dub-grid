@@ -66,15 +66,16 @@ function shiftRow(record: ShiftRecord): ScheduleRow {
   const title = record.shifts
     .map((shift) =>
       shift.jobName && shift.jobName.trim().toLowerCase() !== shift.name.trim().toLowerCase()
-        ? `${shift.name}, ${shift.jobName}`
+        ? `${shift.name} · ${shift.jobName}`
         : shift.name,
     )
     .join(" and ");
   const times = record.shifts.map((shift) => shift.time).filter(Boolean);
+  // Shift and job in the title, then focus area, then time, as every shift reads.
   const detail = [
+    record.focusArea,
     times.join(" and ") || null,
     record.absenceName ? `then ${record.absenceName}` : null,
-    record.focusArea,
     record.was ? `was ${record.was}` : null,
     record.correctedFrom,
     record.correctionReason,

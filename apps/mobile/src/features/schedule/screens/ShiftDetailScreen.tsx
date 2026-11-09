@@ -1488,6 +1488,14 @@ export default function ShiftDetailScreen() {
                   variant="detail"
                 />
               ) : null}
+              {!hasMultipleSegments && focusAreaName ? (
+                <DetailInfoRow
+                  iconName="location-outline"
+                  label={focusAreaFieldLabel}
+                  tone="green"
+                  value={focusAreaName}
+                />
+              ) : null}
               {!hasMultipleSegments && timeRange ? (
                 <DetailInfoRow
                   iconName="time-outline"
@@ -1495,14 +1503,6 @@ export default function ShiftDetailScreen() {
                   tone="blue"
                   value={timeRange}
                   prominent
-                />
-              ) : null}
-              {!hasMultipleSegments && focusAreaName ? (
-                <DetailInfoRow
-                  iconName="location-outline"
-                  label={focusAreaFieldLabel}
-                  tone="green"
-                  value={focusAreaName}
                 />
               ) : null}
               {restOfDayChip ? (
@@ -1935,7 +1935,7 @@ function PreviousShiftFooter({
               const segmentTimeRange = formatScheduleTimeRange(segment.startTime, segment.endTime);
               const segmentFocusAreaName =
                 segment.shiftId === null ? null : segment.displayFocusAreaName?.trim() || null;
-              const detailParts = [segmentTimeRange, segmentFocusAreaName].filter(
+              const detailParts = [segmentFocusAreaName, segmentTimeRange].filter(
                 (part): part is string => Boolean(part),
               );
 
@@ -1971,20 +1971,20 @@ function PreviousShiftFooter({
             <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.previousShiftSegmentTitle}>
               {getPreviousPresentationTitle(previous)}
             </Text>
-            {previousTimeRange ? (
-              <DetailInfoRow
-                iconName="time-outline"
-                label="Shift time"
-                tone="blue"
-                value={previousTimeRange}
-              />
-            ) : null}
             {previousFocusAreaName ? (
               <DetailInfoRow
                 iconName="location-outline"
                 label={focusAreaFieldLabel}
                 tone="green"
                 value={previousFocusAreaName}
+              />
+            ) : null}
+            {previousTimeRange ? (
+              <DetailInfoRow
+                iconName="time-outline"
+                label="Shift time"
+                tone="blue"
+                value={previousTimeRange}
               />
             ) : null}
           </View>
@@ -2199,6 +2199,9 @@ function ShiftmateSegmentGroups({
                   <Text style={styles.shiftmateSegmentTime}>{group.timeRange}</Text>
                 ) : null}
               </View>
+              {group.focusArea ? (
+                <Text style={styles.shiftmateSegmentFocusArea}>{group.focusArea}</Text>
+              ) : null}
             </View>
           </View>
           {group.entries.length > 0 ? (
@@ -2260,8 +2263,8 @@ function ShiftmateRow({
     ? matchedSegment.isMentored === true
     : hasMentoredSegments(segments);
   const metaItems = [
-    entryTimeRange && entryTimeRange !== groupTimeRange ? entryTimeRange : null,
     entryFocusAreaName && entryFocusAreaName !== groupFocusAreaName ? entryFocusAreaName : null,
+    entryTimeRange && entryTimeRange !== groupTimeRange ? entryTimeRange : null,
   ].filter(Boolean);
 
   return (
@@ -2442,7 +2445,7 @@ function SwapSummaryCard({
     ? getMobileScheduleEntrySegmentFocusAreaName(entry, primarySegment)
     : getMobileScheduleEntryDisplayFocusAreaName(entry);
   const jobChip = getEntryJobChip(mobileColors, isDark, entry);
-  const summaryMeta = [primarySegmentTimeRange ?? timeRange ?? "Time unavailable", focusAreaName]
+  const summaryMeta = [focusAreaName, primarySegmentTimeRange ?? timeRange ?? "Time unavailable"]
     .filter(Boolean)
     .join(" · ");
 

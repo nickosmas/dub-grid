@@ -154,6 +154,8 @@ type TeamScheduleShiftGroup = {
   sortKey: string;
   timeRange: string | null;
   title: string;
+  /** Under the title when another shift in view has the same name. */
+  focusArea?: string | null;
 };
 
 function normalizeTeamShiftGroupKey(value: string): string {
@@ -333,13 +335,16 @@ function buildTeamScheduleShiftGroupsForView(
 
     const segmentGroups = segments.map((segment) => {
       const name = getTeamShiftSegmentTitle(segment);
-      const area = sharedTitles.has(name) ? segment.displayFocusAreaName?.trim() : null;
+      const area = (sharedTitles.has(name) && segment.displayFocusAreaName?.trim()) || null;
       return {
         key: getTeamShiftSegmentGroupKey(segment, name),
         segment,
         sortKey: getTeamShiftSegmentSortKey(entry, segment),
         timeRange: getTeamShiftSegmentTimeRange(segment),
-        title: area ? `${name} in ${area}` : name,
+        title: name,
+        focusArea: area,
+        // The "Also" badge is one line, so it names the area inline.
+        inlineTitle: area ? `${name} · ${area}` : name,
       };
     });
 
@@ -352,10 +357,11 @@ function buildTeamScheduleShiftGroupsForView(
           sortKey: segmentGroup.sortKey,
           timeRange: segmentGroup.timeRange,
           title: segmentGroup.title,
+          focusArea: segmentGroup.focusArea,
         } satisfies TeamScheduleShiftGroup);
       const alternateShiftTitles = segmentGroups
         .filter((candidate) => candidate.key !== segmentGroup.key)
-        .map((candidate) => candidate.title)
+        .map((candidate) => candidate.inlineTitle)
         // Kept even when it repeats this group's name: it is another shift.
         .filter((title, index, titles) => titles.indexOf(title) === index);
       const existingRow = group.rows.find((row) => row.entry === entry);
@@ -1570,7 +1576,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                       stackGroupTime && styles.shiftGroupHeaderStacked,
                     ]}
                   >
-                    <Text style={styles.shiftGroupTitle}>{group.title}</Text>
+                    {group.focusArea ? (
+                      <View style={styles.shiftGroupTitleStack}>
+                        <Text style={styles.shiftGroupStackTitle}>{group.title}</Text>
+                        <Text style={styles.shiftGroupFocusArea}>{group.focusArea}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.shiftGroupTitle}>{group.title}</Text>
+                    )}
                     {groupTimeRange ? (
                       <Text
                         style={[

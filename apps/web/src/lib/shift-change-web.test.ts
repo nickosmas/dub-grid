@@ -159,7 +159,7 @@ describe("describeCellStateChange", () => {
     );
     expect(change.kind).toBe("multi");
     expect(change.after.items.map((item) => item.plain)).toEqual([
-      "Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (4.5 hrs) · Skilled Nursing",
+      "Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 12:00 PM (4.5 hrs)",
       "Sick (part of day)",
     ]);
   });
@@ -332,16 +332,16 @@ describe("formatShiftChangeWasText", () => {
     const evening = worked(2);
     expect(
       formatShiftChangeWasText(describeCellStateChange(day, evening, "2026-10-21", resolvers)),
-    ).toBe("Was Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (7.5 hrs) · Skilled Nursing");
+    ).toBe("Was Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (7.5 hrs)");
     expect(
       formatShiftChangeWasText(describeCellStateChange(null, evening, "2026-10-21", resolvers)),
     ).toBe(
-      "Added: Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing",
+      "Added: Evening Shift · Registered Nurse · Skilled Nursing · 3:00 PM - 11:00 PM (8 hrs)",
     );
     expect(
       formatShiftChangeWasText(describeCellStateChange(evening, null, "2026-10-21", resolvers)),
     ).toBe(
-      "Removed: Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing",
+      "Removed: Evening Shift · Registered Nurse · Skilled Nursing · 3:00 PM - 11:00 PM (8 hrs)",
     );
   });
 
@@ -378,8 +378,8 @@ describe("formatShiftChangeWasText", () => {
     expect(text).toBe(
       [
         "Was (15.5 hrs):",
-        "Shift 1: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (7.5 hrs) · Skilled Nursing",
-        "Shift 2: Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing (removed)",
+        "Shift 1: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (7.5 hrs)",
+        "Shift 2: Evening Shift · Registered Nurse · Skilled Nursing · 3:00 PM - 11:00 PM (8 hrs) (removed)",
       ].join("\n"),
     );
   });

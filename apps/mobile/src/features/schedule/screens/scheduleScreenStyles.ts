@@ -1007,6 +1007,20 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...meGroupTitle,
       color: mobileColors.textPrimary,
     },
+    // A title with its focus area under it; no flex, which would collapse the
+    // text in a column.
+    shiftGroupTitleStack: {
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    shiftGroupStackTitle: {
+      ...meGroupTitle,
+      color: mobileColors.textPrimary,
+    },
+    shiftGroupFocusArea: {
+      ...mobileText.meta,
+      color: mobileColors.textSecondary,
+    },
     shiftGroupTime: {
       flexShrink: 0,
       ...mobileText.bodyStrong,

@@ -42,7 +42,7 @@ describe("ShiftChangeCard (46d)", () => {
     expect(screen.getByText("Removed")).toBeInTheDocument();
     expect(
       screen.getByLabelText(
-        /^Before: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM \(8 hrs\) · Skilled Nursing; Evening Shift .*After: Day Shift · Registered Nurse · 7:00 AM - 11:00 AM \(4 hrs\)/,
+        /^Before: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM \(8 hrs\); Evening Shift .*After: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 11:00 AM \(4 hrs\)/,
       ),
     ).toBeInTheDocument();
     expect(screen.getAllByText("7:00 AM").length).toBeGreaterThan(0);

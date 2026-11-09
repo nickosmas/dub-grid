@@ -21,7 +21,7 @@ describe("buildScheduleCsv", () => {
     );
     expect(csv.split("\r\n")).toEqual([
       "Employee,Wings,Mon 5/4",
-      '"Member, Rosa",East Wing,Day Shift (West Wing)',
+      '"Member, Rosa",East Wing,Day Shift · West Wing',
     ]);
   });
 });

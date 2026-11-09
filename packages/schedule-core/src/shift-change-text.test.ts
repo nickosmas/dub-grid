@@ -42,18 +42,18 @@ const thursday = describeShiftChange(
 describe("formatShiftChangePlain", () => {
   it("writes a single change as Before and After lines (Mon)", () => {
     expect(formatShiftChangePlain(monday)).toEqual([
-      "Before: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
-      "After: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Memory Care",
+      "Before: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
+      "After: Day Shift · Registered Nurse · Memory Care · 7:00 AM - 3:00 PM (8 hrs)",
     ]);
   });
 
   it("writes a whole day with totals, labels and tags (Thu)", () => {
     expect(formatShiftChangePlain(thursday)).toEqual([
       "Before (16 hrs):",
-      "Shift 1: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
-      "Shift 2: Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing (removed)",
+      "Shift 1: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
+      "Shift 2: Evening Shift · Registered Nurse · Skilled Nursing · 3:00 PM - 11:00 PM (8 hrs) (removed)",
       "After (5 hrs):",
-      "Shift 1: Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (5 hrs) · Skilled Nursing",
+      "Shift 1: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 12:00 PM (5 hrs)",
       "Absence: Sick (part of day) (added)",
     ]);
   });
@@ -61,10 +61,10 @@ describe("formatShiftChangePlain", () => {
   it("writes a shift on a day that had nothing as New, without Before and After", () => {
     const change = describeShiftChange({ items: [] }, { items: [shift()] }, { date: "2026-10-23" });
     expect(formatShiftChangePlain(change)).toEqual([
-      "New: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+      "New: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
     ]);
     expect(formatShiftChangeCompact(change)).toBe(
-      "New: Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+      "New: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
     );
   });
 
@@ -76,9 +76,9 @@ describe("formatShiftChangePlain", () => {
     );
     expect(formatShiftChangePlain(change).slice(2)).toEqual([
       "After (12 hrs):",
-      "Shift 1: Day Shift · Registered Nurse · 7:00 AM - 11:00 AM (4 hrs) · Skilled Nursing",
+      "Shift 1: Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 11:00 AM (4 hrs)",
       "Break: 4 hrs, 11:00 AM - 3:00 PM",
-      "Shift 2: Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing (added)",
+      "Shift 2: Evening Shift · Registered Nurse · Skilled Nursing · 3:00 PM - 11:00 PM (8 hrs) (added)",
     ]);
   });
 
@@ -95,13 +95,13 @@ describe("formatShiftChangePlain", () => {
 describe("formatShiftChangeCompact", () => {
   it("writes the push line with an arrow (Mon)", () => {
     expect(formatShiftChangeCompact(monday)).toBe(
-      "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing → Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Memory Care",
+      "Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs) → Day Shift · Registered Nurse · Memory Care · 7:00 AM - 3:00 PM (8 hrs)",
     );
   });
 
   it("joins a whole day's items (Thu)", () => {
     expect(formatShiftChangeCompact(thursday)).toBe(
-      "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing + Evening Shift · Registered Nurse · 3:00 PM - 11:00 PM (8 hrs) · Skilled Nursing → Day Shift · Registered Nurse · 7:00 AM - 12:00 PM (5 hrs) · Skilled Nursing + Sick (part of day)",
+      "Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs) + Evening Shift · Registered Nurse · Skilled Nursing · 3:00 PM - 11:00 PM (8 hrs) → Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 12:00 PM (5 hrs) + Sick (part of day)",
     );
   });
 });
@@ -109,8 +109,8 @@ describe("formatShiftChangeCompact", () => {
 describe("formatShiftChangeCompactSides", () => {
   it("keeps Before and After apart (Mon)", () => {
     expect(formatShiftChangeCompactSides(monday)).toEqual({
-      before: "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
-      after: "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Memory Care",
+      before: "Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
+      after: "Day Shift · Registered Nurse · Memory Care · 7:00 AM - 3:00 PM (8 hrs)",
     });
   });
 
@@ -118,7 +118,7 @@ describe("formatShiftChangeCompactSides", () => {
     const change = describeShiftChange({ items: [] }, { items: [shift()] }, { date: "2026-10-26" });
     expect(formatShiftChangeCompactSides(change)).toEqual({
       before: null,
-      after: "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+      after: "Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
     });
   });
 });

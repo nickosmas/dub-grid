@@ -76,7 +76,7 @@ import {
   orderFocusAreasByDepartment,
   pluralLabelNoun,
   singularLabelNoun,
-  shiftDisplayName,
+  sharedShiftFocusArea,
   DEFAULT_ORGANIZATION_LABELS,
 } from "@dubgrid/domain";
 
@@ -528,7 +528,8 @@ function ChecklistPanel({
 }: {
   title: string;
   summary?: string;
-  items: Array<{ id: number; label: string; description?: string }>;
+  /** `subtitle` follows the label, as a shared shift name's focus area does. */
+  items: Array<{ id: number; label: string; subtitle?: string; description?: string }>;
   selectedIds: number[];
   onToggle: (id: number) => void;
   onToggleAll: () => void;
@@ -579,6 +580,17 @@ function ChecklistPanel({
               />
               <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span>{item.label}</span>
+                {item.subtitle ? (
+                  <span
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      color: "var(--dg-color-text-secondary)",
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {item.subtitle}
+                  </span>
+                ) : null}
                 {item.description ? (
                   <span
                     style={{
@@ -1014,12 +1026,12 @@ function JobRow({
       ),
     [activeShifts, form.focusAreaIds],
   );
-  const shiftLabelById = useMemo(
+  const sharedFocusAreaByShiftId = useMemo(
     () =>
       new Map(
         activeShifts.map((shift) => [
           shift.id,
-          shiftDisplayName(shift, activeShifts, (id) => focusAreaNameById.get(id)),
+          sharedShiftFocusArea(shift, activeShifts, (id) => focusAreaNameById.get(id)),
         ]),
       ),
     [activeShifts, focusAreaNameById],
@@ -2015,7 +2027,8 @@ function JobRow({
                   }
                   items={availableShifts.map((shift) => ({
                     id: shift.id,
-                    label: shiftLabelById.get(shift.id) ?? shift.name,
+                    label: shift.name,
+                    subtitle: sharedFocusAreaByShiftId.get(shift.id) ?? undefined,
                     description:
                       shift.startTime && shift.endTime
                         ? `${fmt12h(shift.startTime)} - ${fmt12h(shift.endTime)}`
@@ -2101,7 +2114,7 @@ function JobRow({
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {selectedShifts.map((shift) => {
-                    const shiftLabel = shiftLabelById.get(shift.id) ?? shift.name;
+                    const sharedFocusArea = sharedFocusAreaByShiftId.get(shift.id);
                     const colorOverride = getJobShiftColorOverride(form, shift.id);
                     const resolvedColor = colorOverride ?? shift.color ?? DEFAULT_JOB_PRESET_COLOR;
                     const timeOverride = getJobShiftTimeOverride(form, shift.id);
@@ -2157,8 +2170,18 @@ function JobRow({
                                 color: "var(--dg-color-text-primary)",
                               }}
                             >
-                              {shiftLabel}
+                              {shift.name}
                             </div>
+                            {sharedFocusArea ? (
+                              <div
+                                style={{
+                                  fontSize: "var(--dg-fs-caption)",
+                                  color: "var(--dg-color-text-secondary)",
+                                }}
+                              >
+                                {sharedFocusArea}
+                              </div>
+                            ) : null}
                             <div
                               style={{
                                 fontSize: "var(--dg-fs-caption)",

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { shiftDisplayName } from "@dubgrid/domain";
+import { sharedShiftFocusArea } from "@dubgrid/domain";
 import { addDaysToIsoDate } from "@dubgrid/schedule-core";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
@@ -34,6 +34,8 @@ interface PersonMonthCalendarProps {
 interface CalendarPill {
   key: string;
   name: string;
+  /** Leads the card when another focus area has a shift by this name. */
+  focusArea: string | null;
   detail: string | null;
   background: string;
   border: string;
@@ -124,19 +126,23 @@ export function PersonMonthCalendar({
         );
         const shift =
           assignment.shiftId != null ? lookups.shiftById.get(assignment.shiftId) : undefined;
-        const name = shift
-          ? shiftDisplayName(
+        const name = shift?.name ?? assignment.name;
+        const focusArea = shift
+          ? sharedShiftFocusArea(
               shift,
               [...lookups.shiftById.values()],
               (id) => lookups.focusAreaById.get(id)?.name,
             )
-          : assignment.name;
+          : null;
         const job =
           assignment.jobId != null ? lookups.jobById.get(assignment.jobId)?.name : undefined;
+        const jobDetail =
+          job && job.trim().toLowerCase() !== name.trim().toLowerCase() ? job : null;
         return {
           key: `shift-${assignment.id}`,
           name,
-          detail: job && job.trim().toLowerCase() !== name.trim().toLowerCase() ? job : null,
+          focusArea,
+          detail: jobDetail,
           background: colors.color,
           border: draftBorder ? `2px dashed ${draftBorder}` : FILLED_PILL_BORDER,
           text: colors.text,
@@ -151,6 +157,7 @@ export function PersonMonthCalendar({
       pills.push({
         key: `absence-${absence.id}`,
         name: absence.name || absence.label,
+        focusArea: null,
         detail: null,
         background: fill.background,
         border: draftBorder ? `2px dashed ${draftBorder}` : FILLED_PILL_BORDER,
@@ -241,13 +248,16 @@ export function PersonMonthCalendar({
                     {pills.map((pill) => (
                       <MaybeHint
                         key={pill.key}
-                        content={pill.detail ? `${pill.name}, ${pill.detail}` : pill.name}
+                        content={[pill.name, pill.detail, pill.focusArea]
+                          .filter(Boolean)
+                          .join(", ")}
                       >
                         <div
                           data-calendar-pill=""
-                          // One size for every card, a name alone or a name and job,
-                          // so a month reads as an even grid.
-                          className="box-border flex h-10 flex-col justify-center rounded-[var(--dg-radius-sm)] px-1.5 leading-[1.25]"
+                          // One size for every card, with room for the shift, job and
+                          // focus area each on its own line, so a month reads as an
+                          // even grid.
+                          className="box-border flex h-13 flex-col justify-center rounded-[var(--dg-radius-sm)] px-1.5 leading-[1.25]"
                           style={{
                             background: pill.background,
                             border: pill.border,
@@ -257,11 +267,14 @@ export function PersonMonthCalendar({
                           <div className="truncate text-[length:var(--dg-type-badge-size)] font-semibold">
                             {pill.name}
                           </div>
-                          {pill.detail ? (
-                            <div className="truncate text-[length:var(--dg-type-metadata-size)] font-medium opacity-80">
-                              {pill.detail}
+                          {[pill.detail, pill.focusArea].filter(Boolean).map((line) => (
+                            <div
+                              key={line}
+                              className="truncate text-[length:var(--dg-type-metadata-size)] font-medium opacity-80"
+                            >
+                              {line}
                             </div>
-                          ) : null}
+                          ))}
                         </div>
                       </MaybeHint>
                     ))}
