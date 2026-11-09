@@ -70,6 +70,9 @@ export function UnsavedChangesBar({
   const slot = useContext(UnsavedChangesSlotContext);
   const barRef = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState<"floating" | "docked" | "resting">("resting");
+  // Only shown while a button can be pressed, or while a save is underway.
+  const actionable = saving || !saveDisabled || Boolean(onDiscard);
+  const shown = slot !== null && actionable;
 
   useEffect(() => {
     const bar = barRef.current;
@@ -77,7 +80,7 @@ export function UnsavedChangesBar({
     while (section && getComputedStyle(section).display === "contents") {
       section = section.parentElement;
     }
-    if (!bar || !section) return;
+    if (!shown || !bar || !section) return;
     const scope = section;
     let host: HTMLElement | null = null;
     // The card the bar closes off when it docks: the last one in the section.
@@ -133,9 +136,9 @@ export function UnsavedChangesBar({
       resizeObserver?.disconnect();
       host?.removeAttribute(DOCKED_HOST_ATTRIBUTE);
     };
-  }, [slot]);
+  }, [slot, shown]);
 
-  if (slot === null) return null;
+  if (!shown) return null;
 
   const bar = (
     <div
