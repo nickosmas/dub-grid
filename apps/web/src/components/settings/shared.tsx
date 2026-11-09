@@ -10,6 +10,7 @@ import {
 } from "@/lib/colors";
 import { sectionStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import { Button } from "@/components/Button";
+import { UnsavedChangesScope } from "@/components/ui/UnsavedChangesBar";
 import { parseTo12h, to24h } from "@/lib/utils";
 import CustomSelect from "@/components/CustomSelect";
 import { MaybeHint } from "@/components/ui/hint";
@@ -47,6 +48,7 @@ export function SectionCard({
   maxWidth = 1120,
   noPadding = false,
   align = "center",
+  saveBar,
 }: {
   children: React.ReactNode;
   /** The card's bottom buttons, drawn under a line across the whole card. */
@@ -54,21 +56,31 @@ export function SectionCard({
   maxWidth?: number;
   noPadding?: boolean;
   align?: "center" | "start";
+  /** An edit-in-place card's Unsaved changes bar, or null while nothing has changed. */
+  saveBar?: React.ReactNode;
 }) {
-  return (
+  const placement: React.CSSProperties = {
+    width: "100%",
+    maxWidth,
+    margin: align === "start" ? 0 : "0 auto",
+    flexShrink: 0,
+  };
+  const card = (
     <div
       className="dg-page-enter"
-      style={{
-        ...sectionStyle,
-        width: "100%",
-        maxWidth,
-        margin: align === "start" ? 0 : "0 auto",
-        flexShrink: 0,
-      }}
+      data-unsaved-bar-host=""
+      style={{ ...sectionStyle, ...(saveBar === undefined ? placement : { width: "100%" }) }}
     >
       {noPadding ? children : <div style={{ padding: "20px" }}>{children}</div>}
       {footer ? <div className="dg-footer-bar">{footer}</div> : null}
     </div>
+  );
+  if (saveBar === undefined) return card;
+  return (
+    <UnsavedChangesScope style={placement}>
+      {card}
+      {saveBar}
+    </UnsavedChangesScope>
   );
 }
 

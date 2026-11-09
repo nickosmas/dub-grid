@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 
@@ -29,6 +29,7 @@ import { WorkAndRecordCard } from "@/components/staff-detail/PersonInfoCards";
 import { StaffOverviewTab } from "@/components/staff-detail/tabs/StaffOverviewTab";
 import { ScheduleTab } from "@/components/staff-detail/tabs/ScheduleTab";
 import { CalendarSubscriptionCard } from "./CalendarSubscriptionCard";
+import { UnsavedChangesScope } from "@/components/ui/UnsavedChangesBar";
 import { ProfileHeader } from "./ProfileHeader";
 import { availableProfileTabs, resolveProfileLink, type ProfileTab } from "./profile-tabs";
 
@@ -78,7 +79,6 @@ export function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scrollerRef = useClipTrailingWhitespace();
-  const [saveBarSlot, setSaveBarSlot] = useState<HTMLDivElement | null>(null);
   const {
     orgId,
     role,
@@ -316,7 +316,6 @@ export function ProfilePage() {
                   setProfile={setProfile}
                   setEmployee={setEmployee}
                   refetchProfile={refetchProfile}
-                  saveBarSlot={saveBarSlot}
                   showAccessRole={!recordAccessRole}
                 />
                 {employee ? (
@@ -337,17 +336,18 @@ export function ProfilePage() {
                     }
                   />
                 ) : null}
-                <div ref={setSaveBarSlot} className="sticky bottom-4 z-10 empty:hidden" />
               </div>
             )}
 
             {activeTab === "alerts" && (
-              <SettingsSection id="notifications" title="Alerts">
-                <NotificationsPanel
-                  isGridmaster={Boolean(isGridmaster)}
-                  isSuperAdmin={Boolean(isSuperAdmin)}
-                />
-              </SettingsSection>
+              <UnsavedChangesScope>
+                <SettingsSection id="notifications" title="Alerts">
+                  <NotificationsPanel
+                    isGridmaster={Boolean(isGridmaster)}
+                    isSuperAdmin={Boolean(isSuperAdmin)}
+                  />
+                </SettingsSection>
+              </UnsavedChangesScope>
             )}
 
             {activeTab === "security" && (
