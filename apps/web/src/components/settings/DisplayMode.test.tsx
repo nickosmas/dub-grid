@@ -65,7 +65,7 @@ describe("DisplayMode: what staff see after a publish (46f)", () => {
     const toggle = screen.getByRole("switch", { name: label });
     expect(toggle).toHaveAttribute("aria-checked", "true");
     fireEvent.click(toggle);
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     expect(saveOrganizationSettingsWithRecovery).toHaveBeenCalledWith(
