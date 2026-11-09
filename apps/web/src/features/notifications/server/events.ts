@@ -1,4 +1,8 @@
-import { describeEmploymentStatus, resolveOrganizationLabel } from "@dubgrid/domain";
+import {
+  describeEmploymentStatus,
+  orderFocusAreasByDepartment,
+  resolveOrganizationLabel,
+} from "@dubgrid/domain";
 import { getServiceClient } from "@/lib/supabase-service";
 import { listPermissionChanges, summarizePermissionChanges } from "@/lib/permission-labels";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
@@ -466,20 +470,41 @@ async function getEmployeeEmailDetails(
     ]);
     if (!employee) return empty;
     const focusAreaIds = (employee.focus_area_ids as number[] | null) ?? [];
-    const [{ data: focusAreas }, { data: certification }] = await Promise.all([
-      focusAreaIds.length > 0
-        ? db.from("focus_areas").select("name").eq("org_id", orgId).in("id", focusAreaIds)
-        : Promise.resolve({ data: [] as { name: string }[] }),
-      employee.certification_id != null
-        ? db
-            .from("certifications")
-            .select("name")
-            .eq("org_id", orgId)
-            .eq("id", employee.certification_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null as { name: string } | null }),
-    ]);
-    const focusAreaNames = (focusAreas ?? []).map((row) => row.name as string);
+    const [{ data: focusAreas }, { data: departments }, { data: certification }] =
+      await Promise.all([
+        focusAreaIds.length > 0
+          ? db
+              .from("focus_areas")
+              .select("name, department_id, sort_order")
+              .eq("org_id", orgId)
+              .in("id", focusAreaIds)
+          : Promise.resolve({
+              data: [] as { name: string; department_id: number | null; sort_order: number }[],
+            }),
+        focusAreaIds.length > 0
+          ? db.from("departments").select("id, type, sort_order").eq("org_id", orgId)
+          : Promise.resolve({ data: [] as { id: number; type: string; sort_order: number }[] }),
+        employee.certification_id != null
+          ? db
+              .from("certifications")
+              .select("name")
+              .eq("org_id", orgId)
+              .eq("id", employee.certification_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null as { name: string } | null }),
+      ]);
+    const focusAreaNames = orderFocusAreasByDepartment(
+      (focusAreas ?? []).map((row) => ({
+        name: row.name as string,
+        departmentId: row.department_id as number | null,
+        sortOrder: row.sort_order as number,
+      })),
+      (departments ?? []).map((department) => ({
+        id: department.id as number,
+        type: department.type as string,
+        sortOrder: department.sort_order as number,
+      })),
+    ).map((row) => row.name);
     const line = (label: string, value: unknown): NotificationEmailDetail[] =>
       typeof value === "string" && value.trim() ? [{ label, value: value.trim() }] : [];
     return {

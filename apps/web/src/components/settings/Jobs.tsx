@@ -73,6 +73,7 @@ import {
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import {
   changedElsewhereMessage,
+  orderFocusAreasByDepartment,
   pluralLabelNoun,
   singularLabelNoun,
   shiftDisplayName,
@@ -979,8 +980,12 @@ function JobRow({
     [departments],
   );
   const activeFocusAreas = useMemo(
-    () => sortByOrder(focusAreas.filter((focusArea) => !focusArea.archivedAt)),
-    [focusAreas],
+    () =>
+      orderFocusAreasByDepartment(
+        focusAreas.filter((focusArea) => !focusArea.archivedAt),
+        departments,
+      ),
+    [departments, focusAreas],
   );
   const activeShifts = useMemo(
     () => sortByOrder(shiftCategories.filter((shift) => !shift.archivedAt)),

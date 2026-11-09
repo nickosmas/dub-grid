@@ -15,10 +15,10 @@ const focusAreas = [
 ];
 
 describe("getDepartmentNames", () => {
-  it("keeps the order it was given and drops ids the org no longer has", () => {
+  it("follows the departments' order and drops ids the org no longer has", () => {
     expect(getDepartmentNames([10, 999, 4], departments)).toEqual([
-      "Clinical Leadership",
       "North Wing",
+      "Clinical Leadership",
     ]);
   });
 
