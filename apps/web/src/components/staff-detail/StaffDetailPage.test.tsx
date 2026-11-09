@@ -9,8 +9,10 @@ import {
   fetchEmployeeShifts,
   updateEmployee,
 } from "@/features/employees/client";
-import { resendInvitation } from "@/features/organization/client";
-import type { Employee } from "@/types";
+import { createOrganizationInvitation, resendInvitation } from "@/features/organization/client";
+import type { InviteOnSaveChoice } from "@/features/employees/client/invite-on-save";
+import type { Employee, Invitation } from "@/types";
+import { toast } from "sonner";
 
 const mockReplace = vi.fn();
 const mockRouter = { replace: mockReplace, push: vi.fn(), back: vi.fn() };
@@ -80,13 +82,56 @@ vi.mock("./RecurringScheduleCard", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./RecurringScheduleCard")>()),
   RecurringScheduleCard: () => <div />,
 }));
+type InviteOnSaveStub = {
+  onSaveAndInvite: (
+    employee: Employee,
+    invite: InviteOnSaveChoice,
+    runStepUp: (action: (token?: string) => Promise<unknown>) => Promise<boolean>,
+  ) => unknown;
+};
+const runStepUp = async (action: (token?: string) => Promise<unknown>) => {
+  await action("token");
+  return true;
+};
 vi.mock("@/components/EditEmployeePanel", () => ({
-  default: ({ employee, onSave }: { employee: Employee; onSave: (employee: Employee) => void }) => (
-    <button type="button" onClick={() => onSave({ ...employee, firstName: "Augusta" })}>
-      Save details
-    </button>
+  default: ({
+    employee,
+    onSave,
+    inviteOnSave,
+    pendingInvitation,
+  }: {
+    employee: Employee;
+    onSave: (employee: Employee) => void;
+    inviteOnSave?: InviteOnSaveStub;
+    pendingInvitation?: Invitation;
+  }) => (
+    <>
+      <button type="button" onClick={() => onSave({ ...employee, firstName: "Augusta" })}>
+        Save details
+      </button>
+      <button type="button" onClick={() => onSave({ ...employee, email: "new@example.com" })}>
+        Save new email
+      </button>
+      {inviteOnSave ? (
+        <button
+          type="button"
+          onClick={() =>
+            inviteOnSave.onSaveAndInvite(
+              { ...employee, email: "new@example.com" },
+              pendingInvitation
+                ? { kind: "reinvite", replacing: pendingInvitation }
+                : { kind: "invite", role: "admin" },
+              runStepUp,
+            )
+          }
+        >
+          Save and invite
+        </button>
+      ) : null}
+    </>
   ),
 }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 vi.mock("@/components/InviteEmployeeModal", () => ({ default: () => <div /> }));
 vi.mock("@/features/organization/client", () => ({
   createOrganizationInvitation: vi.fn(),
@@ -320,6 +365,93 @@ describe("StaffDetailPage", () => {
       expect(within(card).getByRole("button", { name: "Invite" })).toBeInTheDocument();
       // The invite card is the one place to invite from.
       expect(screen.queryByRole("button", { name: "Send invitation" })).not.toBeInTheDocument();
+    });
+
+    describe("inviting while saving", () => {
+      beforeEach(() => {
+        vi.mocked(fetchEmployeeInvitations).mockResolvedValue([] as never);
+        vi.mocked(updateEmployee).mockImplementation(
+          async (saved) => ({ ...saved, version: 2 }) as never,
+        );
+      });
+
+      it("saves, then sends the invitation with the access role picked", async () => {
+        vi.mocked(createOrganizationInvitation).mockResolvedValue({} as never);
+        renderPage();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Save and invite" }));
+
+        await waitFor(() =>
+          expect(createOrganizationInvitation).toHaveBeenCalledWith(
+            { email: "new@example.com", role: "admin", orgId: "org-1", employeeId: "emp-2" },
+            "token",
+          ),
+        );
+        expect(updateEmployee).toHaveBeenCalledTimes(1);
+        expect(toast.success).toHaveBeenCalledWith(
+          "Employee saved. An invitation was sent to new@example.com.",
+        );
+      });
+
+      it("keeps the details saved and points to Invite when the send fails", async () => {
+        vi.mocked(createOrganizationInvitation).mockRejectedValue(new Error("Resend down"));
+        renderPage();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Save and invite" }));
+
+        await waitFor(() =>
+          expect(toast.error).toHaveBeenCalledWith(
+            "Employee saved, but we couldn't send the invitation. Use Invite to try again.",
+          ),
+        );
+        expect(updateEmployee).toHaveBeenCalledTimes(1);
+        expect(toast.success).not.toHaveBeenCalled();
+      });
+
+      it("sends no invitation when the save fails", async () => {
+        vi.mocked(updateEmployee).mockRejectedValue(new Error("nope"));
+        renderPage();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Save and invite" }));
+
+        await waitFor(() =>
+          expect(toast.error).toHaveBeenCalledWith("We couldn't save those details. Try again."),
+        );
+        expect(createOrganizationInvitation).not.toHaveBeenCalled();
+      });
+
+      it("replaces a pending invitation at the new address with its access role", async () => {
+        vi.mocked(fetchEmployeeInvitations).mockResolvedValue([
+          invitationFor({ roleToAssign: "admin" }),
+        ] as never);
+        vi.mocked(createOrganizationInvitation).mockResolvedValue({} as never);
+        renderPage();
+        await screen.findByText(/^Invited .+, hasn't joined$/);
+
+        fireEvent.click(screen.getByRole("button", { name: "Save and invite" }));
+
+        await waitFor(() =>
+          expect(createOrganizationInvitation).toHaveBeenCalledWith(
+            expect.objectContaining({ email: "new@example.com", role: "admin" }),
+            "token",
+          ),
+        );
+      });
+
+      it("says the old invitation was canceled when a new email is saved without one", async () => {
+        vi.mocked(fetchEmployeeInvitations).mockResolvedValue([invitationFor({})] as never);
+        renderPage();
+        await screen.findByText(/^Invited .+, hasn't joined$/);
+
+        fireEvent.click(screen.getByRole("button", { name: "Save new email" }));
+
+        await waitFor(() =>
+          expect(toast.success).toHaveBeenCalledWith(
+            "Employee saved. Their invitation to ada@example.com was canceled.",
+          ),
+        );
+        expect(createOrganizationInvitation).not.toHaveBeenCalled();
+      });
     });
 
     it("leaves the invite card off for someone offboarded", async () => {

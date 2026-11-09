@@ -65,6 +65,10 @@ import {
   FocusAreaShiftsCancelledError,
   EmployeeStatusConflictError,
 } from "@/features/employees/client";
+import {
+  inviteRoleOptions,
+  type InviteOnSaveChoice,
+} from "@/features/employees/client/invite-on-save";
 import { queryKeys } from "@/lib/query-keys";
 import {
   mergeEmployeeIntoDirectoryPerson,
@@ -190,6 +194,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [isEditingAccess, setIsEditingAccess] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [detailsSaveBlocked, setDetailsSaveBlocked] = useState(false);
+  const [detailsSaveLabel, setDetailsSaveLabel] = useState("Save changes");
   const detailsEditorRef = useRef<EditEmployeePanelHandle>(null);
   const contentScrollerRef = useClipTrailingWhitespace();
   const {
@@ -434,14 +439,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const { optionsFor: focusAreaSaveOptions, dialog: focusAreaDialog } =
     useFocusAreaShiftsQuestion();
 
-  const handleSaveEmployee = useCallback(
-    async (updatedEmployee: Employee) => {
-      if (!orgId || !employee) return;
+  // The saved record; null when the save failed (already reported), false when
+  // the question about their shifts was closed, which leaves the form open.
+  const persistEmployee = useCallback(
+    async (updatedEmployee: Employee): Promise<Employee | null | false> => {
+      if (!orgId || !employee) return null;
       const previousEmployee = employee;
-      const revokedInvitationEmail =
-        pendingInvite && (previousEmployee.email || "") !== (updatedEmployee.email || "")
-          ? pendingInvite.email
-          : null;
       // A save that may ask about their shifts waits for the answer, so Cancel
       // leaves the form as it was edited.
       if (
@@ -458,133 +461,109 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           focusAreaSaveOptions(`${updatedEmployee.firstName} ${updatedEmployee.lastName}`),
         );
         syncEmployeeCaches(savedEmployee);
-        toast.success(
-          revokedInvitationEmail
-            ? `Employee saved. Their pending invitation to ${revokedInvitationEmail} was revoked.`
-            : "Employee saved",
-        );
-        refreshDirectory();
-        if (revokedInvitationEmail) {
-          void refreshInvitations();
-        }
+        return savedEmployee;
       } catch (err) {
         if (err instanceof EmployeeProfileConflictError) {
           syncEmployeeCaches(err.latestEmployee);
           toast.error(changedElsewhereMessage("their details"));
-          return;
+          return null;
         }
         setEmployee(previousEmployee);
-        // Closing the question about their shifts leaves the form open, unsaved.
         if (err instanceof FocusAreaShiftsCancelledError) return false;
         toast.error(
           err instanceof EmployeeContactConflictError
             ? formatClientErrorMessage(err, "We couldn't save those details. Try again.")
             : "We couldn't save those details. Try again.",
         );
+        return null;
       }
     },
-    [
-      employee,
-      focusAreaSaveOptions,
-      orgId,
-      pendingInvite,
-      refreshDirectory,
-      refreshInvitations,
-      syncEmployeeCaches,
-    ],
+    [employee, focusAreaSaveOptions, orgId, syncEmployeeCaches],
   );
 
-  // Chosen from EditEmployeePanel's confirm dialog when the admin picks
-  // "Save & Send" after changing the email while a pending invitation
-  // exists. Saves the identity change (the DB trigger revokes the old
-  // invitation as a side effect), then creates and sends a replacement
-  // invitation at the new address, reusing the old one's role/departments.
-  const handleSaveEmployeeWithReinvite = useCallback(
-    async (updatedEmployee: Employee, oldInvitation: Invitation, runStepUp: StepUpRun) => {
-      if (!orgId || !employee) return;
-      const previousEmployee = employee;
-      // A save that may ask about their shifts waits for the answer, so Cancel
-      // leaves the form as it was edited.
-      if (
-        removedFocusAreaIds(previousEmployee.focusAreaIds, updatedEmployee.focusAreaIds).length ===
-        0
-      ) {
-        setEmployee(updatedEmployee);
-      }
+  const handleSaveEmployee = useCallback(
+    async (updatedEmployee: Employee) => {
+      // Saving a new address cancels the invitation to the old one (in the database).
+      const canceledInvitationEmail =
+        pendingInvite && (employee?.email || "") !== (updatedEmployee.email || "")
+          ? pendingInvite.email
+          : null;
+      const saved = await persistEmployee(updatedEmployee);
+      if (saved === false) return false;
+      if (!saved) return;
+      toast.success(
+        canceledInvitationEmail
+          ? `Employee saved. Their invitation to ${canceledInvitationEmail} was canceled.`
+          : "Employee saved",
+      );
+      refreshDirectory();
+      if (canceledInvitationEmail) void refreshInvitations();
+    },
+    [employee?.email, pendingInvite, persistEmployee, refreshDirectory, refreshInvitations],
+  );
 
-      let savedEmployee: Employee;
-      try {
-        savedEmployee = await updateEmployee(
-          updatedEmployee,
-          orgId,
-          previousEmployee.version,
-          focusAreaSaveOptions(`${updatedEmployee.firstName} ${updatedEmployee.lastName}`),
-        );
-        syncEmployeeCaches(savedEmployee);
-      } catch (err) {
-        if (err instanceof EmployeeProfileConflictError) {
-          syncEmployeeCaches(err.latestEmployee);
-          toast.error(changedElsewhereMessage("their details"));
-          return;
-        }
-        setEmployee(previousEmployee);
-        if (err instanceof FocusAreaShiftsCancelledError) return false;
-        toast.error(
-          err instanceof EmployeeContactConflictError
-            ? formatClientErrorMessage(err, "We couldn't save those details. Try again.")
-            : "We couldn't save those details. Try again.",
-        );
-        return;
-      }
+  // Saves first, then sends: the details stay saved whatever happens to the
+  // invitation. A new address has already canceled any invitation to the old one.
+  const handleSaveEmployeeAndInvite = useCallback(
+    async (updatedEmployee: Employee, invite: InviteOnSaveChoice, runStepUp: StepUpRun) => {
+      if (!orgId) return;
+      const saved = await persistEmployee(updatedEmployee);
+      if (saved === false) return false;
+      if (!saved) return;
 
-      // The identity save already succeeded at this point, so a failure past
-      // here must not read as the whole action failing — the employee record
-      // is correctly saved either way.
       try {
         const completed = await runStepUp((accessToken) =>
           createOrganizationInvitation(
-            {
-              email: savedEmployee.email,
-              role: oldInvitation.roleToAssign,
-              orgId,
-              employeeId: savedEmployee.id,
-              firstName: savedEmployee.firstName,
-              lastName: savedEmployee.lastName,
-              phone: savedEmployee.phone || undefined,
-              departmentIds: oldInvitation.departmentIds,
-              deptAdminIds: oldInvitation.deptAdminIds,
-            },
+            invite.kind === "reinvite"
+              ? {
+                  email: saved.email,
+                  role: invite.replacing.roleToAssign,
+                  orgId,
+                  employeeId: saved.id,
+                  firstName: saved.firstName,
+                  lastName: saved.lastName,
+                  phone: saved.phone || undefined,
+                  departmentIds: invite.replacing.departmentIds,
+                  deptAdminIds: invite.replacing.deptAdminIds,
+                }
+              : {
+                  email: saved.email,
+                  role: invite.role,
+                  orgId,
+                  employeeId: saved.id,
+                  ...(invite.adminPermissions
+                    ? { adminPermissions: { ...invite.adminPermissions } }
+                    : {}),
+                },
             accessToken,
           ),
         );
         if (!completed) {
-          // The address change already revoked the old invitation.
-          toast.info("Employee saved. No new invitation was sent.");
+          toast.info("Employee saved. No invitation was sent.");
           return;
         }
-
-        toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
+        toast.success(`Employee saved. An invitation was sent to ${saved.email}.`);
       } catch (err) {
-        // Saving the new address revoked the old invitation, and a failed send
-        // leaves no new one, so point at the one action that recovers.
         Sentry.captureException(err);
         toast.error(
-          "Employee saved, but we couldn't send the new invitation. Use Send invitation to try again.",
+          "Employee saved, but we couldn't send the invitation. Use Invite to try again.",
         );
       } finally {
         refreshDirectory();
         void refreshInvitations();
       }
     },
-    [
-      employee,
-      focusAreaSaveOptions,
-      orgId,
-      org?.name,
-      refreshDirectory,
-      refreshInvitations,
-      syncEmployeeCaches,
-    ],
+    [orgId, persistEmployee, refreshDirectory, refreshInvitations],
+  );
+
+  const detailsInviteOnSave = useMemo(
+    () => ({
+      canInvite: perms.canManageEmployees,
+      roleOptions: inviteRoleOptions(perms.isSuperAdmin || perms.isGridmaster),
+      canSetAdminPermissions: perms.isSuperAdmin || perms.isGridmaster,
+      onSaveAndInvite: handleSaveEmployeeAndInvite,
+    }),
+    [perms.canManageEmployees, perms.isSuperAdmin, perms.isGridmaster, handleSaveEmployeeAndInvite],
   );
 
   // ── Status action handlers ──────────────────────────────────────────────────
@@ -917,6 +896,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     if (legacySection) router.replace(hrefForTab(tabForLegacySection(legacySection)));
     else if (legacyTab) router.replace(hrefForTab(activeTab));
   }, [activeTab, hrefForTab, legacySection, legacyTab, router]);
+
+  // Edit details on a person with no email lands in the email field, once the
+  // Account tab is showing (a hidden field can't take focus).
+  const [focusEmailOnAccount, setFocusEmailOnAccount] = useState(false);
+  useEffect(() => {
+    if (!focusEmailOnAccount || activeTab !== "account") return;
+    detailsEditorRef.current?.focusEmail();
+    setFocusEmailOnAccount(false);
+  }, [activeTab, focusEmailOnAccount]);
 
   // The Overview counts the chosen period, loaded on its own so a long custom
   // range never rides on the page's first load.
@@ -1445,7 +1433,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       onInvite={canSendInvitation ? () => setShowInviteModal(true) : undefined}
                       onEditDetails={
                         canEditDetails
-                          ? () => router.replace(hrefForTab("account"), { scroll: false })
+                          ? () => {
+                              router.replace(hrefForTab("account"), { scroll: false });
+                              setFocusEmailOnAccount(true);
+                            }
                           : undefined
                       }
                       onResend={handleResendInvitation}
@@ -1507,7 +1498,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                         onDirtyChange={setDetailsDirty}
                         onSaveBlockedChange={setDetailsSaveBlocked}
                         pendingInvitation={pendingInvite ?? undefined}
-                        onSaveWithReinvite={handleSaveEmployeeWithReinvite}
+                        inviteOnSave={detailsInviteOnSave}
+                        onSaveLabelChange={setDetailsSaveLabel}
                         onMoveToNewEmail={
                           canMoveToNewEmail ? () => setMovingToNewEmail(true) : undefined
                         }
@@ -1515,6 +1507,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       {detailsDirty ? (
                         <UnsavedChangesBar
                           saveDisabled={detailsSaveBlocked}
+                          saveLabel={detailsSaveLabel}
                           onDiscard={() => detailsEditorRef.current?.requestDismiss()}
                           onSave={() => void detailsEditorRef.current?.save()}
                         />
