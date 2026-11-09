@@ -145,7 +145,6 @@ export function UnsavedChangesBar({
       data-placement={placement}
       className="dg-unsaved-bar"
     >
-      <span className="dg-unsaved-bar__label">Unsaved changes</span>
       <div className="dg-unsaved-bar__actions">
         {onDiscard ? (
           <Button

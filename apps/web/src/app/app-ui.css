@@ -1788,9 +1788,8 @@ button.dg-cc-sg-main {
   background: transparent;
 }
 /* Unsaved changes: sticky at the end of the section it saves (UnsavedChangesScope).
-   Floating, it is a bar with one inset on every side, corners concentric with
-   its buttons', and the label as far from the left edge as the button text is
-   from the right. At the section's end it docks: it overlaps the last card's
+   Floating, it is a bar with one inset on every side and corners concentric
+   with its buttons'. At the section's end it docks: it overlaps the last card's
    bottom border and becomes that card's footer, as `.dg-footer-bar` draws one.
    Only paint changes between the two, never its size or place, so docking
    can't move the page. */
@@ -1800,10 +1799,8 @@ button.dg-cc-sg-main {
   bottom: 16px;
   z-index: 20;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--dg-unsaved-bar-inset) 16px;
+  justify-content: flex-end;
   /* Pulls up through the scope's 16px gap onto the card's bottom border. */
   margin-top: -17px;
   padding: var(--dg-unsaved-bar-inset);
@@ -1844,28 +1841,6 @@ button.dg-cc-sg-main {
   border-bottom-color: transparent !important;
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
-}
-.dg-unsaved-bar__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding-left: var(--dg-btn-px);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--dg-color-text-primary);
-  transition: padding 160ms ease;
-}
-.dg-unsaved-bar[data-placement="docked"] .dg-unsaved-bar__label {
-  padding-left: 0;
-}
-.dg-unsaved-bar__label::before {
-  content: "";
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  background: var(--dg-color-warning);
 }
 .dg-unsaved-bar__actions {
   display: grid;

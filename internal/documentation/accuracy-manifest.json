@@ -845,7 +845,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ebfe18427c13d5deda6a00683b78560d65ea5c805adfa577d42f2cdfebf4cd7e"
+      "evidenceFingerprint": "sha256:953718bbb7a44d63c4fb1523df805c78b4a6f7f7648922fd476a536b851f1e88"
     },
     {
       "id": "invitations",
@@ -1710,7 +1710,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a6d35e131b15625b3c15598adca9baa7708e23135601a30ee3d7a9ba8b0ae4a9"
+      "evidenceFingerprint": "sha256:900379d26ec20e7b116f33bc6c006647614c62b061b595f677ebef8e672d0b70"
     },
     {
       "id": "roles-certifications-indicators",
