@@ -23,8 +23,13 @@ import { PersonField, PersonFieldGrid, PersonSection, PersonSubheading } from ".
 import { formatActor, formatDay, formatMoment } from "./person-format";
 import { PersonScheduleSection } from "./PersonScheduleSection";
 
-function namesOf(ids: number[], names: Record<number, string>): string {
-  return ids.map((id) => names[id] ?? `#${id}`).join(", ");
+function namesOf(ids: number[], names: Record<number, string>, order?: number[]): string {
+  const rank = new Map((order ?? []).map((id, index) => [id, index]));
+  const rankOf = (id: number) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
+  return [...ids]
+    .sort((left, right) => rankOf(left) - rankOf(right))
+    .map((id) => names[id] ?? `#${id}`)
+    .join(", ");
 }
 
 function stamp(record: GridmasterPersonRecord, at: string | null, by: string | null) {
@@ -82,12 +87,12 @@ function MembershipFacts({
       />
       <PersonField
         label={terminology.departmentLabel}
-        value={namesOf(membership.departmentIds, names.departments)}
+        value={namesOf(membership.departmentIds, names.departments, names.order?.departments)}
         empty="None"
       />
       <PersonField
         label={ADMINISTRATIVE_TEAM_LABELS.plural}
-        value={namesOf(membership.deptAdminIds, names.departments)}
+        value={namesOf(membership.deptAdminIds, names.departments, names.order?.departments)}
         empty="None"
       />
       <PersonField
@@ -164,12 +169,12 @@ function StaffFacts({
       <PersonField label="Phone" value={employee.phone} />
       <PersonField
         label={terminology.departmentLabel}
-        value={namesOf(employee.departmentIds, names.departments)}
+        value={namesOf(employee.departmentIds, names.departments, names.order?.departments)}
         empty="None"
       />
       <PersonField
         label={terminology.focusAreaLabel}
-        value={namesOf(employee.focusAreaIds, names.focusAreas)}
+        value={namesOf(employee.focusAreaIds, names.focusAreas, names.order?.focusAreas)}
         empty="None"
       />
       <PersonField
@@ -189,7 +194,7 @@ function StaffFacts({
       <PersonField label="Seniority" value={String(employee.seniority)} tabular />
       <PersonField
         label={ADMINISTRATIVE_TEAM_LABELS.plural}
-        value={namesOf(employee.deptAdminIds, names.departments)}
+        value={namesOf(employee.deptAdminIds, names.departments, names.order?.departments)}
         empty="None"
       />
       {employee.contactNotes ? (

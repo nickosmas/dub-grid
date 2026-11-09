@@ -24,14 +24,28 @@ function client(): SupabaseClient {
           },
         };
       }
+      if (table === "departments") {
+        return {
+          select: () => ({
+            eq: () =>
+              Promise.resolve({
+                data: [
+                  { id: 20, type: "scheduled", sort_order: 1 },
+                  { id: 10, type: "scheduled", sort_order: 0 },
+                ],
+                error: null,
+              }),
+          }),
+        };
+      }
       const chain = {
         select: () => chain,
         eq: () => chain,
         in: () =>
           Promise.resolve({
             data: [
-              { id: 3, name: "East Wing" },
-              { id: 4, name: "West Wing" },
+              { id: 3, name: "East Wing", department_id: 20, sort_order: 0 },
+              { id: 4, name: "West Wing", department_id: 10, sort_order: 1 },
             ],
             error: null,
           }),
@@ -69,6 +83,18 @@ describe("planFocusAreaShifts", () => {
     await expect(plan([3], [3, 4])).resolves.toEqual({ clear: [] });
     await expect(plan([3, 4], [4], "keep")).resolves.toEqual({ clear: [] });
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("names the focus areas in the order Settings lists their departments", async () => {
+    rpcResult = {
+      data: [eastRow, { ...eastRow, focus_area_id: 4 }],
+      error: null,
+    };
+    const result = await plan([3, 4], []);
+    expect(result.refuse?.focusAreaShifts.map((area) => area.focusAreaName)).toEqual([
+      "West Wing",
+      "East Wing",
+    ]);
   });
 
   it("counts only the removed focus areas", async () => {

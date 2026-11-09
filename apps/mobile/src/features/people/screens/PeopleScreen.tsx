@@ -644,9 +644,10 @@ export default function PeopleScreen() {
       );
     }
     const person = item.person;
-    const focusAreasForPerson = person.focusAreaIds
-      .map((focusAreaId) => focusAreaMap.get(focusAreaId) ?? null)
-      .filter((value): value is string => Boolean(value));
+    // The map holds the organization's focus areas in Settings order.
+    const focusAreasForPerson = [...focusAreaMap]
+      .filter(([focusAreaId, name]) => person.focusAreaIds.includes(focusAreaId) && Boolean(name))
+      .map(([, name]) => name);
     const subtitle =
       focusAreasForPerson.length > 0
         ? focusAreasForPerson.join(", ")

@@ -1175,6 +1175,7 @@ export default function DashboardView({
             openShifts={openShifts}
             publishedWindowState={publishedWindowState}
             focusAreaLabel={org.focusAreaLabel || DEFAULT_ORGANIZATION_LABELS.focusArea}
+            focusAreas={focusAreas}
             onClose={closeExpanded}
           />
         )}

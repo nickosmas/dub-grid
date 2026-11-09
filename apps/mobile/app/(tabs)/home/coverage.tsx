@@ -70,6 +70,15 @@ export default function CoverageExpandedScreen() {
       ? sections
       : sections.filter((section) => section.focusAreaId === focusAreaFilter);
   const activeFilterCount = focusAreaFilter === "all" ? 0 : 1;
+  // The list leads with the worst covered; the filter follows Settings order.
+  const focusAreaRank = new Map(
+    (bootstrapQuery.data?.focusAreas ?? []).map((area, index) => [area.id, index]),
+  );
+  const filterSections = [...sections].sort(
+    (left, right) =>
+      (focusAreaRank.get(left.focusAreaId) ?? Number.MAX_SAFE_INTEGER) -
+      (focusAreaRank.get(right.focusAreaId) ?? Number.MAX_SAFE_INTEGER),
+  );
 
   return (
     <Screen
@@ -91,7 +100,7 @@ export default function CoverageExpandedScreen() {
             onPress={() => setFocusAreaFilter("all")}
             selected={focusAreaFilter === "all"}
           />
-          {sections.map((section) => (
+          {filterSections.map((section) => (
             <SelectionRow
               key={section.focusAreaId}
               label={section.focusAreaName}

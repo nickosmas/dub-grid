@@ -1,13 +1,14 @@
 import type { MobileDepartment, MobileFocusArea } from "@dubgrid/contracts";
 
-/** Names for a set of department ids, in the order the ids were given. */
+/** Names for a set of department ids, in the order Settings lists the departments. */
 export function getDepartmentNames(
   departmentIds: number[],
   departments: MobileDepartment[] | undefined,
 ): string[] {
-  return departmentIds
-    .map((departmentId) => (departments ?? []).find((item) => item.id === departmentId)?.name)
-    .filter((value): value is string => Boolean(value));
+  return (departments ?? [])
+    .filter((department) => departmentIds.includes(department.id))
+    .map((department) => department.name)
+    .filter(Boolean);
 }
 
 /**

@@ -249,14 +249,12 @@ export function generateEmployeeCSV(
   const cert = certifications.find((c) => c.id === employee.certificationId);
   lines.push(`Certification,${esc(cert?.name ?? "None")}`);
 
-  const roleNames = employee.roleIds
-    .map((id) => orgRoles.find((r) => r.id === id)?.name ?? "")
-    .filter(Boolean);
+  const roleNames = orgRoles.filter((r) => employee.roleIds.includes(r.id)).map((r) => r.name);
   lines.push(`Roles,${esc(roleNames.join(", ") || "None")}`);
 
-  const faNames = employee.focusAreaIds
-    .map((id) => focusAreas.find((fa) => fa.id === id)?.name ?? "")
-    .filter(Boolean);
+  const faNames = focusAreas
+    .filter((fa) => employee.focusAreaIds.includes(fa.id))
+    .map((fa) => fa.name);
   lines.push(`Focus Areas,${esc(faNames.join(", ") || "None")}`);
   lines.push("");
 
