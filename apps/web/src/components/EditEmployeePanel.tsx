@@ -10,7 +10,22 @@ import {
   useImperativeHandle,
   useRef,
 } from "react";
-import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import {
+  Employee,
+  FocusArea,
+  NamedItem,
+  Invitation,
+  type AdminPermissions,
+  type AssignableOrganizationRole,
+} from "@/types";
+import { InvitePermissionsField } from "@/components/InvitePermissionsField";
+import {
+  INVITE_ON_SAVE_LABELS,
+  describeInviteOnSave,
+  describeInviteOnSaveNote,
+  inviteOnSaveButtonLabel,
+  type InviteOnSaveChoice,
+} from "@/features/employees/client/invite-on-save";
 import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE, useIsInSandbox } from "@/hooks";
@@ -105,6 +120,22 @@ export interface EditEmployeePanelProps {
     oldInvitation: Invitation,
     runStepUp: StepUpRun,
   ) => boolean | void | Promise<boolean | void>;
+  /** Offers an invite beside the email and replaces the Save & send
+   *  confirmation (the staff page). Saving with the box ticked calls
+   *  `onSaveAndInvite` instead of `onSave`. */
+  inviteOnSave?: {
+    canInvite: boolean;
+    roleOptions: { value: AssignableOrganizationRole; label: string }[];
+    /** A Super Admin picks an Admin's permissions before the invite goes out. */
+    canSetAdminPermissions: boolean;
+    onSaveAndInvite: (
+      updatedEmployee: Employee,
+      invite: InviteOnSaveChoice,
+      runStepUp: StepUpRun,
+    ) => boolean | void | Promise<boolean | void>;
+  };
+  /** Reports the save button's label for a host that draws its own, such as "Save & invite". */
+  onSaveLabelChange?: (label: string) => void;
   /** When true, render no Close/Save row — the host renders its own footer and
    *  drives save/dismiss through the ref handle. */
   hideActions?: boolean;
@@ -120,6 +151,7 @@ export interface EditEmployeePanelProps {
 export interface EditEmployeePanelHandle {
   save: () => Promise<boolean>;
   requestDismiss: () => void;
+  focusEmail: () => void;
 }
 
 type EditForm = {
@@ -178,6 +210,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onRevoke,
       onResend,
       onSaveWithReinvite,
+      inviteOnSave,
+      onSaveLabelChange,
       hideActions,
       persistent = false,
       sectioned = false,
@@ -190,17 +224,26 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const stepUp = useStepUpAction();
     const stepUpRef = useLatestRef(stepUp);
     const identityFieldIdPrefix = useId();
+    const emailInputRef = useRef<HTMLInputElement>(null);
     // Set while the "changing this email will revoke the pending invitation"
     // confirm dialog is open — holds the already-validated employee payload
     // handleSave built, so onConfirm/onCancel don't need to redo validation.
     const [pendingReinviteSave, setPendingReinviteSave] = useState<Employee | null>(null);
     const [form, setForm] = useState<EditForm>(() => buildEditForm(employee));
     const [hasStarted, setHasStarted] = useState<boolean | null>(null);
-    const [addingFirstDay, setAddingFirstDay] = useState(false);
 
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [emailConflict, setEmailConflict] = useState(false);
     const [phoneConflict, setPhoneConflict] = useState(false);
+    // Null until the box is clicked, so it follows its default as the email changes.
+    const [inviteTicked, setInviteTicked] = useState<boolean | null>(null);
+    const [inviteRole, setInviteRole] = useState<AssignableOrganizationRole>("user");
+    const [invitePermissions, setInvitePermissions] = useState<AdminPermissions | null>(null);
+    const resetInviteChoice = useCallback(() => {
+      setInviteTicked(null);
+      setInviteRole("user");
+      setInvitePermissions(null);
+    }, []);
 
     // Pre-flight: flag a duplicate contact email before Save is pressed,
     // instead of only surfacing it via the unique_active_employee_email_per_org
@@ -317,8 +360,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       if (persistent && unchanged) return;
       setForm(buildEditForm(employee));
       setTouched({});
-      setAddingFirstDay(false);
-    }, [employee, persistent]);
+      resetInviteChoice();
+    }, [employee, persistent, resetInviteChoice]);
 
     // A first day can still be given to someone Active who hasn't worked a shift yet.
     const mayStillStart = Boolean(orgId) && employee.status === "active" && !employee.firstDay;
@@ -359,10 +402,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       );
     }, [form, employee]);
 
-    useEffect(() => {
-      onDirtyChange?.(isModified);
-    }, [isModified, onDirtyChange]);
-
     const isSaveBlocked = useMemo(
       () =>
         Boolean(
@@ -383,6 +422,33 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     useEffect(() => {
       onSaveBlockedChange?.(isSaveBlocked);
     }, [isSaveBlocked, onSaveBlockedChange]);
+
+    const inviteOption =
+      inviteOnSave && !hideIdentityFields && !emailConflict
+        ? describeInviteOnSave({
+            hasAccount: Boolean(employee.userId),
+            savedEmail: employee.email || "",
+            typedEmail: form.email,
+            pendingInvitationEmail: pendingInvitation?.email ?? null,
+            canInvite: inviteOnSave.canInvite,
+            inSandbox: isInSandbox,
+          })
+        : null;
+    const sendingInvite = Boolean(inviteOption && (inviteTicked ?? inviteOption.defaultChecked));
+    const saveLabel = inviteOnSave
+      ? inviteOnSaveButtonLabel(sendingInvite)
+      : EDITOR_ACTION_LABELS.save;
+
+    // Ticking the invite on an unchanged record is still something to save.
+    const hasSomethingToSave = isModified || sendingInvite;
+
+    useEffect(() => {
+      onDirtyChange?.(hasSomethingToSave);
+    }, [hasSomethingToSave, onDirtyChange]);
+
+    useEffect(() => {
+      onSaveLabelChange?.(saveLabel);
+    }, [saveLabel, onSaveLabelChange]);
 
     const handleSave = useCallback(async (): Promise<boolean> => {
       if (
@@ -437,13 +503,32 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       // revoke it (trg_revoke_invitation_on_email_change). Never let that
       // happen as a side effect of a plain save — gate it behind an explicit
       // choice instead of saving right away.
+      // With the invite option, the checkbox already made that choice.
       const emailChanged = (nextEmployee.email || "") !== (employee.email || "");
-      if (emailChanged && pendingInvitation && onSaveWithReinvite) {
+      if (emailChanged && pendingInvitation && onSaveWithReinvite && !inviteOnSave) {
         setPendingReinviteSave(nextEmployee);
         return false;
       }
 
-      const saved = (await onSave(nextEmployee)) !== false;
+      const invite: InviteOnSaveChoice | null =
+        inviteOnSave && inviteOption && sendingInvite
+          ? inviteOption.kind === "reinvite" && pendingInvitation
+            ? { kind: "reinvite", replacing: pendingInvitation }
+            : {
+                kind: "invite",
+                role: inviteRole,
+                ...(inviteOnSave.canSetAdminPermissions &&
+                inviteRole === "admin" &&
+                invitePermissions
+                  ? { adminPermissions: invitePermissions }
+                  : {}),
+              }
+          : null;
+
+      const saved =
+        (await (invite && inviteOnSave
+          ? inviteOnSave.onSaveAndInvite(nextEmployee, invite, stepUpRef.current.run)
+          : onSave(nextEmployee))) !== false;
       if (!saved) return false;
       onSaveCompleted?.();
       return true;
@@ -459,22 +544,33 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       isManagementUser,
       emailConflict,
       phoneConflict,
+      inviteOnSave,
+      inviteOption,
+      sendingInvite,
+      inviteRole,
+      invitePermissions,
     ]);
 
     const handleDismiss = useCallback(() => {
       if (isModified) {
         setForm(buildEditForm(employee));
         setTouched({});
+        resetInviteChoice();
         return;
       }
 
       onCancel();
-    }, [employee, isModified, onCancel]);
+    }, [employee, isModified, onCancel, resetInviteChoice]);
 
-    useImperativeHandle(ref, () => ({ save: handleSave, requestDismiss: handleDismiss }), [
-      handleSave,
-      handleDismiss,
-    ]);
+    useImperativeHandle(
+      ref,
+      () => ({
+        save: handleSave,
+        requestDismiss: handleDismiss,
+        focusEmail: () => emailInputRef.current?.focus(),
+      }),
+      [handleSave, handleDismiss],
+    );
 
     const toggleRole = useCallback(
       (roleId: number) =>
@@ -690,22 +786,15 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       />
                     </div>
                     {/* Here only while it's ahead, or for someone who hasn't worked a shift yet. */}
-                    {upcomingFirstDay(employee, formatDateKey(new Date())) || addingFirstDay ? (
+                    {upcomingFirstDay(employee, formatDateKey(new Date())) ||
+                    (mayStillStart && hasStarted === false && !readOnly) ? (
                       <FirstDayField
                         value={form.firstDay}
                         onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
                         labelStyle={{ ...fieldLabel, marginBottom: 0 }}
                         disabled={readOnly}
+                        placeholder="Set first day"
                       />
-                    ) : mayStillStart && hasStarted === false && !readOnly ? (
-                      <div style={{ paddingTop: 22 }}>
-                        <Button
-                          className="dg-btn dg-btn-ghost dg-btn-sm"
-                          onClick={() => setAddingFirstDay(true)}
-                        >
-                          Set first day
-                        </Button>
-                      </div>
                     ) : null}
                   </div>
                 )}
@@ -775,6 +864,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                         Email
                       </label>
                       <input
+                        ref={emailInputRef}
                         id={`${identityFieldIdPrefix}-email`}
                         name="staff-email"
                         autoComplete="section-staff-editor email"
@@ -844,6 +934,96 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                     </div>
                   </div>
                 )}
+
+                {inviteOption && inviteOnSave ? (
+                  <div
+                    data-slot="invite-on-save"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                      padding: "12px 14px",
+                      borderRadius: "var(--dg-radius-lg)",
+                      border: `1px solid ${
+                        sendingInvite ? "var(--dg-color-brand-border)" : "var(--dg-color-border)"
+                      }`,
+                      background: sendingInvite ? "var(--dg-color-brand-bg)" : "transparent",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          cursor: "pointer",
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 500,
+                          color: "var(--dg-color-text-primary)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          className="dg-checkbox"
+                          checked={sendingInvite}
+                          disabled={readOnly}
+                          onChange={(e) => setInviteTicked(e.target.checked)}
+                        />
+                        {INVITE_ON_SAVE_LABELS[inviteOption.kind]}
+                      </label>
+                      {inviteOption.kind === "invite" && sendingInvite ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ ...fieldLabel, marginBottom: 0, whiteSpace: "nowrap" }}>
+                            Access role
+                          </span>
+                          <CustomSelect
+                            ariaLabel="Access role"
+                            value={inviteRole}
+                            options={inviteOnSave.roleOptions}
+                            onChange={setInviteRole}
+                            disabled={readOnly}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                    {inviteOption.kind === "invite" &&
+                    sendingInvite &&
+                    inviteOnSave.canSetAdminPermissions &&
+                    inviteRole === "admin" ? (
+                      <InvitePermissionsField
+                        value={invitePermissions}
+                        onChange={setInvitePermissions}
+                        disabled={readOnly}
+                      />
+                    ) : null}
+                    {(() => {
+                      const note = describeInviteOnSaveNote(
+                        inviteOption.kind,
+                        sendingInvite,
+                        pendingInvitation?.email ?? "",
+                      );
+                      return note ? (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-text-secondary)",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {note}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                ) : null}
 
                 <div>
                   <label style={fieldLabel}>Internal notes</label>
@@ -1070,10 +1250,10 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   primaryAction={
                     <Button
                       onClick={handleSave}
-                      disabled={!isModified || isSaveBlocked}
+                      disabled={!hasSomethingToSave || isSaveBlocked}
                       className="dg-btn dg-btn-primary"
                     >
-                      {EDITOR_ACTION_LABELS.save}
+                      {saveLabel}
                     </Button>
                   }
                 />

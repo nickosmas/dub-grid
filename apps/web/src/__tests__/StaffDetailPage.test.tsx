@@ -173,10 +173,10 @@ vi.mock("@/components/staff-detail/tabs/ActivityTab", () => ({
 }));
 
 let lastEditEmployeePanelSave: ((updatedEmployee: unknown) => void | Promise<void>) | null = null;
-let lastEditEmployeePanelSaveWithReinvite:
+let lastEditEmployeePanelSaveAndInvite:
   | ((
       updatedEmployee: unknown,
-      oldInvitation: unknown,
+      invite: unknown,
       runStepUp: (action: (accessToken: string) => Promise<unknown>) => Promise<boolean>,
     ) => void | Promise<void>)
   | null = null;
@@ -186,12 +186,14 @@ let lastEditEmployeePanelHideActions = false;
 vi.mock("@/components/EditEmployeePanel", () => ({
   default: (props: {
     onSave: (updatedEmployee: unknown) => void | Promise<void>;
-    onSaveWithReinvite?: (updatedEmployee: unknown, oldInvitation: unknown) => void | Promise<void>;
+    inviteOnSave?: {
+      onSaveAndInvite: (updatedEmployee: unknown, invite: unknown) => void | Promise<void>;
+    };
     pendingInvitation?: unknown;
     hideActions?: boolean;
   }) => {
     lastEditEmployeePanelSave = props.onSave;
-    lastEditEmployeePanelSaveWithReinvite = props.onSaveWithReinvite ?? null;
+    lastEditEmployeePanelSaveAndInvite = props.inviteOnSave?.onSaveAndInvite ?? null;
     lastEditEmployeePanelPendingInvitation = props.pendingInvitation;
     lastEditEmployeePanelHideActions = props.hideActions ?? false;
     return (
@@ -927,7 +929,7 @@ describe("StaffDetailPage", () => {
     expect(screen.getByText("Administrative Teams")).toBeInTheDocument();
   });
 
-  it("shows a distinct toast when saving a changed email silently revokes the pending invitation", async () => {
+  it("says the pending invitation was canceled when a changed email is saved without a new one", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
     await openDetailsEditor();
 
@@ -944,7 +946,7 @@ describe("StaffDetailPage", () => {
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
       expect.stringContaining("margaret@example.com"),
     );
-    expect(vi.mocked(toast.success)).toHaveBeenCalledWith(expect.stringContaining("revoked"));
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith(expect.stringContaining("canceled"));
   });
 
   it("shows the plain saved toast when the email is unchanged, even with a pending invitation present", async () => {
@@ -964,7 +966,7 @@ describe("StaffDetailPage", () => {
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith("Employee saved");
   });
 
-  it("passes the live pending invitation and a reinvite handler into EditEmployeePanel", async () => {
+  it("passes the live pending invitation and a save-and-invite handler into EditEmployeePanel", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
     await openDetailsEditor();
 
@@ -972,10 +974,10 @@ describe("StaffDetailPage", () => {
       id: "invite-1",
       email: "margaret@example.com",
     });
-    expect(lastEditEmployeePanelSaveWithReinvite).toBeTypeOf("function");
+    expect(lastEditEmployeePanelSaveAndInvite).toBeTypeOf("function");
   });
 
-  it("saving with the reinvite confirmation creates and sends a new invitation with the old one's role and departments", async () => {
+  it("saving with a new invitation ticked sends one with the old one's role and departments", async () => {
     mockedCreateOrganizationInvitation.mockResolvedValue({
       invitationId: "invite-2",
       expiresAt: "2099-01-01T00:00:00.000Z",
@@ -992,14 +994,14 @@ describe("StaffDetailPage", () => {
     render(<StaffDetailPage employeeId="emp-1" />);
     await openDetailsEditor();
 
-    if (!lastEditEmployeePanelSaveWithReinvite) {
-      throw new Error("Expected EditEmployeePanel to receive onSaveWithReinvite");
+    if (!lastEditEmployeePanelSaveAndInvite) {
+      throw new Error("Expected EditEmployeePanel to receive inviteOnSave");
     }
     const oldInvitation = lastEditEmployeePanelPendingInvitation;
     await act(async () => {
-      await lastEditEmployeePanelSaveWithReinvite!(
+      await lastEditEmployeePanelSaveAndInvite!(
         { ...mockEmployee, email: "new.address@example.com" },
-        oldInvitation,
+        { kind: "reinvite", replacing: oldInvitation },
         async (action: (accessToken: string) => Promise<unknown>) => {
           await action("step-up-token");
           return true;
