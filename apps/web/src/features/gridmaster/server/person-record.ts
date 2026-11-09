@@ -1,3 +1,4 @@
+import { orderFocusAreasByDepartment } from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbEmployee, DbInvitation, DbOrganization } from "@/lib/db/types";
 import { rowToEmployee, rowToInvitation, rowToOrganizationTerminology } from "@/lib/db/mappers";
@@ -161,8 +162,11 @@ async function groupByOrganization(
       .from("organizations")
       .select("id, name, slug, department_label, focus_area_label, role_label, certification_label")
       .in("id", orgIds),
-    client.from("departments").select("id, org_id, name").in("org_id", orgIds),
-    client.from("focus_areas").select("id, org_id, name").in("org_id", orgIds),
+    client.from("departments").select("id, org_id, name, type, sort_order").in("org_id", orgIds),
+    client
+      .from("focus_areas")
+      .select("id, org_id, name, department_id, sort_order")
+      .in("org_id", orgIds),
     client.from("organization_roles").select("id, org_id, name").in("org_id", orgIds),
     client.from("certifications").select("id, org_id, name").in("org_id", orgIds),
   ]);
@@ -172,6 +176,29 @@ async function groupByOrganization(
         .filter((row) => row.org_id === orgId)
         .map((row) => [row.id, row.name]),
     );
+  const orderFor = (orgId: string) => {
+    const orgDepartments = (
+      unwrap(departments) as { id: number; org_id: string; type: string; sort_order: number }[]
+    )
+      .filter((row) => row.org_id === orgId)
+      .map((row) => ({ id: row.id, type: row.type, sortOrder: row.sort_order }));
+    const orgFocusAreas = (
+      unwrap(focusAreas) as {
+        id: number;
+        org_id: string;
+        department_id: number | null;
+        sort_order: number;
+      }[]
+    )
+      .filter((row) => row.org_id === orgId)
+      .map((row) => ({ id: row.id, departmentId: row.department_id, sortOrder: row.sort_order }));
+    return {
+      departments: [...orgDepartments]
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map((department) => department.id),
+      focusAreas: orderFocusAreasByDepartment(orgFocusAreas, orgDepartments).map((area) => area.id),
+    };
+  };
   return (unwrap(orgRows) as Row[])
     .map((row) => {
       const org = {
@@ -193,6 +220,7 @@ async function groupByOrganization(
           focusAreas: namesFor(focusAreas, org.id),
           roles: namesFor(roles, org.id),
           certifications: namesFor(certifications, org.id),
+          order: orderFor(org.id),
         },
         membership,
         employees: employees.filter((employee) => employee.orgId === org.id),

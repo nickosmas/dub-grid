@@ -37,10 +37,15 @@ export default function StaffHoursExpandedScreen() {
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
   const entries = dashboardQuery.data?.staffHours ?? [];
-  const focusAreaNames = useMemo(
-    () => [...new Set(entries.map((entry) => entry.focusAreaName ?? UNASSIGNED_LABEL))].sort(),
-    [entries],
-  );
+  const orgFocusAreas = bootstrapQuery.data?.focusAreas;
+  const focusAreaNames = useMemo(() => {
+    const shown = new Set(entries.map((entry) => entry.focusAreaName ?? UNASSIGNED_LABEL));
+    // Settings order first, then any name the organization's list doesn't hold.
+    const inOrder = (orgFocusAreas ?? [])
+      .map((area) => area.name)
+      .filter((name) => shown.has(name));
+    return [...new Set([...inOrder, ...shown])];
+  }, [entries, orgFocusAreas]);
   const contentState = useMobileContentState({
     hasData: dashboardQuery.data !== undefined,
     isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading,

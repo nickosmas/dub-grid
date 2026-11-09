@@ -3,6 +3,7 @@ import {
   FOCUS_AREA_SHIFTS_DECISION_CODE,
   focusAreaShiftsClearFailed,
   focusAreaShiftsRefusal,
+  orderFocusAreasByDepartment,
   removedFocusAreaIds,
   type FocusAreaShiftsDecision,
   type FocusAreaUpcomingShifts,
@@ -36,19 +37,51 @@ export async function fetchUpcomingFocusAreaShifts(
   }[];
   if (rows.length === 0) return [];
 
-  const { data: names, error: namesError } = await serviceClient
-    .from("focus_areas")
-    .select("id, name")
-    .eq("org_id", orgId)
-    .in(
-      "id",
-      rows.map((row) => row.focus_area_id),
-    );
+  const [{ data: names, error: namesError }, { data: departments, error: departmentsError }] =
+    await Promise.all([
+      serviceClient
+        .from("focus_areas")
+        .select("id, name, department_id, sort_order")
+        .eq("org_id", orgId)
+        .in(
+          "id",
+          rows.map((row) => row.focus_area_id),
+        ),
+      serviceClient.from("departments").select("id, type, sort_order").eq("org_id", orgId),
+    ]);
   if (namesError) throw namesError;
-  const nameById = new Map(
-    ((names ?? []) as { id: number; name: string }[]).map((row) => [Number(row.id), row.name]),
+  if (departmentsError) throw departmentsError;
+  const ordered = orderFocusAreasByDepartment(
+    (
+      (names ?? []) as {
+        id: number;
+        name: string;
+        department_id: number | null;
+        sort_order: number;
+      }[]
+    ).map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      departmentId: row.department_id,
+      sortOrder: row.sort_order,
+    })),
+    ((departments ?? []) as { id: number; type: string; sort_order: number }[]).map(
+      (department) => ({
+        id: department.id,
+        type: department.type,
+        sortOrder: department.sort_order,
+      }),
+    ),
   );
-  return rows
+  const nameById = new Map(ordered.map((row) => [row.id, row.name]));
+  const rank = new Map(ordered.map((row, index) => [row.id, index]));
+  // In the order Settings lists them; the function returns them by id.
+  return [...rows]
+    .sort(
+      (left, right) =>
+        (rank.get(Number(left.focus_area_id)) ?? Number.MAX_SAFE_INTEGER) -
+        (rank.get(Number(right.focus_area_id)) ?? Number.MAX_SAFE_INTEGER),
+    )
     .map((row) => ({
       focusAreaId: Number(row.focus_area_id),
       focusAreaName: nameById.get(Number(row.focus_area_id)) ?? "",

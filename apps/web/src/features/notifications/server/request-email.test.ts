@@ -35,7 +35,7 @@ const swap: RequestEmailFacts = {
   resolvers,
 };
 
-const SHIFT = "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Memory Care";
+const SHIFT = "Day Shift · Registered Nurse · Memory Care · 7:00 AM - 3:00 PM (8 hrs)";
 
 describe("requestEmailDetails", () => {
   it("names both shifts in full for an approver, with the deadline", () => {

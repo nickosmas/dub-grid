@@ -134,8 +134,8 @@ describe("describeScheduleEntryChanges with two shifts of one name", () => {
       previousPresentation: null,
     });
     expect(describeScheduleEntryChanges(added)).toEqual([
-      "Added Day Shift in Skilled Nursing",
-      "Added Day Shift in Memory Care",
+      "Added Day Shift · Skilled Nursing",
+      "Added Day Shift · Memory Care",
     ]);
   });
 });

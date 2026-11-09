@@ -66,9 +66,7 @@ function AboutCard({
 }
 
 const namesOf = (ids: number[], items: ReadonlyArray<{ id: number; name: string }>) =>
-  ids
-    .map((id) => items.find((item) => item.id === id)?.name)
-    .filter((name): name is string => Boolean(name));
+  items.filter((item) => ids.includes(item.id)).map((item) => item.name);
 
 interface WorkFieldsProps {
   employee: Employee;

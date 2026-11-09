@@ -71,7 +71,7 @@ describe("PersonMonthCalendar", () => {
     // A card with a job and one without are the same size.
     const cards = document.querySelectorAll("[data-calendar-pill]");
     expect(cards.length).toBeGreaterThan(0);
-    for (const card of cards) expect(card).toHaveClass("h-10");
+    for (const card of cards) expect(card).toHaveClass("h-13");
 
     fireEvent.click(screen.getByRole("button", { name: "Later month in these dates" }));
     const november = screen.getByRole("grid", { name: "November 2026" });
@@ -79,6 +79,36 @@ describe("PersonMonthCalendar", () => {
       within(within(november).getByRole("gridcell", { name: "2026-11-02" })).getByText("Day Shift"),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Later month in these dates" })).toBeDisabled();
+  });
+
+  it("puts a shared shift name's focus area on its own line under the job", () => {
+    render(
+      <PersonMonthCalendar
+        employeeId="emp"
+        shifts={shifts}
+        range={{ startDate: "2026-10-01", endDate: "2026-10-31" }}
+        today="2026-10-29"
+        lookups={{
+          ...lookups,
+          shiftById: new Map([
+            [10, { id: 10, name: "Day Shift", focusAreaId: 1 } as ShiftCategory],
+            [11, { id: 11, name: "Day Shift", focusAreaId: 2 } as ShiftCategory],
+          ]),
+          focusAreaById: new Map([
+            [1, { name: "East Wing" }],
+            [2, { name: "West Wing" }],
+          ]),
+        }}
+      />,
+    );
+
+    const day = screen.getByRole("gridcell", { name: "2026-10-29" });
+    const card = day.querySelector("[data-calendar-pill]")!;
+    expect(Array.from(card.children, (line) => line.textContent)).toEqual([
+      "Day Shift",
+      "Mentor",
+      "East Wing",
+    ]);
   });
 
   it("shows one month with no arrows when the period is that month", () => {

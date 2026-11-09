@@ -435,6 +435,7 @@ describe("buildPersonRecordForUser", () => {
       focusAreas: { 5: "East Wing" },
       roles: { 8: "Charge" },
       certifications: {},
+      order: { departments: [3], focusAreas: [5] },
     });
     expect(birch?.names.departments).toEqual({ 4: "Kitchen" });
     expect(birch?.names.certifications).toEqual({ 2: "RN" });

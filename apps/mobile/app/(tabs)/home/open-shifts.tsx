@@ -41,10 +41,15 @@ export default function OpenShiftsExpandedScreen() {
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
   const openShifts = dashboardQuery.data?.openShifts ?? [];
-  const focusAreaNames = useMemo(
-    () => [...new Set(openShifts.map((shift) => shift.focusAreaName ?? UNASSIGNED_LABEL))].sort(),
-    [openShifts],
-  );
+  const orgFocusAreas = bootstrapQuery.data?.focusAreas;
+  const focusAreaNames = useMemo(() => {
+    const shown = new Set(openShifts.map((shift) => shift.focusAreaName ?? UNASSIGNED_LABEL));
+    // Settings order first, then any name the organization's list doesn't hold.
+    const inOrder = (orgFocusAreas ?? [])
+      .map((area) => area.name)
+      .filter((name) => shown.has(name));
+    return [...new Set([...inOrder, ...shown])];
+  }, [openShifts, orgFocusAreas]);
   const contentState = useMobileContentState({
     hasData: dashboardQuery.data !== undefined,
     isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading,

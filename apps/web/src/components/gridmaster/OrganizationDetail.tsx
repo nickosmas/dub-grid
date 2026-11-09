@@ -32,6 +32,7 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { orderFocusAreasByDepartment } from "@dubgrid/domain";
 import { useTheme } from "next-themes";
 import { resolveShiftPillColors, toDarkPillColors } from "@/lib/colors";
 import { toast } from "sonner";
@@ -181,7 +182,8 @@ export default function OrganizationDetail({
     queryKey: queryKeys.gridmaster.orgConfig(organization.id),
     queryFn: async () => {
       const [
-        focusAreas,
+        unorderedFocusAreas,
+        departments,
         shiftCategories,
         jobs,
         certifications,
@@ -190,6 +192,7 @@ export default function OrganizationDetail({
         absenceTypes,
       ] = await Promise.all([
         fetchFocusAreas(organization.id, true),
+        fetchDepartments(organization.id, true),
         fetchShiftCategories(organization.id, true),
         fetchJobDefinitions(organization.id, true),
         fetchCertifications(organization.id, true),
@@ -198,7 +201,7 @@ export default function OrganizationDetail({
         fetchAbsenceTypes(organization.id, true),
       ]);
       return {
-        focusAreas,
+        focusAreas: orderFocusAreasByDepartment(unorderedFocusAreas, departments),
         shiftCategories,
         jobs,
         certifications,

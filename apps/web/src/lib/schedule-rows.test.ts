@@ -74,7 +74,7 @@ describe("buildScheduleWeeks", () => {
       today,
     );
     expect(week.rows[0]).toMatchObject({
-      title: "Day Shift, Mentor",
+      title: "Day Shift · Mentor",
       detail: "7:00 AM - 3:30 PM",
       pill: null,
     });

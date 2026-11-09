@@ -181,13 +181,13 @@ export function getScheduleSegmentTitle(segment: MobileScheduleEntrySegment): st
   return segment.shiftName?.trim() || segment.label?.trim() || "Shift";
 }
 
-/** `Day Shift · 7:00 AM - 3:30 PM · Skilled Nursing`, dropping what a segment lacks. */
+/** `Day Shift · Skilled Nursing · 7:00 AM - 3:30 PM`, dropping what a segment lacks. */
 export function summariseScheduleSegment(segment: MobileScheduleEntrySegment): string {
   const timeRange = formatScheduleTimeRange(segment.startTime, segment.endTime);
   const focusAreaName =
     segment.shiftId === null ? null : segment.displayFocusAreaName?.trim() || null;
 
-  return [getScheduleSegmentTitle(segment), timeRange, focusAreaName]
+  return [getScheduleSegmentTitle(segment), focusAreaName, timeRange]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join(" · ");
 }
@@ -211,7 +211,7 @@ export function describeScheduleEntryChanges(entry: MobileScheduleEntry): string
     const shared = currentSegments.some(
       (other) => other !== segment && getScheduleSegmentTitle(other) === title,
     );
-    return shared && area ? `${title} in ${area}` : title;
+    return shared && area ? `${title} · ${area}` : title;
   };
   if (change.kind === "new") {
     return change.isNewAddition

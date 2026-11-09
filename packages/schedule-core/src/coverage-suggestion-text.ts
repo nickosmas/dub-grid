@@ -8,7 +8,7 @@ export interface CoverageSuggestionTextLookups {
   assignmentFocusAreaId: (assignmentId: number) => number | null;
   focusAreaName: (focusAreaId: number) => string | null;
   absenceName: (absenceTypeId: number) => string;
-  /** A requirement row as the matrix names it, "Skilled Nursing · Day Shift · Med Aide". */
+  /** A requirement row as the matrix names it, "Day Shift · Med Aide · Skilled Nursing". */
   rowLabel: (rowKey: string) => string | null;
   /** The row's focus area, so work elsewhere can be named with its own. */
   rowFocusAreaId?: (rowKey: string) => number | null;

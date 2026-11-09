@@ -79,7 +79,7 @@ export function scheduleNoteGroups(
     const shared =
       name != null &&
       segments.some((other, otherIndex) => otherIndex !== index && nameOf(other) === name);
-    const title = (shared && area ? `${name} in ${area}` : name) || area || "Shift";
+    const title = (shared && area ? `${name} · ${area}` : name) || area || "Shift";
     return [{ key: `shift-${index}`, title, notes: own }];
   });
 }

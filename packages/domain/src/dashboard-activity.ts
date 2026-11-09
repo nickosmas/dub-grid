@@ -55,7 +55,7 @@ export function describeShiftRequestActivity(input: {
   const status = formatShiftRequestStatusLabel(input.status);
   if (input.type === "pickup") {
     const shift = input.focusAreaName
-      ? `${input.shiftName} in ${input.focusAreaName}`
+      ? `${input.shiftName} · ${input.focusAreaName}`
       : input.shiftName;
     return `Pickup request · ${shift} · ${status}`;
   }
