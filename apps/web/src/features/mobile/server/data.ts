@@ -1283,7 +1283,9 @@ export async function fetchMobileOpenShiftContext(
   );
   const focusAreas = contextRows.focusAreaRows.map(rowToFocusArea);
   const shiftCategories = contextRows.shiftCategoryRows.map(rowToShiftCategory);
-  const jobs = contextRows.jobRows.map(rowToJobDefinition);
+  const allJobs = contextRows.jobRows.map(rowToJobDefinition);
+  // Open shifts and coverage plan new work, which an archived job takes none of.
+  const jobs = allJobs.filter((job) => !job.archivedAt);
   const orgRoles = contextRows.organizationRoleRows.map(rowToNamedItem);
   const coverageRequirements = contextRows.coverageRequirementRows.map(rowToCoverageRequirement);
   const coverageRuleConfig = normalizeCoverageRuleConfig(
@@ -1307,14 +1309,24 @@ export async function fetchMobileOpenShiftContext(
     focusAreas,
     shiftDisplayMode: "name",
   });
+  // Hours count every shift worked, so a cell that holds an archived job
+  // still resolves to the assignment carrying its default hours.
+  const hoursAssignments = buildScheduleAssignmentOptions({
+    orgId,
+    focusAreas,
+    shiftCategories,
+    jobs: allJobs,
+    includeArchived: true,
+  });
   // For resolving a schedule segment's (shiftId, jobId) pair to the
   // assignment definition that carries its default hours/duration —
   // packages/mobile-api-core's staff-hours computation needs this the same
   // way the coverage engine already does.
-  const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(assignments);
+  const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(hoursAssignments);
 
   return {
     assignments,
+    hoursAssignments,
     assignmentIdByPair,
     assignmentNameMap,
     coverageRequirements,

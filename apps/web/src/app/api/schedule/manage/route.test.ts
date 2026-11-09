@@ -615,6 +615,32 @@ describe("POST /api/schedule/manage", () => {
     });
   });
 
+  it("answers an archived job on a cell that doesn't hold it with 422 (130)", async () => {
+    userRpc.mockResolvedValue({
+      error: {
+        message:
+          "An archived job stays on the shifts that already have it and can't be added to another",
+        code: "P0001",
+      },
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShift",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        employeeId: "22222222-2222-4222-8222-222222222222",
+        date: "2026-08-03",
+        input: { kind: "worked", segments: [{ shiftId: 3, jobId: 44, position: 0 }] },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      code: "ARCHIVED_JOB",
+      error: expect.stringMatching(/That job is archived/),
+    });
+  });
+
   it("drags an absence beside a shift with its times (item 50b)", async () => {
     userRpc.mockResolvedValue({ error: null });
 
@@ -1177,10 +1203,14 @@ describe("POST /api/schedule/manage", () => {
       const organizationQuery = Object.assign(chainableQuery(organization), {
         single: vi.fn(async () => organization),
       });
-      const shiftOnlyJob = { data: { id: 43 }, error: null };
-      const shiftOnlyJobQuery = Object.assign(chainableQuery(shiftOnlyJob), {
-        maybeSingle: vi.fn(async () => shiftOnlyJob),
-      });
+      const jobRows = {
+        data: [
+          { id: 43, system_key: "default_shift_job", archived_at: null },
+          { id: 44, system_key: null, archived_at: "2026-11-01T00:00:00Z" },
+        ],
+        error: null,
+      };
+      const jobsQuery = chainableQuery(jobRows);
       const recurringQuery = chainableQuery({
         data: [recurringShiftRow(), ...extraTemplates],
         error: null,
@@ -1215,12 +1245,38 @@ describe("POST /api/schedule/manage", () => {
         if (table === "schedule_cells") return cellsQuery;
         if (table === "absence_types") return absenceQuery;
         if (table === "organizations") return organizationQuery;
-        if (table === "jobs") return shiftOnlyJobQuery;
+        if (table === "jobs") return jobsQuery;
         if (table === "audit_log") return { insert: vi.fn(async () => ({ error: null })) };
         throw new Error(`unexpected table ${table}`);
       });
       return { recurringQuery, cellsQuery, absenceQuery };
     }
+
+    it("leaves a template with an archived job unfilled, and fills the rest (130)", async () => {
+      const archivedJob = {
+        ...recurringShiftRow(),
+        id: "rec-archived-job",
+        emp_id: "55555555-5555-4555-8555-555555555555",
+        state: { kind: "worked", segments: [{ shiftId: 3, jobId: 44, position: 0 }] },
+      };
+      mockTables([], [archivedJob]);
+
+      const response = await POST(
+        makeRequest({
+          action: "applyRecurringSchedules",
+          orgId,
+          startDate: dateKey,
+          endDate: dateKey,
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(userRpc).toHaveBeenCalledTimes(1);
+      expect(userRpc).toHaveBeenCalledWith(
+        "write_schedule_cell_snapshot",
+        expect.objectContaining({ p_emp_id: empId }),
+      );
+    });
 
     it("leaves a shift without a job unfilled while they're off, and fills the rest", async () => {
       const shiftOnly = {

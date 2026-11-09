@@ -11,6 +11,7 @@ vi.hoisted(() => {
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchMobileCoverageSummary,
+  fetchMobileOpenShiftContext,
   fetchMobileOpenShifts,
   fetchMobilePeople,
   fetchMobileScheduleEntries,
@@ -541,6 +542,8 @@ function createServiceClientForOpenShifts(options?: {
   publishHistory?: unknown[];
   /** Makes the gap's job the default shift job, with shifts without a job turned off. */
   shiftsWithoutJobOff?: boolean;
+  /** Archives the gap's job. */
+  jobArchived?: boolean;
 }) {
   const assignments = [
     {
@@ -582,7 +585,9 @@ function createServiceClientForOpenShifts(options?: {
     ]).map((job) =>
       options?.shiftsWithoutJobOff && job.id === 91
         ? { ...job, system_key: "default_shift_job" }
-        : job,
+        : options?.jobArchived && job.id === 91
+          ? { ...job, archived_at: "2026-04-01T00:00:00.000Z" }
+          : job,
     ),
     error: null,
   });
@@ -2075,6 +2080,51 @@ describe("fetchMobileOpenShifts", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("offers no gap for an archived job", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const serviceClient = createServiceClientForOpenShifts({ jobArchived: true });
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          id: "196d610f-2283-486c-a9e0-197852969a31",
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [],
+        } as never,
+        showAll: true,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps an archived job's shifts resolvable for staff hours, but plans no new work on it", async () => {
+    const context = await fetchMobileOpenShiftContext(
+      createServiceClientForOpenShifts({ jobArchived: true }) as never,
+      "org-1",
+    );
+
+    expect(context.jobs).toEqual([]);
+    expect(context.assignments).toEqual([]);
+    const assignmentId = context.assignmentIdByPair.get("101:91");
+    expect(assignmentId).toBeDefined();
+    expect(
+      context.hoursAssignments.find((assignment) => assignment.id === assignmentId),
+    ).toMatchObject({
+      shiftId: 101,
+      jobId: 91,
+    });
   });
 
   it("keeps coverage gaps visible to other employees until pending volunteers fill every needed slot", async () => {

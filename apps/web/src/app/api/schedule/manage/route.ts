@@ -43,6 +43,7 @@ import { RECURRING_SHIFT_COLS, fetchAllRows } from "@/lib/db/shared";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { fetchOrgToday } from "@/features/employees/server/org-today";
 import { DEFAULT_SHIFT_JOB_SYSTEM_KEY } from "@/lib/system-jobs";
+import { ARCHIVED_JOB_MESSAGE, ARCHIVED_JOB_REFUSAL } from "@/lib/archived-jobs";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import logger from "@/lib/logger";
 import type {
@@ -388,33 +389,47 @@ function isShiftWithoutJobRefusal(error: unknown): boolean {
   );
 }
 
+/** 130 refuses an archived job on a cell that doesn't already hold it. */
+function isArchivedJobRefusal(error: unknown): boolean {
+  const message = error && typeof error === "object" && "message" in error ? error.message : null;
+  return typeof message === "string" && message.includes(ARCHIVED_JOB_REFUSAL);
+}
+
 type ScheduleServiceClient = Extract<
   Awaited<ReturnType<typeof requireOrgPermissions>>,
   { serviceClient: unknown }
 >["serviceClient"];
 
 /**
- * The default shift job's id while the organization has shifts without a job
- * turned off (Settings > Jobs), else null: no new work may use it.
+ * Jobs no new work may use: archived ones (130), and the default shift job
+ * while the organization has shifts without a job turned off (Settings > Jobs, 129).
  */
-async function fetchJobTakingNoNewWork(
+async function fetchJobsTakingNoNewWork(
   serviceClient: ScheduleServiceClient,
   orgId: string,
-): Promise<number | null> {
+): Promise<Set<number>> {
   const [orgResult, jobResult] = await Promise.all([
     serviceClient.from("organizations").select("default_shift_enabled").eq("id", orgId).single(),
-    serviceClient
-      .from("jobs")
-      .select("id")
-      .eq("org_id", orgId)
-      .eq("system_key", DEFAULT_SHIFT_JOB_SYSTEM_KEY)
-      .maybeSingle(),
+    serviceClient.from("jobs").select("id, system_key, archived_at").eq("org_id", orgId),
   ]);
   if (orgResult.error) throw orgResult.error;
   if (jobResult.error) throw jobResult.error;
-  return orgResult.data?.default_shift_enabled === false && jobResult.data
-    ? jobResult.data.id
-    : null;
+  const shiftsWithoutJobOff = orgResult.data?.default_shift_enabled === false;
+  return new Set(
+    (
+      (jobResult.data ?? []) as Array<{
+        id: number;
+        system_key: string | null;
+        archived_at: string | null;
+      }>
+    )
+      .filter(
+        (job) =>
+          job.archived_at != null ||
+          (shiftsWithoutJobOff && job.system_key === DEFAULT_SHIFT_JOB_SYSTEM_KEY),
+      )
+      .map((job) => job.id),
+  );
 }
 
 /**
@@ -1028,9 +1043,12 @@ function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
  */
 function cellWriteRefusal(error: unknown): {
   error: string;
-  code: "PAST_DAY" | "ABSENCE_TIMES" | "SHIFT_OVERLAP" | "SHIFT_WITHOUT_JOB_OFF";
+  code: "PAST_DAY" | "ABSENCE_TIMES" | "SHIFT_OVERLAP" | "SHIFT_WITHOUT_JOB_OFF" | "ARCHIVED_JOB";
   status: 409 | 422;
 } | null {
+  if (isArchivedJobRefusal(error)) {
+    return { error: ARCHIVED_JOB_MESSAGE, code: "ARCHIVED_JOB", status: 422 };
+  }
   if (isShiftWithoutJobRefusal(error)) {
     return {
       error:
@@ -2328,7 +2346,7 @@ export async function POST(req: NextRequest) {
             .order("id", { ascending: true })
             .range(from, to);
 
-        const [recurringResult, cells, todayKey, pausedJobId] = await Promise.all([
+        const [recurringResult, cells, todayKey, jobsTakingNoNewWork] = await Promise.all([
           auth.serviceClient
             .from("recurring_shifts")
             .select(
@@ -2343,7 +2361,7 @@ export async function POST(req: NextRequest) {
           // empty and overwritten by the recurring fill below.
           fetchAllRows<DbScheduleCell>(buildExistingCellsPage),
           fetchOrgToday(auth.serviceClient, data.orgId),
-          fetchJobTakingNoNewWork(auth.serviceClient, data.orgId),
+          fetchJobsTakingNoNewWork(auth.serviceClient, data.orgId),
         ]);
         const { data: recurringRows, error: recurringError } = recurringResult;
         if (recurringError) {
@@ -2477,11 +2495,11 @@ export async function POST(req: NextRequest) {
             if (existingCell && cellBlocksRecurringFill(existingCell)) {
               continue;
             }
-            // Paused while shifts without a job are off; 129 would refuse it.
+            // An archived job, or a shift without a job while they're off, takes
+            // no new work; 129 and 130 would refuse it.
             if (
-              pausedJobId != null &&
               template.state.kind === "worked" &&
-              template.state.segments.some((segment) => segment.jobId === pausedJobId)
+              template.state.segments.some((segment) => jobsTakingNoNewWork.has(segment.jobId))
             ) {
               continue;
             }

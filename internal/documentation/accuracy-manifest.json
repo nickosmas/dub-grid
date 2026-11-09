@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a1b76deb32f5a6467e58be8a4c51cebdcf1d099925122dcc50743d03bfb45c8e"
+      "evidenceFingerprint": "sha256:883e2aae8ef1893474eb837dbf116686e55ba2ac1810fb25f65b023e0fbcee27"
     },
     {
       "id": "introduction",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8973b0f9c8f37c66ba114c5da1327ef44aca170f6cb3864745d6c490b4b5740f"
+      "evidenceFingerprint": "sha256:c2596c6643bfd6aabc2c7dbb5025cc913403fe655cb9dab77632f2937c5cc40e"
     },
     {
       "id": "quickstart",
@@ -238,7 +238,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1ff2f1bf1278126ea72770000fd61b676b34efd8a11d1add01a2999c7792ce43"
+      "evidenceFingerprint": "sha256:79db350f421456601149a3b45ca0fcaa5aa77f9bb0b6ba1b6f85d911a6bc175d"
     },
     {
       "id": "onboarding",
@@ -386,7 +386,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:25904a6c9cf866530055c32c4cf972821fab975c68a5aba1227253cdf2366a8b"
+      "evidenceFingerprint": "sha256:c0797b30799f11250206b14f347a6e64d84e44c4e280a22b82609f8d46df521c"
     },
     {
       "id": "draft-publish",
@@ -444,7 +444,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:09e60c6198b5ed19ee61fca747e2bdccca10047465f395c3b8ccec2438794845"
+      "evidenceFingerprint": "sha256:afefc1881dd2f733a2bd980b54e27ddc8a29aff8c98db232a3dee6be6c9fe9c5"
     },
     {
       "id": "recurring-shifts",
@@ -499,7 +499,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c0c97ba24a02b6e203994d424cc3400f533ce2be8a881b479a8ff24b0035eed1"
+      "evidenceFingerprint": "sha256:02237b3ef7ec2296170af6e9839611e8ea6e2637d3598dff6f9457a7e4ddd175"
     },
     {
       "id": "realtime",
@@ -546,7 +546,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:76f5f9d21f616b4972bf3c3bc9e89b6ec1f8ba3d2df448e05a45cc099663f9bc"
+      "evidenceFingerprint": "sha256:b11b21f0ff3211a00e7a4e14a4c4f7792dcc2e5bf7029dacc912d970434f33e3"
     },
     {
       "id": "shift-requests",
@@ -1017,7 +1017,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:de6aebd2369409cf8942352010ea772d9a5ae0290f2ff6adabde1cbfe5465956"
+      "evidenceFingerprint": "sha256:3ee63a0b1921b93176f594bc030d2c8d0a9999b78c368796132181cd371ab12f"
     },
     {
       "id": "terminology",
@@ -1439,7 +1439,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7b59d07c74748c4c5090879057361c834d93396b9ed9ebf55e84acdbf2c5afe1"
+      "evidenceFingerprint": "sha256:607ecab07b693985f8f5242272688e9878cb426f7ae3cb4fb815301c3627d006"
     },
     {
       "id": "profile",
@@ -1874,7 +1874,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:12c19309cf4c4ff39de9f21ba3991b6c2e00b09765f1de1e988a792f0fa5da52"
+      "evidenceFingerprint": "sha256:c86d3149d6c1c414583fd427299b8cf421976f79ba5535c8c425314d0489cbbc"
     },
     {
       "id": "shifts-jobs-absences",
@@ -1932,7 +1932,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2f6c9d7f252bd4bdd7345d82e14dd6af5791430d4ce4ae0a5164d1a5a6a2ff61"
+      "evidenceFingerprint": "sha256:96d18b940e5c2899b773a1d199afe05118c9ae59b579d85703abaa4a1eb1f06d"
     },
     {
       "id": "schedule-tools",
@@ -1984,7 +1984,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:1763d3d28efdac9e2e8d98cd64cc1dd5f1d4803518307f8a0533688f97d1adbf"
+      "evidenceFingerprint": "sha256:4146c37c59c7588b7e68a5a9e8dc3db5903291eae88dedd209ee83ea146216dc"
     },
     {
       "id": "coverage-open-shifts",
@@ -2035,7 +2035,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:85d5238c90e001737e9759ea6f385f7c8a4e993f90b8dfeecc842c795585571f"
+      "evidenceFingerprint": "sha256:04796038bcb33a4e2e4f044628afe3b757c668fcdfe5e3c4ad33f32740fc912e"
     },
     {
       "id": "mobile-schedule",
@@ -2148,7 +2148,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:291e1d3ed7857b8d2350289d68c8b77db57db49de498272d75196daabb3415d8"
+      "evidenceFingerprint": "sha256:5156704bd1ef99138020b6032e28356aaaf96a3ffb27756817177f633f22e1fc"
     }
   ],
   "surfaceExclusions": [

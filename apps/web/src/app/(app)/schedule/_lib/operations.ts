@@ -287,6 +287,8 @@ export function getSkipReasonLabel(reason: string | null): string {
       return "Source cell had no usable content";
     case "shift_without_job_off":
       return "Shifts without a job are off";
+    case "archived_job":
+      return "Job is archived";
     default:
       if (reason?.startsWith("disqualified:")) return "Qualification change";
       return "Skipped for other reasons";

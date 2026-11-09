@@ -1672,6 +1672,53 @@ describe("operations reports", () => {
   });
 });
 
+describe("an archived job", () => {
+  const archived = { id: 70, name: "Caregiver", archived_at: "2026-05-01T00:00:00.000Z" };
+  const range = { startDate: "2026-05-03", endDate: "2026-05-04" };
+
+  it("is named on the shifts that still hold it", () => {
+    const payload = buildOperationsReportPayload(buildSource({ jobs: [archived] }), range);
+    expect(payload.reports.staffHours[0]?.jobBreakdown).toContain("Caregiver");
+  });
+
+  it("asks nothing of coverage, and isn't offered as a Job filter", () => {
+    const payload = buildOperationsReportPayload(buildSource({ jobs: [archived] }), range);
+    expect(payload.reports.coverage).toEqual([]);
+    expect(payload.filterOptions.jobs).toEqual([]);
+  });
+
+  it("is read by the report, archived or not", async () => {
+    const jobCalls: Array<[string, unknown[]]> = [];
+    const client = {
+      from(table: string) {
+        const chain: Record<string, unknown> = {};
+        for (const method of ["select", "eq", "is", "not", "order", "in", "or", "gte", "lte"]) {
+          chain[method] = vi.fn((...args: unknown[]) => {
+            if (table === "jobs") jobCalls.push([method, args]);
+            return chain;
+          });
+        }
+        chain.range = vi.fn(async () => ({
+          data: table === "jobs" ? [archived, { id: 71, name: "Med Tech", archived_at: null }] : [],
+          error: null,
+        }));
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+
+    const { filterOptions } = await loadOperationsReportFilterOptions(client, {
+      orgId: ORG_ID,
+      range,
+      hiddenUserIds: [],
+    });
+
+    expect(jobCalls.some(([method, args]) => method === "is" && args[0] === "archived_at")).toBe(
+      false,
+    );
+    expect(filterOptions.jobs).toEqual([{ id: "71", label: "Med Tech" }]);
+  });
+});
+
 describe("buildOperationsReportFilterOptions", () => {
   // The options-only loader (build plan item 30) builds the dropdown lists
   // from this function alone, so it must be exactly what the full payload

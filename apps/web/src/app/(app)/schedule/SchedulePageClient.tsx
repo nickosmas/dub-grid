@@ -165,6 +165,11 @@ import {
 } from "./_lib/coverage-suggestions";
 import { planRecurringFills } from "./_lib/recurring-fills";
 import { jobIdTakesNewWork } from "@/lib/system-jobs";
+import {
+  ARCHIVED_JOB_MESSAGE,
+  addsJobKeptOnlyWhereHeld,
+  jobIdIsArchived,
+} from "@/lib/archived-jobs";
 import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
 import { buildSchedulableOn } from "./_lib/schedulable-on";
 import {
@@ -594,9 +599,12 @@ function SchedulerContent({
     () => jobIdTakesNewWork(jobs, org?.defaultShiftEnabled),
     [jobs, org?.defaultShiftEnabled],
   );
+  // An archived job stays on the cells that hold it and takes no new work.
+  const jobArchived = useMemo(() => jobIdIsArchived(jobs), [jobs]);
   const newWorkJobIds = useMemo(
-    () => jobs.filter((job) => jobTakesNewWork(job.id)).map((job) => job.id),
-    [jobs, jobTakesNewWork],
+    () =>
+      jobs.filter((job) => jobTakesNewWork(job.id) && !jobArchived(job.id)).map((job) => job.id),
+    [jobs, jobArchived, jobTakesNewWork],
   );
   // Use orgId from JWT (available immediately) so employee fetch starts
   // in parallel with org data instead of waiting for it.
@@ -640,13 +648,15 @@ function SchedulerContent({
   const requestedPresenceProfileIdsRef = useRef(new Set<string>());
   const segmentCompatibility = useMemo(
     () =>
+      // Every assignment, archived ones included, so a cell that holds one
+      // still resolves; the pickers offer only active ones.
       createShiftJobCompatibilityMaps({
-        assignments: assignments,
+        assignments: allAssignmentDefinitions,
         shiftCategories,
         jobs,
         shiftDisplayMode: org?.shiftDisplayMode ?? "code",
       }),
-    [jobs, org?.shiftDisplayMode, shiftCategories, assignments],
+    [jobs, org?.shiftDisplayMode, shiftCategories, allAssignmentDefinitions],
   );
 
   const [today, setToday] = useState(() => new Date());
@@ -3279,6 +3289,18 @@ function SchedulerContent({
   }, [editSessionCellKey, editSessionDraft, shifts]);
   const panelCurrentShift = panelShiftEntry ? panelShiftEntry.label : null;
   const panelCurrentAssignmentIds = panelShiftEntry?.assignmentIds ?? [];
+  // The panel names and times the archived assignments its cell already holds;
+  // the picker still offers only active ones.
+  const panelAssignments = useMemo(() => {
+    const held = new Set([
+      ...(panelShiftEntry?.assignmentIds ?? []),
+      ...(panelShiftEntry?.publishedAssignmentDefinitionIds ?? []),
+    ]);
+    const keptArchived = allAssignmentDefinitions.filter(
+      (assignment) => assignment.archivedAt && held.has(assignment.id),
+    );
+    return keptArchived.length > 0 ? [...assignments, ...keptArchived] : assignments;
+  }, [allAssignmentDefinitions, assignments, panelShiftEntry]);
   const panelCurrentAbsenceTypeId =
     editSessionDraft?.cellKey === editSessionCellKey
       ? (panelShiftEntry?.absenceTypeId ?? null)
@@ -5970,22 +5992,20 @@ function SchedulerContent({
   );
 
   // ── Grid-owned drag/drop handler ─────────────────────────────────────────
-  // A paste or drop may not add a shift without a job while they're off; a
-  // cell that already holds one keeps it. The server refuses it too (129).
-  const addsPausedShiftWithoutJob = useCallback(
-    (cellKey: string, input: ScheduleCellInput): boolean => {
-      if (input.kind !== "worked") return false;
+  // A paste or drop may not add an archived job, or a shift without a job
+  // while they're off; a cell that already holds one keeps it. The server
+  // refuses both too (129, 130).
+  const refusedNewJobMessage = useCallback(
+    (cellKey: string, input: ScheduleCellInput): string | null => {
       const entry = shifts[cellKey];
       const held = [...(entry?.segments ?? []), ...(entry?.publishedSegments ?? [])];
-      return input.segments.some(
-        (segment) =>
-          !jobTakesNewWork(segment.jobId) &&
-          !held.some(
-            (existing) => existing.jobId === segment.jobId && existing.shiftId === segment.shiftId,
-          ),
-      );
+      if (addsJobKeptOnlyWhereHeld(input, held, jobArchived)) return ARCHIVED_JOB_MESSAGE;
+      if (addsJobKeptOnlyWhereHeld(input, held, (jobId) => !jobTakesNewWork(jobId))) {
+        return SHIFT_WITHOUT_JOB_OFF_MESSAGE;
+      }
+      return null;
     },
-    [jobTakesNewWork, shifts],
+    [jobArchived, jobTakesNewWork, shifts],
   );
   const handleMoveGridEntry = useCallback<NonNullable<ScheduleGridHandlers["onMoveEntry"]>>(
     ({ sourceCellId, targetCellId, payload, mode }) => {
@@ -5994,8 +6014,9 @@ function SchedulerContent({
       if (sourceKey === targetKey) return;
 
       if (!guardActiveSession()) return;
-      if (addsPausedShiftWithoutJob(targetKey, payload)) {
-        toast.error(SHIFT_WITHOUT_JOB_OFF_MESSAGE);
+      const refusedMove = refusedNewJobMessage(targetKey, payload);
+      if (refusedMove) {
+        toast.error(refusedMove);
         return;
       }
 
@@ -6168,7 +6189,7 @@ function SchedulerContent({
       shifts,
       org,
       guardActiveSession,
-      addsPausedShiftWithoutJob,
+      refusedNewJobMessage,
       getInputAssignmentDefinitionIds,
       getPublishedSnapshot,
       checkQualification,
@@ -6213,8 +6234,9 @@ function SchedulerContent({
       if (!schedulableOn(empId, formatDateKey(date))) return;
       if (!guardActiveSession()) return;
       const cellKey = `${empId}_${formatDateKey(date)}`;
-      if (addsPausedShiftWithoutJob(cellKey, clipboard)) {
-        toast.error(SHIFT_WITHOUT_JOB_OFF_MESSAGE);
+      const refusedPaste = refusedNewJobMessage(cellKey, clipboard);
+      if (refusedPaste) {
+        toast.error(refusedPaste);
         return;
       }
 
@@ -6252,7 +6274,7 @@ function SchedulerContent({
       clipboard,
       setShift,
       guardActiveSession,
-      addsPausedShiftWithoutJob,
+      refusedNewJobMessage,
       getInputAssignmentDefinitionIds,
       checkQualification,
       schedulableOn,
@@ -9699,7 +9721,7 @@ function SchedulerContent({
               currentShift={panelCurrentShift}
               currentAssignmentIds={panelCurrentAssignmentIds}
               currentSegments={panelShiftEntry?.segments ?? []}
-              assignments={assignments}
+              assignments={panelAssignments}
               shiftCategories={shiftCategories}
               jobs={jobs}
               focusAreas={focusAreas}
