@@ -1233,29 +1233,34 @@ function RequestCard({
       <View style={styles.cardSeparator} />
       <View style={styles.cardRow}>
         {isSwap ? (
-          <View style={styles.swapGroup}>
-            <View accessibilityLabel="Swap" accessibilityRole="image" style={styles.swapGutter}>
-              <Ionicons color={mobileColors.brand} name="swap-vertical" size={20} />
+          // A swap is one card about two shifts: each shift is its own panel,
+          // and the swap disc straddles the seam between them.
+          <View>
+            <RequestShift
+              date={request.requesterShiftDate}
+              now={now}
+              personName={copy.requesterShiftLabel}
+              presentation={request.requesterPresentation}
+              seam="below"
+              state={request.requesterState}
+              timeZone={timeZone}
+            />
+            {/* A fixed strip between the panels owns the disc, so it sits on
+                the seam whatever the panels' heights or the text size. */}
+            <View pointerEvents="none" style={styles.swapSeam}>
+              <View accessibilityLabel="Swap" accessibilityRole="image" style={styles.swapArrow}>
+                <Ionicons color={mobileColors.brand} name="swap-vertical" size={16} />
+              </View>
             </View>
-            <View style={styles.swapShifts}>
-              <RequestShift
-                date={request.requesterShiftDate}
-                now={now}
-                personName={copy.requesterShiftLabel}
-                presentation={request.requesterPresentation}
-                state={request.requesterState}
-                timeZone={timeZone}
-              />
-              <View style={styles.swapDivider} />
-              <RequestShift
-                date={request.targetShiftDate}
-                now={now}
-                personName={copy.targetShiftLabel}
-                presentation={request.targetPresentation ?? null}
-                state={request.targetState ?? null}
-                timeZone={timeZone}
-              />
-            </View>
+            <RequestShift
+              date={request.targetShiftDate}
+              now={now}
+              personName={copy.targetShiftLabel}
+              presentation={request.targetPresentation ?? null}
+              seam="above"
+              state={request.targetState ?? null}
+              timeZone={timeZone}
+            />
           </View>
         ) : (
           <RequestShift
@@ -1282,9 +1287,10 @@ function RequestCard({
 }
 
 /**
- * One shift in a request card, as text in the card's own row: whose it is
- * (only when the card holds more than one person's shift), the shift and its
- * focus area, and the day and time on one tabular line. Split shifts list
+ * One shift in a request card: whose it is (only when the card holds more
+ * than one person's shift), the shift and its focus area, and the day and
+ * time on one line. A swap's two shifts are panels meeting at a seam; any
+ * other request's shift is text in the card's own row. Split shifts list
  * their segments the way the open-shift card does.
  */
 function RequestShift({
@@ -1292,6 +1298,7 @@ function RequestShift({
   now,
   personName,
   presentation,
+  seam,
   state,
   timeZone,
 }: {
@@ -1301,6 +1308,8 @@ function RequestShift({
   presentation: ResolvedSchedulePresentation | null;
   state: ScheduleCellState | null;
   timeZone: string | null | undefined;
+  /** A swap panel's edge that meets the other panel, leaving room for the disc. */
+  seam?: "above" | "below";
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -1325,7 +1334,14 @@ function RequestShift({
     null;
 
   return (
-    <View style={styles.shiftBlock}>
+    <View
+      style={[
+        styles.shiftBlock,
+        seam && styles.shiftPanel,
+        seam === "below" && styles.shiftPanelSeamBelow,
+        seam === "above" && styles.shiftPanelSeamAbove,
+      ]}
+    >
       {personName ? <Text style={styles.shiftPerson}>{personName}</Text> : null}
       {splitSegments.length > 1 ? (
         <View style={styles.splitShiftPanel}>
