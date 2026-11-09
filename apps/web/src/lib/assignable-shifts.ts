@@ -816,22 +816,21 @@ export function buildAssignableShiftDisplayMap(
   const shiftById = new Map(input.shiftCategories.map((shift) => [shift.id, shift]));
   const jobById = new Map(input.jobs.map((job) => [job.id, job]));
 
+  // Archived assignments stay in: a cell that already holds one still names it.
   return new Map(
-    resolvedAssignmentDefinitions
-      .filter((assignment) => !assignment.archivedAt)
-      .map((assignment) => {
-        const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
-        const shift = shiftId != null ? (shiftById.get(shiftId) ?? null) : null;
-        const job = assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
-        const displayParts = buildShiftDisplayParts({
-          shift,
-          job,
-          assignment,
-          shiftDisplayMode: input.shiftDisplayMode ?? "code",
-        });
+    resolvedAssignmentDefinitions.map((assignment) => {
+      const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
+      const shift = shiftId != null ? (shiftById.get(shiftId) ?? null) : null;
+      const job = assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
+      const displayParts = buildShiftDisplayParts({
+        shift,
+        job,
+        assignment,
+        shiftDisplayMode: input.shiftDisplayMode ?? "code",
+      });
 
-        return [assignment.id, formatAssignableShiftOptionLabel(displayParts)] as const;
-      }),
+      return [assignment.id, formatAssignableShiftOptionLabel(displayParts)] as const;
+    }),
   );
 }
 

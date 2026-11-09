@@ -138,6 +138,22 @@ describe("buildShiftChangeResolvers", () => {
     });
   });
 
+  it("marks only the job when the job alone is archived", () => {
+    const archivedJob = buildShiftChangeResolvers({
+      assignments: [assignment(104, 1, 40, { archivedAt: "2026-11-01" })],
+      shiftCategories: [category(1, "Day Shift")],
+      jobs: [job(40, "Office", { archivedAt: "2026-11-01" })],
+      absenceTypes,
+      focusAreas,
+    });
+    expect(archivedJob.segment(1, 40)).toMatchObject({
+      shiftName: "Day Shift",
+      shiftArchived: false,
+      jobName: "Office",
+      jobArchived: true,
+    });
+  });
+
   it("shows a shift-only job as the shift alone", () => {
     expect(resolvers.segment(1, 30)).toMatchObject({ shiftName: null, jobName: "Day Shift" });
   });

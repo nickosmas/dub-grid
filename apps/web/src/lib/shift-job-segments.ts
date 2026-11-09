@@ -38,14 +38,21 @@ export function buildShiftJobPairKey(shiftId: number | null, jobId: number): str
   return `${shiftId ?? "null"}:${jobId}`;
 }
 
+/**
+ * Maps each stored shift/job pair to its assignment id. Archived assignments
+ * are in unless `includeArchived` is false, since a cell that already holds
+ * one still has to resolve; an active assignment wins a tie.
+ */
 export function createAssignmentDefinitionIdByPairMap<T extends AssignmentDefinitionPairCompatible>(
   assignments: T[],
   options?: { includeArchived?: boolean },
 ): Map<string, number> {
   const assignmentIdByPair = new Map<string, number>();
+  const archivedIds = new Set<number>();
 
   for (const assignment of assignments) {
-    if (!options?.includeArchived && (assignment.archivedAt ?? assignment.archived_at) != null) {
+    const archived = (assignment.archivedAt ?? assignment.archived_at) != null;
+    if (archived && options?.includeArchived === false) {
       continue;
     }
     const shiftId =
@@ -57,8 +64,16 @@ export function createAssignmentDefinitionIdByPairMap<T extends AssignmentDefini
     const jobId = assignment.jobId ?? assignment.job_id ?? null;
     if (jobId == null) continue;
     const key = buildShiftJobPairKey(shiftId, jobId);
-    if (!assignmentIdByPair.has(key) || assignment.shiftId != null || assignment.shift_id != null) {
+    const existingId = assignmentIdByPair.get(key);
+    if (existingId != null && archived && !archivedIds.has(existingId)) continue;
+    if (
+      existingId == null ||
+      (!archived && archivedIds.has(existingId)) ||
+      assignment.shiftId != null ||
+      assignment.shift_id != null
+    ) {
       assignmentIdByPair.set(key, assignment.id);
+      if (archived) archivedIds.add(assignment.id);
     }
   }
 
@@ -134,11 +149,14 @@ export function createAssignmentDefinitionByPairMap(
   const assignmentByPair = new Map<string, AssignmentDefinition>();
 
   for (const assignment of assignments) {
-    if (assignment.archivedAt) continue;
     const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
     const jobId = assignment.jobId ?? null;
     if (jobId == null) continue;
-    assignmentByPair.set(buildShiftJobPairKey(shiftId, jobId), assignment);
+    const key = buildShiftJobPairKey(shiftId, jobId);
+    // An archived pair still describes the cells that hold it; an active one wins a tie.
+    const existing = assignmentByPair.get(key);
+    if (existing && !existing.archivedAt && assignment.archivedAt) continue;
+    assignmentByPair.set(key, assignment);
   }
 
   return assignmentByPair;

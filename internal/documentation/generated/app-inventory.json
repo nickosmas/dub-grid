@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:ace7f22f36ca30b75d4f89800ba30fff107c0f37e9f38b7ee2333553b2669e45",
+  "sourceDigest": "sha256:82c2907de05bd37f5c2e779b191770116c5775eebee2ab7ac27a63c38eb0edc5",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5130,6 +5130,16 @@
       "sha256": "8521a355071eba74619e9d7b62e1e650bf9497f932b872c6dd543d2e6dd01dd3",
       "source": {
         "path": "supabase/migrations/129_shift_without_job_off.sql"
+      }
+    },
+    {
+      "id": "migration:130_archived_jobs_stay_on_history.sql",
+      "version": "130",
+      "name": "archived_jobs_stay_on_history",
+      "file": "130_archived_jobs_stay_on_history.sql",
+      "sha256": "3cd45525a754c48c4083aa0b4927903f12e84bcbfde5aaeff63232097e712a64",
+      "source": {
+        "path": "supabase/migrations/130_archived_jobs_stay_on_history.sql"
       }
     }
   ],

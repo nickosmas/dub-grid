@@ -1482,7 +1482,13 @@ describe("ScheduleGrid", () => {
       historicalAssignments: [archivedEvening],
       shiftCategories: [
         ...shiftCategories,
-        { id: 2, orgId: "org-1", name: "Evening Shift", sortOrder: 2 },
+        {
+          id: 2,
+          orgId: "org-1",
+          name: "Evening Shift",
+          sortOrder: 2,
+          archivedAt: "2024-01-08T00:00:00.000Z",
+        },
       ],
       jobs: [{ id: 103, name: "Supervisor" } as JobDefinition],
       shiftForKey: () => "D",

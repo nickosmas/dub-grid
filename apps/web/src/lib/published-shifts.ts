@@ -178,7 +178,7 @@ export function mapNormalizedScheduleCellToPublishedShiftRow(
   };
 }
 
-function buildPublishedSegmentDetails(input: {
+export function buildPublishedSegmentDetails(input: {
   focusAreas: FocusArea[];
   shiftCategories: ShiftCategory[];
   jobs: JobDefinition[];
@@ -213,8 +213,9 @@ function buildPublishedSegmentDetails(input: {
     });
   };
 
+  // Archived jobs stay: published cells that already hold one keep their hours and times.
   for (const job of input.jobs) {
-    if (job.archivedAt || isRegularStaffSystemJob(job)) continue;
+    if (isRegularStaffSystemJob(job)) continue;
     const mode = job.assignmentMode ?? "with_shift";
     if (mode !== "shiftless") {
       for (const shift of getJobPlacementShiftPool(job, input.shiftCategories, input.focusAreas)) {
