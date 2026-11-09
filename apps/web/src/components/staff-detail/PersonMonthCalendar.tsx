@@ -254,9 +254,10 @@ export function PersonMonthCalendar({
                       >
                         <div
                           data-calendar-pill=""
-                          // One size for every card, a name alone or a name and job,
-                          // so a month reads as an even grid.
-                          className="box-border flex h-10 flex-col justify-center rounded-[var(--dg-radius-sm)] px-1.5 leading-[1.25]"
+                          // One size for every card, with room for the shift, job and
+                          // focus area each on its own line, so a month reads as an
+                          // even grid.
+                          className="box-border flex h-13 flex-col justify-center rounded-[var(--dg-radius-sm)] px-1.5 leading-[1.25]"
                           style={{
                             background: pill.background,
                             border: pill.border,
@@ -266,13 +267,14 @@ export function PersonMonthCalendar({
                           <div className="truncate text-[length:var(--dg-type-badge-size)] font-semibold">
                             {pill.name}
                           </div>
-                          {/* A day card has two lines, so the job and a shared
-                              name's focus area share the second. */}
-                          {pill.detail || pill.focusArea ? (
-                            <div className="truncate text-[length:var(--dg-type-metadata-size)] font-medium opacity-80">
-                              {[pill.detail, pill.focusArea].filter(Boolean).join(" · ")}
+                          {[pill.detail, pill.focusArea].filter(Boolean).map((line) => (
+                            <div
+                              key={line}
+                              className="truncate text-[length:var(--dg-type-metadata-size)] font-medium opacity-80"
+                            >
+                              {line}
                             </div>
-                          ) : null}
+                          ))}
                         </div>
                       </MaybeHint>
                     ))}

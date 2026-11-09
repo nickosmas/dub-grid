@@ -21,8 +21,9 @@ shift, job order" canvas.
   `sharedShiftFocusArea` gives the area alone for a card's own line or to
   follow a job. The area still shows only where two areas share the name.
 - **Cards:** the dashboard week card, staff page recurring pills and Jobs
-  settings put the area on its own line under the shift and job; a month
-  calendar day reads "Morning" over "Staff · East Wing"; the split-shift hero
+  settings put the area on its own line under the shift and job; every month
+  calendar card has room for three lines, "Morning", "Staff" and "East Wing"
+  (owner, 2026-11-08); the split-shift hero
   shows job pills before the area.
 - **Before and After** (grid, activity log, Publish History, alerts, emails,
   push, mobile What changed) put the area ahead of the time; so do the grid
