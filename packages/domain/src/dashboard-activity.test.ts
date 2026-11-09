@@ -55,7 +55,7 @@ describe("describeShiftRequestActivity", () => {
         requesterName: "Alex Rivera",
         status: "open",
       }),
-    ).toMatch(/^Pickup request · Day Shift in East Wing · /);
+    ).toMatch(/^Pickup request · Day Shift · East Wing · /);
     expect(
       describeShiftRequestActivity({
         type: "swap",

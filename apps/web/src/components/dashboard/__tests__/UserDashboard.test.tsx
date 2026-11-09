@@ -567,9 +567,9 @@ describe("UserDashboard", () => {
     expect(heroBadge).toHaveTextContent("Changed");
     expect(
       within(screen.getByTestId("user-dashboard-hero")).getByLabelText(
-        "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care",
+        "Previous shift: Day shift Care · Memory Care · 12:00 AM - 11:59 PM",
       ),
-    ).toHaveTextContent("Was Day shift Care · 12:00 AM - 11:59 PM · Memory Care");
+    ).toHaveTextContent("Was Day shift Care · Memory Care · 12:00 AM - 11:59 PM");
   });
 
   it("keeps a deleted published shift visible in Your Week history", () => {
@@ -599,9 +599,9 @@ describe("UserDashboard", () => {
     expect(within(myWeek).queryByLabelText("deleted shift")).not.toBeInTheDocument();
     expect(
       within(myWeek).getByLabelText(
-        "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care",
+        "Previous shift: Day shift Care · Memory Care · 12:00 AM - 11:59 PM",
       ),
-    ).toHaveTextContent("Was Day shift Care · 12:00 AM - 11:59 PM · Memory Care");
+    ).toHaveTextContent("Was Day shift Care · Memory Care · 12:00 AM - 11:59 PM");
   });
 
   it("marks a hidden edit without saying what the shift was (46f)", () => {
@@ -1684,7 +1684,7 @@ describe("UserDashboard", () => {
     const myWeek = screen.getByTestId("user-dashboard-my-week");
     expect(
       within(myWeek).getByLabelText(
-        "Previous shift: Day shift Care · 12:00 AM - 11:59 PM · Memory Care; Sick for part of the day",
+        "Previous shift: Day shift Care · Memory Care · 12:00 AM - 11:59 PM; Sick for part of the day",
       ),
     ).toBeInTheDocument();
     expect(within(myWeek).queryByText("Sick")).not.toBeInTheDocument();

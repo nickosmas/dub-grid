@@ -1715,7 +1715,7 @@ describe("fetchMobileScheduleEntries", () => {
     });
 
     expect(entries[0]?.presentation.shiftName).toBe(
-      "Day Shift (Skilled Nursing) / Day Shift (Memory Care)",
+      "Day Shift · Skilled Nursing / Day Shift · Memory Care",
     );
   });
 

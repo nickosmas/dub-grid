@@ -48,7 +48,7 @@ export function describePreference(
   return `${preference.mode === "only" ? "Only" : "Prefers"} ${names}`;
 }
 
-/** "Only Supervisor · Prefers Day Shift", the job first, or null without either. */
+/** "Prefers Day Shift · Only Supervisor", the shift first, or null without either. */
 export function describePreferences(
   shift: CoverageShiftPreference | undefined,
   job: CoverageJobPreference | undefined,
@@ -56,8 +56,8 @@ export function describePreferences(
   jobName: (jobId: number) => string | undefined,
 ): string | null {
   const parts = [
-    describePreference(job && { mode: job.mode, ids: job.jobIds }, jobName),
     describePreference(shift && { mode: shift.mode, ids: shift.shiftIds }, shiftName),
+    describePreference(job && { mode: job.mode, ids: job.jobIds }, jobName),
   ].filter((part): part is string => part != null);
   return parts.length > 0 ? parts.join(" · ") : null;
 }

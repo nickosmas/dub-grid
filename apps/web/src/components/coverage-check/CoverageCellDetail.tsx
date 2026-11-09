@@ -83,7 +83,7 @@ export function CoverageCellDetail({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="dg-cc-detail-title">
-            {row.focusAreaName} · {row.rowLabel}
+            {row.rowLabel} · {row.focusAreaName}
           </h3>
           <div className="dg-cc-detail-date dg-tabular-nums">
             {formatShortDate(date)}

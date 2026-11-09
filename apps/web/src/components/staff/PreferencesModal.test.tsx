@@ -47,7 +47,7 @@ describe("describePreferences", () => {
         (id) => shiftNames[id],
         (id) => jobNames[id],
       ),
-    ).toBe("Only Supervisor · Prefers Evening Shift, Night Shift");
+    ).toBe("Prefers Evening Shift, Night Shift · Only Supervisor");
     expect(
       describePreferences(
         { mode: "only", shiftIds: [2] },

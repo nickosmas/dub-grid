@@ -477,7 +477,7 @@ function getPreviousShiftSummary(
   const title = previous.shiftName?.trim() || previous.label?.trim() || null;
   const timeRange = formatScheduleTimeRange(previous.startTime, previous.endTime);
   const focusAreaName = previous.displayFocusAreaName?.trim() || null;
-  const parts = [title, timeRange, focusAreaName].filter((part): part is string =>
+  const parts = [title, focusAreaName, timeRange].filter((part): part is string =>
     Boolean(part && part.trim()),
   );
 
@@ -1421,12 +1421,12 @@ export function OpenShiftsSection({
             </View>
           ) : jobChip || focusAreaName || isMentored ? (
             <View style={styles.scheduleRowContextStack}>
-              {focusAreaName ? <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text> : null}
               {jobChip || isMentored ? (
                 <View style={styles.scheduleRowContext}>
                   <MeTypePill chip={jobChip} compact isMentored={isMentored} />
                 </View>
               ) : null}
+              {focusAreaName ? <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text> : null}
             </View>
           ) : null}
           <Text style={styles.scheduleRowMeta}>
@@ -1525,12 +1525,12 @@ export function OpenShiftsSection({
         {shouldShowShiftName ? <Text style={styles.scheduleRowTitle}>{shiftName}</Text> : null}
         {jobChip || focusAreaName || isMentored ? (
           <View style={styles.scheduleRowContextStack}>
-            {focusAreaName ? <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text> : null}
             {jobChip || isMentored ? (
               <View style={styles.scheduleRowContext}>
                 <MeTypePill chip={jobChip} compact isMentored={isMentored} />
               </View>
             ) : null}
+            {focusAreaName ? <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text> : null}
           </View>
         ) : null}
         {timeRange ? (
@@ -1545,12 +1545,12 @@ export function OpenShiftsSection({
         {shouldShowShiftName ? <Text style={styles.scheduleRowTitle}>{shiftName}</Text> : null}
         {jobChip || focusAreaName || isMentored ? (
           <View style={styles.scheduleRowContextStack}>
-            {focusAreaName ? <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text> : null}
             {jobChip || isMentored ? (
               <View style={styles.scheduleRowContext}>
                 <MeTypePill chip={jobChip} compact isMentored={isMentored} />
               </View>
             ) : null}
+            {focusAreaName ? <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text> : null}
           </View>
         ) : null}
         {timeRange ? (

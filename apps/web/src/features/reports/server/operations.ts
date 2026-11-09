@@ -1625,7 +1625,7 @@ export function buildOperationsReportPayload(
       .map((id) => focusAreaById.get(id))
       .filter((name): name is string => Boolean(name));
     return otherAreas.length > 0
-      ? `${item.entry.label} (${otherAreas.join(", ")})`
+      ? `${item.entry.label} · ${otherAreas.join(", ")}`
       : item.entry.label;
   };
 

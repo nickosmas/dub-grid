@@ -205,7 +205,7 @@ const documentedOpacityTextCounts = {
   "components/RepeatForm.tsx": 1,
   "components/ScheduleGrid.tsx": 8,
   "components/ShiftEditPanel.tsx": 4,
-  "components/dashboard/MyScheduleRow.tsx": 1,
+  "components/dashboard/MyScheduleRow.tsx": 2,
   "components/settings/DisplayMode.tsx": 1,
   "components/settings/Jobs.tsx": 1,
   "components/staff/RecurringScheduleSection.tsx": 1,

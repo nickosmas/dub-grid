@@ -993,11 +993,14 @@ function getPreviousChangeSummary(input: {
     .map((assignmentId) => input.assignmentById.get(assignmentId) ?? null)
     .filter((assignment): assignment is AssignmentDefinition => assignment !== null)
     .map((assignment) => {
-      const parts = [assignment.name, formatAssignmentTimeRange(assignment)];
-      if (!assignment.isGeneral && assignment.focusAreaId != null) {
-        parts.push(input.focusAreaById.get(assignment.focusAreaId)?.name ?? null);
-      }
-      return parts.filter((part): part is string => Boolean(part)).join(" · ");
+      // Shift, then focus area, then time, as every shift is named.
+      const area =
+        !assignment.isGeneral && assignment.focusAreaId != null
+          ? (input.focusAreaById.get(assignment.focusAreaId)?.name ?? null)
+          : null;
+      return [assignment.name, area, formatAssignmentTimeRange(assignment)]
+        .filter((part): part is string => Boolean(part))
+        .join(" · ");
     });
 
   // A worked cell's absence for the rest of the day (item 45) ends the summary.
@@ -2449,10 +2452,10 @@ function HeroSplitShiftSegment({
           </div>
         ) : null}
       </div>
+      <HeroPillRow segment={item.segment} inverse />
       {item.segment.focusAreaName ? (
         <HeroInfoRow icon={<MapPin size={18} />} text={item.segment.focusAreaName} />
       ) : null}
-      <HeroPillRow segment={item.segment} inverse />
     </div>
   );
 }

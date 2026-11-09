@@ -24,7 +24,7 @@ export interface RequestEmailFacts {
   resolvers: ShiftChangeResolvers | null;
 }
 
-/** "Thu, Nov 13 · Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Memory Care" */
+/** "Thu, Nov 13 · Day Shift · Registered Nurse · Memory Care · 7:00 AM - 3:00 PM (8 hrs)" */
 function shiftLine(date: string, state: unknown, resolvers: ShiftChangeResolvers | null): string {
   const label = dayLabel(date);
   const cell = readCellState(state);

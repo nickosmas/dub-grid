@@ -294,7 +294,7 @@ describe("GET /api/export", () => {
     const csv = await (await GET(new NextRequest(url))).text();
 
     expect(csv.split("\n")[0]).toMatch(/^Employee,Wings,/);
-    expect(csv).toContain("Rosa Member,East Wing,Day Shift,Day Shift (West Wing)");
+    expect(csv).toContain("Rosa Member,East Wing,Day Shift,Day Shift · West Wing");
   });
 
   it("refuses a schedule range that is not a calendar date", async () => {

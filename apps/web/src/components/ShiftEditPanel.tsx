@@ -2485,7 +2485,7 @@ export default function ShiftEditPanel({
                 marginTop: 4,
               }}
             >
-              {[requesterSwapTimeLabel, requesterSwapFocusAreaLabel].filter(Boolean).join(" · ")}
+              {[requesterSwapFocusAreaLabel, requesterSwapTimeLabel].filter(Boolean).join(" · ")}
             </div>
           ) : null}
         </div>
@@ -2546,7 +2546,7 @@ export default function ShiftEditPanel({
                     marginTop: 4,
                   }}
                 >
-                  {[requesterSwapTimeLabel, requesterSwapFocusAreaLabel]
+                  {[requesterSwapFocusAreaLabel, requesterSwapTimeLabel]
                     .filter(Boolean)
                     .join(" · ")}
                 </div>
@@ -2605,7 +2605,7 @@ export default function ShiftEditPanel({
                     marginTop: 4,
                   }}
                 >
-                  {[selectedSwapTarget.timeLabel, selectedSwapTarget.focusAreaLabel]
+                  {[selectedSwapTarget.focusAreaLabel, selectedSwapTarget.timeLabel]
                     .filter(Boolean)
                     .join(" · ")}
                 </div>
@@ -2891,7 +2891,7 @@ export default function ShiftEditPanel({
                               fontSize: "var(--dg-fs-caption)",
                             }}
                           >
-                            {[timeLabel, focusAreaLabel].filter(Boolean).join(" · ")}
+                            {[focusAreaLabel, timeLabel].filter(Boolean).join(" · ")}
                           </span>
                         ) : null}
                       </Button>

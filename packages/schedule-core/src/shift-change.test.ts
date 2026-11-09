@@ -29,9 +29,9 @@ describe("describeShiftChangeItem", () => {
   it("writes a day shift as title and detail", () => {
     const item = describeShiftChangeItem(shift(), { date: WED });
     expect(text(item.title)).toBe("Day Shift · Registered Nurse");
-    expect(text(item.detail)).toBe("7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing");
+    expect(text(item.detail)).toBe("Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)");
     expect(item.plain).toBe(
-      "Day Shift · Registered Nurse · 7:00 AM - 3:00 PM (8 hrs) · Skilled Nursing",
+      "Day Shift · Registered Nurse · Skilled Nursing · 7:00 AM - 3:00 PM (8 hrs)",
     );
     expect(item.minutes).toBe(480);
   });
@@ -43,7 +43,7 @@ describe("describeShiftChangeItem", () => {
         date: WED,
       },
     );
-    expect(text(item.detail)).toBe("Wed 11:00 PM - Thu 7:00 AM (8 hrs) · Skilled Nursing");
+    expect(text(item.detail)).toBe("Skilled Nursing · Wed 11:00 PM - Thu 7:00 AM (8 hrs)");
   });
 
   it("names the weekdays across a month end", () => {
@@ -62,7 +62,7 @@ describe("describeShiftChangeItem", () => {
 
   it("deducts the break from the hours", () => {
     const item = describeShiftChangeItem(shift({ end: "15:30", breakMinutes: 30 }), { date: WED });
-    expect(text(item.detail)).toBe("7:00 AM - 3:30 PM (8 hrs) · Skilled Nursing");
+    expect(text(item.detail)).toBe("Skilled Nursing · 7:00 AM - 3:30 PM (8 hrs)");
     expect(item.minutes).toBe(480);
   });
 
@@ -207,7 +207,7 @@ describe("describeShiftChange, one item each side", () => {
     expect(change.before.items).toEqual([]);
     expect(change.after.items[0].status).toBe("added");
     expect(change.after.items[0].plain).toBe(
-      "Night Shift · Registered Nurse · Fri 11:00 PM - Sat 7:00 AM (8 hrs) · Memory Care",
+      "Night Shift · Registered Nurse · Memory Care · Fri 11:00 PM - Sat 7:00 AM (8 hrs)",
     );
     expect(marked(change.after.items[0].detail)).toEqual([]);
   });

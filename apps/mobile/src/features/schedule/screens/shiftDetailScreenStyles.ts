@@ -367,6 +367,10 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       alignItems: "center",
       gap: 8,
     },
+    shiftmateSegmentFocusArea: {
+      ...mobileText.meta,
+      color: mobileColors.textSecondary,
+    },
     shiftmateSegmentTitle: {
       flexShrink: 1,
       minWidth: 0,

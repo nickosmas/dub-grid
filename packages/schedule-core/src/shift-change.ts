@@ -182,7 +182,15 @@ function describeShift(
   const minutes = shiftChangeItemMinutes(item);
   const detailParts: ShiftChangeTextPart[] = [];
   const detailSeparators = new Set<number>();
+  // Shift, job, then focus area, then time: one order everywhere.
+  if (item.focusAreaName) {
+    detailParts.push(part(item.focusAreaName, all || marks.focusArea));
+  }
   if (item.start && item.end) {
+    if (detailParts.length > 0) {
+      detailSeparators.add(detailParts.length);
+      detailParts.push({ text: SEPARATOR });
+    }
     const startMinutes = getMinutesSinceMidnight(item.start);
     const endMinutes = getMinutesSinceMidnight(item.end);
     const overnight = startMinutes != null && endMinutes != null && endMinutes <= startMinutes;
@@ -201,13 +209,6 @@ function describeShift(
       detailParts.push({ text: " " });
       detailParts.push(part(`(${formatShiftChangeHours(minutes)})`, all || marks.hours));
     }
-  }
-  if (item.focusAreaName) {
-    if (detailParts.length > 0) {
-      detailSeparators.add(detailParts.length);
-      detailParts.push({ text: SEPARATOR });
-    }
-    detailParts.push(part(item.focusAreaName, all || marks.focusArea));
   }
 
   const title = markSeparators(titleParts, titleSeparators);

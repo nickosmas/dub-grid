@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { shiftDisplayName, shiftDisplayNamesById } from "./shift-names";
+import {
+  sharedShiftFocusArea,
+  sharedShiftFocusAreasById,
+  shiftDisplayName,
+  shiftDisplayNamesById,
+} from "./shift-names";
 
 const AREAS = new Map([
   [1, "Skilled Nursing"],
@@ -23,13 +28,13 @@ describe("shiftDisplayName", () => {
   });
 
   it("names the focus area when another area's shift shares the name", () => {
-    expect(shiftDisplayName(SHIFTS[0], SHIFTS, areaName)).toBe("Day Shift (Skilled Nursing)");
-    expect(shiftDisplayName(SHIFTS[1], SHIFTS, areaName)).toBe("Day Shift (Supported Care)");
+    expect(shiftDisplayName(SHIFTS[0], SHIFTS, areaName)).toBe("Day Shift · Skilled Nursing");
+    expect(shiftDisplayName(SHIFTS[1], SHIFTS, areaName)).toBe("Day Shift · Supported Care");
   });
 
   it("leaves an org-wide shift bare and names the area shift sharing its name", () => {
     expect(shiftDisplayName(SHIFTS[3], SHIFTS, areaName)).toBe("General");
-    expect(shiftDisplayName(SHIFTS[4], SHIFTS, areaName)).toBe("General (Supported Care)");
+    expect(shiftDisplayName(SHIFTS[4], SHIFTS, areaName)).toBe("General · Supported Care");
   });
 
   it("ignores an archived shift with the same name", () => {
@@ -37,7 +42,7 @@ describe("shiftDisplayName", () => {
   });
 
   it("still names the area of an archived shift that shares an active one's name", () => {
-    expect(shiftDisplayName(SHIFTS[6], SHIFTS, areaName)).toBe("swing (Supported Care)");
+    expect(shiftDisplayName(SHIFTS[6], SHIFTS, areaName)).toBe("swing · Supported Care");
   });
 
   it("falls back to the bare name when the area is unknown", () => {
@@ -52,9 +57,28 @@ describe("shiftDisplayNamesById", () => {
       { id: 2, name: "Supported Care" },
     ]);
     expect([...labels]).toEqual([
-      [10, "Day Shift (Skilled Nursing)"],
-      [11, "Day Shift (Supported Care)"],
+      [10, "Day Shift · Skilled Nursing"],
+      [11, "Day Shift · Supported Care"],
       [12, "Night Shift"],
+    ]);
+  });
+});
+
+describe("sharedShiftFocusArea", () => {
+  it("gives the area alone, for a line under the name", () => {
+    expect(sharedShiftFocusArea(SHIFTS[0], SHIFTS, areaName)).toBe("Skilled Nursing");
+    expect(sharedShiftFocusArea(SHIFTS[2], SHIFTS, areaName)).toBeNull();
+    expect(sharedShiftFocusArea(SHIFTS[3], SHIFTS, areaName)).toBeNull();
+  });
+
+  it("maps only the shifts that need one", () => {
+    const areas = sharedShiftFocusAreasById(SHIFTS.slice(0, 3), [
+      { id: 1, name: "Skilled Nursing" },
+      { id: 2, name: "Supported Care" },
+    ]);
+    expect([...areas]).toEqual([
+      [10, "Skilled Nursing"],
+      [11, "Supported Care"],
     ]);
   });
 });
