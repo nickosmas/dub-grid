@@ -2,17 +2,15 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import { Organization } from "@/types";
-import { Button } from "@/components/Button";
 import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { getLineTextError, normalizeLineText } from "@/lib/form-validation";
 import { SectionCard, labelStyle } from "./shared";
-import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { UnsavedChangesBar } from "@/components/ui/UnsavedChangesBar";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
-import { ButtonLoading } from "@/components/ButtonSpinner";
 import {
   changedElsewhereMessage,
   DEFAULT_ORGANIZATION_LABELS,
@@ -171,26 +169,15 @@ export default function OrganizationLabels({
 
   return (
     <SectionCard
-      footer={
-        !readOnly &&
-        !isWizardMode && (
-          <div
-            style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}
-          >
-            {isModified ? (
-              <Button onClick={handleDiscard} disabled={saving} className="dg-btn dg-btn-secondary">
-                {EDITOR_ACTION_LABELS.discard}
-              </Button>
-            ) : null}
-            <Button
-              onClick={handleSave}
-              disabled={!isModified || saving || hasFieldErrors}
-              className="dg-btn dg-btn-primary"
-            >
-              <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
-            </Button>
-          </div>
-        )
+      saveBar={
+        !readOnly && !isWizardMode && isModified ? (
+          <UnsavedChangesBar
+            saving={saving}
+            saveDisabled={hasFieldErrors}
+            onDiscard={handleDiscard}
+            onSave={() => void handleSave()}
+          />
+        ) : null
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

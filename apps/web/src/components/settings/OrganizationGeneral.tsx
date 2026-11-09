@@ -2,13 +2,12 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Organization } from "@/types";
-import { Button } from "@/components/Button";
 import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE, useEmployeeCount } from "@/hooks";
 import { SectionCard, labelStyle } from "./shared";
-import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { UnsavedChangesBar } from "@/components/ui/UnsavedChangesBar";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 import OrganizationChangeReviewModal from "@/components/organization/OrganizationChangeReviewModal";
 import {
@@ -19,7 +18,6 @@ import {
   buildOrganizationSettingsChanges,
   pickOrganizationSettings,
 } from "@/lib/organization-settings";
-import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import {
   getLineTextError,
   getOptionalUsPhoneFieldError,
@@ -189,31 +187,16 @@ export default function OrganizationGeneral({
 
   return (
     <SectionCard
-      footer={
-        !isWizardMode && (
-          <EditorActionRow
-            secondaryAction={
-              isModified ? (
-                <Button
-                  onClick={handleDiscard}
-                  disabled={saving}
-                  className="dg-btn dg-btn-secondary"
-                >
-                  {EDITOR_ACTION_LABELS.discard}
-                </Button>
-              ) : null
-            }
-            primaryAction={
-              <Button
-                onClick={handleReview}
-                disabled={!isModified || saving || hasValidationErrors}
-                className="dg-btn dg-btn-primary"
-              >
-                Review & Save
-              </Button>
-            }
+      saveBar={
+        !isWizardMode && isModified ? (
+          <UnsavedChangesBar
+            saveLabel="Review & Save"
+            saving={saving}
+            saveDisabled={hasValidationErrors}
+            onDiscard={handleDiscard}
+            onSave={handleReview}
           />
-        )
+        ) : null
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

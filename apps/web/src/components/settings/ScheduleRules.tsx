@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { AbsenceType, Organization } from "@/types";
 import { resolveDayOffAbsenceType } from "@dubgrid/schedule-core";
-import { Button } from "@/components/Button";
 import {
   changedElsewhereMessage,
   DEFAULT_OPEN_SHIFT_VISIBILITY,
@@ -16,7 +15,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import { Switch } from "@/components/ui/switch";
 import { SectionCard } from "./shared";
-import { ButtonLoading } from "@/components/ButtonSpinner";
+import { UnsavedChangesBar } from "@/components/ui/UnsavedChangesBar";
 
 const ruleTitleStyle: React.CSSProperties = {
   fontSize: "var(--dg-fs-body-sm)",
@@ -84,7 +83,7 @@ export default function ScheduleRules({
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  useEffect(() => {
+  const resetForm = useCallback(() => {
     setEnforceConflictPrevention(organization.enforceConflictPrevention);
     setPayPeriodStartDate(organization.payPeriodStartDate ?? "");
     setMentoredCoverageCreditPercent(organizationMentoredCredit);
@@ -92,24 +91,27 @@ export default function ScheduleRules({
     setCoverageGapVisibility(organizationCoverageGapVisibility);
     setCalloffVisibility(organizationCalloffVisibility);
   }, [
-    organization.coverageRuleConfig,
     organizationMentoredCredit,
     organizationDayOff,
     organization.enforceConflictPrevention,
     organization.payPeriodStartDate,
     organizationCoverageGapVisibility,
     organizationCalloffVisibility,
-    organization.updatedAt,
   ]);
 
-  const isModified =
+  useEffect(() => {
+    resetForm();
+  }, [resetForm, organization.coverageRuleConfig, organization.updatedAt]);
+
+  const hasEdits =
     enforceConflictPrevention !== organization.enforceConflictPrevention ||
     payPeriodStartDate !== (organization.payPeriodStartDate ?? "") ||
     mentoredCoverageCreditPercent !== organizationMentoredCredit ||
     dayOffChoice !== organizationDayOff ||
-    dayOffDetected ||
     coverageGapVisibility !== organizationCoverageGapVisibility ||
     calloffVisibility !== organizationCalloffVisibility;
+  // A day off absence detected by name is still unsaved, with nothing to discard.
+  const isModified = hasEdits || dayOffDetected;
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
@@ -187,16 +189,14 @@ export default function ScheduleRules({
 
   return (
     <SectionCard
-      footer={
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <Button
-            onClick={() => setConfirmOpen(true)}
-            disabled={!isModified || saving}
-            className="dg-btn dg-btn-primary"
-          >
-            <ButtonLoading loading={saving}>Save</ButtonLoading>
-          </Button>
-        </div>
+      saveBar={
+        isModified ? (
+          <UnsavedChangesBar
+            saving={saving}
+            onDiscard={hasEdits ? resetForm : undefined}
+            onSave={() => setConfirmOpen(true)}
+          />
+        ) : null
       }
     >
       <div style={{ display: "flex", flexDirection: "column" }}>
