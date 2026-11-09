@@ -1847,7 +1847,7 @@ button.dg-cc-sg-main {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--dg-unsaved-bar-inset);
 }
-.dg-unsaved-bar__actions > .dg-btn {
+.dg-unsaved-bar__actions > * {
   min-width: 0;
 }
 .dg-unsaved-bar__actions:has(> :only-child) {
