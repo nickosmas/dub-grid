@@ -102,24 +102,37 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     // A swap's two shifts stack beside one swap glyph, split by a hairline,
     // so the card says "these two trade places" without a disc on a seam.
-    swapGroup: {
-      flexDirection: "row",
-      alignItems: "stretch",
-      gap: mobileSpace.md,
+    // A swap's shift as its own panel inside the card. Dark mode's card is
+    // the same gray as `surfaceSecondary`, so the panel takes the control fill.
+    shiftPanel: {
+      padding: mobileSpace.md,
+      borderRadius: mobileRadii.control,
+      backgroundColor: isDark ? mobileColors.controlNeutralBg : mobileColors.surfaceSecondary,
     },
-    swapGutter: {
-      width: 24,
+    shiftPanelSeamBelow: {
+      paddingBottom: mobileSpace.lg + mobileSpace.sm,
+    },
+    shiftPanelSeamAbove: {
+      paddingTop: mobileSpace.lg + mobileSpace.sm,
+    },
+    // Centred on the seam between the two panels; the surface-coloured ring
+    // lifts the disc off both.
+    swapSeam: {
+      height: mobileSpace.xs,
       alignItems: "center",
       justifyContent: "center",
+      overflow: "visible",
+      zIndex: 1,
     },
-    swapShifts: {
-      flex: 1,
-      minWidth: 0,
-    },
-    swapDivider: {
-      height: StyleSheet.hairlineWidth,
-      marginVertical: mobileSpace.md,
-      backgroundColor: mobileColors.borderSubtle,
+    swapArrow: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 3,
+      borderColor: mobileColors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.brandSoft,
     },
     shiftPerson: {
       ...mobileText.meta,
