@@ -556,6 +556,44 @@ describe("assignable shift resolution", () => {
     expect(screen.queryByRole("button", { name: "Day Shift" })).not.toBeInTheDocument();
   });
 
+  it("still shows a cell's own shift without a job while they're turned off", () => {
+    const defaultShiftJob: JobDefinition = {
+      ...jobs[0]!,
+      id: 104,
+      name: "Default shift job",
+      abbr: "SHIFT",
+      showOnGrid: false,
+      departmentIds: [3],
+      focusAreaIds: [1],
+      applicableShiftIds: [10],
+      eligibleRoleIds: [],
+      systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+    };
+    const generatedAssignments = buildScheduleAssignmentOptions({
+      orgId: "org-1",
+      focusAreas,
+      shiftCategories,
+      jobs: [defaultShiftJob],
+    });
+
+    render(
+      <ShiftPicker
+        assignments={generatedAssignments}
+        shiftCategories={shiftCategories}
+        jobs={[defaultShiftJob]}
+        orgRoles={orgRoles}
+        focusAreas={focusAreas}
+        onSelect={vi.fn()}
+        empFocusAreaIds={[1]}
+        empRoleIds={[]}
+        defaultShiftEnabled={false}
+        currentSegments={[{ shiftId: 10, jobId: 104, position: 0 }]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Day Shift/ })).toBeInTheDocument();
+  });
+
   it("filters specialty jobs by combined role and certification eligibility", () => {
     const options = buildAssignableShiftOptions({
       assignments,

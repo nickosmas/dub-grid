@@ -14,6 +14,8 @@ The section lists every schedule area with its shift and job options, grouped by
 
 Numbers go from 0 to 999. **0** means **No requirement**, so to remove a requirement, set it to 0 and save. Changing requirements doesn't change any shifts on the schedule.
 
+With [shifts without a job](/configuration/shifts-jobs-and-absences#turning-off-shifts-without-a-job) turned off, their options leave the list, except one that has a requirement: it stays with a note, still counts, and Auto-build won't fill it. Set it to 0 to remove it.
+
 ### Maximum
 
 Once a requirement needs someone, you can turn on **Set a maximum**, for example to keep a shift to one supervisor. **Maximum Staff** starts at the minimum and can't go below it: raise the minimum past it and the maximum rises too. With different numbers by day, it applies on every day. The row then shows **Max** after its numbers, and the Schedule Builder shows it after what the requirement needs.

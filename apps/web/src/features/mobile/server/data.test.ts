@@ -539,6 +539,8 @@ function createServiceClientForOpenShifts(options?: {
   shiftRequests?: unknown[];
   scheduleCells?: unknown[];
   publishHistory?: unknown[];
+  /** Makes the gap's job the default shift job, with shifts without a job turned off. */
+  shiftsWithoutJobOff?: boolean;
 }) {
   const assignments = [
     {
@@ -577,7 +579,11 @@ function createServiceClientForOpenShifts(options?: {
         name: "Charge Nurse",
         eligibleRoleIds: [777],
       },
-    ]),
+    ]).map((job) =>
+      options?.shiftsWithoutJobOff && job.id === 91
+        ? { ...job, system_key: "default_shift_job" }
+        : job,
+    ),
     error: null,
   });
   const namedItemsQuery = createThenableQuery({
@@ -622,6 +628,7 @@ function createServiceClientForOpenShifts(options?: {
   const organizationQuery = createThenableQuery({
     data: {
       coverage_rule_config: { mentoredCoverageCreditPercent: 100 },
+      default_shift_enabled: !options?.shiftsWithoutJobOff,
     },
     error: null,
   });
@@ -2038,6 +2045,33 @@ describe("fetchMobileOpenShifts", () => {
         canVolunteer: false,
         volunteerBlockReason: "You do not meet the eligibility requirements for this shift.",
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("offers no gap only a shift without a job could fill while they're off", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const serviceClient = createServiceClientForOpenShifts({ shiftsWithoutJobOff: true });
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          id: "196d610f-2283-486c-a9e0-197852969a31",
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [],
+        } as never,
+        showAll: true,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toEqual([]);
     } finally {
       vi.useRealTimers();
     }

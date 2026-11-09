@@ -71,7 +71,7 @@ import {
   resolveJobColorsForShift,
   resolveJobTimesForShift,
 } from "@/lib/job-placement";
-import { isRegularStaffSystemJob } from "@/lib/system-jobs";
+import { isRegularStaffSystemJob, jobIdTakesNewWork } from "@/lib/system-jobs";
 import { normalizeMobileScheduleRange, type MobileScheduleQuery } from "@dubgrid/contracts";
 import type {
   MobileAbsenceType,
@@ -1324,6 +1324,7 @@ export async function fetchMobileOpenShiftContext(
     jobs,
     orgRoles,
     shiftCategories,
+    defaultShiftEnabled: contextRows.organizationRow?.default_shift_enabled ?? true,
   };
 }
 
@@ -1519,8 +1520,16 @@ function buildMobileOpenShiftsFromGaps(
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  // A gap only shifts without a job could fill isn't offered while they're off.
+  const takesNewWork = jobIdTakesNewWork(context.jobs, context.defaultShiftEnabled);
 
   return gaps.flatMap((gap) => {
+    const fillableAssignmentIds = gap.eligibleAssignmentDefinitionIds.filter((assignmentId) =>
+      takesNewWork(assignmentById.get(assignmentId)?.jobId),
+    );
+    if (fillableAssignmentIds.length === 0) {
+      return [];
+    }
     const gapDate = formatMobileIsoDate(gap.date);
     const pendingVolunteerRequestIds = new Set<string>();
     const hasOwnPendingVolunteer = gap.eligibleAssignmentDefinitionIds.some((assignmentId) => {
@@ -1567,7 +1576,7 @@ function buildMobileOpenShiftsFromGaps(
       return [];
     }
 
-    const openAssignments = gap.eligibleAssignmentDefinitionIds
+    const openAssignments = fillableAssignmentIds
       .map((assignmentId) => assignmentById.get(assignmentId))
       .filter((assignment): assignment is (typeof context.assignments)[number] =>
         Boolean(assignment),

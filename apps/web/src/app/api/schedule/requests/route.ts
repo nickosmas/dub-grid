@@ -672,6 +672,17 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
+    // 129: an open shift without a job, while the organization has them off.
+    const message = error && typeof error === "object" && "message" in error ? error.message : null;
+    if (
+      typeof message === "string" &&
+      message.includes("Shifts without a job are off for this organization")
+    ) {
+      return NextResponse.json(
+        { error: "This shift isn't open anymore.", code: "SHIFT_WITHOUT_JOB_OFF" },
+        { status: 422 },
+      );
+    }
     return apiErrorResponse(error, "We couldn't update that request. Try again.");
   }
 }

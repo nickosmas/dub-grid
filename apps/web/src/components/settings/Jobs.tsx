@@ -16,9 +16,10 @@ import type {
 import {
   checkJobDependencies,
   deleteJobDefinition,
+  fetchShiftWithoutJobUsage,
   upsertJobDefinition,
 } from "@/features/settings/client";
-import type { DependencyInfo } from "@/features/settings/client";
+import type { DependencyInfo, ShiftWithoutJobUsage } from "@/features/settings/client";
 import { Button } from "@/components/Button";
 import { saveOrganizationSettingsWithRecovery } from "@/features/organization/client";
 import { toast } from "sonner";
@@ -705,6 +706,35 @@ function DefaultShiftCard({
   );
 }
 
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** What stays once every shift needs a job, counted when the counts have loaded. */
+function requireJobPoints(usage: ShiftWithoutJobUsage | null): React.ReactNode[] {
+  const points: React.ReactNode[] = [
+    usage && usage.upcomingShifts > 0
+      ? `${plural(usage.upcomingShifts, "upcoming shift", "upcoming shifts")} without a job stay on the schedule and count toward coverage. Change them if they need a job.`
+      : "Shifts already scheduled without a job stay on the schedule and count toward coverage.",
+  ];
+  if (usage && usage.recurringDays > 0) {
+    points.push(
+      `${plural(usage.recurringDays, "recurring day uses", "recurring days use")} one and won't fill until you allow them again.`,
+    );
+  }
+  if (usage && usage.coverageRequirements > 0) {
+    points.push(
+      `${plural(usage.coverageRequirements, "coverage requirement is", "coverage requirements are")} for one. ${usage.coverageRequirements === 1 ? "It still counts" : "They still count"}, and Auto-build won't fill ${usage.coverageRequirements === 1 ? "it" : "them"}.`,
+    );
+  }
+  points.push(
+    <>
+      The <strong>{DEFAULT_SHIFT_JOB_LABEL}</strong> settings are hidden until you allow it again.
+    </>,
+  );
+  return points;
+}
+
 function DefaultShiftToggle({
   organization,
   onOrganizationSave,
@@ -717,10 +747,26 @@ function DefaultShiftToggle({
   const [enabled, setEnabled] = useState(organization.defaultShiftEnabled);
   const [saving, setSaving] = useState(false);
   const [pendingValue, setPendingValue] = useState<boolean | null>(null);
+  const [usage, setUsage] = useState<ShiftWithoutJobUsage | null>(null);
 
   useEffect(() => {
     setEnabled(organization.defaultShiftEnabled);
   }, [organization.defaultShiftEnabled]);
+
+  // Turning them off says what stays; until the counts load it says so plainly.
+  useEffect(() => {
+    if (pendingValue !== false) return;
+    let cancelled = false;
+    setUsage(null);
+    fetchShiftWithoutJobUsage(organization.id)
+      .then((next) => {
+        if (!cancelled) setUsage(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingValue, organization.id]);
 
   const handleConfirm = useCallback(async () => {
     if (pendingValue === null) return;
@@ -777,22 +823,10 @@ function DefaultShiftToggle({
                 <strong>{DEFAULT_SHIFT_JOB_LABEL}</strong>.
               </>
             ) : (
-              "Staff can no longer be scheduled with just a shift."
+              "Nobody new can be scheduled with just a shift. Auto-build, recurring fills and open shifts stop using them."
             )
           }
-          summary={
-            pendingValue
-              ? undefined
-              : {
-                  points: [
-                    <>
-                      The <strong>{DEFAULT_SHIFT_JOB_LABEL}</strong> settings are hidden until you
-                      allow it again.
-                    </>,
-                    "Shifts already scheduled without a job stay on the schedule. Change them if they need a job.",
-                  ],
-                }
-          }
+          summary={pendingValue ? undefined : { points: requireJobPoints(usage) }}
           confirmLabel={pendingValue ? "Allow" : "Require a job"}
           variant={pendingValue ? "info" : "warning"}
           isLoading={saving}
