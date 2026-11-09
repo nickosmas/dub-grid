@@ -2,13 +2,10 @@
 
 import { useState, useEffect, type CSSProperties } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { Button } from "@/components/Button";
-import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { Bell, Mail } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { UnsavedChangesBar } from "@/components/ui/UnsavedChangesBar";
 import {
   fetchNotificationPreferences,
   saveNotificationPreferences,
@@ -345,27 +342,9 @@ export function NotificationPreferences({
           ))}
       </div>
 
-      <EditorActionRow
-        className="dg-footer-bar dg-footer-bar--bleed"
-        secondaryAction={
-          hasChanges ? (
-            <Button onClick={discard} disabled={saving} className="dg-btn dg-btn-secondary">
-              {EDITOR_ACTION_LABELS.discard}
-            </Button>
-          ) : null
-        }
-        primaryAction={
-          <Button onClick={save} disabled={!hasChanges || saving} className="dg-btn dg-btn-primary">
-            <ButtonLoading
-              loading={saving}
-              spinnerColor="var(--dg-color-text-inverse)"
-              spinnerSize={14}
-            >
-              Save Preferences
-            </ButtonLoading>
-          </Button>
-        }
-      />
+      {hasChanges ? (
+        <UnsavedChangesBar saving={saving} onDiscard={discard} onSave={() => void save()} />
+      ) : null}
     </div>
   );
 }

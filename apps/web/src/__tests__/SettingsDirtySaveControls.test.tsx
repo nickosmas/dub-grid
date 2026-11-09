@@ -137,28 +137,22 @@ describe("settings dirty save controls", () => {
     }));
   });
 
-  it("organization settings only show Discard while the draft is dirty", async () => {
+  it("organization settings show the Unsaved changes bar only while the draft is dirty", async () => {
     const user = userEvent.setup();
 
     render(<OrganizationGeneral organization={baseOrganization} onSave={vi.fn()} />);
 
     const nameInput = screen.getByDisplayValue("Acme Health");
-    const saveButton = screen.getByRole("button", { name: /review & save/i });
-    expect(saveButton).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
 
     await user.clear(nameInput);
     await user.type(nameInput, "Acme North");
 
-    const discardButton = screen.getByRole("button", { name: /^discard$/i });
-    expect(saveButton).toBeEnabled();
-    expect(discardButton).toBeEnabled();
-
-    await user.click(discardButton);
+    expect(screen.getByRole("button", { name: /review & save/i })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: /^discard$/i }));
 
     expect(screen.getByDisplayValue("Acme Health")).toBeInTheDocument();
-    expect(saveButton).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
   });
 
   it("organization settings require review before the guarded save runs", async () => {
@@ -214,27 +208,22 @@ describe("settings dirty save controls", () => {
     expect(screen.getByRole("button", { name: /review & save/i })).toBeDisabled();
   });
 
-  it("organization labels only show Discard while the labels are dirty", async () => {
+  it("organization labels show the Unsaved changes bar only while the labels are dirty", async () => {
     const user = userEvent.setup();
 
     render(<OrganizationLabels organization={baseOrganization} onSave={vi.fn()} />);
 
     const labelInput = screen.getByDisplayValue("Focus Areas");
-    const saveButton = screen.getByRole("button", { name: /^save$/i });
-    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
 
     await user.clear(labelInput);
     await user.type(labelInput, "Units");
 
-    const discardButton = screen.getByRole("button", { name: /^discard$/i });
-    expect(saveButton).toBeEnabled();
-    expect(discardButton).toBeEnabled();
-
-    await user.click(discardButton);
+    expect(screen.getByRole("button", { name: /^save changes$/i })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: /^discard$/i }));
 
     expect(screen.getByDisplayValue("Focus Areas")).toBeInTheDocument();
-    expect(saveButton).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
   });
 
   it("custom labels does not expose a Scheduled Departments field — that label is fixed", () => {
@@ -250,12 +239,11 @@ describe("settings dirty save controls", () => {
     expect(screen.getByText("Roles label")).toBeInTheDocument();
   });
 
-  it("display mode uses Cancel while the mode selection is dirty", async () => {
+  it("display mode shows the Unsaved changes bar while the mode selection is dirty", async () => {
     const user = userEvent.setup();
 
     render(<DisplayMode organization={baseOrganization} onSave={vi.fn()} />);
 
-    const saveButton = screen.getByRole("button", { name: /^save$/i });
     const codeSample = document.querySelector('[data-display-mode-sample="code"]');
     const codeSampleStaffHeader = document.querySelector(
       '[data-display-mode-sample-staff-header="true"]',
@@ -263,7 +251,7 @@ describe("settings dirty save controls", () => {
     const optionsGrid = document.querySelector<HTMLElement>("[data-display-mode-options]");
     const codeOption = screen.getByRole("button", { name: /short codes/i });
     const fullNameOption = screen.getByRole("button", { name: /full names/i });
-    expect(saveButton).toBeDisabled();
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
     expect(codeSample).not.toBeNull();
     expect(codeSampleStaffHeader).not.toBeNull();
     expect(optionsGrid).toHaveStyle({
@@ -284,15 +272,13 @@ describe("settings dirty save controls", () => {
     });
     expect(codeSample?.querySelector('.dg-grid-slot[data-leading-divider="split"]')).not.toBeNull();
     expect(codeSample?.querySelector('.dg-grid-cell[data-top-divider="dark"]')).not.toBeNull();
-    expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
     expect(codeOption).toHaveAttribute("aria-pressed", "true");
 
     await user.click(fullNameOption);
 
-    const cancelButton = screen.getByRole("button", { name: /^cancel$/i });
+    const discardButton = screen.getByRole("button", { name: /^discard$/i });
     expect(screen.getByText(/choose a display mode/i)).toBeInTheDocument();
-    expect(saveButton).toBeEnabled();
-    expect(cancelButton).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^save changes$/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /short codes/i })).toHaveAttribute(
       "aria-pressed",
       "false",
@@ -302,11 +288,10 @@ describe("settings dirty save controls", () => {
       "true",
     );
 
-    await user.click(cancelButton);
+    await user.click(discardButton);
 
     expect(screen.getByText(/choose a display mode/i)).toBeInTheDocument();
-    expect(saveButton).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
   });
 
   it("saves the appwide compact role and certification label preference", async () => {
@@ -325,7 +310,7 @@ describe("settings dirty save controls", () => {
     expect(compactLabelsSwitch).toHaveAttribute("aria-checked", "false");
 
     await user.click(compactLabelsSwitch);
-    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await user.click(screen.getByRole("button", { name: /^save changes$/i }));
 
     expect(saveOrganizationSettingsWithRecovery).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -337,7 +322,7 @@ describe("settings dirty save controls", () => {
     );
   });
 
-  it("schedule rules only expose Save for a modified toggle", async () => {
+  it("schedule rules show the Unsaved changes bar for a modified toggle, and Discard puts it back", async () => {
     const user = userEvent.setup();
 
     render(<ScheduleRules organization={baseOrganization} onOrganizationSave={vi.fn()} />);
@@ -345,17 +330,19 @@ describe("settings dirty save controls", () => {
     const toggle = screen.getByRole("switch", {
       name: /block overlapping shifts/i,
     });
-    const saveButton = screen.getByRole("button", { name: /^save$/i });
-
-    expect(saveButton).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
+    const initial = toggle.getAttribute("aria-checked");
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
 
     await user.click(toggle);
 
-    expect(saveButton).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^save changes$/i })).toBeEnabled();
     expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^discard$/i }));
+
+    expect(toggle).toHaveAttribute("aria-checked", initial ?? "");
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
   });
 
   it("gives schedule rules distinct titles, descriptions, and divided rows", () => {
@@ -418,7 +405,9 @@ describe("settings dirty save controls", () => {
     );
 
     expect(screen.getByText(/Picked from its name; save to confirm it\./)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    // Nothing was edited, so there is nothing to discard.
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
   it("schedule rules save a biweekly pay-period anchor date", async () => {
@@ -452,9 +441,7 @@ describe("settings dirty save controls", () => {
       }),
     );
 
-    await user.click(screen.getByRole("button", { name: /^save$/i }));
-    // The page's Save and the dialog's confirm are both "Save" now, so scope
-    // the confirm to the dialog rather than matching whichever comes first.
+    await user.click(screen.getByRole("button", { name: /^save changes$/i }));
     const ruleDialog = await screen.findByRole("alertdialog", { name: /save schedule rule/i });
     await user.click(within(ruleDialog).getByRole("button", { name: /^save$/i }));
 
@@ -3270,7 +3257,7 @@ describe("settings dirty save controls", () => {
     await user.type(input, "https://units.example");
 
     expect(screen.getByText("Schedule area label cannot contain a URL")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^save changes$/i })).toBeDisabled();
     expect(updateOrganizationSettings).not.toHaveBeenCalled();
   });
 

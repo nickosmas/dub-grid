@@ -45,25 +45,36 @@ describe("NotificationPreferences", () => {
     });
   });
 
-  it("keeps Save Preferences disabled until preferences change, then disables again after save", async () => {
+  it("shows the Unsaved changes bar only while preferences differ from what's saved", async () => {
     const user = userEvent.setup();
 
     render(<NotificationPreferences />);
 
-    const saveButton = await screen.findByRole("button", { name: /save preferences/i });
-    expect(saveButton).toBeDisabled();
+    await screen.findAllByRole("switch");
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
 
     const [scheduleInApp] = screen.getAllByRole("switch");
     fireEvent.click(scheduleInApp);
-    await waitFor(() => {
-      expect(saveButton).toBeEnabled();
-    });
+    const saveButton = await screen.findByRole("button", { name: /save changes/i });
 
     await user.click(saveButton);
 
     await waitFor(() => {
-      expect(saveButton).toBeDisabled();
+      expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
     });
+  });
+
+  it("puts the preferences back on Discard", async () => {
+    render(<NotificationPreferences />);
+
+    const [scheduleInApp] = await screen.findAllByRole("switch");
+    const before = scheduleInApp.getAttribute("aria-checked");
+    fireEvent.click(scheduleInApp);
+    fireEvent.click(await screen.findByRole("button", { name: /discard/i }));
+
+    expect(screen.getAllByRole("switch")[0]).toHaveAttribute("aria-checked", before ?? "");
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
+    expect(mockSaveNotificationPreferences).not.toHaveBeenCalled();
   });
 
   it("shows security alerts as always on and never saves a preference for them", async () => {
@@ -83,9 +94,7 @@ describe("NotificationPreferences", () => {
     expect(screen.queryByRole("switch", { name: /security alerts/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("switch")[0]);
-    const saveButton = screen.getByRole("button", { name: /save preferences/i });
-    await waitFor(() => expect(saveButton).toBeEnabled());
-    await user.click(saveButton);
+    await user.click(await screen.findByRole("button", { name: /save changes/i }));
 
     await waitFor(() => expect(mockSaveNotificationPreferences).toHaveBeenCalledOnce());
     const saved = mockSaveNotificationPreferences.mock.calls[0]?.[0] as Record<string, unknown>;
