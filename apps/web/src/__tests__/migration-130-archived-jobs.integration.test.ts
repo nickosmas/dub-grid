@@ -333,6 +333,17 @@ describe.skipIf(!reachable)("130 archived jobs stay on history", () => {
         WHERE id = $1 AND NOT ($2::bigint = ANY(focus_area_ids))`,
       [fx.adminEmpId, fx.focusAreaId],
     );
+    // The seed may already schedule the volunteer that day.
+    await db.query(`DELETE FROM public.schedule_cells WHERE emp_id = $1 AND date = $2::date`, [
+      fx.adminEmpId,
+      day(3),
+    ]);
+    await db.query(
+      `DELETE FROM public.shift_requests
+        WHERE (requester_emp_id = $1 AND requester_shift_date = $2::date)
+           OR (target_emp_id = $1 AND target_shift_date = $2::date)`,
+      [fx.adminEmpId, day(3)],
+    );
     await insertRequest({
       status: "pending_approval",
       requester: personA,
