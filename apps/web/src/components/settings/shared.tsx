@@ -68,6 +68,7 @@ export function SectionCard({
   const card = (
     <div
       className="dg-page-enter"
+      data-unsaved-bar-host=""
       style={{ ...sectionStyle, ...(saveBar === undefined ? placement : { width: "100%" }) }}
     >
       {noPadding ? children : <div style={{ padding: "20px" }}>{children}</div>}

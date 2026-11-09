@@ -15,6 +15,10 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { cn } from "@/lib/utils";
 
+/** Cards a docked bar can close off; SectionCard and other styled cards opt in. */
+const HOST_SELECTOR = ".dg-card, [data-unsaved-bar-host]";
+const DOCKED_HOST_ATTRIBUTE = "data-unsaved-bar-docked";
+
 /**
  * Where a scope's bar goes. `undefined` outside any scope, so the bar renders
  * in place; `null` while the scope's slot is mounting, so it waits.
@@ -65,7 +69,7 @@ export function UnsavedChangesBar({
 }: UnsavedChangesBarProps) {
   const slot = useContext(UnsavedChangesSlotContext);
   const barRef = useRef<HTMLDivElement>(null);
-  const [floating, setFloating] = useState(false);
+  const [placement, setPlacement] = useState<"floating" | "docked" | "resting">("resting");
 
   useEffect(() => {
     const bar = barRef.current;
@@ -75,22 +79,51 @@ export function UnsavedChangesBar({
     }
     if (!bar || !section) return;
     const scope = section;
+    let host: HTMLElement | null = null;
+    // The card the bar closes off when it docks: the last one in the section.
+    const findHost = () => {
+      const cards = Array.from(scope.querySelectorAll<HTMLElement>(HOST_SELECTOR)).filter(
+        (card) => !bar.contains(card) && !card.parentElement?.closest(HOST_SELECTOR),
+      );
+      const next = cards.at(-1) ?? null;
+      if (next !== host) {
+        host?.removeAttribute(DOCKED_HOST_ATTRIBUTE);
+        host = next;
+        if (host) {
+          const style = getComputedStyle(host);
+          bar.style.setProperty("--dg-unsaved-bar-host-radius", style.borderBottomLeftRadius);
+          bar.style.setProperty("--dg-unsaved-bar-host-shadow", style.boxShadow);
+          const paddingX = style.getPropertyValue("--dg-card-padding-x").trim();
+          bar.style.setProperty("--dg-unsaved-bar-host-px", paddingX || "20px");
+        }
+      }
+    };
     // At rest the bar is the last thing in its section, so the two share a
     // bottom edge; floating, sticky lifts the bar above it.
     let frame = 0;
     const measure = () => {
       frame = 0;
-      setFloating(scope.getBoundingClientRect().bottom - bar.getBoundingClientRect().bottom > 1);
+      if (!host?.isConnected) findHost();
+      const floating =
+        scope.getBoundingClientRect().bottom - bar.getBoundingClientRect().bottom > 1;
+      host?.toggleAttribute(DOCKED_HOST_ATTRIBUTE, !floating);
+      setPlacement(floating ? "floating" : host ? "docked" : "resting");
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
     };
+    findHost();
     measure();
     document.addEventListener("scroll", schedule, { capture: true, passive: true });
     window.addEventListener("resize", schedule);
     bar.addEventListener("animationend", schedule);
     const resizeObserver =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            findHost();
+            schedule();
+          });
     resizeObserver?.observe(scope);
     return () => {
       cancelAnimationFrame(frame);
@@ -98,6 +131,7 @@ export function UnsavedChangesBar({
       window.removeEventListener("resize", schedule);
       bar.removeEventListener("animationend", schedule);
       resizeObserver?.disconnect();
+      host?.removeAttribute(DOCKED_HOST_ATTRIBUTE);
     };
   }, [slot]);
 
@@ -108,7 +142,7 @@ export function UnsavedChangesBar({
       ref={barRef}
       role="region"
       aria-label="Unsaved changes"
-      data-floating={floating ? "" : undefined}
+      data-placement={placement}
       className="dg-unsaved-bar"
     >
       <span className="dg-unsaved-bar__label">Unsaved changes</span>
@@ -116,7 +150,7 @@ export function UnsavedChangesBar({
         {onDiscard ? (
           <Button
             type="button"
-            className="dg-btn dg-btn-secondary dg-btn-sm"
+            className="dg-btn dg-btn-secondary"
             disabled={saving}
             onClick={onDiscard}
           >
@@ -125,7 +159,7 @@ export function UnsavedChangesBar({
         ) : null}
         <Button
           type="button"
-          className="dg-btn dg-btn-primary dg-btn-sm"
+          className="dg-btn dg-btn-primary"
           disabled={saveDisabled || saving}
           onClick={onSave}
         >

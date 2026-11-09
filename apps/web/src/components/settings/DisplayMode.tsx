@@ -457,6 +457,7 @@ export default function DisplayMode({
   return (
     <UnsavedChangesScope>
       <div
+        data-unsaved-bar-host=""
         style={{
           borderRadius: "var(--dg-radius-lg)",
           border: "1px solid var(--dg-color-border)",
