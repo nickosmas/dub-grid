@@ -17,7 +17,7 @@ Under the header, a card says where their status stands, with **Change staff sta
 
 If they can't sign in yet and aren't offboarded, an invite card sits beside the status card (under it on a narrow screen) and says where their invitation stands:
 
-- **Not invited yet**, with **Invite**. Without an email on file, it asks you to add one and opens **Account**.
+- **Not invited yet**, with **Invite**. Without an email on file, it asks you to add one and opens **Account** at the email field.
 - **Invited** on a date, **hasn't joined**, with the day the invite expires, **Resend** and **Revoke**.
 - **Invite expired** on a date, with **Resend**.
 
@@ -25,7 +25,7 @@ See [Invitations](/staff/invitations).
 
 ## Tabs
 
-- **Account**: opens first, and you edit right on the page if you can manage staff. **Details** and **Work** hold their name, employment type, phone, email, internal notes, certification, schedule areas, and roles. **Unsaved changes** appears at the bottom when there is something to save, with **Discard** and **Save changes**. If you can only view staff, you see **Work** as text.
+- **Account**: opens first, and you edit right on the page if you can manage staff. **Details** and **Work** hold their name, employment type, phone, email, internal notes, certification, schedule areas, and roles. **Unsaved changes** appears at the bottom when there is something to save, with **Discard** and **Save changes** (**Save & invite** when saving also sends an invitation). If you can only view staff, you see **Work** as text.
   - **Access**: their access role, how many permissions an Admin has, their administrative teams, if any, their **Account**: whether they have one (**Linked account**, **Invitation pending**, **Invitation expired**, **Not invited**, or **No email**), and when they were last active. A Super Admin can **Change access** to set the access role and choose which permissions an Admin has (see [Roles and permissions](/reference/roles)), and **Edit** their administrative teams. For someone without a role, the access role says where their invitation stands, such as **Not invited yet**.
   - **Record**: their employee ID, when they were added and joined, their first day if one is set, when their status last changed, any planned change, and any status note.
   - **Delete account**: for a Super Admin, once someone has an account. See [Deleting their account](#deleting-their-account).
@@ -52,7 +52,8 @@ A person's email address is also the address they sign in with, so:
 - If they've lost access to that email, **Move them to a new one** under the field moves their staff record to a new address and sends an invite to it, on the web. Their current sign-in email loses access to this organization, and they join with the invite at the same access role, keeping their shifts and history. They set a new password and two-factor. Their other organizations aren't affected. Only a Super Admin can move an Admin or Super Admin.
 - Two people in your organization can't share an address or a phone number. If one belongs to someone else, the field says so and you can't save until it's changed.
 - If someone changes their sign-in email to an address another staff record here already uses, their record keeps the old address and Super Admins get an alert naming the other record. Change that record's email, and theirs updates within a day.
-- Changing the address of someone with a pending invitation asks whether to send a new invitation to the new address.
+- For someone who isn't invited yet, adding or changing their email offers **Invite to the app** under it, with their access role. It's ticked when the email is new, and **Save & invite** saves their details, then sends the invitation. With an email that hasn't changed, it stays unticked, so an ordinary save sends nothing.
+- Changing the address of someone with a pending invitation offers **Send a new invitation to this email**, ticked. Leave it ticked and the new address gets a new link while the old one stops working; untick it and their invitation is canceled when you save.
 
 ### Deleting their account
 

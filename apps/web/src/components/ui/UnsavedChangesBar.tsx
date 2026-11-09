@@ -6,6 +6,8 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 interface UnsavedChangesBarProps {
   saveDisabled?: boolean;
   saving?: boolean;
+  /** Names what saving also does, such as "Save & invite". */
+  saveLabel?: string;
   onDiscard: () => void;
   onSave: () => void;
 }
@@ -14,6 +16,7 @@ interface UnsavedChangesBarProps {
 export function UnsavedChangesBar({
   saveDisabled = false,
   saving = false,
+  saveLabel = "Save changes",
   onDiscard,
   onSave,
 }: UnsavedChangesBarProps) {
@@ -41,7 +44,7 @@ export function UnsavedChangesBar({
           disabled={saveDisabled || saving}
           onClick={onSave}
         >
-          Save changes
+          {saveLabel}
         </Button>
       </div>
     </div>
