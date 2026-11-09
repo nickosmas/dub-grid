@@ -1438,20 +1438,13 @@ const SectionBlock = memo(function SectionBlock({
     for (const sc of assignments) map.set(sc.id, sc);
     return map;
   }, [historicalAssignments, assignments]);
+  // Archived assignments included: a cell or a published snapshot that still
+  // holds one has to name it.
   const assignmentIdByPair = useMemo(
     () => createAssignmentDefinitionIdByPairMap([...historicalAssignments, ...assignments]),
     [historicalAssignments, assignments],
   );
-  // A published snapshot may refer to an assignment that has since been
-  // archived. Current scheduling must ignore it, but history must still be
-  // able to name it in a `Was …` explanation.
-  const publishedAssignmentIdByPair = useMemo(
-    () =>
-      createAssignmentDefinitionIdByPairMap([...historicalAssignments, ...assignments], {
-        includeArchived: true,
-      }),
-    [historicalAssignments, assignments],
-  );
+  const publishedAssignmentIdByPair = assignmentIdByPair;
 
   const categoryById = useMemo(() => {
     const map = new Map<number, ShiftCategory>();

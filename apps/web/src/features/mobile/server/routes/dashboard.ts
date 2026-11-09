@@ -112,8 +112,15 @@ export async function GET(req: NextRequest) {
             ...input,
             hiddenUserIds: await hiddenUserIds(),
           }),
-        fetchMobileOpenShiftContext: async (serviceClient, orgId) =>
-          fetchMobileOpenShiftContext(serviceClient, orgId, await hiddenUserIds()),
+        fetchMobileOpenShiftContext: async (serviceClient, orgId) => {
+          const context = await fetchMobileOpenShiftContext(
+            serviceClient,
+            orgId,
+            await hiddenUserIds(),
+          );
+          // Staff hours read these; archived jobs' shifts still count.
+          return { ...context, assignments: context.hoursAssignments };
+        },
         fetchMobilePublishHistoryRows: async (serviceClient, orgId, input) => {
           const [rows, hiddenStaffIds] = await Promise.all([
             fetchMobilePublishHistoryRows(serviceClient, orgId, input),

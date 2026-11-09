@@ -356,6 +356,7 @@ type NamedRow = {
   name?: string | null;
   label?: string | null;
   abbr?: string | null;
+  archived_at?: string | null;
 };
 
 type FocusAreaRow = NamedRow & {
@@ -842,7 +843,9 @@ export function buildOperationsReportFilterOptions(
       label: getNamedValue(focusArea),
     })),
     shiftCategories: shiftFilterOptions(source),
-    jobs: source.jobs.map((job) => ({ id: String(job.id), label: getNamedValue(job) })),
+    jobs: source.jobs
+      .filter((job) => !job.archived_at)
+      .map((job) => ({ id: String(job.id), label: getNamedValue(job) })),
     indicators: source.indicatorTypes.map((indicator) => ({
       id: String(indicator.id),
       label: indicator.name,
@@ -1193,6 +1196,8 @@ export function buildOperationsReportPayload(
     }))
     .sort((left, right) => left.employeeName.localeCompare(right.employeeName));
 
+  // An archived job takes no new work, so nothing is required of it.
+  const archivedJobIds = new Set(source.jobs.filter((job) => job.archived_at).map((job) => job.id));
   const coverage: CoverageReportRow[] = [];
   const focusAreaRank = new Map([...focusAreaById.keys()].map((id, index) => [id, index]));
   const requirementsInFocusAreaOrder = [...source.coverageRequirements].sort(
@@ -1202,6 +1207,9 @@ export function buildOperationsReportPayload(
   );
   for (const requirement of requirementsInFocusAreaOrder) {
     if (focusAreaIdSet.size > 0 && !focusAreaIdSet.has(requirement.focus_area_id)) {
+      continue;
+    }
+    if (requirement.job_id != null && archivedJobIds.has(requirement.job_id)) {
       continue;
     }
 
@@ -2442,12 +2450,13 @@ function fetchFilterOptionSource(
         .order("id", { ascending: true })
         .range(from, to),
     ),
+    // Archived jobs too, so shifts that still hold one are named; the Job
+    // filter offers only active ones.
     jobs: fetchTableRows<NamedRow>((from, to) =>
       serviceClient
         .from("jobs")
-        .select("id, name")
+        .select("id, name, archived_at")
         .eq("org_id", orgId)
-        .is("archived_at", null)
         .order("id", { ascending: true })
         .range(from, to),
     ),

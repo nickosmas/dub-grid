@@ -100,6 +100,12 @@ describe("a shift without a job, while they're off", () => {
   });
 });
 
+describe("an archived job", () => {
+  it("names why a copied day was skipped", () => {
+    expect(getSkipReasonLabel("archived_job")).toBe("Job is archived");
+  });
+});
+
 describe("formatImportPreviousSkipDescription", () => {
   it("returns an empty string when nothing was skipped", () => {
     const outcomes = [row({ outcome: "imported" })];

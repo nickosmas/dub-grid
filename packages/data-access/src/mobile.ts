@@ -753,12 +753,9 @@ export async function fetchMobileAssignmentSeedRows(
         .eq("org_id", orgId)
         .is("archived_at", null)
         .order("sort_order"),
-      serviceClient
-        .from("jobs")
-        .select(JOB_COLS)
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .order("sort_order"),
+      // Archived jobs too: cells that already hold one still show it. Callers
+      // offering new work leave them out.
+      serviceClient.from("jobs").select(JOB_COLS).eq("org_id", orgId).order("sort_order"),
       serviceClient
         .from("organization_roles")
         .select(ORG_ROLE_COLS)
@@ -936,11 +933,8 @@ export async function fetchMobileJobNameRows(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileJobNameRow[]> {
-  const { data, error } = await serviceClient
-    .from("jobs")
-    .select("id, name")
-    .eq("org_id", orgId)
-    .is("archived_at", null);
+  // Archived jobs too, so a cell that still holds one is named.
+  const { data, error } = await serviceClient.from("jobs").select("id, name").eq("org_id", orgId);
 
   if (error) throw error;
 

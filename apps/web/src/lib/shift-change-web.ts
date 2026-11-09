@@ -102,7 +102,8 @@ export function buildShiftChangeResolvers(data: ShiftChangeOrgData): ShiftChange
         ...defaults,
         shiftName,
         jobName: job.name,
-        shiftArchived: archived,
+        // An assignment is archived with its job; the shift is marked only for itself.
+        shiftArchived: shift ? Boolean(shift.archivedAt) : archived,
         jobArchived: Boolean(job.archivedAt),
       };
     },
