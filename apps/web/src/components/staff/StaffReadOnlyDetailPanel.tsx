@@ -44,7 +44,8 @@ interface StaffReadOnlyDetailPanelProps {
 }
 
 function formatList(ids: number[], map: Map<number, string>): string {
-  const names = ids.map((id) => map.get(id)).filter((v): v is string => Boolean(v));
+  // The map is built from the list in Settings order, so names follow it.
+  const names = [...map].filter(([id]) => ids.includes(id)).map(([, name]) => name);
   return names.length > 0 ? names.join(", ") : "-";
 }
 

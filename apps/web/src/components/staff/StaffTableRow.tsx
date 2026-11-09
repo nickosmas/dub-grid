@@ -346,9 +346,7 @@ function StaffRowCells({
       >
         <div className="flex gap-1">
           {(() => {
-            const resolved = emp.focusAreaIds
-              .map((faId) => focusAreas.find((f) => f.id === faId))
-              .filter((fa): fa is FocusArea => !!fa);
+            const resolved = focusAreas.filter((fa) => emp.focusAreaIds.includes(fa.id));
             const visible = resolved.slice(0, 2);
             const overflow = resolved.slice(2);
             return (

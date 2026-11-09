@@ -3,6 +3,7 @@ import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import Link from "next/link";
 import { formatDateKey } from "@/lib/utils";
 import type { OpenShift } from "@/lib/dashboard-stats";
+import type { FocusArea } from "@/types";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import Modal from "@/components/Modal";
 
@@ -46,6 +47,8 @@ interface ExpandedOpenShiftsProps {
   openShifts: OpenShift[];
   publishedWindowState?: PublishedWindowState;
   focusAreaLabel?: string;
+  /** Every focus area, in Settings order, so the filter lists them that way. */
+  focusAreas: FocusArea[];
   onClose: () => void;
 }
 
@@ -53,6 +56,7 @@ export default function ExpandedOpenShifts({
   openShifts,
   publishedWindowState = "published",
   focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
+  focusAreas,
   onClose,
 }: ExpandedOpenShiftsProps) {
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
@@ -69,10 +73,11 @@ export default function ExpandedOpenShifts({
     return list;
   }, [openShifts, urgencyFilter, focusAreaFilter]);
 
-  const focusAreaNames = useMemo(
-    () => [...new Set(openShifts.map((s) => s.focusAreaName))].sort(),
-    [openShifts],
-  );
+  const focusAreaNames = useMemo(() => {
+    const shown = new Set(openShifts.map((s) => s.focusAreaName));
+    const inOrder = focusAreas.map((fa) => fa.name).filter((name) => shown.has(name));
+    return [...new Set([...inOrder, ...shown])];
+  }, [focusAreas, openShifts]);
   const filteredSlotCount = filtered.reduce((total, shift) => total + shift.needed, 0);
   const openShiftFilterCount = [urgencyFilter !== "all", focusAreaFilter !== "all"].filter(
     Boolean,

@@ -11,6 +11,7 @@ import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { buildAssignableShiftDisplayMap } from "@/lib/assignable-shifts";
 import { fetchAccountOrgContext } from "@/features/account/client";
 import { useOrgRealtimeInvalidation } from "./useOrgRealtimeInvalidation";
+import { orderFocusAreasByDepartment } from "@dubgrid/domain";
 import {
   getOrganizationBootstrapQueryPolicy,
   isRetryableOrganizationBootstrapError,
@@ -341,7 +342,6 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     }
   }, [bootstrap, effectiveOrgId, includeAssignmentDefinitionCompatibility, queryClient]);
 
-  const focusAreas = useMemo(() => bootstrap?.focusAreas ?? [], [bootstrap?.focusAreas]);
   const allAssignmentDefinitions = useMemo(
     () => bootstrap?.allAssignmentDefinitions ?? [],
     [bootstrap?.allAssignmentDefinitions],
@@ -365,6 +365,12 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   );
   const orgRoles = useMemo(() => bootstrap?.orgRoles ?? [], [bootstrap?.orgRoles]);
   const departments = useMemo(() => bootstrap?.departments ?? [], [bootstrap?.departments]);
+  // A focus area's stored order only counts inside its department, so every
+  // list reads them grouped by department, as Settings shows them.
+  const focusAreas = useMemo(
+    () => orderFocusAreasByDepartment(bootstrap?.focusAreas ?? [], departments),
+    [bootstrap?.focusAreas, departments],
+  );
   const coverageRequirements = useMemo(
     () => bootstrap?.coverageRequirements ?? [],
     [bootstrap?.coverageRequirements],

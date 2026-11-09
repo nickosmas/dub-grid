@@ -2636,9 +2636,10 @@ function sameIds(left: number[], right: number[]): boolean {
   return sortedLeft.every((value, index) => value === sortedRight[index]);
 }
 
+/** Names in the map's order, which is the order Settings lists them. */
 function formatIdList(ids: number[], map: Map<number, string>): string {
   return formatNameList(
-    ids.map((id) => map.get(id)).filter((value): value is string => Boolean(value)),
+    [...map].filter(([id, name]) => ids.includes(id) && Boolean(name)).map(([, name]) => name),
   );
 }
 
