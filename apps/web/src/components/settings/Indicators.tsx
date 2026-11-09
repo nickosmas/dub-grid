@@ -367,6 +367,7 @@ function IndicatorRow({
             {canEdit && (
               <EditorActionRow
                 className="dg-footer-bar dg-footer-bar--in-box"
+                floating
                 destructiveAction={
                   !indicator.isNew ? (
                     <Button

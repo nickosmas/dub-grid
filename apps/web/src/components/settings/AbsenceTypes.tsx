@@ -430,6 +430,7 @@ function AbsenceTypeRow({
 
           <EditorActionRow
             className="dg-footer-bar dg-footer-bar--in-box"
+            floating
             destructiveAction={
               canEdit && !absenceType.isNew ? (
                 <Button

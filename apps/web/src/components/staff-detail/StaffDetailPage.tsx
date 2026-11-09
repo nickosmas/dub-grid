@@ -1512,13 +1512,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                           canMoveToNewEmail ? () => setMovingToNewEmail(true) : undefined
                         }
                       />
-                      {detailsDirty ? (
-                        <UnsavedChangesBar
-                          saveDisabled={detailsSaveBlocked}
-                          onDiscard={() => detailsEditorRef.current?.requestDismiss()}
-                          onSave={() => void detailsEditorRef.current?.save()}
-                        />
-                      ) : null}
+                      <UnsavedChangesBar
+                        dirty={detailsDirty}
+                        saveDisabled={detailsSaveBlocked}
+                        onDiscard={() => detailsEditorRef.current?.requestDismiss()}
+                        onSave={() => void detailsEditorRef.current?.save()}
+                      />
                     </UnsavedChangesScope>
                   ) : (
                     <WorkCard

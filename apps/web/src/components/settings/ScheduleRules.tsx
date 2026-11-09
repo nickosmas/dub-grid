@@ -190,13 +190,12 @@ export default function ScheduleRules({
   return (
     <SectionCard
       saveBar={
-        isModified ? (
-          <UnsavedChangesBar
-            saving={saving}
-            onDiscard={hasEdits ? resetForm : undefined}
-            onSave={() => setConfirmOpen(true)}
-          />
-        ) : null
+        <UnsavedChangesBar
+          dirty={isModified}
+          saving={saving}
+          onDiscard={hasEdits ? resetForm : undefined}
+          onSave={() => setConfirmOpen(true)}
+        />
       }
     >
       <div style={{ display: "flex", flexDirection: "column" }}>

@@ -723,6 +723,7 @@ function ShiftCategoriesSettings({
         {/* Actions */}
         <EditorActionRow
           className="dg-footer-bar dg-footer-bar--in-box"
+          floating
           destructiveAction={
             canManageScheduleDefinitions && !cat.isNew ? (
               <Button

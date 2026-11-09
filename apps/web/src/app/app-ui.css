@@ -1787,37 +1787,73 @@ button.dg-cc-sg-main {
   border-top-color: var(--dg-color-border);
   background: transparent;
 }
-/* Unsaved changes: sticky at the end of the section it saves (UnsavedChangesScope).
-   Floating, it is a bar with one inset on every side and corners concentric
-   with its buttons'. At the section's end it docks: it overlaps the last card's
-   bottom border and becomes that card's footer, as `.dg-footer-bar` draws one.
-   Only paint changes between the two, never its size or place, so docking
-   can't move the page. */
-.dg-unsaved-bar {
-  --dg-unsaved-bar-inset: 12px;
+/* An editor box's footer (EditorActionRow `floating`): sticky within the box,
+   so while the box is taller than the screen it floats at the bottom of the
+   screen, and it rests as the box's footer at its end. Floating keeps the
+   footer's padding, top rule and the box's own fill, and only rounds its
+   corners to the box's and lifts on a shadow, so it docks seamlessly. */
+.dg-floating-footer {
   position: sticky;
   bottom: 16px;
   z-index: 20;
+  transition:
+    box-shadow 160ms ease,
+    border-radius 160ms ease;
+}
+/* A box that clips its overflow would become the footer's scroll area, so it
+   could never float; `clip` draws the same edges without being one. Inline
+   `overflow: hidden` is matched too, since the settings rows set it that way. */
+.dg-card:has(.dg-floating-footer),
+[style*="overflow: hidden"]:has(.dg-floating-footer) {
+  overflow: clip !important;
+}
+.dg-floating-footer[data-placement="floating"] {
+  border-radius: var(--dg-floating-footer-radius, var(--dg-radius-md));
+  background: var(--dg-floating-footer-bg, var(--dg-color-surface-footer));
+  box-shadow:
+    0 0 0 1px var(--dg-color-border),
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.dark .dg-floating-footer[data-placement="floating"] {
+  box-shadow:
+    0 0 0 1px var(--dg-color-border),
+    0 8px 24px rgba(0, 0, 0, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+/* The save footer of a section that edits in place (UnsavedChangesScope). It is
+   drawn as the last card's footer, as `.dg-footer-bar` draws one, overlapping
+   the card's bottom border. Floating it keeps that fill, padding and size and
+   only rounds its top corners and lifts on a shadow, so docking is seamless and
+   never moves the page. */
+.dg-unsaved-bar {
+  --dg-unsaved-bar-radius: var(--dg-unsaved-bar-host-radius, var(--dg-radius-md));
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   /* Pulls up through the scope's 16px gap onto the card's bottom border. */
   margin-top: -17px;
-  padding: var(--dg-unsaved-bar-inset);
+  padding: 12px var(--dg-unsaved-bar-host-px, 20px);
   border: 1px solid var(--dg-color-border);
-  border-radius: calc(var(--dg-btn-radius) + var(--dg-unsaved-bar-inset) + 1px);
-  background: var(--dg-color-surface);
-  box-shadow: none;
+  border-top-color: var(--dg-color-border-light);
+  border-radius: 0 0 var(--dg-unsaved-bar-radius) var(--dg-unsaved-bar-radius);
+  background: var(--dg-color-surface-footer);
+  box-shadow: var(--dg-unsaved-bar-host-shadow, none);
   transition:
     box-shadow 160ms ease,
     border-color 160ms ease,
-    border-radius 160ms ease,
-    background-color 160ms ease,
-    padding 160ms ease;
-  animation: dg-unsaved-bar-in 180ms ease-out;
+    border-radius 160ms ease;
+}
+/* Only while one of its buttons can be pressed. */
+.dg-unsaved-bar[data-sticky] {
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
 }
 .dg-unsaved-bar[data-placement="floating"] {
-  border-color: var(--dg-color-border-strong);
+  border-top-color: var(--dg-color-border);
+  border-radius: var(--dg-unsaved-bar-radius);
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.12),
     0 1px 3px rgba(0, 0, 0, 0.08);
@@ -1826,14 +1862,6 @@ button.dg-cc-sg-main {
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.55),
     0 1px 3px rgba(0, 0, 0, 0.4);
-}
-.dg-unsaved-bar[data-placement="docked"] {
-  padding-inline: var(--dg-unsaved-bar-host-px, 20px);
-  border-top-color: var(--dg-color-border-light);
-  border-radius: 0 0 var(--dg-unsaved-bar-host-radius, var(--dg-radius-md))
-    var(--dg-unsaved-bar-host-radius, var(--dg-radius-md));
-  background: var(--dg-color-surface-footer);
-  box-shadow: var(--dg-unsaved-bar-host-shadow, none);
 }
 /* The card a docked bar closes off hands its bottom edge to the bar.
    `!important` because SectionCard draws its edges inline. */
@@ -1845,7 +1873,7 @@ button.dg-cc-sg-main {
 .dg-unsaved-bar__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--dg-unsaved-bar-inset);
+  gap: 8px;
 }
 .dg-unsaved-bar__actions > * {
   min-width: 0;
@@ -1856,18 +1884,6 @@ button.dg-cc-sg-main {
 @media (max-width: 479px) {
   .dg-unsaved-bar__actions {
     flex: 1 1 100%;
-  }
-}
-@keyframes dg-unsaved-bar-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dg-unsaved-bar {
-    animation: none;
-    transition: none;
   }
 }
 /* The modal's footer is that strip, pulled out through the side padding so the

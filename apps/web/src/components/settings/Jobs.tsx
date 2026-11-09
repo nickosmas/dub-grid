@@ -2556,6 +2556,7 @@ function JobRow({
 
           <EditorActionRow
             className="dg-footer-bar dg-footer-bar--in-box"
+            floating
             destructiveAction={
               canManageScheduleDefinitions && !job.isNew && !isLockedIdentityJob ? (
                 <Button

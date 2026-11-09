@@ -188,15 +188,16 @@ export default function OrganizationGeneral({
   return (
     <SectionCard
       saveBar={
-        !isWizardMode && isModified ? (
+        isWizardMode ? null : (
           <UnsavedChangesBar
+            dirty={isModified}
             saveLabel="Review & Save"
             saving={saving}
             saveDisabled={hasValidationErrors}
             onDiscard={handleDiscard}
             onSave={handleReview}
           />
-        ) : null
+        )
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
