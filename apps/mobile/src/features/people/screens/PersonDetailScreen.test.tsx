@@ -1027,7 +1027,7 @@ describe("PersonDetailScreen", () => {
     // away, which the dedicated test below covers.
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(screen.queryByRole("menu", { name: "Discard" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
     expect(screen.queryByText("Bench")).not.toBeInTheDocument();
   });
@@ -1797,7 +1797,7 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByText("Change when Mina Diaz's suspension ends?")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^Ends, / }));
       fireEvent.click(screen.getByRole("button", { name: "No end date" }));
-      confirm("Save changes");
+      confirm("Save");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
         action: "setSuspendedUntil",
@@ -1823,7 +1823,7 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByText("Clear it to suspend them today.")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^Ends, / }));
       choose(day(12));
-      confirm("Save changes");
+      confirm("Save");
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
         action: "setPlannedChange",
         startDate: day(5),
@@ -1924,7 +1924,7 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByText("Change Mina Diaz's last day?")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^Last day, / }));
       choose(day(6));
-      confirm("Save changes");
+      confirm("Save");
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
         action: "setPlannedChange",
         copyAction: "setPlannedChange",
@@ -2041,7 +2041,7 @@ describe("PersonDetailScreen", () => {
       });
     });
 
-    it("changes an Away person's return date from the list, as Save changes", () => {
+    it("changes an Away person's return date from the list, as Save", () => {
       const mutate = renderWithStatusMutation({ status: "inactive", awayUntil: day(1) });
 
       openStatus();
@@ -2049,10 +2049,10 @@ describe("PersonDetailScreen", () => {
       expect(screen.queryByRole("button", { name: /^Return date, / })).not.toBeInTheDocument();
       pick(/^Edit time away/);
       expect(screen.getByText("Change Mina Diaz's time away?")).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: "Save changes" }).at(-1)).toBeDisabled();
+      expect(screen.getAllByRole("button", { name: "Save" }).at(-1)).toBeDisabled();
       fireEvent.click(screen.getByRole("button", { name: /^Return date, / }));
       choose(day(2));
-      confirm("Save changes");
+      confirm("Save");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
         action: "setReturnDate",
@@ -2071,7 +2071,7 @@ describe("PersonDetailScreen", () => {
       openStatus();
       pick(/^Edit time away/);
       fireEvent.click(screen.getByRole("radio", { name: "Sick" }));
-      confirm("Save changes");
+      confirm("Save");
 
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
         action: "setReturnDate",
@@ -2148,7 +2148,7 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByText("Change Mina Diaz's planned return?")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^Starts, / }));
       choose(day(7));
-      confirm("Save changes");
+      confirm("Save");
       expect(mutate.mock.calls[0]?.[0]).toMatchObject({
         action: "setPlannedChange",
         copyAction: "setPlannedChange",
@@ -2228,7 +2228,7 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(edit);
 
       // Editing, the bar holds Cancel and Save in Edit's place.
-      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Call" })).not.toBeInTheDocument();
@@ -2689,7 +2689,7 @@ describe("PersonDetailScreen", () => {
           "Saving now removes them from the schedule. They'll stay on their administrative teams.",
         ),
       ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
     });
 
     // The notice above the chips already says what saving does, so saving goes
@@ -2699,7 +2699,7 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
       fireEvent.click(screen.getByRole("checkbox", { name: "Skilled Nursing" }));
-      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
       expect(
@@ -2738,7 +2738,7 @@ describe("PersonDetailScreen", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
       fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@dubgrid.test" } });
-      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
       confirmDialog("Save");
 
       await waitFor(() =>
@@ -2858,7 +2858,7 @@ describe("PersonDetailScreen", () => {
           return { success: true, person: { ...person, focusAreaIds: [2], version: 8 } };
         },
       );
-      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
       expect(
         await screen.findByText(
@@ -2881,7 +2881,7 @@ describe("PersonDetailScreen", () => {
     it("keeps the form open, unsaved, when the question is closed", async () => {
       renderEditing();
       updateMobilePerson.mockRejectedValue(refusal);
-      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
       await screen.findByText(/upcoming shifts in East Wing\?$/);
       fireEvent.click(screen.getAllByRole("button", { name: "Close" }).at(-1)!);
@@ -2891,7 +2891,7 @@ describe("PersonDetailScreen", () => {
       );
       expect(updateMobilePerson).toHaveBeenCalledTimes(1);
       expect(pushToast).not.toHaveBeenCalled();
-      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
     });
   });
 });

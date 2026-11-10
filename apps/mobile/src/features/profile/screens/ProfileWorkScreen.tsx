@@ -540,7 +540,7 @@ export default function ProfileWorkScreen() {
           <Button
             compact
             disabled={saveMutation.isPending || !hasChanges || hasValidationErrors}
-            label={isNameRequest ? "Send request" : "Save changes"}
+            label={isNameRequest ? "Send request" : "Save"}
             loading={saveMutation.isPending}
             onPress={handleSave}
           />
@@ -557,7 +557,7 @@ export default function ProfileWorkScreen() {
       <EditBarActions
         save={{
           label: isNameRequest ? "Send" : "Save",
-          accessibilityLabel: isNameRequest ? "Send request" : "Save changes",
+          accessibilityLabel: isNameRequest ? "Send request" : "Save",
           disabled:
             !draft || !profile || saveMutation.isPending || !hasChanges || hasValidationErrors,
           loading: saveMutation.isPending,

@@ -19,25 +19,25 @@ describe("UnsavedChangesBar", () => {
     renderBar({ dirty: false, onDiscard: vi.fn() });
 
     expect(footer()).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
     expect(region()).not.toBeInTheDocument();
     expect(footer()).not.toHaveAttribute("data-sticky");
   });
 
-  it("floats with Discard and Save changes once something changed", () => {
+  it("floats with Discard and Save once something changed", () => {
     renderBar({ onDiscard: vi.fn() });
 
     expect(region()).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Discard" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
     expect(footer()).toHaveAttribute("data-sticky");
   });
 
   it("still floats while Save is blocked but Discard can be pressed", () => {
     renderBar({ onDiscard: vi.fn(), saveDisabled: true });
 
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     expect(footer()).toHaveAttribute("data-sticky");
   });
 

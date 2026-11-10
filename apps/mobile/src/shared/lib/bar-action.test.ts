@@ -3,7 +3,7 @@ import { barActionIsCheckmark } from "./bar-action";
 
 describe("barActionIsCheckmark", () => {
   it("draws a plain save as a checkmark", () => {
-    for (const label of ["Save", "Save changes", "Save access", "Done", "Update", "Confirm"]) {
+    for (const label of ["Save", "Save", "Save access", "Done", "Update", "Confirm"]) {
       expect(barActionIsCheckmark(label)).toBe(true);
     }
   });

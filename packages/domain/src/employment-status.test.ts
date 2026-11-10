@@ -673,7 +673,7 @@ describe("planned away (51g1)", () => {
       startDate: "2026-11-12",
       returnDate: "2027-01-04",
     });
-    expect(edit.label).toBe("Save changes");
+    expect(edit.label).toBe("Save");
     expect(edit.message).toBe("Away from Thu, Nov 12, back Mon, Jan 4.");
     const cancel = describeStatusAction("cancelPlannedChange", "Ana Diaz", {
       absenceName: "Vacation",
@@ -821,7 +821,7 @@ describe("last day (51g2)", () => {
       lastDay: "2026-11-12",
     });
     expect(edit).toMatchObject({
-      label: "Save changes",
+      label: "Save",
       title: "Change Ana's last day?",
       message: "They stay Active through Thu, Nov 12, their last day.",
       done: "Last day changed",
@@ -1031,7 +1031,7 @@ describe("suspended until (51g3)", () => {
         returnDate: null,
       }),
     ).toMatchObject({
-      label: "Save changes",
+      label: "Save",
       title: "Change Ana's planned suspension?",
       message: "Suspended from Thu, Nov 12.",
       done: "Planned suspension changed",
@@ -1396,7 +1396,7 @@ describe("a planned return (51l)", () => {
         startDate: "2026-11-12",
       }),
     ).toMatchObject({
-      label: "Save changes",
+      label: "Save",
       title: "Change Ana Torres's planned return?",
       message: "They stay Offboarded until Thu, Nov 12.",
       done: "Planned return changed",

@@ -218,7 +218,7 @@ describe("EditEmployeePanel", () => {
       await user.type(screen.getByDisplayValue("Alice"), "a");
       await user.click(screen.getByRole("button", { name: "Mentor" }));
 
-      const [personal, work] = screen.getAllByRole("button", { name: "Save changes" });
+      const [personal, work] = screen.getAllByRole("button", { name: "Save" });
       await user.click(personal);
       expect(onSave).toHaveBeenCalledOnce();
       expect(onSave.mock.calls[0][0]).toMatchObject({ firstName: "Alicea", roleIds: [] });
@@ -229,7 +229,7 @@ describe("EditEmployeePanel", () => {
           {...props}
         />,
       );
-      const [personalAfter, workAfter] = screen.getAllByRole("button", { name: "Save changes" });
+      const [personalAfter, workAfter] = screen.getAllByRole("button", { name: "Save" });
       expect(personalAfter).toBeDisabled();
       expect(workAfter).toBeEnabled();
 

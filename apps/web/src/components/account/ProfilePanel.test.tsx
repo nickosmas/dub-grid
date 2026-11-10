@@ -160,8 +160,8 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof ProfilePanel
   return { ...render(<ProfilePanel {...props} />), props };
 }
 
-// Personal details comes first, so its footer holds the first Save changes.
-const personalSave = () => screen.getAllByRole("button", { name: "Save changes" })[0];
+// Personal details comes first, so its footer holds the first Save.
+const personalSave = () => screen.getAllByRole("button", { name: "Save" })[0];
 
 describe("ProfilePanel", () => {
   beforeEach(() => {
@@ -326,7 +326,7 @@ describe("ProfilePanel", () => {
     renderPanel();
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Draft" } });
     fireEvent.click(screen.getByRole("button", { name: "Change work details" }));
-    const [personal, work] = screen.getAllByRole("button", { name: "Save changes" });
+    const [personal, work] = screen.getAllByRole("button", { name: "Save" });
     await waitFor(() => expect(work).toBeEnabled());
     fireEvent.click(work);
 
@@ -355,7 +355,7 @@ describe("ProfilePanel", () => {
       firstName: "Draft",
       roleIds: [],
     });
-    const work = screen.getAllByRole("button", { name: "Save changes" })[1];
+    const work = screen.getAllByRole("button", { name: "Save" })[1];
     expect(work).toBeEnabled();
   });
 
