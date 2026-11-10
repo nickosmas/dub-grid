@@ -140,9 +140,9 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     let saved = false;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(
+      saved = await result.current.handleSaveEmployeeAndInvite(
         updated,
-        OLD_INVITATION,
+        { kind: "reinvite", replacing: OLD_INVITATION },
         runStepUp,
       );
     });
@@ -164,6 +164,35 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     expect(result.current.employees.find((e) => e.id === "emp-1")?.email).toBe("new@example.com");
   });
 
+  it("invites someone not yet invited with the role and permissions chosen", async () => {
+    const result = await renderReady();
+    const updated = { ...EMPLOYEE, email: "new@example.com" };
+    let saved = false;
+
+    await act(async () => {
+      saved = await result.current.handleSaveEmployeeAndInvite(
+        updated,
+        { kind: "invite", role: "admin", adminPermissions: { canEditShifts: true } as never },
+        runStepUp,
+      );
+    });
+
+    expect(saved).toBe(true);
+    expect(mockCreateOrganizationInvitation).toHaveBeenCalledWith(
+      {
+        email: "new@example.com",
+        orgId: "org-1",
+        employeeId: "emp-1",
+        role: "admin",
+        adminPermissions: { canEditShifts: true },
+      },
+      "step-up-token",
+    );
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      "Employee saved. An invitation was sent to new@example.com.",
+    );
+  });
+
   it("keeps the saved employee and sends nothing when step-up is cancelled", async () => {
     runStepUp.mockResolvedValueOnce(false);
     const result = await renderReady();
@@ -171,9 +200,9 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     let saved = false;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(
+      saved = await result.current.handleSaveEmployeeAndInvite(
         updated,
-        OLD_INVITATION,
+        { kind: "reinvite", replacing: OLD_INVITATION },
         runStepUp,
       );
     });
@@ -183,7 +212,7 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     expect(mockToastSuccess).not.toHaveBeenCalled();
     expect(mockToastError).not.toHaveBeenCalled();
     expect(mockToastInfo).toHaveBeenCalledTimes(1);
-    expect(mockToastInfo).toHaveBeenCalledWith("Employee saved. No new invitation was sent.");
+    expect(mockToastInfo).toHaveBeenCalledWith("Employee saved. No invitation was sent.");
   });
 
   it("shows a distinct error but keeps the saved employee when the identity save succeeds but sending the new invite fails", async () => {
@@ -196,9 +225,9 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     let saved = false;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(
+      saved = await result.current.handleSaveEmployeeAndInvite(
         updated,
-        OLD_INVITATION,
+        { kind: "reinvite", replacing: OLD_INVITATION },
         runStepUp,
       );
     });
@@ -206,7 +235,7 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     expect(saved).toBe(true);
     expect(mockUpdateEmployee).toHaveBeenCalled();
     expect(mockToastError).toHaveBeenCalledWith(
-      "Employee saved, but we couldn't send the new invitation. Use Send invitation to try again.",
+      "Employee saved, but we couldn't send the invitation. Use Invite to try again.",
     );
     expect(mockToastSuccess).not.toHaveBeenCalled();
     // The identity save already succeeded — must not roll back just because
@@ -221,9 +250,9 @@ describe("useEmployees — handleSaveEmployeeWithReinvite", () => {
     let saved = true;
 
     await act(async () => {
-      saved = await result.current.handleSaveEmployeeWithReinvite(
+      saved = await result.current.handleSaveEmployeeAndInvite(
         updated,
-        OLD_INVITATION,
+        { kind: "reinvite", replacing: OLD_INVITATION },
         runStepUp,
       );
     });

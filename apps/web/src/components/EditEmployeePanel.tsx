@@ -53,7 +53,6 @@ import { upcomingFirstDay, DEFAULT_ORGANIZATION_LABELS, singularLabelNoun } from
 import { formatDateKey } from "@/lib/utils";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { hasSavedScheduleAssignment } from "@/components/staff/capability-state";
-import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   checkEmployeeEmailConflict,
   checkEmployeePhoneConflict,
@@ -109,20 +108,9 @@ export interface EditEmployeePanelProps {
   onMoveToNewEmail?: () => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onResend?: (invitationId: string) => Promise<boolean> | boolean | void;
-  /** Called instead of `onSave` when the admin confirms changing the email
-   *  while a pending invitation exists — saves the identity change (which
-   *  auto-revokes the old invitation) and sends a fresh one to the new
-   *  address, reusing the old invitation's role/departments. Required to
-   *  offer the "Save & send" choice; without it, a changed email with a
-   *  pending invitation present falls back to a plain save. */
-  onSaveWithReinvite?: (
-    updatedEmployee: Employee,
-    oldInvitation: Invitation,
-    runStepUp: StepUpRun,
-  ) => boolean | void | Promise<boolean | void>;
-  /** Offers an invite beside the email and replaces the Save & send
-   *  confirmation (the staff page). Saving with the box ticked calls
-   *  `onSaveAndInvite` instead of `onSave`. */
+  /** Offers an invite beside the email (the staff page and the People
+   *  slideover). Saving with the box ticked calls `onSaveAndInvite` instead
+   *  of `onSave`. */
   inviteOnSave?: {
     canInvite: boolean;
     roleOptions: { value: AssignableOrganizationRole; label: string }[];
@@ -209,7 +197,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onMoveToNewEmail,
       onRevoke,
       onResend,
-      onSaveWithReinvite,
       inviteOnSave,
       onSaveLabelChange,
       hideActions,
@@ -228,7 +215,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     // Set while the "changing this email will revoke the pending invitation"
     // confirm dialog is open — holds the already-validated employee payload
     // handleSave built, so onConfirm/onCancel don't need to redo validation.
-    const [pendingReinviteSave, setPendingReinviteSave] = useState<Employee | null>(null);
     const [form, setForm] = useState<EditForm>(() => buildEditForm(employee));
     const [hasStarted, setHasStarted] = useState<boolean | null>(null);
 
@@ -499,17 +485,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         firstDay: form.firstDay || null,
       };
 
-      // Changing the email while a pending invitation exists will silently
-      // revoke it (trg_revoke_invitation_on_email_change). Never let that
-      // happen as a side effect of a plain save — gate it behind an explicit
-      // choice instead of saving right away.
-      // With the invite option, the checkbox already made that choice.
-      const emailChanged = (nextEmployee.email || "") !== (employee.email || "");
-      if (emailChanged && pendingInvitation && onSaveWithReinvite && !inviteOnSave) {
-        setPendingReinviteSave(nextEmployee);
-        return false;
-      }
-
       const invite: InviteOnSaveChoice | null =
         inviteOnSave && inviteOption && sendingInvite
           ? inviteOption.kind === "reinvite" && pendingInvitation
@@ -537,7 +512,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       employee,
       onSave,
       onSaveCompleted,
-      onSaveWithReinvite,
       pendingInvitation,
       stepUpRef,
       validateStaffEmail,
@@ -1271,32 +1245,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           )}
         </div>
         {stepUp.dialog}
-        {pendingReinviteSave && pendingInvitation && onSaveWithReinvite && !stepUp.dialog && (
-          <ConfirmDialog
-            title={`Send a new invitation to ${pendingReinviteSave.email}?`}
-            message={
-              <>
-                The new email is saved, and the pending invitation to{" "}
-                <strong>{pendingInvitation.email}</strong> is revoked.
-              </>
-            }
-            confirmLabel="Save & send"
-            cancelLabel="Cancel"
-            variant="warning"
-            onCancel={() => setPendingReinviteSave(null)}
-            onConfirm={async () => {
-              const saved =
-                (await onSaveWithReinvite(
-                  pendingReinviteSave,
-                  pendingInvitation,
-                  stepUpRef.current.run,
-                )) !== false;
-              if (!saved) return;
-              setPendingReinviteSave(null);
-              onSaveCompleted?.();
-            }}
-          />
-        )}
       </>
     );
   },

@@ -66,6 +66,7 @@ import {
   EmployeeStatusConflictError,
 } from "@/features/employees/client";
 import {
+  invitationRequestForSave,
   inviteRoleOptions,
   type InviteOnSaveChoice,
 } from "@/features/employees/client/invite-on-save";
@@ -513,30 +514,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
       try {
         const completed = await runStepUp((accessToken) =>
-          createOrganizationInvitation(
-            invite.kind === "reinvite"
-              ? {
-                  email: saved.email,
-                  role: invite.replacing.roleToAssign,
-                  orgId,
-                  employeeId: saved.id,
-                  firstName: saved.firstName,
-                  lastName: saved.lastName,
-                  phone: saved.phone || undefined,
-                  departmentIds: invite.replacing.departmentIds,
-                  deptAdminIds: invite.replacing.deptAdminIds,
-                }
-              : {
-                  email: saved.email,
-                  role: invite.role,
-                  orgId,
-                  employeeId: saved.id,
-                  ...(invite.adminPermissions
-                    ? { adminPermissions: { ...invite.adminPermissions } }
-                    : {}),
-                },
-            accessToken,
-          ),
+          createOrganizationInvitation(invitationRequestForSave(saved, invite, orgId), accessToken),
         );
         if (!completed) {
           toast.info("Employee saved. No invitation was sent.");

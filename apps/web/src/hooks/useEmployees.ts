@@ -24,6 +24,10 @@ import {
   type UpdateEmployeeOptions,
 } from "@/features/employees/client";
 import { createOrganizationInvitation } from "@/features/organization/client";
+import {
+  invitationRequestForSave,
+  type InviteOnSaveChoice,
+} from "@/features/employees/client/invite-on-save";
 import { getStepUpMethod } from "@/features/account/client/step-up";
 import { toast } from "sonner";
 import {
@@ -40,7 +44,7 @@ import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { useOrgRealtimeInvalidation } from "@/hooks/useOrgRealtimeInvalidation";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
-import type { Employee, Invitation } from "@/types";
+import type { Employee } from "@/types";
 import { replaceEmployeeRow } from "./employee-rows";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -56,12 +60,11 @@ export interface EmployeesData {
   handleSaveEmployee: (emp: Employee) => Promise<boolean>;
   /** Saves a whole new seniority order at once; false when nothing changed. */
   handleSaveSeniorityOrder: (order: Employee[]) => Promise<boolean>;
-  /** Saves an employee whose email just changed while a pending invitation
-   *  exists, then creates and sends a replacement invitation at the new
-   *  address (reusing the old invitation's role/departments). */
-  handleSaveEmployeeWithReinvite: (
+  /** Saves the record, then sends the invitation the editor's invite option chose.
+   *  A failed send keeps the save. */
+  handleSaveEmployeeAndInvite: (
     emp: Employee,
-    oldInvitation: Invitation,
+    invite: InviteOnSaveChoice,
     runStepUp: StepUpRun,
   ) => Promise<boolean>;
   /** A step-up refusal is rethrown (after the optimistic change is undone) for the caller to prompt. */
@@ -320,8 +323,8 @@ export function useEmployees(
     [orgId, invalidateEmployees],
   );
 
-  const handleSaveEmployeeWithReinvite = useCallback(
-    async (emp: Employee, oldInvitation: Invitation, runStepUp: StepUpRun) => {
+  const handleSaveEmployeeAndInvite = useCallback(
+    async (emp: Employee, invite: InviteOnSaveChoice, runStepUp: StepUpRun) => {
       if (!orgId) return false;
       const prevAll = allEmployeesRef.current;
       // A save that may ask about their shifts waits for the answer: showing it
@@ -359,40 +362,27 @@ export function useEmployees(
       try {
         const completed = await runStepUp((accessToken) =>
           createOrganizationInvitation(
-            {
-              email: savedEmployee.email,
-              role: oldInvitation.roleToAssign,
-              orgId,
-              employeeId: savedEmployee.id,
-              firstName: savedEmployee.firstName,
-              lastName: savedEmployee.lastName,
-              phone: savedEmployee.phone || undefined,
-              departmentIds: oldInvitation.departmentIds,
-              deptAdminIds: oldInvitation.deptAdminIds,
-            },
+            invitationRequestForSave(savedEmployee, invite, orgId),
             accessToken,
           ),
         );
         if (!completed) {
-          // The address change already revoked the old invitation.
-          toast.info("Employee saved. No new invitation was sent.");
+          toast.info("Employee saved. No invitation was sent.");
           return true;
         }
-
-        toast.success(`Employee saved. A new invitation was sent to ${savedEmployee.email}.`);
+        toast.success(`Employee saved. An invitation was sent to ${savedEmployee.email}.`);
       } catch (err) {
-        // Saving the new address revoked the old invitation, and a failed send
-        // leaves no new one, so point at the one action that recovers.
         Sentry.captureException(err);
         toast.error(
-          "Employee saved, but we couldn't send the new invitation. Use Send invitation to try again.",
+          "Employee saved, but we couldn't send the invitation. Use Invite to try again.",
         );
       } finally {
         invalidateEmployees();
+        void queryClient.invalidateQueries({ queryKey: queryKeys.org.invitations(orgId) });
       }
       return true;
     },
-    [orgId, invalidateEmployees],
+    [orgId, invalidateEmployees, queryClient],
   );
 
   const handleRemoveEmployee = useCallback(
@@ -751,7 +741,7 @@ export function useEmployees(
     handleAddEmployee,
     handleSaveEmployee,
     handleSaveSeniorityOrder,
-    handleSaveEmployeeWithReinvite,
+    handleSaveEmployeeAndInvite,
     handleRemoveEmployee,
     handleDeactivateEmployee,
     handleActivateEmployee,

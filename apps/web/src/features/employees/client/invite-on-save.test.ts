@@ -3,8 +3,10 @@ import {
   describeInviteOnSave,
   describeInviteOnSaveNote,
   inviteOnSaveButtonLabel,
+  invitationRequestForSave,
   type InviteOnSaveInput,
 } from "./invite-on-save";
+import type { Invitation } from "@/types";
 
 const base: InviteOnSaveInput = {
   hasAccount: false,
@@ -104,5 +106,56 @@ describe("inviteOnSaveButtonLabel", () => {
   it("names the invite on the save button", () => {
     expect(inviteOnSaveButtonLabel(true)).toBe("Save & invite");
     expect(inviteOnSaveButtonLabel(false)).toBe("Save changes");
+  });
+});
+
+describe("invitationRequestForSave", () => {
+  const saved = {
+    id: "emp-1",
+    email: "new@example.com",
+    firstName: "Ana",
+    lastName: "Lee",
+    phone: "",
+  };
+
+  it("sends a new invite with the chosen role and permissions", () => {
+    expect(
+      invitationRequestForSave(
+        saved,
+        { kind: "invite", role: "admin", adminPermissions: { canEditShifts: true } as never },
+        "org-1",
+      ),
+    ).toEqual({
+      email: "new@example.com",
+      orgId: "org-1",
+      employeeId: "emp-1",
+      role: "admin",
+      adminPermissions: { canEditShifts: true },
+    });
+  });
+
+  it("leaves permissions out when none were chosen", () => {
+    expect(
+      invitationRequestForSave(saved, { kind: "invite", role: "user" }, "org-1"),
+    ).not.toHaveProperty("adminPermissions");
+  });
+
+  it("gives a reinvite the replaced invitation's role and teams", () => {
+    const replacing = {
+      roleToAssign: "admin",
+      departmentIds: [3],
+      deptAdminIds: [4],
+    } as Invitation;
+    expect(invitationRequestForSave(saved, { kind: "reinvite", replacing }, "org-1")).toEqual({
+      email: "new@example.com",
+      orgId: "org-1",
+      employeeId: "emp-1",
+      role: "admin",
+      firstName: "Ana",
+      lastName: "Lee",
+      phone: undefined,
+      departmentIds: [3],
+      deptAdminIds: [4],
+    });
   });
 });

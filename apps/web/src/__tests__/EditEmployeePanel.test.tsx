@@ -2,14 +2,13 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
-import EditEmployeePanel from "@/components/EditEmployeePanel";
+import EditEmployeePanel, { type EditEmployeePanelProps } from "@/components/EditEmployeePanel";
 import {
   checkEmployeeEmailConflict,
   checkEmployeePhoneConflict,
   fetchEmployeeHasStarted,
 } from "@/features/employees/client";
 import { Employee, FocusArea, Invitation, NamedItem } from "@/types";
-import type { StepUpRun } from "@/hooks/useStepUpAction";
 
 vi.mock("@/hooks", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks")>()),
@@ -143,11 +142,7 @@ function renderPanel(
     onCancel: () => void;
     isManagementUser: boolean;
     pendingInvitation: Invitation;
-    onSaveWithReinvite: (
-      updated: Employee,
-      oldInvitation: Invitation,
-      runStepUp: StepUpRun,
-    ) => boolean | void | Promise<boolean | void>;
+    inviteOnSave: EditEmployeePanelProps["inviteOnSave"];
     orgId: string;
     onEmailConflictChange: (hasConflict: boolean) => void;
     onSaveBlockedChange: (isBlocked: boolean) => void;
@@ -172,7 +167,7 @@ function renderPanel(
       onSaveCompleted={overrides.onSaveCompleted}
       onCancel={onCancel}
       pendingInvitation={overrides.pendingInvitation}
-      onSaveWithReinvite={overrides.onSaveWithReinvite}
+      inviteOnSave={overrides.inviteOnSave}
       onEmailConflictChange={overrides.onEmailConflictChange}
       onSaveBlockedChange={overrides.onSaveBlockedChange}
       persistent={overrides.persistent}
@@ -771,79 +766,86 @@ describe("EditEmployeePanel", () => {
       await user.type(emailInput, "new.address@example.com");
     }
 
-    it("shows a confirm dialog instead of saving immediately, and does not call onSave", async () => {
+    const withInvite = (onSaveAndInvite = vi.fn().mockResolvedValue(true)) => ({
+      onSaveAndInvite,
+      inviteOnSave: {
+        canInvite: true,
+        roleOptions: [
+          { value: "user" as const, label: "User" },
+          { value: "admin" as const, label: "Admin" },
+        ],
+        canSetAdminPermissions: false,
+        onSaveAndInvite,
+      },
+    });
+
+    it("offers a new invitation, ticked, and sends it in place of a plain save", async () => {
       const user = userEvent.setup();
       const onSave = vi.fn();
-      renderPanel({ onSave, pendingInvitation, onSaveWithReinvite: vi.fn() });
+      const { onSaveAndInvite, inviteOnSave } = withInvite();
+      renderPanel({ onSave, pendingInvitation, inviteOnSave });
 
       await changeEmail(user);
-      await user.click(screen.getByRole("button", { name: "Save" }));
-
-      const dialog = screen.getByRole("alertdialog", {
-        name: "Send a new invitation to new.address@example.com?",
-      });
-      expect(dialog).toHaveTextContent(
-        /The new email is saved, and the pending invitation to .* is revoked\./,
-      );
       expect(
-        within(dialog).queryByRole("region", { name: "Keep in mind" }),
-      ).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Save & send" })).toBeInTheDocument();
-      expect(onSave).not.toHaveBeenCalled();
-    });
+        screen.getByRole("checkbox", { name: "Send a new invitation to this email" }),
+      ).toBeChecked();
+      await user.click(screen.getByRole("button", { name: "Save & invite" }));
 
-    it("Cancel closes the dialog without saving anything", async () => {
-      const user = userEvent.setup();
-      const onSave = vi.fn();
-      const onSaveWithReinvite = vi.fn();
-      renderPanel({ onSave, pendingInvitation, onSaveWithReinvite });
-
-      await changeEmail(user);
-      await user.click(screen.getByRole("button", { name: "Save" }));
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
-
-      expect(screen.queryByText(/the pending invitation to/i)).not.toBeInTheDocument();
-      expect(onSave).not.toHaveBeenCalled();
-      expect(onSaveWithReinvite).not.toHaveBeenCalled();
-      // The edit is not discarded — the admin can still adjust and retry.
-      expect(screen.getByDisplayValue("new.address@example.com")).toBeInTheDocument();
-    });
-
-    it("Save & Send calls onSaveWithReinvite with the updated employee and the old invitation, not onSave", async () => {
-      const user = userEvent.setup();
-      const onSave = vi.fn();
-      const onSaveWithReinvite = vi.fn().mockResolvedValue(undefined);
-      renderPanel({ onSave, pendingInvitation, onSaveWithReinvite });
-
-      await changeEmail(user);
-      await user.click(screen.getByRole("button", { name: "Save" }));
-      await user.click(screen.getByRole("button", { name: "Save & send" }));
-
-      expect(onSaveWithReinvite).toHaveBeenCalledWith(
+      expect(onSaveAndInvite).toHaveBeenCalledWith(
         expect.objectContaining({ email: "new.address@example.com" }),
-        pendingInvitation,
+        { kind: "reinvite", replacing: pendingInvitation },
         stepUpRun,
       );
       expect(onSave).not.toHaveBeenCalled();
     });
 
-    it("reports Save & send completion only after the employee save succeeds", async () => {
+    it("saves plainly once the new invitation is unticked", async () => {
       const user = userEvent.setup();
-      const onSaveCompleted = vi.fn();
-      const onSaveWithReinvite = vi.fn().mockResolvedValue(false);
-      renderPanel({
-        pendingInvitation,
-        onSaveWithReinvite,
-        onSaveCompleted,
-      });
+      const onSave = vi.fn();
+      const { onSaveAndInvite, inviteOnSave } = withInvite();
+      renderPanel({ onSave, pendingInvitation, inviteOnSave });
 
       await changeEmail(user);
-      await user.click(screen.getByRole("button", { name: "Save" }));
-      await user.click(screen.getByRole("button", { name: "Save & send" }));
+      await user.click(
+        screen.getByRole("checkbox", { name: "Send a new invitation to this email" }),
+      );
+      expect(screen.getByText(/is canceled when you save/)).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "new.address@example.com" }),
+      );
+      expect(onSaveAndInvite).not.toHaveBeenCalled();
+    });
+
+    it("invites someone not invited yet with the role chosen", async () => {
+      const user = userEvent.setup();
+      const { onSaveAndInvite, inviteOnSave } = withInvite();
+      renderPanel({ inviteOnSave });
+
+      await changeEmail(user);
+      expect(screen.getByRole("checkbox", { name: "Invite to the app" })).toBeChecked();
+      await user.click(screen.getByRole("button", { name: "Save & invite" }));
+
+      expect(onSaveAndInvite).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "new.address@example.com" }),
+        { kind: "invite", role: "user" },
+        stepUpRun,
+      );
+    });
+
+    it("reports completion only after the save and invite succeeds", async () => {
+      const user = userEvent.setup();
+      const onSaveCompleted = vi.fn();
+      const { onSaveAndInvite, inviteOnSave } = withInvite(vi.fn().mockResolvedValue(false));
+      renderPanel({ pendingInvitation, inviteOnSave, onSaveCompleted });
+
+      await changeEmail(user);
+      await user.click(screen.getByRole("button", { name: "Save & invite" }));
       expect(onSaveCompleted).not.toHaveBeenCalled();
 
-      onSaveWithReinvite.mockResolvedValueOnce(true);
-      await user.click(screen.getByRole("button", { name: "Save & send" }));
+      onSaveAndInvite.mockResolvedValueOnce(true);
+      await user.click(screen.getByRole("button", { name: "Save & invite" }));
       expect(onSaveCompleted).toHaveBeenCalledOnce();
     });
 
@@ -876,7 +878,7 @@ describe("EditEmployeePanel", () => {
     it("does not gate the save when there is no pending invitation", async () => {
       const user = userEvent.setup();
       const onSave = vi.fn();
-      renderPanel({ onSave, onSaveWithReinvite: vi.fn() });
+      renderPanel({ onSave });
 
       await changeEmail(user);
       await user.click(screen.getByRole("button", { name: "Save" }));
@@ -887,7 +889,7 @@ describe("EditEmployeePanel", () => {
       expect(screen.queryByText(/the pending invitation to/i)).not.toBeInTheDocument();
     });
 
-    it("falls back to a plain save when onSaveWithReinvite is not provided", async () => {
+    it("saves plainly when the host offers no invite", async () => {
       const user = userEvent.setup();
       const onSave = vi.fn();
       renderPanel({ onSave, pendingInvitation });
@@ -903,12 +905,12 @@ describe("EditEmployeePanel", () => {
     it("does not gate the save when the email is unchanged", async () => {
       const user = userEvent.setup();
       const onSave = vi.fn();
-      renderPanel({ onSave, pendingInvitation, onSaveWithReinvite: vi.fn() });
+      renderPanel({ onSave, pendingInvitation, inviteOnSave: withInvite().inviteOnSave });
 
       const firstNameInput = screen.getByDisplayValue("Alice");
       await user.clear(firstNameInput);
       await user.type(firstNameInput, "Bob");
-      await user.click(screen.getByRole("button", { name: "Save" }));
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
 
       expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ firstName: "Bob" }));
     });
