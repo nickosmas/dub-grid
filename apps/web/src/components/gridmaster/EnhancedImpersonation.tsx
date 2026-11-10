@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { VenetianMask } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -46,6 +47,11 @@ export default function EnhancedImpersonation({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [justification, setJustification] = useState("");
+  // Starting reloads the page into the organization; that isn't leaving the reason behind.
+  const startingRef = useRef(false);
+  useNavigationGuard("impersonation-justification", {
+    isDirty: () => !startingRef.current && justification.trim().length > 0,
+  });
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
   const [startConfirm, setStartConfirm] = useState(false);
@@ -175,6 +181,7 @@ export default function EnhancedImpersonation({
       // load that replaces it.
       markAuthTransition();
       queryClient.clear();
+      startingRef.current = true;
       window.location.replace("/schedule");
     } catch (err: unknown) {
       Sentry.captureException(err, { extra: { context: "impersonation-start" } });

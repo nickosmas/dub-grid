@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getRequiredStaffEmailError,
   getStaffNameError,
@@ -45,6 +45,26 @@ export default function RequestDemoPage() {
 
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // A public page, outside the app's guard and its dialog styles, so it asks
+  // with the browser's own leave prompt. Its links home are full page loads
+  // while something is typed, so that prompt covers them too.
+  const hasTyped =
+    !submitted &&
+    !loading &&
+    [contactName, email, phone, orgName, orgSize, industry, message].some(
+      (value) => value.trim().length > 0,
+    );
+  useEffect(() => {
+    if (!hasTyped) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasTyped]);
+  const leaveWithPrompt = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!hasTyped) return;
+    event.preventDefault();
+    window.location.assign(event.currentTarget.href);
+  };
   // A field the visitor has not reached yet is not wrong yet: without this the
   // page opens already accusing them of three missing required fields.
   const [touched, setTouched] = useState<Partial<Record<DemoField, boolean>>>({});
@@ -161,7 +181,12 @@ export default function RequestDemoPage() {
   return (
     <PageShell>
       <Card>
-        <Link href="/" className="dg-auth-logo-block dg-auth-logo-block--spacious">
+        <Link
+          href="/"
+          className="dg-auth-logo-block dg-auth-logo-block--spacious"
+          prefetch={!hasTyped}
+          onClick={leaveWithPrompt}
+        >
           <DubGridStackedLockup />
         </Link>
 
@@ -329,7 +354,7 @@ export default function RequestDemoPage() {
         </Form>
 
         <div className="dg-auth-back-link">
-          <Link href="/" className="dg-auth-link dg-auth-link--subtle">
+          <Link href="/" className="dg-auth-link dg-auth-link--subtle" onClick={leaveWithPrompt}>
             Back to home
           </Link>
         </div>

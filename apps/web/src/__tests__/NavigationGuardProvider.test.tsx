@@ -1,7 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NavigationGuardProvider, useNavigationGuard } from "@/components/NavigationGuardProvider";
+import {
+  NavigationGuardProvider,
+  useConfirmLeave,
+  useNavigationGuard,
+} from "@/components/NavigationGuardProvider";
 
 const routerPush = vi.fn();
 
@@ -21,15 +25,17 @@ const navigate = vi.fn();
 function GuardedPage({
   dirty,
   onDiscard,
+  save,
   anchorProps = {},
   children,
 }: {
   dirty: boolean;
   onDiscard?: () => void;
+  save?: () => boolean | Promise<boolean>;
   anchorProps?: React.AnchorHTMLAttributes<HTMLAnchorElement>;
   children?: React.ReactNode;
 }) {
-  useNavigationGuard("test-page", { isDirty: () => dirty, onDiscard });
+  useNavigationGuard("test-page", { isDirty: () => dirty, onDiscard, save });
 
   return (
     <a
@@ -135,6 +141,42 @@ describe("NavigationGuardProvider", () => {
     expect(navigate).not.toHaveBeenCalled();
     expect(onDiscard).not.toHaveBeenCalled();
     expect(screen.queryByText(DIALOG_TITLE)).not.toBeInTheDocument();
+  });
+
+  it("offers Save when the page can save, and leaves once it has", async () => {
+    const onDiscard = vi.fn();
+    const save = vi.fn(async () => true);
+    renderGuarded({ dirty: true, onDiscard, save });
+
+    await userEvent.click(screen.getByRole("link", { name: "Jobs" }));
+    expect(screen.getByText("Save your changes?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(onDiscard).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Save your changes?")).not.toBeInTheDocument();
+  });
+
+  it("stays put when the save fails", async () => {
+    const save = vi.fn(async () => false);
+    renderGuarded({ dirty: true, save });
+
+    await userEvent.click(screen.getByRole("link", { name: "Jobs" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.queryByText("Save your changes?")).not.toBeInTheDocument();
+  });
+
+  it("offers Discard and Keep editing only when the page can't save", async () => {
+    renderGuarded({ dirty: true });
+
+    await userEvent.click(screen.getByRole("link", { name: "Jobs" }));
+
+    expect(screen.getByText(DIALOG_TITLE)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 
   it("stops guarding once the page unmounts", async () => {
@@ -335,5 +377,70 @@ describe("NavigationGuardProvider", () => {
 
       expect(fireBeforeUnload()).toBe(false);
     });
+  });
+});
+
+function Pager({ dirty, onMove }: { dirty: boolean; onMove: () => void }) {
+  useNavigationGuard("test-pager", { isDirty: () => dirty });
+  const confirmLeave = useConfirmLeave();
+  return (
+    <button type="button" onClick={() => confirmLeave(onMove)}>
+      Next person
+    </button>
+  );
+}
+
+describe("useConfirmLeave", () => {
+  it("moves at once when nothing is dirty", async () => {
+    const onMove = vi.fn();
+    render(
+      <NavigationGuardProvider>
+        <Pager dirty={false} onMove={onMove} />
+      </NavigationGuardProvider>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Next person" }));
+
+    expect(onMove).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(DIALOG_TITLE)).not.toBeInTheDocument();
+  });
+
+  it("asks while dirty, and moves after Discard", async () => {
+    const onMove = vi.fn();
+    render(
+      <NavigationGuardProvider>
+        <Pager dirty onMove={onMove} />
+      </NavigationGuardProvider>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Next person" }));
+    expect(onMove).not.toHaveBeenCalled();
+    expect(screen.getByText(DIALOG_TITLE)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(onMove).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays put on Keep editing", async () => {
+    const onMove = vi.fn();
+    render(
+      <NavigationGuardProvider>
+        <Pager dirty onMove={onMove} />
+      </NavigationGuardProvider>,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Next person" }));
+    await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it("just moves outside the provider", async () => {
+    const onMove = vi.fn();
+    render(<Pager dirty onMove={onMove} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Next person" }));
+
+    expect(onMove).toHaveBeenCalledTimes(1);
   });
 });

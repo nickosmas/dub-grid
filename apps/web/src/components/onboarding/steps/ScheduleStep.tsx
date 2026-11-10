@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirmLeave } from "@/components/NavigationGuardProvider";
 import { pluralLabelNoun, singularLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 import { useState, useCallback } from "react";
 import StepLayout from "../StepLayout";
@@ -74,10 +75,13 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
     }
   }, [org, selectedMode, setOrg]);
 
+  // Continue saves the display mode only; a shift or job row left open with
+  // edits asks to be saved or discarded before the step moves on.
+  const confirmLeave = useConfirmLeave();
   const handleNext = useCallback(async () => {
     const ok = await saveDisplayMode();
-    if (ok) onNext();
-  }, [saveDisplayMode, onNext]);
+    if (ok) confirmLeave(onNext);
+  }, [confirmLeave, saveDisplayMode, onNext]);
 
   if (!org) return null;
 

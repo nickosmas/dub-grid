@@ -190,6 +190,7 @@ export function PlatformBillingPolicyCard() {
             })
           }
           onCancel={() => setDraft(null)}
+          hasUnsavedChanges={BILLING_POLICY_KEYS.some((key) => draft[key] !== platform[key])}
         />
       )}
       {dialog}
@@ -309,6 +310,10 @@ export function OrganizationBillingPolicyCard({ org }: { org: GridmasterBillingO
           confirmDisabled={!valid}
           onConfirm={submit}
           onCancel={() => setDraft(null)}
+          hasUnsavedChanges={BILLING_POLICY_KEYS.some((key) => {
+            const next = draft[key].overridden ? draft[key].value : null;
+            return next !== (sources[key] === "organization" ? values[key] : null);
+          })}
         />
       )}
       {dialog}

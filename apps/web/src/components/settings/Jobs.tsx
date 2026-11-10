@@ -35,6 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { PresetColorPicker, TimeInput12h, inputStyle, labelStyle } from "./shared";
 import { namesForIds, summarizeNames } from "./job-placement-summary";
 import {
@@ -1172,11 +1173,6 @@ function JobRow({
     setExpanded(false);
   }, [job.id, job.isNew, onDeleted]);
 
-  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
-    hasUnsavedChanges: expanded && isDirty,
-    onDiscard: () => discardDraft(true),
-  });
-
   const trimSelectionToPlacement = useCallback(
     (nextDepartmentIds: number[], nextFocusAreaIds: number[]) => {
       const validFocusAreaIds = activeFocusAreas
@@ -1220,8 +1216,8 @@ function JobRow({
     ],
   );
 
-  const handleSave = useCallback(async () => {
-    if (!canSave) return;
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (!canSave) return false;
 
     setSaving(true);
     try {
@@ -1277,9 +1273,11 @@ function JobRow({
       onSaved(saved, job.id);
       setExpanded(false);
       toast.success("Job saved");
+      return true;
     } catch (error) {
       Sentry.captureException(error);
       toast.error(formatClientErrorMessage(error, "We couldn't save that job."));
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1330,6 +1328,18 @@ function JobRow({
     },
     [job.id, onDeleted, orgId],
   );
+
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: expanded && isDirty,
+    onDiscard: () => discardDraft(true),
+    onSave: canSave ? handleSave : undefined,
+  });
+  // The prompt covers collapsing the row; this covers a link, a section switch
+  // and a refresh, which would otherwise drop the row's edits silently.
+  useNavigationGuard(`jobs-row-${job.id}`, {
+    isDirty: () => expanded && isDirty && !saving,
+    save: canSave ? handleSave : undefined,
+  });
 
   const toggleExpanded = useCallback(() => {
     if (!expanded) {

@@ -273,4 +273,67 @@ describe("ManagementAccessSheet", () => {
 
     expect(allMutatePayloads(mutationCalls).filter((payload) => payload?.remove)).toHaveLength(1);
   });
+
+  it("keeps the baseline it opened on when the record refetches", () => {
+    const onDismiss = vi.fn();
+    const sheet = (managementDepartmentIds: number[]) => (
+      <ManagementAccessSheet
+        managementDepartments={DEPARTMENTS}
+        onDismiss={onDismiss}
+        person={
+          makePerson({ orgRole: "admin", managementDepartmentIds, userId: "user-1" }) as never
+        }
+        visible
+      />
+    );
+    const view = render(sheet([9]));
+
+    // Someone else's change lands while this sheet is open and untouched.
+    view.rerender(sheet([9, 10]));
+    fireEvent.click(screen.getAllByRole("button", { name: "Close" })[0]!);
+
+    expect(screen.queryByText("Discard your changes?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Save your changes?")).not.toBeInTheDocument();
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Save from the question for an edit of someone with an account", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ result: "access_updated" });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), mutateAsync });
+    const onDismiss = vi.fn();
+    render(
+      <ManagementAccessSheet
+        managementDepartments={DEPARTMENTS}
+        onDismiss={onDismiss}
+        person={
+          makePerson({ orgRole: "admin", managementDepartmentIds: [9], userId: "user-1" }) as never
+        }
+        visible
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Facilities"));
+    fireEvent.click(screen.getAllByRole("button", { name: "Close" })[0]!);
+    expect(screen.getByText("Save your changes?")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Save" }));
+
+    await vi.waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith({
+        orgRole: "admin",
+        managementDepartmentIds: [9, 10],
+      });
+    });
+  });
+
+  it("offers no Save when saving would send an invitation", () => {
+    renderSheet();
+
+    fireEvent.click(screen.getByText("Operations"));
+    fireEvent.click(screen.getAllByRole("button", { name: "Close" })[0]!);
+
+    expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("alert")).queryByRole("button", { name: "Save" }),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -23,7 +23,9 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { InlineError } from "../../../shared/components/InlineError";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
 
@@ -52,7 +54,8 @@ export function PermissionsSheet({
   isPending: boolean;
   error?: string | null;
   onDismiss: () => void;
-  onSave: (permissions: AdminPermissions) => Promise<unknown> | void;
+  /** Resolves whether the permissions were saved; a failure shows as `error`. */
+  onSave: (permissions: AdminPermissions) => Promise<boolean> | boolean;
 }) {
   const initial = useMemo(() => buildInitialPermissions(stored), [stored]);
   const [perms, setPerms] = useState<AdminPermissions>(initial);
@@ -66,9 +69,18 @@ export function PermissionsSheet({
 
   const count = countPermissionLevels(perms);
   const changed = JSON.stringify(perms) !== JSON.stringify(initial);
+  const guard = useUnsavedChangesGuard({
+    isDirty: changed,
+    disabled: isPending,
+    onClose: onDismiss,
+    onSave: () => onSave(perms),
+  });
 
   return (
     <BottomSheetModal
+      dismissDisabled={isPending}
+      hasUnsavedChanges={changed}
+      overlay={<ConfirmationModal presentation="inline" {...guard.confirmationProps} />}
       footer={
         <>
           {error ? <InlineError message={error} /> : null}
@@ -78,11 +90,18 @@ export function PermissionsSheet({
                 disabled={isPending || !changed}
                 label="Save"
                 loading={isPending}
-                onPress={() => onSave(perms)}
+                onPress={async () => {
+                  await onSave(perms);
+                }}
               />
             }
           >
-            <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
+            <Button
+              disabled={isPending}
+              label="Cancel"
+              onPress={guard.requestClose}
+              tone="neutral"
+            />
           </SheetActions>
         </>
       }
@@ -94,7 +113,7 @@ export function PermissionsSheet({
       }
       scrollable
       visible={visible}
-      onDismiss={onDismiss}
+      onDismiss={guard.requestClose}
     >
       {PERMISSION_CATEGORY_ORDER.map((category) => (
         <PermissionGroup

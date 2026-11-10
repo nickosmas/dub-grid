@@ -1032,6 +1032,86 @@ describe("RequestsScreen", () => {
     );
   });
 
+  it("asks before a typed decision note is dropped, and offers no Save", () => {
+    const mutate = vi.fn();
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate });
+    useQuery.mockReturnValue({
+      data: {
+        requests: [
+          {
+            id: "req-2",
+            requesterName: "Mina Diaz",
+            requesterShiftDate: "2026-04-17",
+            status: "pending_approval",
+            type: "pickup",
+            requesterShiftLabel: "Day",
+            requesterEmpId: "emp-2",
+            targetEmpId: null,
+            requesterPresentation: { label: "Day Shift" },
+          },
+        ],
+        openShifts: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    fireEvent.click(screen.getByText("Approve"));
+    fireEvent.change(screen.getByLabelText("Note to Mina (optional)"), {
+      target: { value: "Thanks for covering" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    // Saving the note would mean making the decision, so only two answers.
+    expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(screen.queryByText("Discard your changes?")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Note to Mina (optional)")).toHaveValue("Thanks for covering");
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("closes a decision with no note typed without asking", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+    useQuery.mockReturnValue({
+      data: {
+        requests: [
+          {
+            id: "req-2",
+            requesterName: "Mina Diaz",
+            requesterShiftDate: "2026-04-17",
+            status: "pending_approval",
+            type: "pickup",
+            requesterShiftLabel: "Day",
+            requesterEmpId: "emp-2",
+            targetEmpId: null,
+            requesterPresentation: { label: "Day Shift" },
+          },
+        ],
+        openShifts: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    fireEvent.click(screen.getByText("Approve"));
+    fireEvent.change(screen.getByLabelText("Note to Mina (optional)"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByText("Discard your changes?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Approve request?")).not.toBeInTheDocument();
+  });
+
   it("shows the all-requests tab for schedule editors without a linked employee", () => {
     useBootstrap.mockReturnValue({
       data: {

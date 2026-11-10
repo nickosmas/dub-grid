@@ -1,5 +1,6 @@
 "use client";
 
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { FormEvent, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -105,6 +106,7 @@ export default function GridmasterAccountsView({
   const stepUp = useStepUpAction();
   const [search, setSearch] = useState("");
   const [promoteEmail, setPromoteEmail] = useState("");
+  useNavigationGuard("gridmaster-promote", { isDirty: () => promoteEmail.trim().length > 0 });
   const [promoteConfirmEmail, setPromoteConfirmEmail] = useState<string | null>(null);
   const [promoteLoading, setPromoteLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);

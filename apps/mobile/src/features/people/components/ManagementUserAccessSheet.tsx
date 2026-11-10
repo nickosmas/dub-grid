@@ -12,6 +12,7 @@ import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { SectionNotice } from "./SectionNotice";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
+import { sameIds } from "../../../shared/lib/same-ids";
 import { ProfileChoiceGroup } from "../../profile/components/ProfilePrimitives";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import type { ManagementAccessRole } from "../lib/managementAccess";
@@ -22,13 +23,6 @@ type Draft = {
   orgRole: ManagementAccessRole;
   managementDepartmentIds: number[];
 };
-
-function sameIds(left: number[], right: number[]): boolean {
-  if (left.length !== right.length) return false;
-  const sortedLeft = [...left].sort((a, b) => a - b);
-  const sortedRight = [...right].sort((a, b) => a - b);
-  return sortedLeft.every((value, index) => value === sortedRight[index]);
-}
 
 /**
  * Edit an existing roster member's departments. The staff-side sheet
@@ -65,7 +59,8 @@ export function ManagementUserAccessSheet({
    * button, and two copies of that prompt would be two copies of its wording.
    */
   onRemove: () => void;
-  onSubmit: (draft: Draft) => Promise<unknown>;
+  /** Resolves whether the save worked; a failure shows as `error`. */
+  onSubmit: (draft: Draft) => Promise<boolean>;
   /**
    * The parent's prompts, rendered inside this sheet while it is the one on
    * top: iOS refuses a second Modal while a sheet is up, so a confirmation
@@ -110,12 +105,15 @@ export function ManagementUserAccessSheet({
   // Every way out funnels through here, the Cancel button included — it used to
   // close straight through, so the one exit the user took deliberately was the
   // one that dropped their edit without asking.
+  // Save is not offered for an empty draft: that save asks its own question
+  // about taking them off the roster.
   const guard = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
     disabled: isPending,
-    body: "Your changes to their administrative teams will be lost.",
     onDiscard: () => setDraft(baseline),
     onClose: onDismiss,
+    onSave:
+      canSubmit && draft.managementDepartmentIds.length > 0 ? () => onSubmit(draft) : undefined,
   });
 
   const removalNotices =
@@ -139,6 +137,8 @@ export function ManagementUserAccessSheet({
 
   return (
     <BottomSheetModal
+      dismissDisabled={isPending}
+      hasUnsavedChanges={hasUnsavedChanges}
       overlay={
         <>
           <ConfirmationModal presentation="inline" {...guard.confirmationProps} />

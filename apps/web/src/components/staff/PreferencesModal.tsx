@@ -11,6 +11,7 @@ import {
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import type { JobDefinition, ShiftCategory } from "@/types";
 
 type Mode = "any" | CoverageShiftPreference["mode"];
@@ -174,73 +175,98 @@ export function PreferencesModal({
     }
   };
 
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: touched.shifts || touched.jobs,
+    onDiscard: onClose,
+    onSave:
+      blocked("shifts") || blocked("jobs")
+        ? undefined
+        : async () => {
+            try {
+              await save();
+              return true;
+            } catch {
+              return false;
+            }
+          },
+  });
+
   return (
-    <Modal
-      title={
-        step === "start" ? "Preferences" : step === "shifts" ? "Shift preference" : "Job preference"
-      }
-      subtitle={personName}
-      onBack={step === "start" ? undefined : () => setStep("start")}
-      onClose={onClose}
-      onRequestClose={() => !saving}
-      className="dg-modal--quiet-footer"
-      style={{ maxWidth: 520, width: "100%" }}
-      footer={
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            type="button"
-            className="dg-btn dg-btn-secondary"
-            onClick={onClose}
-            disabled={saving}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            className="dg-btn dg-btn-primary"
-            onClick={() => save()}
-            disabled={blocked("shifts") || blocked("jobs") || saving}
-          >
-            <ButtonLoading loading={saving}>Save</ButtonLoading>
-          </Button>
-        </div>
-      }
-    >
-      {step === "start" ? (
-        <div className="dg-choice-list" role="group" aria-label="Preferences">
-          {(["shifts", "jobs"] as const).map((kind) => (
-            <button key={kind} type="button" className="dg-choice" onClick={() => setStep(kind)}>
-              <span className="dg-choice-copy">
-                <strong className="dg-choice-title">{kind === "shifts" ? "Shifts" : "Jobs"}</strong>
-                <span className={needsItem(kind) ? "dg-choice-hint" : "dg-choice-detail"}>
-                  {summary(kind)}
+    <>
+      <Modal
+        title={
+          step === "start"
+            ? "Preferences"
+            : step === "shifts"
+              ? "Shift preference"
+              : "Job preference"
+        }
+        subtitle={personName}
+        onBack={step === "start" ? undefined : () => setStep("start")}
+        onClose={onClose}
+        onRequestClose={() => !saving && requestClose()}
+        className="dg-modal--quiet-footer"
+        style={{ maxWidth: 520, width: "100%" }}
+        footer={
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              className="dg-btn dg-btn-secondary"
+              onClick={() => requestClose() && onClose()}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="dg-btn dg-btn-primary"
+              onClick={() => save()}
+              disabled={blocked("shifts") || blocked("jobs") || saving}
+            >
+              <ButtonLoading loading={saving}>Save</ButtonLoading>
+            </Button>
+          </div>
+        }
+      >
+        {step === "start" ? (
+          <div className="dg-choice-list" role="group" aria-label="Preferences">
+            {(["shifts", "jobs"] as const).map((kind) => (
+              <button key={kind} type="button" className="dg-choice" onClick={() => setStep(kind)}>
+                <span className="dg-choice-copy">
+                  <strong className="dg-choice-title">
+                    {kind === "shifts" ? "Shifts" : "Jobs"}
+                  </strong>
+                  <span className={needsItem(kind) ? "dg-choice-hint" : "dg-choice-detail"}>
+                    {summary(kind)}
+                  </span>
                 </span>
-              </span>
-              <ChevronRight size={18} className="dg-choice-chevron" aria-hidden="true" />
-            </button>
-          ))}
-        </div>
-      ) : (
-        <PreferenceStep
-          kind={step}
-          choice={choices[step]}
-          chosen={chosen(step)}
-          groups={
-            step === "shifts"
-              ? groupShifts(shifts, focusAreaName)
-              : [
-                  {
-                    key: "jobs",
-                    title: null,
-                    items: jobs.map((job) => ({ id: job.id, name: job.name, detail: null })),
-                  },
-                ]
-          }
-          needsItem={needsItem(step)}
-          onChange={(change) => setChoice(step, change)}
-        />
-      )}
-    </Modal>
+                <ChevronRight size={18} className="dg-choice-chevron" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <PreferenceStep
+            kind={step}
+            choice={choices[step]}
+            chosen={chosen(step)}
+            groups={
+              step === "shifts"
+                ? groupShifts(shifts, focusAreaName)
+                : [
+                    {
+                      key: "jobs",
+                      title: null,
+                      items: jobs.map((job) => ({ id: job.id, name: job.name, detail: null })),
+                    },
+                  ]
+            }
+            needsItem={needsItem(step)}
+            onChange={(change) => setChoice(step, change)}
+          />
+        )}
+      </Modal>
+      {unsavedChangesDialog}
+    </>
   );
 }
 

@@ -963,6 +963,15 @@ export function EmployeeStatusActions({
         }
         onConfirm={confirm}
         onCancel={close}
+        // Picking a status alone isn't work to lose; a typed reason or a date is.
+        hasUnsavedChanges={
+          note.trim().length > 0 ||
+          returnDate !== initialReturnDate ||
+          absenceTypeId !== initialAbsenceTypeId ||
+          startDate !== initialStartDate ||
+          lastDay !== initialLastDay ||
+          until !== initialUntil
+        }
       />
     ) : null;
 

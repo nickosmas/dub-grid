@@ -1,3 +1,4 @@
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { Button } from "@/components/Button";
@@ -153,6 +154,9 @@ export function OverviewTab({
     setEditing(false);
     resetEditState();
   }, [organization.id, organization.updatedAt]);
+
+  // Saving goes through a review first, so leaving only offers Discard.
+  useNavigationGuard("gridmaster-org-details", { isDirty: () => editing && hasChanges && !saving });
 
   async function handleSave() {
     if (!nextOrganization.name) return;
@@ -732,6 +736,7 @@ export function OverviewTab({
             setSuspendConfirm(false);
             setSuspendReason("");
           }}
+          hasUnsavedChanges={suspendReason.trim().length > 0}
         />
       )}
 

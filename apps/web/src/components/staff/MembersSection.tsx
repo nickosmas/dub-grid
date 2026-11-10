@@ -2311,6 +2311,7 @@ export function MembersSection({
           pendingInvitation={pendingInviteByEmployeeId.get(managementAccessEmployee.id)}
           onDirtyChange={setManagementAccessDirty}
           onClose={closeManagementAccessPopup}
+          requestClose={requestManagementAccessClose}
           onCompleted={async (updatedEmployee) => {
             syncExistingEmployeeInCaches(updatedEmployee);
             await refreshInvitations();

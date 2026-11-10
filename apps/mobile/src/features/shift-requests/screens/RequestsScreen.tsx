@@ -39,6 +39,7 @@ import {
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
   getMySchedule,
   getShiftRequestHistory,
@@ -589,6 +590,14 @@ export default function RequestsScreen() {
 
   const requests = requestsQuery.data?.requests ?? [];
   const isResolveConfirmation = Boolean(requestActionConfirmation?.takesNote);
+  // A typed note asks before it is dropped. No Save: the only way to keep it is
+  // the decision itself, which is the person's to make on the sheet.
+  const decisionNoteGuard = useUnsavedChangesGuard({
+    isDirty: isResolveConfirmation && resolveNote.trim() !== "",
+    disabled: pendingAction != null,
+    onDiscard: () => setResolveNote(""),
+    onClose: () => setRequestActionConfirmation(null),
+  });
   const resolveNoteRecipients = useMemo(() => {
     const confirmation = requestActionConfirmation;
     if (!confirmation?.takesNote) return "";
@@ -1093,7 +1102,7 @@ export default function RequestsScreen() {
                 buttons cannot read as the same word. */}
             <Button
               label={requestActionConfirmation?.body.action === "cancel" ? "Dismiss" : "Cancel"}
-              onPress={() => setRequestActionConfirmation(null)}
+              onPress={decisionNoteGuard.requestClose}
               tone="neutral"
             />
           </SheetActions>
@@ -1104,8 +1113,12 @@ export default function RequestsScreen() {
             title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
           />
         }
+        hasUnsavedChanges={decisionNoteGuard.isDirty}
+        overlay={
+          <ConfirmationModal presentation="inline" {...decisionNoteGuard.confirmationProps} />
+        }
         visible={isResolveConfirmation}
-        onDismiss={() => setRequestActionConfirmation(null)}
+        onDismiss={decisionNoteGuard.requestClose}
       >
         <SectionNotice
           messages={requestActionConfirmation?.feedback.warning ?? []}

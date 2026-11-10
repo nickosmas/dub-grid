@@ -222,6 +222,7 @@ export function BulkStatusDialog({
       isLoading={running}
       onConfirm={onConfirm}
       onCancel={onClose}
+      hasUnsavedChanges={note.trim().length > 0 || (action === "markAway" && Boolean(returnDate))}
     />
   );
 }

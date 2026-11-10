@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import type { UnsavedChangesSave } from "@/components/UnsavedChangesDialog";
 
 /** Matches .dg-panel's exit animation duration in globals.css. */
 export const SLIDEOVER_CLOSE_MS = 200;
@@ -79,8 +81,27 @@ export function useSlideoverEscape(onEscape: () => void) {
  * darkened backdrop content can't be scrolled underneath it, and closes on
  * Escape. Pass `escape: false` to handle Escape yourself (for example behind
  * an unsaved-changes guard) via `useSlideoverEscape`.
+ *
+ * Pass `unsaved` for a panel that edits: then `close()` (Escape, the backdrop,
+ * the X) asks before throwing the edits away, and the caller renders
+ * `unsavedChangesDialog`. `forceClose()` skips the question, for a close that
+ * follows a save.
  */
-export function useSlideoverClose(onClose: () => void, { escape = true } = {}) {
+export function useSlideoverClose(
+  onClose: () => void,
+  {
+    escape = true,
+    unsaved,
+  }: {
+    escape?: boolean;
+    unsaved?: {
+      hasUnsavedChanges: boolean;
+      onSave?: UnsavedChangesSave;
+      /** False when a successful save already closes the panel itself. */
+      closeAfterSave?: boolean;
+    };
+  } = {},
+) {
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
   const onCloseRef = useLatestRef(onClose);
@@ -90,7 +111,7 @@ export function useSlideoverClose(onClose: () => void, { escape = true } = {}) {
     return unlockBodyScroll;
   }, []);
 
-  const close = useCallback(() => {
+  const forceClose = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
     setClosing(true);
@@ -99,7 +120,18 @@ export function useSlideoverClose(onClose: () => void, { escape = true } = {}) {
     }, SLIDEOVER_CLOSE_MS);
   }, [onCloseRef]);
 
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: Boolean(unsaved?.hasUnsavedChanges),
+    onDiscard: forceClose,
+    onSave: unsaved?.onSave,
+    onSaved: unsaved?.closeAfterSave === false ? undefined : forceClose,
+  });
+
+  const close = useCallback(() => {
+    if (requestClose()) forceClose();
+  }, [forceClose, requestClose]);
+
   useSlideoverEscape(escape ? close : () => {});
 
-  return { closing, close };
+  return { closing, close, forceClose, unsavedChangesDialog };
 }

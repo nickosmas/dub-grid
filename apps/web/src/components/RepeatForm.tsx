@@ -86,6 +86,8 @@ interface RepeatFormProps {
     pattern: ShiftSeriesPattern;
     onSave: (pattern: ShiftSeriesReschedule) => void;
   };
+  /** Whether the pattern differs from the one the form opened with. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export interface RepeatFormHandle {
@@ -335,6 +337,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     onConfirm,
     absenceType,
     editing,
+    onDirtyChange,
   }: RepeatFormProps,
   ref,
 ) {
@@ -365,6 +368,13 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   // it could not be counted.
   const [overwritePrompt, setOverwritePrompt] = useState<{ count: number | null } | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const patternKey = JSON.stringify([frequency, daysOfWeek, start, endType, endDate, afterN]);
+  const [openedPatternKey] = useState(patternKey);
+  const patternDirty = patternKey !== openedPatternKey;
+  useEffect(() => {
+    onDirtyChange?.(patternDirty);
+  }, [onDirtyChange, patternDirty]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   const primarySegment = selectionSegments[0] ?? null;
   const assignment = assignments.find((shift) => shift.id === (primarySegment?.assignmentId ?? -1));

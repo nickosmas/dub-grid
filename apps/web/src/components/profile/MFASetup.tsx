@@ -6,6 +6,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Button } from "@/components/Button";
 import { StepUpForm } from "@/components/auth/StepUpForm";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { isRequestTimeout } from "@/lib/fetch-with-timeout";
@@ -98,6 +99,9 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   const verifyingRef = useRef(false);
   const mountedRef = useRef(true);
   const pendingFactorIdRef = useRef<string | null>(null);
+  // Leaving mid-setup removes the half-made factor, which leaves a dead entry
+  // in an authenticator that already scanned the code, so it asks first.
+  useNavigationGuard("mfa-setup", { isDirty: () => step === "verifying" });
 
   useEffect(() => {
     mountedRef.current = true;

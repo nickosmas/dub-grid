@@ -42,6 +42,22 @@ describe("confirmationAlertSpec", () => {
     ]);
   });
 
+  it("asks Save, Discard and Keep editing as three plain buttons, none destructive", () => {
+    const spec = confirmationAlertSpec({
+      title: "Save your changes?",
+      body: "You haven't saved what you changed here.",
+      confirmLabel: "Save",
+      cancelLabel: "Keep editing",
+      confirmTone: "primary",
+      secondaryAction: { label: "Discard" },
+    });
+    expect(spec.buttons).toEqual([
+      { kind: "cancel", text: "Keep editing", style: "cancel" },
+      { kind: "secondary", text: "Discard", style: "default" },
+      { kind: "confirm", text: "Save", style: "default" },
+    ]);
+  });
+
   it("adds a summary after the body, one point plainly and several as bullets", () => {
     expect(
       confirmationAlertSpec({
