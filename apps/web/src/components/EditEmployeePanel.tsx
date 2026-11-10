@@ -18,12 +18,12 @@ import {
   type AdminPermissions,
   type AssignableOrganizationRole,
 } from "@/types";
-import { InvitePermissionsField } from "@/components/InvitePermissionsField";
+import { InviteOptionBox } from "@/components/staff/InviteOptionBox";
 import {
   INVITE_ON_SAVE_LABELS,
   describeInviteOnSave,
   describeInviteOnSaveNote,
-  inviteOnSaveButtonLabel,
+  INVITE_ON_SAVE_BUTTON_LABEL,
   type InviteOnSaveChoice,
 } from "@/features/employees/client/invite-on-save";
 import { Button } from "@/components/Button";
@@ -53,7 +53,6 @@ import { upcomingFirstDay, DEFAULT_ORGANIZATION_LABELS, singularLabelNoun } from
 import { formatDateKey } from "@/lib/utils";
 import { PendingInvitationBanner } from "@/components/staff/PendingInvitationBanner";
 import { hasSavedScheduleAssignment } from "@/components/staff/capability-state";
-import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   checkEmployeeEmailConflict,
   checkEmployeePhoneConflict,
@@ -109,20 +108,9 @@ export interface EditEmployeePanelProps {
   onMoveToNewEmail?: () => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onResend?: (invitationId: string) => Promise<boolean> | boolean | void;
-  /** Called instead of `onSave` when the admin confirms changing the email
-   *  while a pending invitation exists — saves the identity change (which
-   *  auto-revokes the old invitation) and sends a fresh one to the new
-   *  address, reusing the old invitation's role/departments. Required to
-   *  offer the "Save & send" choice; without it, a changed email with a
-   *  pending invitation present falls back to a plain save. */
-  onSaveWithReinvite?: (
-    updatedEmployee: Employee,
-    oldInvitation: Invitation,
-    runStepUp: StepUpRun,
-  ) => boolean | void | Promise<boolean | void>;
-  /** Offers an invite beside the email and replaces the Save & send
-   *  confirmation (the staff page). Saving with the box ticked calls
-   *  `onSaveAndInvite` instead of `onSave`. */
+  /** Offers an invite beside the email (the staff page and the People
+   *  slideover). Saving with the box ticked calls `onSaveAndInvite` instead
+   *  of `onSave`. */
   inviteOnSave?: {
     canInvite: boolean;
     roleOptions: { value: AssignableOrganizationRole; label: string }[];
@@ -135,7 +123,7 @@ export interface EditEmployeePanelProps {
     ) => boolean | void | Promise<boolean | void>;
   };
   /** Reports the save button's label for a host that draws its own, such as "Save & invite". */
-  onSaveLabelChange?: (label: string) => void;
+  onSaveLabelChange?: (label: string | undefined) => void;
   /** When true, render no Close/Save row — the host renders its own footer and
    *  drives save/dismiss through the ref handle. */
   hideActions?: boolean;
@@ -209,7 +197,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onMoveToNewEmail,
       onRevoke,
       onResend,
-      onSaveWithReinvite,
       inviteOnSave,
       onSaveLabelChange,
       hideActions,
@@ -228,7 +215,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     // Set while the "changing this email will revoke the pending invitation"
     // confirm dialog is open — holds the already-validated employee payload
     // handleSave built, so onConfirm/onCancel don't need to redo validation.
-    const [pendingReinviteSave, setPendingReinviteSave] = useState<Employee | null>(null);
     const [form, setForm] = useState<EditForm>(() => buildEditForm(employee));
     const [hasStarted, setHasStarted] = useState<boolean | null>(null);
 
@@ -435,9 +421,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           })
         : null;
     const sendingInvite = Boolean(inviteOption && (inviteTicked ?? inviteOption.defaultChecked));
-    const saveLabel = inviteOnSave
-      ? inviteOnSaveButtonLabel(sendingInvite)
-      : EDITOR_ACTION_LABELS.save;
+    // Only an invite renames the host's save button; otherwise each host keeps its own wording.
+    const saveLabel = sendingInvite ? INVITE_ON_SAVE_BUTTON_LABEL : undefined;
 
     // Ticking the invite on an unchanged record is still something to save.
     const hasSomethingToSave = isModified || sendingInvite;
@@ -499,17 +484,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         firstDay: form.firstDay || null,
       };
 
-      // Changing the email while a pending invitation exists will silently
-      // revoke it (trg_revoke_invitation_on_email_change). Never let that
-      // happen as a side effect of a plain save — gate it behind an explicit
-      // choice instead of saving right away.
-      // With the invite option, the checkbox already made that choice.
-      const emailChanged = (nextEmployee.email || "") !== (employee.email || "");
-      if (emailChanged && pendingInvitation && onSaveWithReinvite && !inviteOnSave) {
-        setPendingReinviteSave(nextEmployee);
-        return false;
-      }
-
       const invite: InviteOnSaveChoice | null =
         inviteOnSave && inviteOption && sendingInvite
           ? inviteOption.kind === "reinvite" && pendingInvitation
@@ -537,7 +511,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       employee,
       onSave,
       onSaveCompleted,
-      onSaveWithReinvite,
       pendingInvitation,
       stepUpRef,
       validateStaffEmail,
@@ -791,7 +764,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       <FirstDayField
                         value={form.firstDay}
                         onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
-                        labelStyle={{ ...fieldLabel, marginBottom: 0 }}
+                        labelStyle={fieldLabel}
+                        labelGap={4}
                         disabled={readOnly}
                         placeholder="Set first day"
                       />
@@ -936,93 +910,33 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 )}
 
                 {inviteOption && inviteOnSave ? (
-                  <div
-                    data-slot="invite-on-save"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                      padding: "12px 14px",
-                      borderRadius: "var(--dg-radius-lg)",
-                      border: `1px solid ${
-                        sendingInvite ? "var(--dg-color-brand-border)" : "var(--dg-color-border)"
-                      }`,
-                      background: sendingInvite ? "var(--dg-color-brand-bg)" : "transparent",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 12,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          cursor: "pointer",
-                          fontSize: "var(--dg-fs-label)",
-                          fontWeight: 500,
-                          color: "var(--dg-color-text-primary)",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          className="dg-checkbox"
-                          checked={sendingInvite}
-                          disabled={readOnly}
-                          onChange={(e) => setInviteTicked(e.target.checked)}
-                        />
-                        {INVITE_ON_SAVE_LABELS[inviteOption.kind]}
-                      </label>
-                      {inviteOption.kind === "invite" && sendingInvite ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ ...fieldLabel, marginBottom: 0, whiteSpace: "nowrap" }}>
-                            Access role
-                          </span>
-                          <CustomSelect
-                            ariaLabel="Access role"
-                            value={inviteRole}
-                            options={inviteOnSave.roleOptions}
-                            onChange={setInviteRole}
-                            disabled={readOnly}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                    {inviteOption.kind === "invite" &&
-                    sendingInvite &&
-                    inviteOnSave.canSetAdminPermissions &&
-                    inviteRole === "admin" ? (
-                      <InvitePermissionsField
-                        value={invitePermissions}
-                        onChange={setInvitePermissions}
-                        disabled={readOnly}
-                      />
-                    ) : null}
-                    {(() => {
-                      const note = describeInviteOnSaveNote(
-                        inviteOption.kind,
-                        sendingInvite,
-                        pendingInvitation?.email ?? "",
-                      );
-                      return note ? (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-text-secondary)",
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {note}
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
+                  <InviteOptionBox
+                    label={INVITE_ON_SAVE_LABELS[inviteOption.kind]}
+                    checked={sendingInvite}
+                    onCheckedChange={setInviteTicked}
+                    role={
+                      inviteOption.kind === "invite"
+                        ? {
+                            value: inviteRole,
+                            options: inviteOnSave.roleOptions,
+                            onChange: setInviteRole,
+                          }
+                        : undefined
+                    }
+                    permissions={
+                      inviteOption.kind === "invite" &&
+                      inviteOnSave.canSetAdminPermissions &&
+                      inviteRole === "admin"
+                        ? { value: invitePermissions, onChange: setInvitePermissions }
+                        : undefined
+                    }
+                    note={describeInviteOnSaveNote(
+                      inviteOption.kind,
+                      sendingInvite,
+                      pendingInvitation?.email ?? "",
+                    )}
+                    disabled={readOnly}
+                  />
                 ) : null}
 
                 <div>
@@ -1253,7 +1167,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       disabled={!hasSomethingToSave || isSaveBlocked}
                       className="dg-btn dg-btn-primary"
                     >
-                      {saveLabel}
+                      {saveLabel ?? EDITOR_ACTION_LABELS.save}
                     </Button>
                   }
                 />
@@ -1271,32 +1185,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           )}
         </div>
         {stepUp.dialog}
-        {pendingReinviteSave && pendingInvitation && onSaveWithReinvite && !stepUp.dialog && (
-          <ConfirmDialog
-            title={`Send a new invitation to ${pendingReinviteSave.email}?`}
-            message={
-              <>
-                The new email is saved, and the pending invitation to{" "}
-                <strong>{pendingInvitation.email}</strong> is revoked.
-              </>
-            }
-            confirmLabel="Save & send"
-            cancelLabel="Cancel"
-            variant="warning"
-            onCancel={() => setPendingReinviteSave(null)}
-            onConfirm={async () => {
-              const saved =
-                (await onSaveWithReinvite(
-                  pendingReinviteSave,
-                  pendingInvitation,
-                  stepUpRef.current.run,
-                )) !== false;
-              if (!saved) return;
-              setPendingReinviteSave(null);
-              onSaveCompleted?.();
-            }}
-          />
-        )}
       </>
     );
   },

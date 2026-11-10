@@ -241,10 +241,9 @@ describe("AddEmployeeModal", () => {
       await userEvent.type(emails[0]!, "jane@calmhaven.org");
       await userEvent.type(emails[1]!, "omar@calmhaven.org");
 
-      // Ruth has no email, so she can't be invited.
+      // Ruth has no email, so she gets no invite option.
       const inviteBoxes = screen.getAllByRole("checkbox", { name: /Invite to the app/ });
       expect(inviteBoxes).toHaveLength(2);
-      expect(screen.getByRole("checkbox", { name: "Add an email to invite" })).toBeDisabled();
       await userEvent.click(inviteBoxes[1]!);
 
       await userEvent.click(screen.getByRole("button", { name: "Access role" }));
@@ -252,10 +251,43 @@ describe("AddEmployeeModal", () => {
       // Super Admin is offered only by someone who holds it.
       expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole("button", { name: "Add 3 Staff Members, Invite 1" }));
+      expect(
+        screen.getByText(
+          "Ready to add 3 staff members. We email the person you invite a link to join.",
+        ),
+      ).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Add 3 & invite 1" }));
 
       expect(onAdd.mock.calls[0][0]).toHaveLength(3);
       expect(onAdd.mock.calls[0][1]).toEqual([{ email: "jane@calmhaven.org", role: "admin" }]);
+    });
+
+    it("sets everyone invited to one access role, which each can still change", async () => {
+      const { onAdd } = renderModal();
+      const firstNames = getFirstNameInputs();
+      const lastNames = getLastNameInputs();
+      const emails = getEmailInputs();
+      for (const [index, name] of ["Jane", "Omar"].entries()) {
+        await userEvent.type(firstNames[index]!, name);
+        await userEvent.type(lastNames[index]!, "Doe");
+        await userEvent.type(emails[index]!, `${name.toLowerCase()}@calmhaven.org`);
+      }
+      const everyone = screen.getByRole("button", { name: "Set everyone's access role" });
+
+      await userEvent.click(everyone);
+      await userEvent.click(screen.getByRole("option", { name: "Admin" }));
+      const rowRoles = screen.getAllByRole("button", { name: "Access role" });
+      expect(rowRoles.map((button) => button.textContent)).toEqual(["Admin", "Admin"]);
+
+      await userEvent.click(rowRoles[1]!);
+      await userEvent.click(screen.getByRole("option", { name: "User" }));
+      expect(everyone).toHaveTextContent("Mixed");
+
+      await userEvent.click(screen.getByRole("button", { name: "Add 2 & invite 2" }));
+      expect(onAdd.mock.calls[0][1]).toEqual([
+        { email: "jane@calmhaven.org", role: "admin" },
+        { email: "omar@calmhaven.org", role: "user" },
+      ]);
     });
 
     it("ticks and clears everyone with an email at once", async () => {

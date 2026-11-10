@@ -1,5 +1,5 @@
 import { getOptionalStaffEmailError } from "@dubgrid/contracts";
-import type { AdminPermissions, AssignableOrganizationRole, Invitation } from "@/types";
+import type { AdminPermissions, AssignableOrganizationRole, Employee, Invitation } from "@/types";
 
 /** "invite" for someone not invited (or whose invite expired); "reinvite" replaces a pending one. */
 export type InviteOnSaveKind = "invite" | "reinvite";
@@ -79,6 +79,30 @@ export function describeInviteOnSaveNote(
     : `Their invitation to ${previousEmail} is canceled when you save, because it was for the old email.`;
 }
 
-export function inviteOnSaveButtonLabel(sendingInvite: boolean): string {
-  return sendingInvite ? "Save & invite" : "Save changes";
+/** What the host's save button reads while saving also sends an invitation. */
+export const INVITE_ON_SAVE_BUTTON_LABEL = "Save & invite";
+
+/** The invitation request for a just-saved record; a reinvite keeps the replaced one's access. */
+export function invitationRequestForSave(
+  saved: Pick<Employee, "id" | "email" | "firstName" | "lastName" | "phone">,
+  invite: InviteOnSaveChoice,
+  orgId: string,
+) {
+  const base = { email: saved.email, orgId, employeeId: saved.id };
+  if (invite.kind === "reinvite") {
+    return {
+      ...base,
+      role: invite.replacing.roleToAssign,
+      firstName: saved.firstName,
+      lastName: saved.lastName,
+      phone: saved.phone || undefined,
+      departmentIds: invite.replacing.departmentIds,
+      deptAdminIds: invite.replacing.deptAdminIds,
+    };
+  }
+  return {
+    ...base,
+    role: invite.role,
+    ...(invite.adminPermissions ? { adminPermissions: { ...invite.adminPermissions } } : {}),
+  };
 }

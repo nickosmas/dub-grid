@@ -35,6 +35,7 @@ import type {
   AssignmentDefinition,
   ShiftDisplayMode,
 } from "@/types";
+import type { InviteOnSaveChoice } from "@/features/employees/client/invite-on-save";
 import type { StepUpRun } from "@/hooks/useStepUpAction";
 import { MembersSection } from "@/components/staff/MembersSection";
 import { ProfileChangeRequestQueue } from "@/components/staff/ProfileChangeRequestQueue";
@@ -111,9 +112,9 @@ interface StaffViewProps {
   /** Called instead of `onSave` when the admin confirms changing an
    *  on-schedule employee's email while a pending invitation exists — see
    *  EditEmployeePanel. */
-  onSaveWithReinvite?: (
+  onSaveAndInvite?: (
     updatedEmployee: Employee,
-    oldInvitation: Invitation,
+    invite: InviteOnSaveChoice,
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string, lastDay?: string) => void | Promise<boolean>;
@@ -181,7 +182,7 @@ export default function StaffView({
   roles,
   onSave,
   onSaveOrder,
-  onSaveWithReinvite,
+  onSaveAndInvite,
   onRemove,
   onDeactivate,
   onSetReturnDate,
@@ -382,7 +383,7 @@ export default function StaffView({
             useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
             onSave={onSave}
             onSaveOrder={onSaveOrder}
-            onSaveWithReinvite={onSaveWithReinvite}
+            onSaveAndInvite={onSaveAndInvite}
             onRemove={onRemove}
             onDeactivate={onDeactivate}
             onSetReturnDate={onSetReturnDate}
