@@ -286,14 +286,14 @@ describe("EmployeeStatusActions", () => {
     expect(onSuspend).toHaveBeenCalledWith("emp-1", { startDate: start.key, until: null });
   });
 
-  it("changes a suspended person's end date with nothing picked, as Save changes", async () => {
+  it("changes a suspended person's end date with nothing picked, as Save", async () => {
     const user = userEvent.setup();
     const { onSetSuspendedUntil } = renderActions(
       makeEmployee({ suspendedAt: "2026-10-26T12:00:00Z", suspendedUntil: "2099-01-12" }),
     );
 
     const dialog = await openDialog(user);
-    const save = within(dialog).getByRole("button", { name: "Save changes" });
+    const save = within(dialog).getByRole("button", { name: "Save" });
     expect(save).toBeDisabled();
     await user.click(within(dialog).getByRole("button", { name: "Ends" }));
     await user.click(screen.getByRole("button", { name: "Clear" }));
@@ -301,7 +301,7 @@ describe("EmployeeStatusActions", () => {
     expect(
       within(dialog).getByText("They stay suspended until someone reinstates them."),
     ).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
     expect(onSetSuspendedUntil).toHaveBeenCalledWith("emp-1", null);
   });
 
@@ -394,7 +394,7 @@ describe("EmployeeStatusActions", () => {
     expect(onActivate).toHaveBeenCalledWith("emp-1");
   });
 
-  it("changes an Away person's return date with nothing picked, as Save changes", async () => {
+  it("changes an Away person's return date with nothing picked, as Save", async () => {
     const user = userEvent.setup();
     const { onSetReturnDate, onActivate } = renderActions(
       makeEmployee({ status: "inactive", awayUntil: dayFromToday(1).key }),
@@ -402,10 +402,10 @@ describe("EmployeeStatusActions", () => {
     const day = dayFromToday(2);
 
     const dialog = await openDialog(user);
-    expect(within(dialog).getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     await user.click(within(dialog).getByRole("button", { name: "Return date" }));
     await user.click(screen.getByRole("button", { name: day.label }));
-    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", day.key, null);
     expect(onActivate).not.toHaveBeenCalled();
@@ -421,7 +421,7 @@ describe("EmployeeStatusActions", () => {
     const dialog = await openDialog(user);
     await user.click(within(dialog).getByRole("button", { name: "Absence" }));
     await user.click(screen.getByRole("option", { name: "Sick" }));
-    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", "2099-01-05", 135);
   });
@@ -498,7 +498,7 @@ describe("EmployeeStatusActions", () => {
 
       const dialog = await openDialog(user);
       expect(choices(dialog)[0]).toBe("ActiveReturns Fri, Jan 9. Change it with Edit plan.");
-      expect(within(dialog).getByRole("button", { name: "Save changes" })).toBeDisabled();
+      expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     });
 
     it("moves a planned return", async () => {
@@ -512,7 +512,7 @@ describe("EmployeeStatusActions", () => {
       await user.click(within(dialog).getByRole("button", { name: "Starts" }));
       await user.click(screen.getByRole("button", { name: later.label }));
       expect(dialog).toHaveAccessibleName("Change Alice Smith's planned return?");
-      await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
       expect(onSetPlannedChange).toHaveBeenCalledWith("emp-1", {
         startDate: later.key,
         returnDate: null,
@@ -624,10 +624,10 @@ describe("EmployeeStatusActions", () => {
     const { onSetPlannedChange } = renderActions(makeEmployee(planned), ABSENCE_TYPES);
 
     const dialog = await openDialog(user);
-    expect(within(dialog).getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     await user.click(within(dialog).getByRole("button", { name: "Absence" }));
     await user.click(screen.getByRole("option", { name: "Sick" }));
-    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     expect(onSetPlannedChange).toHaveBeenCalledWith("emp-1", {
       startDate: "2099-01-05",
@@ -740,7 +740,7 @@ describe("EmployeeStatusActions", () => {
       "SuspendedCan't sign in. Stays on the schedule.",
       "OffboardedLeaving Thu, Jan 8. Change it with Edit plan.",
     ]);
-    expect(within(dialog).getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     expect(onSetPlannedChange).not.toHaveBeenCalled();
   });
 
@@ -756,7 +756,7 @@ describe("EmployeeStatusActions", () => {
     await user.click(screen.getByRole("button", { name: later.label }));
 
     expect(dialog).toHaveAccessibleName("Change Alice Smith's last day?");
-    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
     expect(onSetPlannedChange).toHaveBeenCalledWith("emp-1", { lastDay: later.key });
   });
 
