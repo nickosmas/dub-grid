@@ -268,7 +268,7 @@ function IndicatorRow({
         <div style={{ overflow: "hidden" }}>
           <div
             style={{
-              background: "var(--dg-color-bg-secondary)",
+              background: "var(--dg-color-surface-editor)",
               borderRadius: "var(--dg-radius-lg)",
               border: "1px solid var(--dg-color-border-light)",
               margin: "0 0 8px",
@@ -367,6 +367,7 @@ function IndicatorRow({
             {canEdit && (
               <EditorActionRow
                 className="dg-footer-bar dg-footer-bar--in-box"
+                floating
                 destructiveAction={
                   !indicator.isNew ? (
                     <Button
@@ -592,7 +593,7 @@ export default function Indicators({
             action={
               canManageIndicatorTypes ? (
                 <Button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
-                  + Add schedule note
+                  Add schedule note
                 </Button>
               ) : undefined
             }
@@ -606,7 +607,7 @@ export default function Indicators({
               className="dg-btn dg-btn-dashed dg-btn-sm"
               style={{ width: "100%" }}
             >
-              + Add schedule note
+              Add schedule note
             </Button>
           </div>
         )}
