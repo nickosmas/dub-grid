@@ -931,6 +931,7 @@ function DepartmentSection({
         </Button>
       }
       className="dg-footer-bar [--dg-footer-bar-px:16px]"
+      floating
     />
   ) : null;
 

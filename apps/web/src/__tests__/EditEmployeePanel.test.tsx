@@ -150,6 +150,7 @@ function renderPanel(
     roles: NamedItem[];
     certifications: NamedItem[];
     persistent: boolean;
+    sectioned: boolean;
   }> = {},
 ) {
   const onSave = overrides.onSave ?? vi.fn();
@@ -171,6 +172,7 @@ function renderPanel(
       onEmailConflictChange={overrides.onEmailConflictChange}
       onSaveBlockedChange={overrides.onSaveBlockedChange}
       persistent={overrides.persistent}
+      sectioned={overrides.sectioned}
     />,
   );
 
@@ -182,6 +184,35 @@ function renderPanel(
 // ---------------------------------------------------------------------------
 
 describe("EditEmployeePanel", () => {
+  describe("Sectioned", () => {
+    const follows = (a: string, b: string) =>
+      Boolean(
+        screen.getByText(a).compareDocumentPosition(screen.getByText(b)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+
+    it("puts personal details first and the work facts under Work", () => {
+      renderPanel({ sectioned: true });
+
+      expect(screen.queryByText("Details")).not.toBeInTheDocument();
+      expect(follows("Personal details", "Email")).toBe(true);
+      expect(follows("Email", "Work")).toBe(true);
+      expect(follows("Work", "Employment")).toBe(true);
+      expect(follows("Work", "Internal notes")).toBe(true);
+    });
+
+    it("keeps everything in Personal details for someone with no Work section", () => {
+      renderPanel({
+        sectioned: true,
+        isManagementUser: true,
+        employee: { ...employee, focusAreaIds: [], roleIds: [], certificationId: null },
+      });
+
+      expect(screen.queryByText("Work")).not.toBeInTheDocument();
+      expect(follows("Personal details", "Internal notes")).toBe(true);
+    });
+  });
+
   // -------------------------------------------------------------------------
   // Pre-population
   // -------------------------------------------------------------------------

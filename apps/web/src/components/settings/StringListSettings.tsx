@@ -573,6 +573,7 @@ export default function StringListSettings({
         </Button>
       }
       className={sectionTitle ? "dg-footer-bar [--dg-footer-bar-px:16px]" : undefined}
+      floating={Boolean(sectionTitle)}
       style={{ marginTop: 12 }}
     />
   ) : null;
