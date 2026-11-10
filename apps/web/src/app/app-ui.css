@@ -1787,6 +1787,10 @@ button.dg-cc-sg-main {
   border-top-color: var(--dg-color-border);
   background: transparent;
 }
+/* Every floating footer shares one corner, concentric with its buttons. */
+:root {
+  --dg-floating-bar-radius: calc(var(--dg-btn-radius) + 12px);
+}
 /* An editor box's footer (EditorActionRow `floating`): sticky within the box,
    so while the box is taller than the screen it floats at the bottom of the
    screen, and it rests as the box's footer at its end. Floating keeps the
@@ -1798,7 +1802,9 @@ button.dg-cc-sg-main {
   z-index: 20;
   transition:
     box-shadow 160ms ease,
-    border-radius 160ms ease;
+    border-radius 160ms ease,
+    margin 160ms ease,
+    padding 160ms ease;
 }
 /* A box that clips its overflow would become the footer's scroll area, so it
    could never float; `clip` draws the same edges without being one. Inline
@@ -1808,7 +1814,10 @@ button.dg-cc-sg-main {
   overflow: clip !important;
 }
 .dg-floating-footer[data-placement="floating"] {
-  border-radius: var(--dg-floating-footer-radius, var(--dg-radius-md));
+  /* 8px clear of the box's edges at any width, 12px inside on every side. */
+  margin-inline: -8px;
+  padding-inline: 12px;
+  border-radius: var(--dg-floating-bar-radius);
   background: var(--dg-floating-footer-bg, var(--dg-color-surface-footer));
   box-shadow:
     0 0 0 1px var(--dg-color-border),
@@ -1843,7 +1852,9 @@ button.dg-cc-sg-main {
   transition:
     box-shadow 160ms ease,
     border-color 160ms ease,
-    border-radius 160ms ease;
+    border-radius 160ms ease,
+    margin 160ms ease,
+    padding 160ms ease;
 }
 /* Only while one of its buttons can be pressed. */
 .dg-unsaved-bar[data-sticky] {
@@ -1852,8 +1863,11 @@ button.dg-cc-sg-main {
   z-index: 20;
 }
 .dg-unsaved-bar[data-placement="floating"] {
+  /* 8px clear of the card's edges at any width, 12px inside on every side. */
+  margin-inline: 8px;
+  padding-inline: 12px;
   border-top-color: var(--dg-color-border);
-  border-radius: var(--dg-unsaved-bar-radius);
+  border-radius: var(--dg-floating-bar-radius);
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.12),
     0 1px 3px rgba(0, 0, 0, 0.08);

@@ -36,7 +36,7 @@ export function EditorActionRow({
   useEffect(() => {
     const row = rowRef.current;
     if (!row || !floating) return;
-    // Floating, the row wears the fill and corners of the box it closes.
+    // Floating, the row wears the fill of the box it closes.
     let box = row.parentElement;
     while (box && getComputedStyle(box).backgroundColor === "rgba(0, 0, 0, 0)") {
       box = box.parentElement;
@@ -44,7 +44,6 @@ export function EditorActionRow({
     if (!box) return;
     const style = getComputedStyle(box);
     row.style.setProperty("--dg-floating-footer-bg", style.backgroundColor);
-    row.style.setProperty("--dg-floating-footer-radius", style.borderBottomLeftRadius);
   }, [floating]);
   const baseStyle: CSSProperties = {
     display: "flex",
