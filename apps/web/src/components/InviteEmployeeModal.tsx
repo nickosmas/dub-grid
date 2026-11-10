@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import Modal from "./Modal";
-import CustomSelect from "./CustomSelect";
+import { InviteRoleField, InviteRoleRefusal } from "@/components/staff/InviteRoleField";
+import { inviteRoleOptions } from "@/features/employees/client/invite-on-save";
 import { Employee, NamedItem, Department, Invitation } from "@/types";
 import type { AdminPermissions } from "@/types";
 import { InvitePermissionsField } from "@/components/InvitePermissionsField";
@@ -29,16 +30,6 @@ import { useIsInSandbox } from "@/hooks";
 import { usePermissions } from "@/features/permissions/client";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
-
-const ROLE_OPTIONS = [
-  { value: "user" as const, label: "User" },
-  { value: "admin" as const, label: "Admin" },
-];
-
-const SUPER_ADMIN_OPTION = {
-  value: "super_admin" as const,
-  label: "Super Admin",
-};
 
 interface InviteEmployeeModalProps {
   /** Employee to invite. When null, operates in management staff mode (no employee link). */
@@ -68,7 +59,7 @@ export default function InviteEmployeeModal({
   const { isSuperAdmin, isGridmaster } = usePermissions();
   const stepUp = useStepUpAction();
   const roleOptions = useMemo(
-    () => (isSuperAdmin || isGridmaster ? [...ROLE_OPTIONS, SUPER_ADMIN_OPTION] : ROLE_OPTIONS),
+    () => inviteRoleOptions(isSuperAdmin || isGridmaster),
     [isSuperAdmin, isGridmaster],
   );
   const [email, setEmail] = useState(employee?.email || "");
@@ -533,13 +524,10 @@ export default function InviteEmployeeModal({
           )}
 
           {/* Role */}
-          <div style={{ maxWidth: 200 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
             <label style={labelStyle}>Access role</label>
-            <CustomSelect
-              value={role}
-              options={roleOptions}
-              onChange={(v) => setRole(v as AssignableOrganizationRole)}
-            />
+            <InviteRoleField value={role} options={roleOptions} onChange={setRole} />
+            <InviteRoleRefusal options={roleOptions} />
           </div>
 
           {setsPermissions && (

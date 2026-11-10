@@ -23,7 +23,8 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { SectionNotice } from "@/components/ui/SectionNotice";
 import { Banner } from "@/components/ui/Banner";
 import { FlaskConical } from "lucide-react";
-import CustomSelect from "@/components/CustomSelect";
+import { InviteRoleField, InviteRoleRefusal } from "@/components/staff/InviteRoleField";
+import { inviteRoleOptions } from "@/features/employees/client/invite-on-save";
 import type {
   AssignableOrganizationRole,
   Department,
@@ -58,16 +59,6 @@ export interface EmployeeManagementAccessEditorHandle {
   discard: () => void;
 }
 
-const INVITE_ROLE_OPTIONS: { value: AssignableOrganizationRole; label: string }[] = [
-  { value: "user", label: "User" },
-  { value: "admin", label: "Admin" },
-];
-
-const SUPER_ADMIN_OPTION: { value: AssignableOrganizationRole; label: string } = {
-  value: "super_admin",
-  label: "Super Admin",
-};
-
 /**
  * In-place editor shared by every management-access popup. It edits
  * management departments and nothing else: role and permissions are changed on
@@ -100,11 +91,8 @@ export const EmployeeManagementAccessEditor = forwardRef<
   const isInSandbox = useIsInSandbox();
   const { isSuperAdmin, isGridmaster } = usePermissions();
   const stepUp = useStepUpAction();
-  const inviteRoleOptions = useMemo(
-    () =>
-      isSuperAdmin || isGridmaster
-        ? [...INVITE_ROLE_OPTIONS, SUPER_ADMIN_OPTION]
-        : INVITE_ROLE_OPTIONS,
+  const roleOptions = useMemo(
+    () => inviteRoleOptions(isSuperAdmin || isGridmaster),
     [isSuperAdmin, isGridmaster],
   );
   const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
@@ -423,12 +411,9 @@ export const EmployeeManagementAccessEditor = forwardRef<
       {!hasKnownOrgRole && (
         <div>
           <label style={fieldLabelStyle}>Role</label>
-          <div style={{ maxWidth: 200 }}>
-            <CustomSelect
-              value={role}
-              options={inviteRoleOptions}
-              onChange={(value) => setRole(value as AssignableOrganizationRole)}
-            />
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+            <InviteRoleField value={role} options={roleOptions} onChange={setRole} />
+            <InviteRoleRefusal options={roleOptions} />
           </div>
         </div>
       )}

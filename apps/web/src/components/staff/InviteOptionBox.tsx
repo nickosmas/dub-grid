@@ -1,7 +1,8 @@
 "use client";
 
-import CustomSelect from "@/components/CustomSelect";
 import { InvitePermissionsField } from "@/components/InvitePermissionsField";
+import { InviteRoleField, InviteRoleRefusal } from "@/components/staff/InviteRoleField";
+import type { InviteRoleOption } from "@/features/employees/client/invite-on-save";
 import type { AdminPermissions, AssignableOrganizationRole } from "@/types";
 
 interface InviteOptionBoxProps {
@@ -11,7 +12,7 @@ interface InviteOptionBoxProps {
   /** The access role choice, shown while ticked; a reinvite keeps the replaced invitation's role. */
   role?: {
     value: AssignableOrganizationRole;
-    options: { value: AssignableOrganizationRole; label: string }[];
+    options: InviteRoleOption[];
     onChange: (role: AssignableOrganizationRole) => void;
   };
   /** An Admin's permissions, for a Super Admin inviting an Admin. */
@@ -89,8 +90,7 @@ export function InviteOptionBox({
             >
               Access role
             </span>
-            <CustomSelect
-              ariaLabel="Access role"
+            <InviteRoleField
               value={role.value}
               options={role.options}
               onChange={role.onChange}
@@ -99,6 +99,7 @@ export function InviteOptionBox({
           </div>
         ) : null}
       </div>
+      {checked && role ? <InviteRoleRefusal options={role.options} /> : null}
       {checked && permissions ? (
         <InvitePermissionsField
           value={permissions.value}

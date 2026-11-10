@@ -820,14 +820,6 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-07 (review):** `account/profile` (`route.ts:44-58`, `profile-change-requests.ts:833`) reads the role from the client's organization, so someone with a surviving Super Admin membership elsewhere renames their global profile directly, skipping the review their own organization requires. The rule that a manager edits directly should use the session's organization. Traced, not run.
 
-### F-218 [P2] open - Moving a pending Admin invitation keeps its stored permissions
-
-**File:** `apps/web/src/app/api/organizations/invitations/route.ts:320-323`, `:423-435`; `accept_invitation` (`113:172`)
-**Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security)
-**Why it matters:** PATCH checks only the Super Admin tier. On the stack an Admin who can manage staff moved an Admin invitation holding `canManageBilling` to their own second address, and the permissions stayed for `accept_invitation` to apply. Rotating the token doesn't help, because the new mailbox is theirs. `employees/move-email/route.ts:155` already refuses this case.
-**Suggested fix:** Apply move-email's rule, or clear `admin_permissions` when the address changes.
-**Resolution:**
-
 ### F-219 [P2] open - Losing sandbox rights locks the session out, and Exit can't fix it
 
 **File:** `apps/web/src/app/api/test-sandbox/route.ts:45`; `apps/web/src/lib/api-auth.ts:414`; `apps/web/src/app/api/shared/permissions.ts:453`
@@ -970,4 +962,75 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Found:** 2026-11-10 while restoring the native segmented switch
 **Why it matters:** On the Android emulator, tapping People's Filter calls `onPress` (logged) and sets the sheet visible, but no sheet appears and nothing is logged. It happens with the drawn switch and the native one, and with People's search action removed from the bar, so neither causes it. iOS opens the same sheet. Only the emulator's development build was tried, not a release build or a phone, and other native sheets on Android weren't checked.
 **Suggested fix:** Check whether any `BottomSheetModal.native` sheet opens on Android, then whether 56d's `sheetOpenSize` refactor changed the Android first render (it now reads `androidResizableRef` before setting it).
+
+### F-241 [P2] open - The mobile admin dashboard ignores Dashboard: View
+
+**File:** `packages/mobile-api-core/src/dashboard.ts:604`; `apps/web/src/features/mobile/server/routes/dashboard.ts:83`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
+**Why it matters:** It checks only that the caller is an Admin or Super Admin, while web's `/api/dashboard/analytics` requires `canViewDashboardAnalytics`. An Admin with every view off still gets org-wide coverage, every shift request in the range, publish history and staff hours on the phone. The comment assumes approvals default on; `ADMIN_DEFAULT_PERMS` has them off.
+**Suggested fix:** Require the resolved `canViewDashboardAnalytics` (and per-section keys where web has them), and add a contract test that web and mobile refuse the same Admin.
+**Resolution:**
+
+### F-242 [P2] unverified - A non-approver Admin may get a request approved, and published, in an approver's name
+
+**File:** `create_shift_request_unguarded` (099:98), `claim_shift_request` and `volunteer_for_open_shift` (130), `auto_approve_shift_request` (030:44-66); `apps/web/src/app/api/schedule/requests/route.ts:199`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
+**Why it matters:** The database lets any Admin act for another employee with no permission key; the route narrows it to Schedule or Staff edit, but PostgREST calls skip the route. An Admin without approve or publish rights could file a call-off as an approver's employee row, and auto-approval would then publish it as that approver. Traced by a subagent, not run.
+**Suggested fix:** Confirm on the stack. If it holds, require `canEditShifts` or `canManageEmployees` in the SQL for acting on someone else, and never auto-approve a request that someone other than the requester filed.
+**Resolution:**
+
+### F-244 [P2] open - An Admin never configured shows no permissions, and can't be edited on mobile
+
+**File:** `apps/mobile/src/features/people/screens/PersonDetailScreen.tsx:1051-1055, 1811`; `apps/web/src/components/staff-detail/PersonInfoCards.tsx:177-189`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX)
+**Why it matters:** Both gate on a stored set. For an Admin with `NULL` (F-239's common case), web drops the Permissions line and mobile hides the Permissions row, so a Super Admin on the phone has no way to set them.
+**Suggested fix:** Gate on `orgRole === "admin"` and count from `buildInitialPermissions(stored)`.
+**Resolution:**
+
+### F-246 [P3] open - Permission counts and change summaries disagree with the editor
+
+**File:** `apps/web/src/components/staff-detail/PersonInfoCards.tsx:177, 191`; `access-management.ts:53-63` (`formatAdminPermissionsSummary`); `admin-permission-count.ts`; `access/route.ts:400` and `notifications/server/events.ts:1278`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX, quality)
+**Why it matters:** Seen locally for the same Admin: the Access card reads "24 of 25" (raw stored keys, a total no Admin can reach) while the editor reads "16 of 16 turned on". The save review says "10 permissions enabled → 12", not which areas changed, so granting Staff: Edit looks like granting Reports. For a first edit of a `NULL` set, the alert, email and activity log list every standard permission as newly added.
+**Suggested fix:** Count with `countPermissionLevels` everywhere, list each flipped area and level in the review and alert ("Staff: Edit on"), diff against `buildInitialPermissions(before)`, and remove the unused raw counter.
+**Resolution:**
+
+### F-247 [P3] open - The editor hides the Recurring dependency, mobile shows no notes, and Select all grants Staff: Edit unchecked
+
+**File:** `apps/web/src/components/PermissionsEditor.tsx:177, 282-288`; `apps/mobile/src/features/people/components/PermissionsSheet.tsx:97, 178-183`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX)
+**Why it matters:** `impliedNote ?? mod.note` replaces "Applying to the grid and creating series also need Schedule: Edit." with "Included with Edit." whenever Recurring Edit is on, which is the default (seen locally). The phone sheet shows neither note, so "Included" and "Off" come with no reason, and swiping it down discards edits without asking. Select all turns on every switch, Staff: Edit included, in one click.
+**Suggested fix:** Show both lines, warn inline when Recurring Edit is on without Schedule Edit, render notes on mobile, prompt before discarding, and leave Staff: Edit out of Select all (or confirm it).
+**Resolution:**
+
+### F-248 [P3] open - Permission alerts and the activity log use a second, hardcoded vocabulary
+
+**File:** `permission-labels.ts:18-23` (`PERMISSION_LABELS`)
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: quality, UX)
+**Why it matters:** Alerts, email and the activity log say "Manage schedule areas" and "Manage repeating shifts", which match neither the editor's rows nor the organization's own term for focus areas (a standards rule).
+**Suggested fix:** Derive these labels from `PERMISSION_MODULES` and the organization's labels.
+**Resolution:**
+
+### F-249 [P3] open - Super Admins grant Super Admin and change permissions without fresh proof
+
+**File:** `apps/web/src/app/api/organizations/access/route.ts:300-303`; `change_user_role` (053:95)
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
+**Why it matters:** Fresh proof is required only of a Gridmaster. A stolen or left-open Super Admin session can mint another Super Admin (who then holds billing and can change the original's role) with no password or code. Step-up already guards credential changes and exports; granting authority is the same class.
+**Suggested fix:** Require `requireSensitiveActionAuth` for any role change and any permission change that turns a switch on; the client already runs these through `useStepUpAction`.
+**Resolution:**
+
+### F-250 [P3] open - The server never applies the impersonation narrowing the app shows
+
+**File:** `apps/web/src/app/api/shared/permissions.ts:563-567`; `packages/authz/src/index.ts:109-121`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
+**Why it matters:** `buildPermissionContext` turns off staff, settings, approvals and notes while a Gridmaster impersonates, but `requireOrgPermissions` never passes `isImpersonating`, so routes grant all of it and only the client hides it. Part of F-201's gap.
+**Suggested fix:** Pass the impersonation state into the resolver in `requireOrgPermissions` and the mobile auth context, with F-201.
+**Resolution:**
+
+### F-251 [P3] open - `departments.permissions` is written from client input and read by nothing
+
+**File:** `supabase/migrations/001_schema.sql:257-262`; `apps/web/src/app/api/settings/config/route.ts:2406`; `apps/web/src/lib/db/employees.ts:71`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: quality)
+**Why it matters:** The column's comment still says it "defines what members can do", the settings route stores whatever the client sends, and nothing reads it. A future change that trusts it would grant permissions from data anyone with Departments: Edit can write. Beside the Access card's "Administrative Teams" line, it also suggests teams grant something.
+**Suggested fix:** Drop the column (or at least stop writing it and fix the comment) in a forward migration.
 **Resolution:**

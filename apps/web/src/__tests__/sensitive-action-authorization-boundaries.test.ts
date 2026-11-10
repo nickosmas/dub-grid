@@ -381,7 +381,7 @@ const SHARED_STATUS_CHANGE_ASSERTIONS: RegExp[] = [
   /if \(action === "remove" && !planning\) \{\s*await endOffboardedAccess\(serviceClient, \{[\s\S]*?userId: currentEmployee\.userId,/,
   // Offboarding and Restore change the membership whoever acts (51k), so an
   // Admin never reaches a Super Admin: the tier guard runs before any write.
-  /if \(\(offboarding \|\| restoring\) && !isGridmaster && !isSuperAdmin && currentEmployee\.userId\) \{[\s\S]*?if \(!canOffboardAtTier\(actor, targetMembership\?\.org_role\)\) \{[\s\S]*?\{ status: 403 \}[\s\S]*?\.from\("employees"\)\s*\.update\(update\)/,
+  /if \(\s*\(offboarding \|\| restoring \|\| suspending \|\| reinstating \|\| replacingPlan\) &&\s*!isGridmaster &&\s*!isSuperAdmin &&\s*currentEmployee\.userId\s*\) \{[\s\S]*?if \(!canOffboardAtTier\(actor, targetMembership\?\.org_role\)\) \{[\s\S]*?\{ status: 403 \}[\s\S]*?\.from\("employees"\)\s*\.update\(update\)/,
   // Suspension signs only the suspended person out (51c), and only once
   // it starts: a planned one (51g3) waits for the daily job.
   /if \(action === "suspend" && !planning && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,

@@ -100,7 +100,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     id: "staff",
     title: "Staff",
     description: (labels) =>
-      `See staff profiles, contact details, and ${inSentence(labels.certificationLabel)}. With Edit, they can also add and invite people, change their status, and set their access role.`,
+      `See staff profiles, contact details, and ${inSentence(labels.certificationLabel)}. With Edit, they can also add people, invite them as Users, and change their status.`,
     icon: "users",
     category: "CORE",
     viewKeys: ["canViewEmployeeDetails"],

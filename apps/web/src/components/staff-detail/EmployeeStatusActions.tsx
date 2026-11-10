@@ -33,8 +33,9 @@ export interface EmployeeStatusActionsProps {
   /** When true, this employee is the current user — destructive self-actions are hidden. */
   isSelf?: boolean;
   /**
-   * False when this manager may not offboard or restore them (51k,
-   * `canOffboardAtTier`): both stay listed, disabled with the reason.
+   * False when this manager may not change their access (`canOffboardAtTier`):
+   * Offboarded, Suspended and the way back stay listed, disabled with the
+   * reason (51k, F-240).
    */
   canOffboard?: boolean;
   onDeactivate: (
