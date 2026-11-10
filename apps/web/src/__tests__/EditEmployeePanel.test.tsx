@@ -810,7 +810,7 @@ describe("EditEmployeePanel", () => {
         screen.getByRole("checkbox", { name: "Send a new invitation to this email" }),
       );
       expect(screen.getByText(/is canceled when you save/)).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Save changes" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({ email: "new.address@example.com" }),
@@ -910,7 +910,7 @@ describe("EditEmployeePanel", () => {
       const firstNameInput = screen.getByDisplayValue("Alice");
       await user.clear(firstNameInput);
       await user.type(firstNameInput, "Bob");
-      await user.click(screen.getByRole("button", { name: "Save changes" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ firstName: "Bob" }));
     });

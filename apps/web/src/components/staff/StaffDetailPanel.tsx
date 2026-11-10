@@ -150,7 +150,7 @@ export function StaffDetailPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [saveLabel, setSaveLabel] = useState<string>(EDITOR_ACTION_LABELS.save);
+  const [saveLabel, setSaveLabel] = useState<string>();
   const [isEditorSaveBlocked, setIsEditorSaveBlocked] = useState(false);
   const { closing, close: closePanel } = useSlideoverClose(onClose, { escape: false });
   const pendingInvitation = canManageEmployees
@@ -510,7 +510,7 @@ export function StaffDetailPanel({
                     disabled={!hasUnsavedChanges || isEditorSaveBlocked}
                     className="dg-btn dg-btn-primary"
                   >
-                    {saveLabel}
+                    {saveLabel ?? EDITOR_ACTION_LABELS.save}
                   </Button>
                 ) : undefined
               }

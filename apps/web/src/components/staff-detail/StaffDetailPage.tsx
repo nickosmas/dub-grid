@@ -195,7 +195,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [isEditingAccess, setIsEditingAccess] = useState(false);
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [detailsSaveBlocked, setDetailsSaveBlocked] = useState(false);
-  const [detailsSaveLabel, setDetailsSaveLabel] = useState("Save changes");
+  const [detailsSaveLabel, setDetailsSaveLabel] = useState<string>();
   const detailsEditorRef = useRef<EditEmployeePanelHandle>(null);
   const contentScrollerRef = useClipTrailingWhitespace();
   const {

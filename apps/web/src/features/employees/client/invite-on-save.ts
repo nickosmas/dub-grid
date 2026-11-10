@@ -79,9 +79,8 @@ export function describeInviteOnSaveNote(
     : `Their invitation to ${previousEmail} is canceled when you save, because it was for the old email.`;
 }
 
-export function inviteOnSaveButtonLabel(sendingInvite: boolean): string {
-  return sendingInvite ? "Save & invite" : "Save changes";
-}
+/** What the host's save button reads while saving also sends an invitation. */
+export const INVITE_ON_SAVE_BUTTON_LABEL = "Save & invite";
 
 /** The invitation request for a just-saved record; a reinvite keeps the replaced one's access. */
 export function invitationRequestForSave(

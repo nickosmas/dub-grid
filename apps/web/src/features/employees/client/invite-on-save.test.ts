@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   describeInviteOnSave,
   describeInviteOnSaveNote,
-  inviteOnSaveButtonLabel,
   invitationRequestForSave,
   type InviteOnSaveInput,
 } from "./invite-on-save";
@@ -99,13 +98,6 @@ describe("describeInviteOnSaveNote", () => {
     expect(describeInviteOnSaveNote("reinvite", false, "old@example.com")).toBe(
       "Their invitation to old@example.com is canceled when you save, because it was for the old email.",
     );
-  });
-});
-
-describe("inviteOnSaveButtonLabel", () => {
-  it("names the invite on the save button", () => {
-    expect(inviteOnSaveButtonLabel(true)).toBe("Save & invite");
-    expect(inviteOnSaveButtonLabel(false)).toBe("Save changes");
   });
 });
 

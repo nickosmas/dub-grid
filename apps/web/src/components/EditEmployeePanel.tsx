@@ -23,7 +23,7 @@ import {
   INVITE_ON_SAVE_LABELS,
   describeInviteOnSave,
   describeInviteOnSaveNote,
-  inviteOnSaveButtonLabel,
+  INVITE_ON_SAVE_BUTTON_LABEL,
   type InviteOnSaveChoice,
 } from "@/features/employees/client/invite-on-save";
 import { Button } from "@/components/Button";
@@ -123,7 +123,7 @@ export interface EditEmployeePanelProps {
     ) => boolean | void | Promise<boolean | void>;
   };
   /** Reports the save button's label for a host that draws its own, such as "Save & invite". */
-  onSaveLabelChange?: (label: string) => void;
+  onSaveLabelChange?: (label: string | undefined) => void;
   /** When true, render no Close/Save row — the host renders its own footer and
    *  drives save/dismiss through the ref handle. */
   hideActions?: boolean;
@@ -421,9 +421,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           })
         : null;
     const sendingInvite = Boolean(inviteOption && (inviteTicked ?? inviteOption.defaultChecked));
-    const saveLabel = inviteOnSave
-      ? inviteOnSaveButtonLabel(sendingInvite)
-      : EDITOR_ACTION_LABELS.save;
+    // Only an invite renames the host's save button; otherwise each host keeps its own wording.
+    const saveLabel = sendingInvite ? INVITE_ON_SAVE_BUTTON_LABEL : undefined;
 
     // Ticking the invite on an unchanged record is still something to save.
     const hasSomethingToSave = isModified || sendingInvite;
@@ -1228,7 +1227,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       disabled={!hasSomethingToSave || isSaveBlocked}
                       className="dg-btn dg-btn-primary"
                     >
-                      {saveLabel}
+                      {saveLabel ?? EDITOR_ACTION_LABELS.save}
                     </Button>
                   }
                 />
