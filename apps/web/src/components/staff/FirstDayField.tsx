@@ -11,11 +11,14 @@ export function FirstDayField({
   onChange,
   labelStyle,
   disabled = false,
+  placeholder = "Not set",
 }: {
   value: string;
   onChange: (value: string) => void;
   labelStyle: CSSProperties;
   disabled?: boolean;
+  /** What the empty field says. */
+  placeholder?: string;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -24,7 +27,7 @@ export function FirstDayField({
         value={value}
         onChange={onChange}
         label="First day"
-        placeholder="Not set"
+        placeholder={placeholder}
         minDate={formatDateKey(new Date())}
         maxDate={formatDateKey(addDays(new Date(), PLANNED_START_MAX_DAYS))}
         disabled={disabled}
