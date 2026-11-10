@@ -972,13 +972,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Only a Super Admin or Gridmaster grants the Admin tier (invite, edit and replace alike), or cap an invite's permissions at the inviter's own resolved set. Update the Staff row's description to match.
 **Resolution:** Fixed on fix/admin-tier-boundary (2026-11-10): `canGrantOrgRole` in `@dubgrid/domain` lets only a Super Admin or Gridmaster give an elevated tier, and `canAssignOrgRole` (web create, edit, redirect and replace) and the mobile invite route apply it, answering "Only a Super Admin can invite someone as an Admin." with an audit row. The web invite surfaces state Access role as User with that reason for anyone else; the app lists Admin disabled with it. Pending Admin invitations sent before stay valid (owner, 2026-11-10). Route and helper tests fail against the old rule.
 
-### F-238 [P1] open - An Admin with no stored permission set is shown Edit and Publish, and the database refuses them
+### F-238 [P1] fixed - An Admin with no stored permission set is shown Edit and Publish, and the database refuses them
 
 **File:** `supabase/migrations/002_functions_triggers.sql:88-104` (`check_admin_permission`), `092_absence_times.sql:949-960` (publish); `packages/authz/src/index.ts:90-96`; writers that leave NULL: `apps/web/src/app/api/organizations/access/route.ts:280-286`, mobile `person-org-role.ts`, `change_user_role`, `invitation-permissions.ts:15` with `accept_invitation` (113)
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security, quality, UX)
 **Why it matters:** The app resolves a missing key to the Admin default (true for edit, publish, notes, recurring and series); SQL reads the raw key and treats missing as false. Run on the local stack in a rolled-back transaction: the seeded Admin's `check_admin_permission('canEditShifts')` was true with their stored set and false for edit, notes, series and recurring once it was NULL. Publish is called with the actor and checks the raw key, so it refuses; RLS hides drafts and recurring rows from the grid. Every User promoted to Admin and every Admin invited without custom permissions lands here until a Super Admin saves a full set. Fails closed, so not a leak, but the UI promises what the server refuses. Whether production holds such rows is unknown: `select count(*) from organization_memberships where org_role='admin' and archived_at is null and (admin_permissions is null or not admin_permissions ?& array['canEditShifts','canPublishSchedule','canEditNotes','canManageRecurringShifts','canManageShiftSeries'])`.
 **Suggested fix:** Store a complete set wherever someone becomes an Admin (promotion on web and mobile, `change_user_role`, invite acceptance), backfill existing NULL and partial rows with `ADMIN_DEFAULT_PERMS` in a migration, then add a CHECK or trigger that an Admin's set has every key. One source of defaults, not two.
-**Resolution:**
+**Resolution:** Fixed on fix/admin-tier-boundary (2026-11-10): migration 131 adds a trigger on `organization_memberships` that stores, for every Admin, the set the app resolves (the defaults overlaid with the stored boolean keys it knows, View and Staff on, organization settings off, each View its Edit implies) and NULL for anyone else, and backfills existing rows without logging a permission change or moving `updated_at`. `check_admin_permission` and publish therefore grant what the app shows. `admin_default_permissions()` must equal `ADMIN_DEFAULT_PERMS`; `admin-permissions-complete.integration.test.ts` compares them and the resolver, and promotes a User through `change_user_role` to prove edit and publish pass. Local stack: 7 Admins filled, 6 of them losing a stored `canManageOrgSettings: true`. Production needs 131 applied.
 
 ### F-239 [P1] open - An Admin with Staff: Edit can suspend a Super Admin
 
@@ -1020,13 +1020,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Gate on `orgRole === "admin"` and count from `buildInitialPermissions(stored)`.
 **Resolution:**
 
-### F-244 [P3] open - Re-promotion restores a stale permission set, and stored sets aren't normalized
+### F-244 [P3] fixed - Re-promotion restores a stale permission set, and stored sets aren't normalized
 
 **File:** `change_user_role` (053:202-204, 126:311); `apps/web/src/lib/db/organizations.ts:327-334`; mobile `person-org-role.ts:92`; `apps/web/src/app/api/organizations/access/route.ts:44`
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security, quality)
 **Why it matters:** Only the web access route clears permissions on demotion. Demote through mobile, the RPC or a Gridmaster path, then promote again, and the old set comes back, possibly with Staff: Edit or approvals from a past stint nobody re-reviewed. The route also accepts and stores `canManageOrgSettings: true` (6 of 7 local seeded Admins carry it), which the resolver forces off and SQL never reads, and its comment says partial sets resolve against the read-only base when they resolve against Admin defaults.
 **Suggested fix:** Clear the set inside `change_user_role` whenever the role leaves Admin, write a reviewed set on every promotion (with F-238), and drop non-configurable keys on save.
-**Resolution:**
+**Resolution:** Fixed with F-238 on fix/admin-tier-boundary (2026-11-10): the 131 trigger stores NULL whenever the role leaves Admin, by any path, so a re-promotion starts from the defaults, and it drops unknown keys and `canManageOrgSettings` on every write. The alert and summary parts are F-245.
 
 ### F-245 [P3] open - Permission counts and change summaries disagree with the editor
 

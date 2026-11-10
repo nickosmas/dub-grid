@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:82c2907de05bd37f5c2e779b191770116c5775eebee2ab7ac27a63c38eb0edc5",
+  "sourceDigest": "sha256:9dae8fd2d618abfa4cbce05c28d4bdff5f024c4d0915ed5a6f93400172a7ccaa",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5140,6 +5140,16 @@
       "sha256": "3cd45525a754c48c4083aa0b4927903f12e84bcbfde5aaeff63232097e712a64",
       "source": {
         "path": "supabase/migrations/130_archived_jobs_stay_on_history.sql"
+      }
+    },
+    {
+      "id": "migration:131_admin_permissions_complete.sql",
+      "version": "131",
+      "name": "admin_permissions_complete",
+      "file": "131_admin_permissions_complete.sql",
+      "sha256": "24f26d0b61c83372b4cd56a07e3c31423665a92645922c785f5516ad319a649e",
+      "source": {
+        "path": "supabase/migrations/131_admin_permissions_complete.sql"
       }
     }
   ],

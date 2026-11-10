@@ -100,7 +100,7 @@ count query first so we know how many Admins it fills.
        prototype shows. Route tests cover an Admin inviting as User (allowed), as Admin (403 with
        an audit row), raising a pending invite to Admin, and moving a pending Admin invite (403).
        **Done when:** those tests pass, and fail against the old rule.
-3. [ ] **Complete permission sets** (migration `131`, checksum locked). Add the defaults
+3. [x] **Complete permission sets** (migration `131`, checksum locked). Add the defaults
        function, the trigger and the backfill. Add a live test that:
    - a User promoted by `change_user_role` passes `check_admin_permission('canEditShifts')`
      and can publish;

@@ -3,8 +3,8 @@
 /**
  * Migration 113: an invite can carry an Admin's permissions, and accepting it
  * writes them onto the new membership. Any other tier ignores them, and an
- * invite without them leaves the membership's permissions empty, which the
- * resolver reads as the standard Admin set. Runs 113 inside BEGIN/ROLLBACK.
+ * invite without them gives the standard Admin set (stored in full since 131).
+ * Runs 113 inside BEGIN/ROLLBACK.
  *
  * Skipped when the local Postgres is unreachable (CI without Supabase).
  */
@@ -12,6 +12,8 @@
 import { readFileSync } from "node:fs";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import { buildPermissionContext } from "@dubgrid/authz";
+import type { AdminPermissions } from "@dubgrid/domain";
 import { migrationPath } from "./helpers/sql-inventory";
 
 const DB_URL =
@@ -140,12 +142,15 @@ describe.skipIf(!reachable)("113 invite admin permissions (live DB)", () => {
   it("gives an invited Admin the permissions chosen before the invite", async () => {
     const chosen = { canEditShifts: true, canViewReports: false, canManageEmployees: true };
     await accept(await invite("admin", chosen));
-    expect(await membershipPermissions()).toEqual(chosen);
+    expect(await membershipPermissions()).toMatchObject(chosen);
   });
 
-  it("leaves them empty, the standard set, when none were chosen", async () => {
+  it("gives the standard set when none were chosen", async () => {
     await accept(await invite("admin", null));
-    expect(await membershipPermissions()).toBeNull();
+    const stored = (await membershipPermissions()) as AdminPermissions | null;
+    expect(buildPermissionContext("admin", ORG, stored)).toEqual(
+      buildPermissionContext("admin", ORG, null),
+    );
   });
 
   it("ignores permissions on an invite for another tier", async () => {
