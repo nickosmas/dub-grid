@@ -105,7 +105,6 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import EditEmployeePanel, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
-import { UnsavedChangesBar, UnsavedChangesScope } from "@/components/ui/UnsavedChangesBar";
 import { SpanTabs } from "@/components/ui/span-tabs";
 import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import { usePersonPeriod } from "@/hooks/usePersonPeriod";
@@ -193,9 +192,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddToScheduleModal, setShowAddToScheduleModal] = useState(false);
   const [isEditingAccess, setIsEditingAccess] = useState(false);
-  const [detailsDirty, setDetailsDirty] = useState(false);
-  const [detailsSaveBlocked, setDetailsSaveBlocked] = useState(false);
-  const [detailsSaveLabel, setDetailsSaveLabel] = useState<string>();
   const detailsEditorRef = useRef<EditEmployeePanelHandle>(null);
   const contentScrollerRef = useClipTrailingWhitespace();
   const {
@@ -1455,41 +1451,29 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 {/* Stays mounted so a draft survives a look at another tab. */}
                 <div hidden={activeTab !== "account"} className="flex flex-col gap-4">
                   {canEditDetails ? (
-                    <UnsavedChangesScope>
-                      <EditEmployeePanel
-                        ref={detailsEditorRef}
-                        sectioned
-                        persistent
-                        hideActions
-                        flushHorizontal
-                        employee={employee}
-                        orgId={orgId ?? undefined}
-                        focusAreas={focusAreas}
-                        certifications={certifications}
-                        roles={orgRoles}
-                        focusAreaLabel={org?.focusAreaLabel}
-                        certificationLabel={org?.certificationLabel}
-                        roleLabel={org?.roleLabel}
-                        isManagementUser={directoryPerson?.isManagementUser}
-                        onSave={handleSaveEmployee}
-                        onCancel={() => undefined}
-                        onDirtyChange={setDetailsDirty}
-                        onSaveBlockedChange={setDetailsSaveBlocked}
-                        pendingInvitation={pendingInvite ?? undefined}
-                        inviteOnSave={detailsInviteOnSave}
-                        onSaveLabelChange={setDetailsSaveLabel}
-                        onMoveToNewEmail={
-                          canMoveToNewEmail ? () => setMovingToNewEmail(true) : undefined
-                        }
-                      />
-                      <UnsavedChangesBar
-                        dirty={detailsDirty}
-                        saveDisabled={detailsSaveBlocked}
-                        saveLabel={detailsSaveLabel}
-                        onDiscard={() => detailsEditorRef.current?.requestDismiss()}
-                        onSave={() => void detailsEditorRef.current?.save()}
-                      />
-                    </UnsavedChangesScope>
+                    <EditEmployeePanel
+                      ref={detailsEditorRef}
+                      sectioned
+                      persistent
+                      hideActions
+                      flushHorizontal
+                      employee={employee}
+                      orgId={orgId ?? undefined}
+                      focusAreas={focusAreas}
+                      certifications={certifications}
+                      roles={orgRoles}
+                      focusAreaLabel={org?.focusAreaLabel}
+                      certificationLabel={org?.certificationLabel}
+                      roleLabel={org?.roleLabel}
+                      isManagementUser={directoryPerson?.isManagementUser}
+                      onSave={handleSaveEmployee}
+                      onCancel={() => undefined}
+                      pendingInvitation={pendingInvite ?? undefined}
+                      inviteOnSave={detailsInviteOnSave}
+                      onMoveToNewEmail={
+                        canMoveToNewEmail ? () => setMovingToNewEmail(true) : undefined
+                      }
+                    />
                   ) : (
                     <WorkCard
                       employee={employee}

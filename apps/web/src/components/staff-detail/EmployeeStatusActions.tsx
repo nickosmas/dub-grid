@@ -937,7 +937,7 @@ export function EmployeeStatusActions({
                 ((hasPlan || plannedLeave || hasSuspensionPlan || returnDay) &&
                   onSetPlannedChange &&
                   focus !== "status")
-              ? "Save changes"
+              ? "Save"
               : "Change staff status"
         }
         confirmDisabled={

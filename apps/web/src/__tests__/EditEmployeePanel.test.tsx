@@ -201,6 +201,43 @@ describe("EditEmployeePanel", () => {
       expect(follows("Work", "Internal notes")).toBe(true);
     });
 
+    it("saves each card on its own and keeps the other card's draft", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      const props = {
+        focusAreas,
+        certifications: [...DESIGNATIONS],
+        roles: [...ROLES],
+        persistent: true,
+        sectioned: true,
+        hideActions: true,
+        onSave,
+        onCancel: vi.fn(),
+      };
+      const { rerender } = render(<EditEmployeePanel employee={employee} {...props} />);
+      await user.type(screen.getByDisplayValue("Alice"), "a");
+      await user.click(screen.getByRole("button", { name: "Mentor" }));
+
+      const [personal, work] = screen.getAllByRole("button", { name: "Save" });
+      await user.click(personal);
+      expect(onSave).toHaveBeenCalledOnce();
+      expect(onSave.mock.calls[0][0]).toMatchObject({ firstName: "Alicea", roleIds: [] });
+
+      rerender(
+        <EditEmployeePanel
+          employee={{ ...employee, firstName: "Alicea", version: employee.version + 1 }}
+          {...props}
+        />,
+      );
+      const [personalAfter, workAfter] = screen.getAllByRole("button", { name: "Save" });
+      expect(personalAfter).toBeDisabled();
+      expect(workAfter).toBeEnabled();
+
+      await user.click(work);
+      expect(onSave).toHaveBeenCalledTimes(2);
+      expect(onSave.mock.calls[1][0]).toMatchObject({ firstName: "Alicea", roleIds: [4] });
+    });
+
     it("keeps everything in Personal details for someone with no Work section", () => {
       renderPanel({
         sectioned: true,
@@ -360,7 +397,7 @@ describe("EditEmployeePanel", () => {
       expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
     });
 
-    it("keeps a draft through a refetch of the same record, in persistent mode", async () => {
+    it("keeps a draft through a refetch or a new version of the same record, in persistent mode", async () => {
       const user = userEvent.setup();
       const { rerender } = render(
         <EditEmployeePanel
@@ -390,7 +427,7 @@ describe("EditEmployeePanel", () => {
 
       rerender(
         <EditEmployeePanel
-          employee={{ ...employee, version: employee.version + 1 }}
+          employee={{ ...employee, lastName: "Jones", version: employee.version + 1 }}
           focusAreas={focusAreas}
           certifications={[...DESIGNATIONS]}
           roles={[]}
@@ -399,7 +436,9 @@ describe("EditEmployeePanel", () => {
           onCancel={vi.fn()}
         />,
       );
-      expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
+      // The field being typed keeps its draft; the rest take the new version.
+      expect(screen.getByDisplayValue("Alicea")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Jones")).toBeInTheDocument();
     });
 
     it("Save becomes enabled after changing the first name field", async () => {

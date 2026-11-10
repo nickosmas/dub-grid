@@ -404,7 +404,7 @@ export interface StatusActionOptions {
   /** With a return date: the absence their away days hold (51f), by name. */
   absenceName?: string | null;
   /**
-   * Mark away, Suspend, Restore or Save changes: a first day after today
+   * Mark away, Suspend, Restore or Save: a first day after today
    * (YYYY-MM-DD) plans the change for then instead of starting it (51g1,
    * 51g3, 51l).
    */
@@ -417,7 +417,7 @@ export interface StatusActionOptions {
    */
   plannedStatus?: PlannedStatus | null;
   /**
-   * Offboard, Save changes or Cancel last day: the last day (YYYY-MM-DD).
+   * Offboard, Save or Cancel last day: the last day (YYYY-MM-DD).
    * Offboard with one offboards them the day after instead of now (51g2).
    */
   lastDay?: string | null;
@@ -425,7 +425,7 @@ export interface StatusActionOptions {
   hasAccount?: boolean;
   /**
    * The absence their days hold now, by name: an Away person's (Mark active,
-   * Edit time away), or the planned Away's (Save changes, and any change that
+   * Edit time away), or the planned Away's (Save, and any change that
    * cancels it).
    */
   currentAbsenceName?: string | null;
@@ -773,7 +773,7 @@ export function describeStatusAction(
     case "setPlannedChange":
       if (plannedStatus === "active") {
         return {
-          label: "Save changes",
+          label: "Save",
           title: `Change ${name}'s planned return?`,
           message: startDate ? staysOffboardedSentence(startDate) : "",
           points: startDate ? plannedReturnPoints(startDate, account) : [],
@@ -783,7 +783,7 @@ export function describeStatusAction(
       }
       if (plannedStatus === "suspended") {
         return {
-          label: "Save changes",
+          label: "Save",
           title: `Change ${name}'s planned suspension?`,
           message: startDate ? plannedSuspensionSentence(startDate, returnDate) : "",
           points: [],
@@ -793,7 +793,7 @@ export function describeStatusAction(
       }
       if (plannedStatus === "removed") {
         return {
-          label: "Save changes",
+          label: "Save",
           title: `Change ${name}'s last day?`,
           message: lastDay ? lastDayMessage(lastDay) : "",
           points: lastDay ? lastDayPoints(lastDay, account) : [],
@@ -811,7 +811,7 @@ export function describeStatusAction(
               )
             : { points: [], unchanged: [] };
         return {
-          label: "Save changes",
+          label: "Save",
           title: `Change ${name}'s planned time away?`,
           message: startDate ? plannedAwaySentence(startDate, returnDate) : "",
           points: startDate

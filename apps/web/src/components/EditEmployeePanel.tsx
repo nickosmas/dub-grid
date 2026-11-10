@@ -9,6 +9,7 @@ import {
   forwardRef,
   useImperativeHandle,
   useRef,
+  type ReactNode,
 } from "react";
 import {
   Employee,
@@ -45,6 +46,7 @@ import {
 } from "@dubgrid/contracts";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { UnsavedChangesBar, UnsavedChangesScope } from "@/components/ui/UnsavedChangesBar";
 import { satisfiesCertificationRequirement } from "@/lib/credential-requirements";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { SectionNotice } from "@/components/ui/SectionNotice";
@@ -129,7 +131,7 @@ export interface EditEmployeePanelProps {
   hideActions?: boolean;
   /** Persistent page editors have no meaningful pristine Close action. */
   persistent?: boolean;
-  /** Draws Personal details and Work as one card on the page, for editing in place. */
+  /** Draws Personal details and Work as the page's own cards, each saved on its own. */
   sectioned?: boolean;
   /** Drops the editor's own side padding so an embedding card owns the inner
    *  padding and the fields line up with that card's heading. */
@@ -156,6 +158,34 @@ type EditForm = {
   /** Their first day (YYYY-MM-DD, 51g4), or empty for none. */
   firstDay: string;
 };
+
+type EditField = keyof EditForm;
+
+const PERSONAL_FIELDS: readonly EditField[] = ["firstName", "lastName", "phone", "email"];
+const WORK_FIELDS: readonly EditField[] = [
+  "employmentType",
+  "certificationId",
+  "focusAreaIds",
+  "roleIds",
+  "departmentIds",
+  "contactNotes",
+  "firstDay",
+];
+const ALL_FIELDS: readonly EditField[] = [...PERSONAL_FIELDS, ...WORK_FIELDS];
+
+/** A card of the in-place editor, saved on its own. */
+type EditorSection = "personal" | "work";
+
+function sameFieldValue(a: EditForm[EditField], b: EditForm[EditField]): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((id) => b.includes(id));
+  }
+  return a === b;
+}
+
+function pickFields(source: EditForm, fields: readonly EditField[]): Partial<EditForm> {
+  return Object.fromEntries(fields.map((field) => [field, source[field]]));
+}
 
 function buildEditForm(employee: Employee): EditForm {
   return {
@@ -217,6 +247,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     // handleSave built, so onConfirm/onCancel don't need to redo validation.
     const [form, setForm] = useState<EditForm>(() => buildEditForm(employee));
     const [hasStarted, setHasStarted] = useState<boolean | null>(null);
+    const [savingSection, setSavingSection] = useState<EditorSection | null>(null);
 
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [emailConflict, setEmailConflict] = useState(false);
@@ -338,12 +369,31 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
     // Editing in place outlives a background refetch, which hands back the same
     // record as a new object: only a real change replaces what's being typed.
-    const loadedRecordRef = useRef({ id: employee.id, version: employee.version });
+    // A new version of the same record keeps every field still being edited, so
+    // saving one card, here or elsewhere on the page, leaves the other's draft.
+    const loadedEmployeeRef = useRef(employee);
+    // The fields a save from this editor just wrote, which take the saved values.
+    const savedFieldsRef = useRef<readonly EditField[] | null>(null);
     useEffect(() => {
-      const loaded = loadedRecordRef.current;
-      const unchanged = loaded.id === employee.id && loaded.version === employee.version;
-      loadedRecordRef.current = { id: employee.id, version: employee.version };
-      if (persistent && unchanged) return;
+      const previous = loadedEmployeeRef.current;
+      loadedEmployeeRef.current = employee;
+      const sameRecord = previous.id === employee.id;
+      if (persistent && sameRecord && previous.version === employee.version) return;
+      const savedFields = savedFieldsRef.current;
+      savedFieldsRef.current = null;
+      if (persistent && sameRecord) {
+        const before = buildEditForm(previous);
+        const after = buildEditForm(employee);
+        setForm((current) => {
+          const kept = ALL_FIELDS.filter(
+            (field) =>
+              !savedFields?.includes(field) && !sameFieldValue(current[field], before[field]),
+          );
+          return { ...after, ...pickFields(current, kept) };
+        });
+        if (savedFields?.includes("email")) resetInviteChoice();
+        return;
+      }
       setForm(buildEditForm(employee));
       setTouched({});
       resetInviteChoice();
@@ -368,6 +418,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         cancelled = true;
       };
     }, [mayStillStart, orgId, employee.id]);
+
+    const savedForm = useMemo(() => buildEditForm(employee), [employee]);
 
     const isModified = useMemo(() => {
       return (
@@ -435,6 +487,46 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onSaveLabelChange?.(saveLabel);
     }, [saveLabel, onSaveLabelChange]);
 
+    const buildInvite = useCallback(
+      (): InviteOnSaveChoice | null =>
+        inviteOnSave && inviteOption && sendingInvite
+          ? inviteOption.kind === "reinvite" && pendingInvitation
+            ? { kind: "reinvite", replacing: pendingInvitation }
+            : {
+                kind: "invite",
+                role: inviteRole,
+                ...(inviteOnSave.canSetAdminPermissions &&
+                inviteRole === "admin" &&
+                invitePermissions
+                  ? { adminPermissions: invitePermissions }
+                  : {}),
+              }
+          : null,
+      [inviteOnSave, inviteOption, sendingInvite, pendingInvitation, inviteRole, invitePermissions],
+    );
+
+    const submitEmployee = useCallback(
+      async (
+        nextEmployee: Employee,
+        invite: InviteOnSaveChoice | null,
+        fields: readonly EditField[],
+      ): Promise<boolean> => {
+        savedFieldsRef.current = fields;
+        try {
+          const saved =
+            (await (invite && inviteOnSave
+              ? inviteOnSave.onSaveAndInvite(nextEmployee, invite, stepUpRef.current.run)
+              : onSave(nextEmployee))) !== false;
+          if (!saved) savedFieldsRef.current = null;
+          return saved;
+        } catch (err) {
+          savedFieldsRef.current = null;
+          throw err;
+        }
+      },
+      [inviteOnSave, onSave, stepUpRef],
+    );
+
     const handleSave = useCallback(async (): Promise<boolean> => {
       if (
         !form.firstName.trim() ||
@@ -484,44 +576,22 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         firstDay: form.firstDay || null,
       };
 
-      const invite: InviteOnSaveChoice | null =
-        inviteOnSave && inviteOption && sendingInvite
-          ? inviteOption.kind === "reinvite" && pendingInvitation
-            ? { kind: "reinvite", replacing: pendingInvitation }
-            : {
-                kind: "invite",
-                role: inviteRole,
-                ...(inviteOnSave.canSetAdminPermissions &&
-                inviteRole === "admin" &&
-                invitePermissions
-                  ? { adminPermissions: invitePermissions }
-                  : {}),
-              }
-          : null;
+      const invite = buildInvite();
 
-      const saved =
-        (await (invite && inviteOnSave
-          ? inviteOnSave.onSaveAndInvite(nextEmployee, invite, stepUpRef.current.run)
-          : onSave(nextEmployee))) !== false;
+      const saved = await submitEmployee(nextEmployee, invite, ALL_FIELDS);
       if (!saved) return false;
       onSaveCompleted?.();
       return true;
     }, [
       form,
       employee,
-      onSave,
       onSaveCompleted,
-      pendingInvitation,
-      stepUpRef,
       validateStaffEmail,
       isManagementUser,
       emailConflict,
       phoneConflict,
-      inviteOnSave,
-      inviteOption,
-      sendingInvite,
-      inviteRole,
-      invitePermissions,
+      buildInvite,
+      submitEmployee,
     ]);
 
     const handleDismiss = useCallback(() => {
@@ -617,6 +687,97 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     // Sectioned, employment and notes are work facts and sit under Work, so the
     // first section holds only their personal details.
     const workHoldsProfileFields = sectioned && showScheduleAssignments;
+
+    // In place, Personal details and Work are cards saved on their own. With no
+    // Work card, Personal details holds every field.
+    const sectionFields = (section: EditorSection): readonly EditField[] =>
+      !workHoldsProfileFields ? ALL_FIELDS : section === "personal" ? PERSONAL_FIELDS : WORK_FIELDS;
+    const sectionDirty = (section: EditorSection) =>
+      sectionFields(section).some((field) => !sameFieldValue(form[field], savedForm[field])) ||
+      (section === "personal" && sendingInvite);
+    const sectionBlocked = (section: EditorSection): boolean => {
+      if (!workHoldsProfileFields) return isSaveBlocked;
+      if (section === "work") {
+        return Boolean(
+          (form.focusAreaIds.length === 0 && !isManagementUser) || validateNotes(form.contactNotes),
+        );
+      }
+      return Boolean(
+        !form.firstName.trim() ||
+        !form.lastName.trim() ||
+        validateRequired(form.firstName, "First name") ||
+        validateRequired(form.lastName, "Last name") ||
+        validateStaffEmail(form.email) ||
+        validatePhone(form.phone) ||
+        emailConflict ||
+        phoneConflict,
+      );
+    };
+
+    const saveSection = async (section: EditorSection) => {
+      setSavingSection(section);
+      try {
+        if (!workHoldsProfileFields) {
+          await handleSave();
+          return;
+        }
+        const fields = sectionFields(section);
+        if (sectionBlocked(section)) {
+          setTouched((prev) => ({ ...prev, ...Object.fromEntries(fields.map((f) => [f, true])) }));
+          return;
+        }
+        const nextEmployee: Employee =
+          section === "personal"
+            ? {
+                ...employee,
+                firstName: normalizeStaffName(form.firstName),
+                lastName: normalizeStaffName(form.lastName),
+                phone: normalizeOptionalUsPhone(form.phone),
+                email: normalizeOptionalStaffEmail(form.email),
+              }
+            : {
+                ...employee,
+                employmentType: form.employmentType,
+                certificationId: form.certificationId,
+                focusAreaIds: form.focusAreaIds,
+                roleIds: form.roleIds,
+                departmentIds: form.departmentIds,
+                contactNotes: normalizeStaffNotes(form.contactNotes),
+                firstDay: form.firstDay || null,
+              };
+        await submitEmployee(nextEmployee, section === "personal" ? buildInvite() : null, fields);
+      } finally {
+        setSavingSection(null);
+      }
+    };
+
+    const dismissSection = (section: EditorSection) => {
+      const fields = sectionFields(section);
+      setForm((prev) => ({ ...prev, ...pickFields(savedForm, fields) }));
+      setTouched((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).filter(([field]) => !fields.includes(field as EditField)),
+        ),
+      );
+      if (fields.includes("email")) resetInviteChoice();
+    };
+
+    const renderSection = (section: EditorSection, card: ReactNode) =>
+      sectioned ? (
+        <UnsavedChangesScope>
+          {card}
+          <UnsavedChangesBar
+            dirty={sectionDirty(section)}
+            saveDisabled={sectionBlocked(section)}
+            saving={savingSection === section}
+            saveLabel={section === "personal" ? saveLabel : undefined}
+            onDiscard={() => dismissSection(section)}
+            onSave={() => void saveSection(section)}
+          />
+        </UnsavedChangesScope>
+      ) : (
+        card
+      );
     const employmentFields = showScheduleAssignments ? (
       <div
         style={{
@@ -700,398 +861,405 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
               below already carries its own `readOnly`/`disabled`, so dimming the
               whole card only made the record look broken and blocked selecting
               text out of it. */}
-          {/* Sectioned, both sections share one card: one save covers both. */}
+          {/* Sectioned, each section is its own card, saved on its own. */}
           <div
-            className={sectioned ? "dg-card" : undefined}
-            style={{ display: "flex", flexDirection: "column" }}
+            style={{ display: "flex", flexDirection: "column", gap: sectioned ? 16 : undefined }}
           >
             {/* ── Details section ── */}
-            <div
-              style={
-                sectioned
-                  ? undefined
-                  : { paddingTop: hideIdentityFields ? 0 : 20, paddingBottom: 20 }
-              }
-            >
-              {sectioned ? (
-                <div className="dg-card-header">
-                  <div className="dg-card-title">Personal details</div>
-                </div>
-              ) : hideIdentityFields ? null : (
-                <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
-                  Details
-                </div>
-              )}
+            {renderSection(
+              "personal",
               <div
-                className={sectioned ? "dg-card-body" : undefined}
-                style={{ display: "flex", flexDirection: "column", gap: 14 }}
-              >
-                {!hideIdentityFields && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                      gap: 10,
-                    }}
-                  >
-                    <div>
-                      <label htmlFor={`${identityFieldIdPrefix}-first-name`} style={fieldLabel}>
-                        First name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
-                      </label>
-                      <input
-                        id={`${identityFieldIdPrefix}-first-name`}
-                        name="staff-first-name"
-                        autoComplete="section-staff-editor given-name"
-                        className="dg-input"
-                        value={form.firstName}
-                        onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
-                        onBlur={() => markTouched("firstName")}
-                        placeholder="e.g. Maria"
-                        readOnly={readOnly}
-                        style={
-                          fieldErrors.firstName
-                            ? { borderColor: "var(--dg-color-danger)" }
-                            : undefined
-                        }
-                      />
-                      {fieldErrors.firstName && (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-danger)",
-                            marginTop: 4,
-                          }}
-                          role="alert"
-                        >
-                          {fieldErrors.firstName}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label htmlFor={`${identityFieldIdPrefix}-last-name`} style={fieldLabel}>
-                        Last name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
-                      </label>
-                      <input
-                        id={`${identityFieldIdPrefix}-last-name`}
-                        name="staff-last-name"
-                        autoComplete="section-staff-editor family-name"
-                        className="dg-input"
-                        value={form.lastName}
-                        onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
-                        onBlur={() => markTouched("lastName")}
-                        placeholder="e.g. Garcia"
-                        readOnly={readOnly}
-                        style={
-                          fieldErrors.lastName
-                            ? { borderColor: "var(--dg-color-danger)" }
-                            : undefined
-                        }
-                      />
-                      {fieldErrors.lastName && (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-danger)",
-                            marginTop: 4,
-                          }}
-                          role="alert"
-                        >
-                          {fieldErrors.lastName}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {!workHoldsProfileFields && employmentFields}
-
-                {!hideIdentityFields && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                      gap: 10,
-                    }}
-                  >
-                    <div>
-                      <label htmlFor={`${identityFieldIdPrefix}-phone`} style={fieldLabel}>
-                        Phone
-                      </label>
-                      <input
-                        id={`${identityFieldIdPrefix}-phone`}
-                        name="staff-phone"
-                        autoComplete="section-staff-editor tel"
-                        className="dg-input"
-                        type="tel"
-                        value={form.phone}
-                        onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                        onBlur={() => markTouched("phone")}
-                        onBlurCapture={() => {
-                          if (!validatePhone(form.phone)) {
-                            setForm((p) => ({
-                              ...p,
-                              phone: normalizeOptionalUsPhone(p.phone),
-                            }));
-                          }
-                        }}
-                        placeholder="(415) 555-0100"
-                        readOnly={readOnly}
-                        style={
-                          fieldErrors.phone ? { borderColor: "var(--dg-color-danger)" } : undefined
-                        }
-                      />
-                      {fieldErrors.phone && (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-danger)",
-                            marginTop: 4,
-                          }}
-                          role="alert"
-                        >
-                          {fieldErrors.phone}
-                        </div>
-                      )}
-                      {!fieldErrors.phone && phoneConflict && (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-danger)",
-                            marginTop: 4,
-                          }}
-                          role="alert"
-                        >
-                          {PHONE_BELONGS_TO_SOMEONE_ELSE}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label htmlFor={`${identityFieldIdPrefix}-email`} style={fieldLabel}>
-                        Email
-                      </label>
-                      <input
-                        ref={emailInputRef}
-                        id={`${identityFieldIdPrefix}-email`}
-                        name="staff-email"
-                        autoComplete="section-staff-editor email"
-                        className="dg-input"
-                        type="email"
-                        value={form.email}
-                        onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                        onBlur={() => markTouched("email")}
-                        placeholder="name@example.com"
-                        readOnly={readOnly || Boolean(employee.userId)}
-                        style={{
-                          ...(fieldErrors.email
-                            ? { borderColor: "var(--dg-color-danger)" }
-                            : undefined),
-                          ...(employee.userId
-                            ? { color: "var(--dg-color-text-muted)", cursor: "default" }
-                            : undefined),
-                        }}
-                      />
-                      {employee.userId && !fieldErrors.email && (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-text-subtle)",
-                            marginTop: 4,
-                          }}
-                        >
-                          This is their sign-in email, so they change it on their own profile.
-                          {onMoveToNewEmail ? (
-                            <span className="block">
-                              Lost access to this email?{" "}
-                              <button
-                                type="button"
-                                onClick={onMoveToNewEmail}
-                                className="cursor-pointer border-0 bg-transparent p-0 font-semibold text-[var(--dg-color-link)] hover:underline"
-                              >
-                                Move them to a new one
-                              </button>
-                            </span>
-                          ) : null}
-                        </div>
-                      )}
-                      {fieldErrors.email && (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-danger)",
-                            marginTop: 4,
-                          }}
-                          role="alert"
-                        >
-                          {fieldErrors.email}
-                        </div>
-                      )}
-                      {!fieldErrors.email && emailConflict && (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-danger)",
-                            marginTop: 4,
-                          }}
-                          role="alert"
-                        >
-                          {EMAIL_BELONGS_TO_SOMEONE_ELSE}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {inviteOption && inviteOnSave ? (
-                  <InviteOptionBox
-                    label={INVITE_ON_SAVE_LABELS[inviteOption.kind]}
-                    checked={sendingInvite}
-                    onCheckedChange={setInviteTicked}
-                    role={
-                      inviteOption.kind === "invite"
-                        ? {
-                            value: inviteRole,
-                            options: inviteOnSave.roleOptions,
-                            onChange: setInviteRole,
-                          }
-                        : undefined
-                    }
-                    permissions={
-                      inviteOption.kind === "invite" &&
-                      inviteOnSave.canSetAdminPermissions &&
-                      inviteRole === "admin"
-                        ? { value: invitePermissions, onChange: setInvitePermissions }
-                        : undefined
-                    }
-                    note={describeInviteOnSaveNote(
-                      inviteOption.kind,
-                      sendingInvite,
-                      pendingInvitation?.email ?? "",
-                    )}
-                    disabled={readOnly}
-                  />
-                ) : null}
-
-                {!workHoldsProfileFields && notesField}
-              </div>
-            </div>
-
-            {showScheduleAssignments && (
-              <div
+                className={sectioned ? "dg-card" : undefined}
                 style={
                   sectioned
                     ? undefined
-                    : {
-                        borderTop: "1px solid var(--dg-color-border-light)",
-                        paddingTop: 20,
-                        paddingBottom: 20,
-                      }
+                    : { paddingTop: hideIdentityFields ? 0 : 20, paddingBottom: 20 }
                 }
               >
                 {sectioned ? (
-                  <div
-                    className="dg-card-header"
-                    style={{ borderTop: "1px solid var(--dg-color-border-light)" }}
-                  >
-                    <div className="dg-card-title">Work</div>
+                  <div className="dg-card-header">
+                    <div className="dg-card-title">Personal details</div>
                   </div>
                 ) : hideIdentityFields ? null : (
                   <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
-                    Assignments
+                    Details
                   </div>
                 )}
                 <div
                   className={sectioned ? "dg-card-body" : undefined}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
+                  style={{ display: "flex", flexDirection: "column", gap: 14 }}
                 >
-                  {workHoldsProfileFields && employmentFields}
-                  {workHoldsProfileFields && notesField}
-                  <SectionNotice messages={assignmentNotices} />
-                  <div>
-                    <label style={fieldLabel}>{certificationLabel}</label>
-                    <CustomSelect
-                      value={form.certificationId != null ? String(form.certificationId) : ""}
-                      options={[
-                        { value: "", label: "None" },
-                        ...certifications.map((d) => ({
-                          value: String(d.id),
-                          label: d.name,
-                        })),
-                      ]}
-                      onChange={(v) =>
-                        setForm((p) => ({
-                          ...p,
-                          certificationId: v ? Number(v) : null,
-                        }))
-                      }
-                      disabled={readOnly}
-                      style={{ width: "100%" }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={fieldLabel}>
-                      {focusAreaLabel}
-                      {!isManagementUser && (
-                        <span style={{ color: "var(--dg-color-danger)" }}> *</span>
-                      )}
-                    </label>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {focusAreas.map((focusArea) => {
-                        const active = form.focusAreaIds.includes(focusArea.id);
-                        return (
-                          <SelectableTag
-                            key={focusArea.id}
-                            selected={active}
-                            onClick={() => {
-                              toggleFocusArea(focusArea.id);
-                              markTouched("focusAreaIds");
+                  {!hideIdentityFields && (
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gap: 10,
+                      }}
+                    >
+                      <div>
+                        <label htmlFor={`${identityFieldIdPrefix}-first-name`} style={fieldLabel}>
+                          First name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                        </label>
+                        <input
+                          id={`${identityFieldIdPrefix}-first-name`}
+                          name="staff-first-name"
+                          autoComplete="section-staff-editor given-name"
+                          className="dg-input"
+                          value={form.firstName}
+                          onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
+                          onBlur={() => markTouched("firstName")}
+                          placeholder="e.g. Maria"
+                          readOnly={readOnly}
+                          style={
+                            fieldErrors.firstName
+                              ? { borderColor: "var(--dg-color-danger)" }
+                              : undefined
+                          }
+                        />
+                        {fieldErrors.firstName && (
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--dg-color-danger)",
+                              marginTop: 4,
                             }}
-                            disabled={readOnly}
-                            padding="5px 12px"
+                            role="alert"
                           >
-                            {focusArea.name}
-                          </SelectableTag>
-                        );
-                      })}
-                    </div>
-                    {fieldErrors.focusAreaIds && (
-                      <div
-                        style={{
-                          fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--dg-color-danger)",
-                          marginTop: 4,
-                        }}
-                        role="alert"
-                      >
-                        {fieldErrors.focusAreaIds}
+                            {fieldErrors.firstName}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                      <div>
+                        <label htmlFor={`${identityFieldIdPrefix}-last-name`} style={fieldLabel}>
+                          Last name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
+                        </label>
+                        <input
+                          id={`${identityFieldIdPrefix}-last-name`}
+                          name="staff-last-name"
+                          autoComplete="section-staff-editor family-name"
+                          className="dg-input"
+                          value={form.lastName}
+                          onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
+                          onBlur={() => markTouched("lastName")}
+                          placeholder="e.g. Garcia"
+                          readOnly={readOnly}
+                          style={
+                            fieldErrors.lastName
+                              ? { borderColor: "var(--dg-color-danger)" }
+                              : undefined
+                          }
+                        />
+                        {fieldErrors.lastName && (
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--dg-color-danger)",
+                              marginTop: 4,
+                            }}
+                            role="alert"
+                          >
+                            {fieldErrors.lastName}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                  <div>
-                    <label style={fieldLabel}>{roleLabel}</label>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {roles
-                        .filter((role) => form.roleIds.includes(role.id) || !isRoleBlocked(role.id))
-                        .map((role) => {
-                          const active = form.roleIds.includes(role.id);
+                  {!workHoldsProfileFields && employmentFields}
+
+                  {!hideIdentityFields && (
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gap: 10,
+                      }}
+                    >
+                      <div>
+                        <label htmlFor={`${identityFieldIdPrefix}-phone`} style={fieldLabel}>
+                          Phone
+                        </label>
+                        <input
+                          id={`${identityFieldIdPrefix}-phone`}
+                          name="staff-phone"
+                          autoComplete="section-staff-editor tel"
+                          className="dg-input"
+                          type="tel"
+                          value={form.phone}
+                          onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                          onBlur={() => markTouched("phone")}
+                          onBlurCapture={() => {
+                            if (!validatePhone(form.phone)) {
+                              setForm((p) => ({
+                                ...p,
+                                phone: normalizeOptionalUsPhone(p.phone),
+                              }));
+                            }
+                          }}
+                          placeholder="(415) 555-0100"
+                          readOnly={readOnly}
+                          style={
+                            fieldErrors.phone
+                              ? { borderColor: "var(--dg-color-danger)" }
+                              : undefined
+                          }
+                        />
+                        {fieldErrors.phone && (
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--dg-color-danger)",
+                              marginTop: 4,
+                            }}
+                            role="alert"
+                          >
+                            {fieldErrors.phone}
+                          </div>
+                        )}
+                        {!fieldErrors.phone && phoneConflict && (
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--dg-color-danger)",
+                              marginTop: 4,
+                            }}
+                            role="alert"
+                          >
+                            {PHONE_BELONGS_TO_SOMEONE_ELSE}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label htmlFor={`${identityFieldIdPrefix}-email`} style={fieldLabel}>
+                          Email
+                        </label>
+                        <input
+                          ref={emailInputRef}
+                          id={`${identityFieldIdPrefix}-email`}
+                          name="staff-email"
+                          autoComplete="section-staff-editor email"
+                          className="dg-input"
+                          type="email"
+                          value={form.email}
+                          onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                          onBlur={() => markTouched("email")}
+                          placeholder="name@example.com"
+                          readOnly={readOnly || Boolean(employee.userId)}
+                          style={{
+                            ...(fieldErrors.email
+                              ? { borderColor: "var(--dg-color-danger)" }
+                              : undefined),
+                            ...(employee.userId
+                              ? { color: "var(--dg-color-text-muted)", cursor: "default" }
+                              : undefined),
+                          }}
+                        />
+                        {employee.userId && !fieldErrors.email && (
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--dg-color-text-subtle)",
+                              marginTop: 4,
+                            }}
+                          >
+                            This is their sign-in email, so they change it on their own profile.
+                            {onMoveToNewEmail ? (
+                              <span className="block">
+                                Lost access to this email?{" "}
+                                <button
+                                  type="button"
+                                  onClick={onMoveToNewEmail}
+                                  className="cursor-pointer border-0 bg-transparent p-0 font-semibold text-[var(--dg-color-link)] hover:underline"
+                                >
+                                  Move them to a new one
+                                </button>
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
+                        {fieldErrors.email && (
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--dg-color-danger)",
+                              marginTop: 4,
+                            }}
+                            role="alert"
+                          >
+                            {fieldErrors.email}
+                          </div>
+                        )}
+                        {!fieldErrors.email && emailConflict && (
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--dg-color-danger)",
+                              marginTop: 4,
+                            }}
+                            role="alert"
+                          >
+                            {EMAIL_BELONGS_TO_SOMEONE_ELSE}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {inviteOption && inviteOnSave ? (
+                    <InviteOptionBox
+                      label={INVITE_ON_SAVE_LABELS[inviteOption.kind]}
+                      checked={sendingInvite}
+                      onCheckedChange={setInviteTicked}
+                      role={
+                        inviteOption.kind === "invite"
+                          ? {
+                              value: inviteRole,
+                              options: inviteOnSave.roleOptions,
+                              onChange: setInviteRole,
+                            }
+                          : undefined
+                      }
+                      permissions={
+                        inviteOption.kind === "invite" &&
+                        inviteOnSave.canSetAdminPermissions &&
+                        inviteRole === "admin"
+                          ? { value: invitePermissions, onChange: setInvitePermissions }
+                          : undefined
+                      }
+                      note={describeInviteOnSaveNote(
+                        inviteOption.kind,
+                        sendingInvite,
+                        pendingInvitation?.email ?? "",
+                      )}
+                      disabled={readOnly}
+                    />
+                  ) : null}
+
+                  {!workHoldsProfileFields && notesField}
+                </div>
+              </div>,
+            )}
+
+            {showScheduleAssignments &&
+              renderSection(
+                "work",
+                <div
+                  className={sectioned ? "dg-card" : undefined}
+                  style={
+                    sectioned
+                      ? undefined
+                      : {
+                          borderTop: "1px solid var(--dg-color-border-light)",
+                          paddingTop: 20,
+                          paddingBottom: 20,
+                        }
+                  }
+                >
+                  {sectioned ? (
+                    <div className="dg-card-header">
+                      <div className="dg-card-title">Work</div>
+                    </div>
+                  ) : hideIdentityFields ? null : (
+                    <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
+                      Assignments
+                    </div>
+                  )}
+                  <div
+                    className={sectioned ? "dg-card-body" : undefined}
+                    style={{ display: "flex", flexDirection: "column", gap: 16 }}
+                  >
+                    {workHoldsProfileFields && employmentFields}
+                    {workHoldsProfileFields && notesField}
+                    <SectionNotice messages={assignmentNotices} />
+                    <div>
+                      <label style={fieldLabel}>{certificationLabel}</label>
+                      <CustomSelect
+                        value={form.certificationId != null ? String(form.certificationId) : ""}
+                        options={[
+                          { value: "", label: "None" },
+                          ...certifications.map((d) => ({
+                            value: String(d.id),
+                            label: d.name,
+                          })),
+                        ]}
+                        onChange={(v) =>
+                          setForm((p) => ({
+                            ...p,
+                            certificationId: v ? Number(v) : null,
+                          }))
+                        }
+                        disabled={readOnly}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={fieldLabel}>
+                        {focusAreaLabel}
+                        {!isManagementUser && (
+                          <span style={{ color: "var(--dg-color-danger)" }}> *</span>
+                        )}
+                      </label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {focusAreas.map((focusArea) => {
+                          const active = form.focusAreaIds.includes(focusArea.id);
                           return (
                             <SelectableTag
-                              key={role.id}
+                              key={focusArea.id}
                               selected={active}
-                              onClick={() => toggleRole(role.id)}
+                              onClick={() => {
+                                toggleFocusArea(focusArea.id);
+                                markTouched("focusAreaIds");
+                              }}
                               disabled={readOnly}
                               padding="5px 12px"
                             >
-                              {role.name}
+                              {focusArea.name}
                             </SelectableTag>
                           );
                         })}
+                      </div>
+                      {fieldErrors.focusAreaIds && (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--dg-color-danger)",
+                            marginTop: 4,
+                          }}
+                          role="alert"
+                        >
+                          {fieldErrors.focusAreaIds}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label style={fieldLabel}>{roleLabel}</label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {roles
+                          .filter(
+                            (role) => form.roleIds.includes(role.id) || !isRoleBlocked(role.id),
+                          )
+                          .map((role) => {
+                            const active = form.roleIds.includes(role.id);
+                            return (
+                              <SelectableTag
+                                key={role.id}
+                                selected={active}
+                                onClick={() => toggleRole(role.id)}
+                                disabled={readOnly}
+                                padding="5px 12px"
+                              >
+                                {role.name}
+                              </SelectableTag>
+                            );
+                          })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
+                </div>,
+              )}
           </div>
 
           {/* ── Invite status ── */}

@@ -219,7 +219,7 @@ describe("settings dirty save controls", () => {
     await user.clear(labelInput);
     await user.type(labelInput, "Units");
 
-    expect(screen.getByRole("button", { name: /^save changes$/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: /^discard$/i }));
 
     expect(screen.getByDisplayValue("Focus Areas")).toBeInTheDocument();
@@ -278,7 +278,7 @@ describe("settings dirty save controls", () => {
 
     const discardButton = screen.getByRole("button", { name: /^discard$/i });
     expect(screen.getByText(/choose a display mode/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^save changes$/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /short codes/i })).toHaveAttribute(
       "aria-pressed",
       "false",
@@ -310,7 +310,7 @@ describe("settings dirty save controls", () => {
     expect(compactLabelsSwitch).toHaveAttribute("aria-checked", "false");
 
     await user.click(compactLabelsSwitch);
-    await user.click(screen.getByRole("button", { name: /^save changes$/i }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     expect(saveOrganizationSettingsWithRecovery).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -335,7 +335,7 @@ describe("settings dirty save controls", () => {
 
     await user.click(toggle);
 
-    expect(screen.getByRole("button", { name: /^save changes$/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
     expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
 
@@ -406,7 +406,7 @@ describe("settings dirty save controls", () => {
 
     expect(screen.getByText(/Picked from its name\./)).toBeInTheDocument();
     // Auto-build already uses it, so nothing is unsaved until something is edited.
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
@@ -441,7 +441,7 @@ describe("settings dirty save controls", () => {
       }),
     );
 
-    await user.click(screen.getByRole("button", { name: /^save changes$/i }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
     const ruleDialog = await screen.findByRole("alertdialog", { name: /save schedule rule/i });
     await user.click(within(ruleDialog).getByRole("button", { name: /^save$/i }));
 
@@ -3257,7 +3257,7 @@ describe("settings dirty save controls", () => {
     await user.type(input, "https://units.example");
 
     expect(screen.getByText("Schedule area label cannot contain a URL")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^save changes$/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
     expect(updateOrganizationSettings).not.toHaveBeenCalled();
   });
 

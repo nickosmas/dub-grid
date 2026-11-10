@@ -124,13 +124,10 @@ function AccountCard({
   title,
   action,
   children,
-  after,
 }: {
   title: string;
   action?: ReactNode;
   children: ReactNode;
-  /** Further sections of the same card, such as one a shared save covers. */
-  after?: ReactNode;
 }) {
   return (
     <section className="dg-card">
@@ -139,22 +136,7 @@ function AccountCard({
         {action}
       </div>
       <div className="dg-card-body">{children}</div>
-      {after}
     </section>
-  );
-}
-
-function AccountCardSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <>
-      <div
-        className="dg-card-header"
-        style={{ borderTop: "1px solid var(--dg-color-border-light)" }}
-      >
-        <h3 className="dg-card-title">{title}</h3>
-      </div>
-      <div className="dg-card-body">{children}</div>
-    </>
   );
 }
 
@@ -215,6 +197,7 @@ export function ProfilePanel({
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savingWork, setSavingWork] = useState(false);
   const [requestedEmail, setRequestedEmail] = useState<string | null>(null);
   const [workHasChanges, setWorkHasChanges] = useState(false);
   const [workSaveBlocked, setWorkSaveBlocked] = useState(false);
@@ -252,7 +235,8 @@ export function ProfilePanel({
   const normalizedPhone =
     phoneError || !employee ? editPhone.trim() : normalizeOptionalUsPhone(editPhone);
   const hasPhoneChanges = normalizedPhone !== savedPhone;
-  const hasAnyChanges = hasNameChanges || hasEmailChanges || hasPhoneChanges || workHasChanges;
+  // Personal details and Work are saved on their own, each from its own card.
+  const hasPersonalChanges = hasNameChanges || hasEmailChanges || hasPhoneChanges;
   const contactCheck = useOwnContactCheck({
     orgId,
     email: hasEmailChanges && !emailError ? editedEmail : null,
@@ -263,7 +247,6 @@ export function ProfilePanel({
     lastNameError ||
     emailError ||
     phoneError ||
-    workSaveBlocked ||
     contactCheck.checking ||
     contactCheck.emailTaken ||
     contactCheck.phoneTaken,
@@ -414,22 +397,25 @@ export function ProfilePanel({
   const canAddToSchedule =
     canManageScheduleEmployees && !isOnSchedule && showManagementAccess && !!employee?.userId;
 
-  async function saveWorkDetails(updatedEmployee: Employee): Promise<Employee> {
+  // Saves the staff record with the personal details typed in this card.
+  async function savePersonalDetails(currentEmployee: Employee): Promise<Employee> {
+    return saveStaffRecord({
+      ...currentEmployee,
+      firstName: canEditProfileDirectly
+        ? normalizeStaffName(editFirstName)
+        : currentEmployee.firstName,
+      lastName: canEditProfileDirectly
+        ? normalizeStaffName(editLastName)
+        : currentEmployee.lastName,
+      phone: normalizeOptionalUsPhone(editPhone),
+    });
+  }
+
+  async function saveStaffRecord(nextEmployee: Employee): Promise<Employee> {
     if (!orgId || !employee) {
       throw new Error("This account is not linked to an organization staff profile.");
     }
-    const previousEmployee = employee;
-    const mergedEmployee = {
-      ...updatedEmployee,
-      firstName: canEditProfileDirectly
-        ? normalizeStaffName(editFirstName)
-        : updatedEmployee.firstName,
-      lastName: canEditProfileDirectly
-        ? normalizeStaffName(editLastName)
-        : updatedEmployee.lastName,
-      phone: normalizeOptionalUsPhone(editPhone),
-    };
-    const savedEmployee = await updateEmployee(mergedEmployee, orgId, previousEmployee.version);
+    const savedEmployee = await updateEmployee(nextEmployee, orgId, employee.version);
     setEmployee(savedEmployee);
     if (canEditProfileDirectly) {
       setProfile((current) =>
@@ -475,12 +461,11 @@ export function ProfilePanel({
     setEditLastName(savedLastName);
     setEditEmail(user?.email ?? "");
     setEditPhone(employee?.phone ?? "");
-    workEditorRef.current?.requestDismiss();
   }
 
   function requestSave() {
     if (saving || hasInvalidDraft) return;
-    if (!hasAnyChanges) return;
+    if (!hasPersonalChanges) return;
     setPendingConfirm("account-details");
   }
 
@@ -496,13 +481,8 @@ export function ProfilePanel({
 
       const persistDraft = async (): Promise<boolean> => {
         if (canEditProfileDirectly && employee && orgId) {
-          if (workHasChanges) {
-            const workSaved = await workEditorRef.current?.save();
-            if (!workSaved) return false;
-          } else if (hasNameChanges || hasPhoneChanges) {
-            await saveWorkDetails(employee);
-          }
-          profileSaved = hasNameChanges || hasPhoneChanges || workHasChanges;
+          if (hasNameChanges || hasPhoneChanges) await savePersonalDetails(employee);
+          profileSaved = hasNameChanges || hasPhoneChanges;
         } else if (hasNameChanges) {
           const updated = await updateSelfProfileDetails({
             firstName: nextFirst,
@@ -642,6 +622,23 @@ export function ProfilePanel({
     }
   }
 
+  async function saveWork() {
+    if (savingWork || workSaveBlocked || !workHasChanges) return;
+    setSavingWork(true);
+    try {
+      if (await workEditorRef.current?.save()) toast.success("Work details saved.");
+    } catch (err) {
+      if (err instanceof EmployeeProfileConflictError) {
+        setEmployee(err.latestEmployee);
+        toast.error(changedElsewhereMessage("your work details"));
+        return;
+      }
+      toast.error(extractErrorMessage(err, "We couldn't save your work details. Try again."));
+    } finally {
+      setSavingWork(false);
+    }
+  }
+
   function confirmPending() {
     const action = pendingConfirm;
     if (!action) return;
@@ -656,7 +653,7 @@ export function ProfilePanel({
   const confirmation =
     pendingConfirm === "account-details"
       ? {
-          title: "Save your account and contact changes?",
+          title: "Save your personal details?",
           message: undefined,
           confirmLabel: "Save",
           variant: "info" as const,
@@ -675,36 +672,7 @@ export function ProfilePanel({
   return (
     <>
       <UnsavedChangesScope>
-        <AccountCard
-          title="Personal details"
-          after={
-            canEditProfileDirectly && employee ? (
-              <AccountCardSection title="Work">
-                <EditEmployeePanel
-                  flushHorizontal
-                  ref={workEditorRef}
-                  employee={employee}
-                  focusAreas={focusAreas}
-                  certifications={certifications}
-                  certificationLabel={certificationLabel}
-                  roles={roles}
-                  roleLabel={roleLabel}
-                  focusAreaLabel={focusAreaLabel}
-                  isManagementUser={showManagementAccess}
-                  hideIdentityFields
-                  hideActions
-                  persistent
-                  onDirtyChange={setWorkHasChanges}
-                  onSaveBlockedChange={setWorkSaveBlocked}
-                  onSave={async (updatedEmployee) => {
-                    await saveWorkDetails(updatedEmployee);
-                  }}
-                  onCancel={() => undefined}
-                />
-              </AccountCardSection>
-            ) : undefined
-          }
-        >
+        <AccountCard title="Personal details">
           <Form
             onSubmit={(e) => {
               e.preventDefault();
@@ -832,13 +800,48 @@ export function ProfilePanel({
         </AccountCard>
 
         <UnsavedChangesBar
-          dirty={hasAnyChanges}
+          dirty={hasPersonalChanges}
           saveDisabled={hasInvalidDraft}
           saving={saving}
           onDiscard={cancelEditing}
           onSave={requestSave}
         />
       </UnsavedChangesScope>
+
+      {canEditProfileDirectly && employee ? (
+        <UnsavedChangesScope>
+          <AccountCard title="Work">
+            <EditEmployeePanel
+              flushHorizontal
+              ref={workEditorRef}
+              employee={employee}
+              focusAreas={focusAreas}
+              certifications={certifications}
+              certificationLabel={certificationLabel}
+              roles={roles}
+              roleLabel={roleLabel}
+              focusAreaLabel={focusAreaLabel}
+              isManagementUser={showManagementAccess}
+              hideIdentityFields
+              hideActions
+              persistent
+              onDirtyChange={setWorkHasChanges}
+              onSaveBlockedChange={setWorkSaveBlocked}
+              onSave={async (updatedEmployee) => {
+                await saveStaffRecord(updatedEmployee);
+              }}
+              onCancel={() => undefined}
+            />
+          </AccountCard>
+          <UnsavedChangesBar
+            dirty={workHasChanges}
+            saveDisabled={workSaveBlocked}
+            saving={savingWork}
+            onDiscard={() => workEditorRef.current?.requestDismiss()}
+            onSave={() => void saveWork()}
+          />
+        </UnsavedChangesScope>
+      ) : null}
 
       {isGridmaster || canManageManagementAccess || showAccessRole ? (
         <AccountCard title="Access">

@@ -55,7 +55,7 @@ describe("NotificationPreferences", () => {
 
     const [scheduleInApp] = screen.getAllByRole("switch");
     fireEvent.click(scheduleInApp);
-    const saveButton = await screen.findByRole("button", { name: /save changes/i });
+    const saveButton = await screen.findByRole("button", { name: /^save$/i });
 
     await user.click(saveButton);
 
@@ -94,7 +94,7 @@ describe("NotificationPreferences", () => {
     expect(screen.queryByRole("switch", { name: /security alerts/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("switch")[0]);
-    await user.click(await screen.findByRole("button", { name: /save changes/i }));
+    await user.click(await screen.findByRole("button", { name: /^save$/i }));
 
     await waitFor(() => expect(mockSaveNotificationPreferences).toHaveBeenCalledOnce());
     const saved = mockSaveNotificationPreferences.mock.calls[0]?.[0] as Record<string, unknown>;
