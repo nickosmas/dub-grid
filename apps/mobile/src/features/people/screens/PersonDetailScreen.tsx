@@ -2708,7 +2708,7 @@ function EditPanel({
 
   return (
     <>
-      <ProfileSection title="Basic info">
+      <ProfileSection title="Name">
         <ProfilePanel>
           <ProfileTextInput
             accessibilityLabel="First name"

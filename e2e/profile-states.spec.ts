@@ -43,13 +43,13 @@ test.describe("profile states", () => {
     const tryAgain = page.getByRole("button", { name: "Try again" });
     await expect(tryAgain).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("Temporary test failure")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Your details" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Name and contact" })).toHaveCount(0);
 
     // Lift the failure; the button refetches and the page renders.
     await page.unroute(SELF_PROFILE_GLOB);
     await tryAgain.click();
 
-    await expect(page.getByRole("heading", { name: "Your details" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Name and contact" })).toBeVisible({
       timeout: 15_000,
     });
     await expect(tryAgain).toHaveCount(0);
@@ -57,7 +57,7 @@ test.describe("profile states", () => {
 
   // Each setting has a tab of its own, and an old ?section= link opens it.
   const SECTION_MARKERS: Record<string, string> = {
-    profile: "Your details",
+    profile: "Name and contact",
     security: "Password and two-factor",
     notifications: "Alerts",
     "data-privacy": "Data and privacy",
@@ -86,7 +86,7 @@ test.describe("profile states", () => {
 
     // Account comes first and is where a plain /profile opens.
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile`);
-    await expect(page.getByRole("heading", { name: "Your details" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Name and contact" })).toBeVisible({
       timeout: 15_000,
     });
   });

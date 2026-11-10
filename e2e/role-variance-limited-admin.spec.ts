@@ -79,7 +79,7 @@ test.describe("role variance: limited admin route entry contract", () => {
       {
         path: "/settings",
         finalUrl: /\/profile/,
-        marker: (p) => p.getByRole("heading", { name: "Your details", exact: true }),
+        marker: (p) => p.getByRole("heading", { name: "Name and contact", exact: true }),
       },
     ]);
 

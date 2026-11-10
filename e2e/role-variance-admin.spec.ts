@@ -51,7 +51,7 @@ test.describe("role variance: qa-admin route entry contract", () => {
       {
         path: "/profile",
         finalUrl: /\/profile/,
-        marker: (p) => p.getByRole("heading", { name: "Your details", exact: true }),
+        marker: (p) => p.getByRole("heading", { name: "Name and contact", exact: true }),
       },
       {
         // canViewReports is in ADMIN_DEFAULT_PERMS: the page renders.

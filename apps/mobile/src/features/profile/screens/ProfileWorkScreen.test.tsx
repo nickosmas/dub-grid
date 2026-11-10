@@ -273,7 +273,8 @@ describe("ProfileWorkScreen", () => {
   it("opens directly in the persistent account and staff editor", () => {
     render(<ProfileWorkScreen />);
 
-    expect(screen.getByText("Account")).toBeInTheDocument();
+    expect(screen.getByText("Name and contact")).toBeInTheDocument();
+    expect(screen.getByText("Work")).toBeInTheDocument();
     expect(screen.getByText("Staff profile")).toBeInTheDocument();
     expect(screen.getByText("Employment")).toBeInTheDocument();
     expect(screen.getAllByText("Supervisor").length).toBeGreaterThan(0);

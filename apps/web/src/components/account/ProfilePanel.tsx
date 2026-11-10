@@ -676,7 +676,7 @@ export function ProfilePanel({
     <>
       <UnsavedChangesScope>
         <AccountCard
-          title="Your details"
+          title="Name and contact"
           after={
             canEditProfileDirectly && employee ? (
               <AccountCardSection title="Work">

@@ -129,7 +129,7 @@ export interface EditEmployeePanelProps {
   hideActions?: boolean;
   /** Persistent page editors have no meaningful pristine Close action. */
   persistent?: boolean;
-  /** Draws Details and Work as one card on the page, for editing in place. */
+  /** Draws Name and contact and Work as one card on the page, for editing in place. */
   sectioned?: boolean;
   /** Drops the editor's own side padding so an embedding card owns the inner
    *  padding and the fields line up with that card's heading. */
@@ -614,6 +614,81 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     // Flush inside a card's side padding, the footer reaches out to the card's edges.
     const footerSidePadding = flushHorizontal ? "var(--dg-card-padding-x)" : sidePadding;
 
+    // Sectioned, employment and notes are work facts and sit under Work, so the
+    // first section holds only the name and contact details its title names.
+    const workHoldsProfileFields = sectioned && showScheduleAssignments;
+    const employmentFields = showScheduleAssignments ? (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gap: 10,
+          alignItems: "start",
+        }}
+      >
+        <div>
+          <label style={fieldLabel}>Employment</label>
+          <CustomSelect
+            value={form.employmentType}
+            options={[
+              { value: "full_time", label: "Full-time" },
+              { value: "part_time", label: "Part-time" },
+            ]}
+            onChange={(v) =>
+              setForm((p) => ({
+                ...p,
+                employmentType: v === "part_time" ? "part_time" : "full_time",
+              }))
+            }
+            disabled={readOnly}
+            style={{ width: "100%" }}
+          />
+        </div>
+        {/* Here only while it's ahead, or for someone who hasn't worked a shift yet. */}
+        {upcomingFirstDay(employee, formatDateKey(new Date())) ||
+        (mayStillStart && hasStarted === false && !readOnly) ? (
+          <FirstDayField
+            value={form.firstDay}
+            onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
+            labelStyle={fieldLabel}
+            labelGap={4}
+            disabled={readOnly}
+            placeholder="Set first day"
+          />
+        ) : null}
+      </div>
+    ) : null;
+    const notesField = (
+      <div>
+        <label style={fieldLabel}>Internal notes</label>
+        <textarea
+          className="dg-input"
+          value={form.contactNotes}
+          onChange={(e) => setForm((p) => ({ ...p, contactNotes: e.target.value }))}
+          onBlur={() => markTouched("contactNotes")}
+          placeholder="Preferences, availability, etc."
+          rows={2}
+          style={{
+            resize: "vertical",
+            minHeight: 64,
+          }}
+          readOnly={readOnly}
+        />
+        {fieldErrors.contactNotes && (
+          <div
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--dg-color-danger)",
+              marginTop: 4,
+            }}
+            role="alert"
+          >
+            {fieldErrors.contactNotes}
+          </div>
+        )}
+      </div>
+    );
+
     return (
       <>
         <div
@@ -625,7 +700,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
               below already carries its own `readOnly`/`disabled`, so dimming the
               whole card only made the record look broken and blocked selecting
               text out of it. */}
-          {/* Sectioned, Details and Work share one card: one save covers both. */}
+          {/* Sectioned, both sections share one card: one save covers both. */}
           <div
             className={sectioned ? "dg-card" : undefined}
             style={{ display: "flex", flexDirection: "column" }}
@@ -640,7 +715,9 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             >
               {sectioned ? (
                 <div className="dg-card-header">
-                  <div className="dg-card-title">Details</div>
+                  <div className="dg-card-title">
+                    {workHoldsProfileFields ? "Name and contact" : "Details"}
+                  </div>
                 </div>
               ) : hideIdentityFields ? null : (
                 <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
@@ -728,47 +805,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   </div>
                 )}
 
-                {showScheduleAssignments && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                      gap: 10,
-                      alignItems: "start",
-                    }}
-                  >
-                    <div>
-                      <label style={fieldLabel}>Employment</label>
-                      <CustomSelect
-                        value={form.employmentType}
-                        options={[
-                          { value: "full_time", label: "Full-time" },
-                          { value: "part_time", label: "Part-time" },
-                        ]}
-                        onChange={(v) =>
-                          setForm((p) => ({
-                            ...p,
-                            employmentType: v === "part_time" ? "part_time" : "full_time",
-                          }))
-                        }
-                        disabled={readOnly}
-                        style={{ width: "100%" }}
-                      />
-                    </div>
-                    {/* Here only while it's ahead, or for someone who hasn't worked a shift yet. */}
-                    {upcomingFirstDay(employee, formatDateKey(new Date())) ||
-                    (mayStillStart && hasStarted === false && !readOnly) ? (
-                      <FirstDayField
-                        value={form.firstDay}
-                        onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
-                        labelStyle={fieldLabel}
-                        labelGap={4}
-                        disabled={readOnly}
-                        placeholder="Set first day"
-                      />
-                    ) : null}
-                  </div>
-                )}
+                {!workHoldsProfileFields && employmentFields}
 
                 {!hideIdentityFields && (
                   <div
@@ -936,34 +973,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   />
                 ) : null}
 
-                <div>
-                  <label style={fieldLabel}>Internal notes</label>
-                  <textarea
-                    className="dg-input"
-                    value={form.contactNotes}
-                    onChange={(e) => setForm((p) => ({ ...p, contactNotes: e.target.value }))}
-                    onBlur={() => markTouched("contactNotes")}
-                    placeholder="Preferences, availability, etc."
-                    rows={2}
-                    style={{
-                      resize: "vertical",
-                      minHeight: 64,
-                    }}
-                    readOnly={readOnly}
-                  />
-                  {fieldErrors.contactNotes && (
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--dg-color-danger)",
-                        marginTop: 4,
-                      }}
-                      role="alert"
-                    >
-                      {fieldErrors.contactNotes}
-                    </div>
-                  )}
-                </div>
+                {!workHoldsProfileFields && notesField}
               </div>
             </div>
 
@@ -995,6 +1005,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   className={sectioned ? "dg-card-body" : undefined}
                   style={{ display: "flex", flexDirection: "column", gap: 16 }}
                 >
+                  {workHoldsProfileFields && employmentFields}
+                  {workHoldsProfileFields && notesField}
                   <SectionNotice messages={assignmentNotices} />
                   <div>
                     <label style={fieldLabel}>{certificationLabel}</label>

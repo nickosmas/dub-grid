@@ -815,7 +815,7 @@ function EditPanel({
           tone="info"
         />
       ) : null}
-      <ProfileSection title="Account">
+      <ProfileSection title="Name and contact">
         <ProfilePanel>
           <ProfileTextInput
             accessibilityLabel="First name"
@@ -880,7 +880,7 @@ function EditPanel({
 
       {hasLinkedEmployee && canEditProfileDirectly ? (
         <>
-          <ProfileSection>
+          <ProfileSection title="Work">
             <ProfileChoiceGroup
               items={[
                 { id: 0, name: "Full-time" },

@@ -1017,7 +1017,7 @@ describe("PersonDetailScreen", () => {
 
     fireEvent.click(screen.getByText("Edit"));
 
-    expect(screen.getByText("Basic info")).toBeInTheDocument();
+    expect(screen.getByText("Name")).toBeInTheDocument();
     // One title per group: Employment, not Staffing over Employment.
     expect(screen.getByText("Employment")).toBeInTheDocument();
     expect(screen.queryByText("Staffing")).not.toBeInTheDocument();
@@ -1048,7 +1048,7 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("Add phone"));
 
-    expect(screen.getByText("Basic info")).toBeInTheDocument();
+    expect(screen.getByText("Name")).toBeInTheDocument();
     expect(screen.getByLabelText("Phone")).toHaveFocus();
   });
 
@@ -1077,7 +1077,7 @@ describe("PersonDetailScreen", () => {
     // open, and the X has gone back to Cancel. Leaving is the back gesture's
     // job, which is guarded separately.
     expect(screen.getByDisplayValue("Mina")).toBeInTheDocument();
-    expect(screen.getByText("Basic info")).toBeInTheDocument();
+    expect(screen.getByText("Name")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(screen.queryByRole("menu", { name: "Discard" })).not.toBeInTheDocument();
   });
