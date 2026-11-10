@@ -11,7 +11,7 @@ import {
 import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import type { AdminPermissions, AssignableOrganizationRole } from "@/types";
-import { InvitePermissionsField } from "@/components/InvitePermissionsField";
+import { InviteOptionBox } from "@/components/staff/InviteOptionBox";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import type { NewStaffInvite } from "@/features/employees/client/new-staff-invites";
 import CustomSelect from "@/components/CustomSelect";
@@ -187,6 +187,11 @@ export default function AddEmployeeModal({
   const invitableRows = rows.filter(canInviteRow);
   const inviteAll = invitableRows.length > 0 && invitableRows.every((row) => row.invite);
   const invitedRows = validRows.filter((row) => row.invite && row.email.trim().length > 0);
+  const invitingRows = invitableRows.filter((row) => row.invite);
+  const bulkRole: AssignableOrganizationRole | "mixed" =
+    invitingRows.length > 0 && invitingRows.every((row) => row.role === invitingRows[0].role)
+      ? invitingRows[0].role
+      : "mixed";
 
   const updateRow = useCallback((id: string, patch: Partial<Omit<RowEntry, "_id">>) => {
     setRows((prev) => prev.map((r) => (r._id === id ? { ...r, ...patch } : r)));
@@ -297,7 +302,13 @@ export default function AddEmployeeModal({
             <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
               {validRows.length === 0
                 ? "Complete the fields marked with * to create a profile."
-                : `Ready to add ${validRows.length} staff member${validRows.length === 1 ? "" : "s"}.`}
+                : `Ready to add ${validRows.length} staff member${validRows.length === 1 ? "" : "s"}.${
+                    invitedRows.length === 0
+                      ? ""
+                      : invitedRows.length === 1
+                        ? " We email the person you invite a link to join."
+                        : ` We email each of the ${invitedRows.length} people you invite a link to join.`
+                  }`}
             </div>
             <div
               style={{
@@ -334,9 +345,11 @@ export default function AddEmployeeModal({
                 disabled={validRows.length === 0}
                 style={{ flex: isMobile ? 1 : undefined }}
               >
-                Add {validRows.length > 0 ? `${validRows.length} ` : ""}Staff Member
-                {validRows.length !== 1 ? "s" : ""}
-                {invitedRows.length > 0 ? `, Invite ${invitedRows.length}` : ""}
+                {invitedRows.length > 0
+                  ? `Add ${validRows.length} & invite ${invitedRows.length}`
+                  : `Add ${validRows.length > 0 ? `${validRows.length} ` : ""}Staff Member${
+                      validRows.length !== 1 ? "s" : ""
+                    }`}
               </Button>
             </div>
           </div>
@@ -377,22 +390,42 @@ export default function AddEmployeeModal({
                 {" · "}
                 {validRows.length} ready to add
               </div>
-              <label style={checkboxLabelStyle}>
-                <input
-                  type="checkbox"
-                  className="dg-checkbox"
-                  checked={inviteAll}
-                  disabled={invitableRows.length === 0}
-                  onChange={() =>
-                    setRows((prev) =>
-                      prev.map((r, index) =>
-                        canInviteRow(r, index) ? { ...r, invite: !inviteAll } : r,
-                      ),
-                    )
-                  }
-                />
-                Invite everyone with an email
-              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                <label style={checkboxLabelStyle}>
+                  <input
+                    type="checkbox"
+                    className="dg-checkbox"
+                    checked={inviteAll}
+                    disabled={invitableRows.length === 0}
+                    onChange={() =>
+                      setRows((prev) =>
+                        prev.map((r, index) =>
+                          canInviteRow(r, index) ? { ...r, invite: !inviteAll } : r,
+                        ),
+                      )
+                    }
+                  />
+                  Invite everyone with an email
+                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ ...fieldLabelStyle, whiteSpace: "nowrap" }}>Set everyone to</span>
+                  <CustomSelect<AssignableOrganizationRole | "mixed">
+                    ariaLabel="Set everyone's access role"
+                    value={bulkRole}
+                    options={roleOptions}
+                    placeholder={invitingRows.length === 0 ? "No one invited" : "Mixed"}
+                    disabled={invitingRows.length === 0}
+                    onChange={(role) => {
+                      if (role === "mixed") return;
+                      setRows((prev) =>
+                        prev.map((r, index) =>
+                          canInviteRow(r, index) && r.invite ? { ...r, role } : r,
+                        ),
+                      );
+                    }}
+                  />
+                </div>
+              </div>
             </div>
             <div
               style={{
@@ -642,62 +675,27 @@ export default function AddEmployeeModal({
                       />
                     </div>
 
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: isMobile
-                          ? "1fr"
-                          : "minmax(0, 1fr) minmax(220px, 0.6fr)",
-                        gap: 12,
-                        alignItems: "center",
-                      }}
-                    >
-                      <label
-                        style={{
-                          ...checkboxLabelStyle,
-                          color: canInviteRow(row, idx)
-                            ? checkboxLabelStyle.color
-                            : "var(--dg-color-text-muted)",
+                    {canInviteRow(row, idx) ? (
+                      <InviteOptionBox
+                        label="Invite to the app"
+                        checked={row.invite}
+                        onCheckedChange={(invite) => updateRow(row._id, { invite })}
+                        role={{
+                          value: row.role,
+                          options: roleOptions,
+                          onChange: (role) => updateRow(row._id, { role }),
                         }}
-                      >
-                        <input
-                          type="checkbox"
-                          className="dg-checkbox"
-                          checked={canInviteRow(row, idx) && row.invite}
-                          disabled={!canInviteRow(row, idx)}
-                          onChange={(e) => updateRow(row._id, { invite: e.target.checked })}
-                        />
-                        {canInviteRow(row, idx) ? "Invite to the app" : "Add an email to invite"}
-                      </label>
-                      {canInviteRow(row, idx) && row.invite ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ ...fieldLabelStyle, whiteSpace: "nowrap" }}>
-                            Access role
-                          </span>
-                          <CustomSelect
-                            ariaLabel="Access role"
-                            value={row.role}
-                            options={roleOptions}
-                            onChange={(role) => updateRow(row._id, { role })}
-                            style={{ flex: 1, minWidth: 0 }}
-                            fontSize={12}
-                          />
-                        </div>
-                      ) : null}
-                      {canGrantSuperAdmin &&
-                      canInviteRow(row, idx) &&
-                      row.invite &&
-                      row.role === "admin" ? (
-                        <div className="col-span-full">
-                          <InvitePermissionsField
-                            value={row.adminPermissions}
-                            onChange={(adminPermissions) =>
-                              updateRow(row._id, { adminPermissions })
-                            }
-                          />
-                        </div>
-                      ) : null}
-                    </div>
+                        permissions={
+                          canGrantSuperAdmin && row.role === "admin"
+                            ? {
+                                value: row.adminPermissions,
+                                onChange: (adminPermissions) =>
+                                  updateRow(row._id, { adminPermissions }),
+                              }
+                            : undefined
+                        }
+                      />
+                    ) : null}
 
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       <div
