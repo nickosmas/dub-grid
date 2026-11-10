@@ -18,7 +18,7 @@ import {
   type AdminPermissions,
   type AssignableOrganizationRole,
 } from "@/types";
-import { InvitePermissionsField } from "@/components/InvitePermissionsField";
+import { InviteOptionBox } from "@/components/staff/InviteOptionBox";
 import {
   INVITE_ON_SAVE_LABELS,
   describeInviteOnSave,
@@ -910,93 +910,33 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 )}
 
                 {inviteOption && inviteOnSave ? (
-                  <div
-                    data-slot="invite-on-save"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                      padding: "12px 14px",
-                      borderRadius: "var(--dg-radius-lg)",
-                      border: `1px solid ${
-                        sendingInvite ? "var(--dg-color-brand-border)" : "var(--dg-color-border)"
-                      }`,
-                      background: sendingInvite ? "var(--dg-color-brand-bg)" : "transparent",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 12,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          cursor: "pointer",
-                          fontSize: "var(--dg-fs-label)",
-                          fontWeight: 500,
-                          color: "var(--dg-color-text-primary)",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          className="dg-checkbox"
-                          checked={sendingInvite}
-                          disabled={readOnly}
-                          onChange={(e) => setInviteTicked(e.target.checked)}
-                        />
-                        {INVITE_ON_SAVE_LABELS[inviteOption.kind]}
-                      </label>
-                      {inviteOption.kind === "invite" && sendingInvite ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ ...fieldLabel, marginBottom: 0, whiteSpace: "nowrap" }}>
-                            Access role
-                          </span>
-                          <CustomSelect
-                            ariaLabel="Access role"
-                            value={inviteRole}
-                            options={inviteOnSave.roleOptions}
-                            onChange={setInviteRole}
-                            disabled={readOnly}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                    {inviteOption.kind === "invite" &&
-                    sendingInvite &&
-                    inviteOnSave.canSetAdminPermissions &&
-                    inviteRole === "admin" ? (
-                      <InvitePermissionsField
-                        value={invitePermissions}
-                        onChange={setInvitePermissions}
-                        disabled={readOnly}
-                      />
-                    ) : null}
-                    {(() => {
-                      const note = describeInviteOnSaveNote(
-                        inviteOption.kind,
-                        sendingInvite,
-                        pendingInvitation?.email ?? "",
-                      );
-                      return note ? (
-                        <div
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--dg-color-text-secondary)",
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {note}
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
+                  <InviteOptionBox
+                    label={INVITE_ON_SAVE_LABELS[inviteOption.kind]}
+                    checked={sendingInvite}
+                    onCheckedChange={setInviteTicked}
+                    role={
+                      inviteOption.kind === "invite"
+                        ? {
+                            value: inviteRole,
+                            options: inviteOnSave.roleOptions,
+                            onChange: setInviteRole,
+                          }
+                        : undefined
+                    }
+                    permissions={
+                      inviteOption.kind === "invite" &&
+                      inviteOnSave.canSetAdminPermissions &&
+                      inviteRole === "admin"
+                        ? { value: invitePermissions, onChange: setInvitePermissions }
+                        : undefined
+                    }
+                    note={describeInviteOnSaveNote(
+                      inviteOption.kind,
+                      sendingInvite,
+                      pendingInvitation?.email ?? "",
+                    )}
+                    disabled={readOnly}
+                  />
                 ) : null}
 
                 <div>
