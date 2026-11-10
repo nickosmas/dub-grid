@@ -1446,7 +1446,7 @@ function JobRow({
         <div
           id={editorId}
           style={{
-            background: "var(--dg-color-bg-secondary)",
+            background: "var(--dg-color-surface-editor)",
             borderRadius: "var(--dg-radius-lg)",
             border: "1px solid var(--dg-color-border-light)",
             margin: "0 0 8px",
