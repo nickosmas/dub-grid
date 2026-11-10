@@ -116,15 +116,20 @@ export const OFFBOARD_OUT_OF_REACH_MESSAGE = "Only a Super Admin can offboard a 
 
 export const RESTORE_OUT_OF_REACH_MESSAGE = "Only a Super Admin can restore a Super Admin.";
 
+export const SUSPEND_OUT_OF_REACH_MESSAGE = "Only a Super Admin can suspend a Super Admin.";
+
+export const REINSTATE_OUT_OF_REACH_MESSAGE = "Only a Super Admin can reinstate a Super Admin.";
+
 /** Gridmaster's Remove from organization confirmation: it offboards their staff record too (51k). */
 export const REMOVE_FROM_ORGANIZATION_MESSAGE =
   "They're offboarded from the organization too: they lose access now, and their shifts from today on come off the published schedule, except a day that has already started. Their staff record stays, and the organization can restore them.";
 
 /**
- * Whether this manager may offboard or restore someone with `targetOrgRole`
- * (51k). Offboarding ends their membership and Restore reopens it, so the
- * Super Admin tier stays with Super Admins and Gridmasters, as when it's
- * given (`canAssignOrgRole`); an Admin who can manage staff reaches the rest.
+ * Whether this manager may change the access of someone with `targetOrgRole`:
+ * offboard or restore them (51k), suspend them, plan or end a suspension, or
+ * reinstate them (F-240). Each ends or reopens their sign-in, so the Super
+ * Admin tier stays with Super Admins and Gridmasters, as when it's given
+ * (`canGrantOrgRole`); an Admin who can manage staff reaches the rest.
  */
 export function canOffboardAtTier(
   actor: { isSuperAdmin: boolean; isGridmaster: boolean },
@@ -1014,8 +1019,9 @@ export interface CurrentStatusState extends StatusState {
 
 export interface StatusChoiceOptions {
   /**
-   * False when the manager may not offboard or restore this person
-   * (`canOffboardAtTier`): both stay listed, disabled with the reason (51k).
+   * False when the manager may not change this person's access
+   * (`canOffboardAtTier`): Offboarded, Suspended and the way back stay
+   * listed, disabled with the reason (51k, F-240).
    */
   canOffboard?: boolean;
 }
@@ -1064,7 +1070,42 @@ const EDIT_PLAN_HINT = "Change it with Edit plan.";
  */
 export function statusChoices(
   state: CurrentStatusState,
-  { canOffboard = true }: StatusChoiceOptions = {},
+  options: StatusChoiceOptions = {},
+): StatusChoice[] {
+  const choices = everyStatusChoice(state, options);
+  const reason = planOutOfReachReason(state, options);
+  return reason
+    ? choices.map((option) =>
+        option.available ? { ...option, available: false, unavailableReason: reason } : option,
+      )
+    : choices;
+}
+
+/**
+ * A Super Admin's planned suspension, last day or return is theirs to keep:
+ * any other status change would replace or cancel it, so a manager who can't
+ * reach the tier changes nothing while one is planned (F-240).
+ */
+function planOutOfReachReason(
+  state: CurrentStatusState,
+  { canOffboard = true }: StatusChoiceOptions,
+): string | null {
+  if (canOffboard) return null;
+  switch (state.plannedStatus) {
+    case "suspended":
+      return SUSPEND_OUT_OF_REACH_MESSAGE;
+    case "removed":
+      return OFFBOARD_OUT_OF_REACH_MESSAGE;
+    case "active":
+      return RESTORE_OUT_OF_REACH_MESSAGE;
+    default:
+      return null;
+  }
+}
+
+function everyStatusChoice(
+  state: CurrentStatusState,
+  { canOffboard = true }: StatusChoiceOptions,
 ): StatusChoice[] {
   const account = hasAccount(state);
   const kind = currentKind(state);
@@ -1104,13 +1145,15 @@ export function statusChoices(
       detail: SUSPENDED_DETAIL,
       outcome: "They'll be Suspended, so they can't sign in but stay on the schedule.",
     },
-    kind !== "active"
-      ? NOT_SUSPENDABLE_MESSAGE
-      : !account
-        ? NO_ACCOUNT_MESSAGE
-        : plannedSuspensionFrom
-          ? `Planned from ${formatReturnDate(plannedSuspensionFrom, { weekday: true })}. ${EDIT_PLAN_HINT}`
-          : null,
+    !canOffboard && kind === "active"
+      ? SUSPEND_OUT_OF_REACH_MESSAGE
+      : kind !== "active"
+        ? NOT_SUSPENDABLE_MESSAGE
+        : !account
+          ? NO_ACCOUNT_MESSAGE
+          : plannedSuspensionFrom
+            ? `Planned from ${formatReturnDate(plannedSuspensionFrom, { weekday: true })}. ${EDIT_PLAN_HINT}`
+            : null,
   );
   const archived = choice(
     {
@@ -1133,15 +1176,18 @@ export function statusChoices(
       return [away, suspended, archived];
     case "suspended":
       return [
-        choice({
-          kind: "active",
-          action: "reinstate",
-          label: EMPLOYMENT_STATUS_LABELS.active,
-          detail: account ? "Can sign in again." : "Back to Active.",
-          outcome: account
-            ? "They'll be Active again and can sign in."
-            : "They'll be Active again.",
-        }),
+        choice(
+          {
+            kind: "active",
+            action: "reinstate",
+            label: EMPLOYMENT_STATUS_LABELS.active,
+            detail: account ? "Can sign in again." : "Back to Active.",
+            outcome: account
+              ? "They'll be Active again and can sign in."
+              : "They'll be Active again.",
+          },
+          canOffboard ? null : REINSTATE_OUT_OF_REACH_MESSAGE,
+        ),
         away,
         archived,
       ];

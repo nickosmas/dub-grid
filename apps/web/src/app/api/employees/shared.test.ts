@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import {
+  canAssignOrgRole,
   canManageEmployees,
   isActingInSessionOrg,
   isGridmasterActor,
@@ -262,5 +263,34 @@ describe("isGridmasterActor (F-69)", () => {
     await expect(
       isGridmasterActor(makeProfileClient({ data: null, error: null }).client, ACTOR_ID),
     ).resolves.toBe(false);
+  });
+});
+
+describe("canAssignOrgRole (F-238)", () => {
+  const admin = makeServiceClient({
+    membership: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
+    profile: { platform_role: null },
+  });
+
+  it("lets an Admin who manages staff invite Users only", async () => {
+    await expect(canAssignOrgRole(admin, "actor-1", "org-1", "user")).resolves.toBe(true);
+    await expect(canAssignOrgRole(admin, "actor-1", "org-1", "admin")).resolves.toBe(false);
+    await expect(canAssignOrgRole(admin, "actor-1", "org-1", "super_admin")).resolves.toBe(false);
+  });
+
+  it("lets a Super Admin or Gridmaster give every tier", async () => {
+    const superAdmin = makeServiceClient({
+      membership: { org_role: "super_admin", admin_permissions: null },
+      profile: { platform_role: null },
+    });
+    const gridmaster = makeServiceClient({
+      membership: null,
+      profile: { platform_role: "gridmaster" },
+    });
+    for (const client of [superAdmin, gridmaster]) {
+      for (const role of ["user", "admin", "super_admin"]) {
+        await expect(canAssignOrgRole(client, "actor-1", "org-1", role)).resolves.toBe(true);
+      }
+    }
   });
 });

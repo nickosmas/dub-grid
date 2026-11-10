@@ -186,65 +186,27 @@ afterAll(async () => {
 });
 
 describe.runIf(reachable)("role-escalation guards (live DB)", () => {
+  // Only the Gridmaster portal assigns by email (F-252): an Admin could set any
+  // member to User, demoting a Super Admin or reviving an archived membership.
   describe("assign_org_role_by_email", () => {
-    it("blocks an admin from assigning super_admin to anyone", async () => {
+    it.each([
+      ["an admin assigning super_admin", "admin", "super_admin", "superAdminEmail"],
+      ["an admin assigning admin", "admin", "admin", "superAdminEmail"],
+      ["an admin self-promoting", "admin", "super_admin", "adminEmail"],
+      ["an admin demoting a super_admin to user", "admin", "user", "superAdminEmail"],
+      ["a super_admin", "super_admin", "user", "adminEmail"],
+    ] as const)("refuses %s", async (_name, callerRole, role, emailKey) => {
       await db.query("BEGIN");
       try {
-        await asUser(fx.adminUserId, fx.orgId, "admin");
+        const caller = callerRole === "admin" ? fx.adminUserId : fx.superAdminUserId;
+        await asUser(caller, fx.orgId, callerRole);
         await expect(
-          db.query(`SELECT public.assign_org_role_by_email($1, $2, 'super_admin')`, [
-            fx.superAdminEmail,
+          db.query(`SELECT public.assign_org_role_by_email($1, $2, $3)`, [
+            fx[emailKey],
             fx.orgId,
+            role,
           ]),
-        ).rejects.toThrow(/admin cannot assign admin or super_admin/i);
-      } finally {
-        await db.query("ROLLBACK");
-        await resetSession();
-      }
-    });
-
-    it("blocks an admin from assigning admin to anyone", async () => {
-      await db.query("BEGIN");
-      try {
-        await asUser(fx.adminUserId, fx.orgId, "admin");
-        await expect(
-          db.query(`SELECT public.assign_org_role_by_email($1, $2, 'admin')`, [
-            fx.superAdminEmail,
-            fx.orgId,
-          ]),
-        ).rejects.toThrow(/admin cannot assign admin or super_admin/i);
-      } finally {
-        await db.query("ROLLBACK");
-        await resetSession();
-      }
-    });
-
-    it("blocks an admin from self-promoting (even to 'user' would no-op, but to super_admin must raise)", async () => {
-      await db.query("BEGIN");
-      try {
-        await asUser(fx.adminUserId, fx.orgId, "admin");
-        await expect(
-          db.query(`SELECT public.assign_org_role_by_email($1, $2, 'super_admin')`, [
-            fx.adminEmail,
-            fx.orgId,
-          ]),
-        ).rejects.toThrow(/admin cannot assign admin or super_admin/i);
-      } finally {
-        await db.query("ROLLBACK");
-        await resetSession();
-      }
-    });
-
-    it("allows a super_admin to assign super_admin", async () => {
-      await db.query("BEGIN");
-      try {
-        await asUser(fx.superAdminUserId, fx.orgId, "super_admin");
-        await expect(
-          db.query(`SELECT public.assign_org_role_by_email($1, $2, 'user')`, [
-            fx.adminEmail,
-            fx.orgId,
-          ]),
-        ).resolves.toBeDefined();
+        ).rejects.toThrow(/insufficient permissions/i);
       } finally {
         await db.query("ROLLBACK");
         await resetSession();
