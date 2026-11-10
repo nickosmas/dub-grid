@@ -58,6 +58,10 @@ import type {
   OrganizationRole,
   OrganizationUser,
 } from "@/types";
+import {
+  inviteRoleOptions,
+  type InviteOnSaveChoice,
+} from "@/features/employees/client/invite-on-save";
 import { useClientFeatureFlags, useDirectory, useMediaQuery, MOBILE } from "@/hooks";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
@@ -146,9 +150,9 @@ export interface MembersSectionProps {
   /** Called instead of `onSave` when the admin confirms changing an
    *  on-schedule employee's email while a pending invitation exists — see
    *  EditEmployeePanel. */
-  onSaveWithReinvite?: (
+  onSaveAndInvite?: (
     updatedEmployee: Employee,
-    oldInvitation: Invitation,
+    invite: InviteOnSaveChoice,
     runStepUp: StepUpRun,
   ) => boolean | Promise<boolean>;
   onRemove: (empId: string, note?: string, lastDay?: string) => void | Promise<boolean>;
@@ -210,7 +214,7 @@ export function MembersSection({
   useCompactRoleCertificationLabels = false,
   onSave,
   onSaveOrder,
-  onSaveWithReinvite,
+  onSaveAndInvite,
   onRemove,
   onDeactivate,
   onSetReturnDate,
@@ -787,6 +791,24 @@ export function MembersSection({
       })
       .catch(() => {});
   }
+
+  // The slideover's editor offers an invite beside the email, as the staff page does.
+  const detailsInviteOnSave = onSaveAndInvite
+    ? {
+        canInvite: canManageEmployees,
+        roleOptions: inviteRoleOptions(!!isSuperAdmin || !!isGridmaster),
+        canSetAdminPermissions: !!isSuperAdmin || !!isGridmaster,
+        onSaveAndInvite: async (
+          updatedEmployee: Employee,
+          invite: InviteOnSaveChoice,
+          runStepUp: StepUpRun,
+        ) => {
+          const saved = await onSaveAndInvite(updatedEmployee, invite, runStepUp);
+          refreshInvitations();
+          return saved;
+        },
+      }
+    : undefined;
 
   // Not wrapped in a confirmation: its only caller is the pending-invitation
   // banner, which asks first, and the banner's reinvite calls it again inside
@@ -2250,7 +2272,7 @@ export function MembersSection({
           pendingInviteByEmployeeId={pendingInviteByEmployeeId}
           accountState={selectedAccountState}
           onSave={handleSave}
-          onSaveWithReinvite={onSaveWithReinvite}
+          inviteOnSave={detailsInviteOnSave}
           onRemove={onRemove}
           onDeactivate={onDeactivate}
           onSetReturnDate={onSetReturnDate}
