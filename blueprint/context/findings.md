@@ -820,13 +820,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-07 (review):** `account/profile` (`route.ts:44-58`, `profile-change-requests.ts:833`) reads the role from the client's organization, so someone with a surviving Super Admin membership elsewhere renames their global profile directly, skipping the review their own organization requires. The rule that a manager edits directly should use the session's organization. Traced, not run.
 
-### F-218 [P2] open - Moving a pending Admin invitation keeps its stored permissions
+### F-218 [P2] fixed - Moving a pending Admin invitation keeps its stored permissions
 
 **File:** `apps/web/src/app/api/organizations/invitations/route.ts:320-323`, `:423-435`; `accept_invitation` (`113:172`)
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security)
 **Why it matters:** PATCH checks only the Super Admin tier. On the stack an Admin who can manage staff moved an Admin invitation holding `canManageBilling` to their own second address, and the permissions stayed for `accept_invitation` to apply. Rotating the token doesn't help, because the new mailbox is theirs. `employees/move-email/route.ts:155` already refuses this case.
 **Suggested fix:** Apply move-email's rule, or clear `admin_permissions` when the address changes.
-**Resolution:**
+**Resolution:** Fixed with F-237 on fix/admin-tier-boundary (2026-11-10): redirecting a pending invitation needs the editor to be able to give its role, so an Admin can no longer move an Admin invitation; an edit that resends the unchanged role checks nothing, so editing such an invitation's other fields still works.
 
 ### F-219 [P2] open - Losing sandbox rights locks the session out, and Exit can't fix it
 
@@ -962,4 +962,116 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Found:** 2026-11-09 by /audit (scope: re-review of F-224; lens: security, multi-tenancy)
 **Why it matters:** Switching organization into one that suspended you answers `ACCOUNT_SUSPENDED` without `suspendedUntil`, though F-224's resolution says the route returns the date. And someone suspended at this address and in every other organization is refused with the date from their default organization's staff row, not this one's. Neither grants access; both can tell the person the wrong day. Read in code, not run.
 **Suggested fix:** Return `suspendedUntil` from the switch route as the login route does, and have the hook name the date of the organization it refused for.
+**Resolution:**
+
+### F-237 [P1] fixed - An Admin with Staff: Edit can create Admins who hold more than they do
+
+**File:** `apps/web/src/app/api/organizations/invitations/create/route.ts:252-266`; `apps/web/src/app/api/employees/shared.ts:52-60` (`canAssignOrgRole`); `apps/web/src/features/organization/server/invitation-permissions.ts:15`; `packages/authz/src/index.ts:90-96`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security, quality, UX)
+**Why it matters:** Inviting needs only `canManageEmployees`, and `canAssignOrgRole` blocks only `super_admin`. An Admin invite from an Admin stores `admin_permissions = NULL`, which the app resolves to the standard Admin set (edit, publish, notes, recurring, reports). So an Admin trusted only with Staff: Edit can invite a second address of their own as Admin and gain publish and report rights they were never given. The same applies to raising a pending User invite to Admin (`invitations/route.ts:322`). It also contradicts `change_user_role`'s own rule that an Admin can't promote anyone into Admin (053). Traced in code, not run.
+**Suggested fix:** Only a Super Admin or Gridmaster grants the Admin tier (invite, edit and replace alike), or cap an invite's permissions at the inviter's own resolved set. Update the Staff row's description to match.
+**Resolution:** Fixed on fix/admin-tier-boundary (2026-11-10): `canGrantOrgRole` in `@dubgrid/domain` lets only a Super Admin or Gridmaster give an elevated tier, and `canAssignOrgRole` (web create, edit, redirect and replace) and the mobile invite route apply it, answering "Only a Super Admin can invite someone as an Admin." with an audit row. The web invite surfaces state Access role as User with that reason for anyone else; the app lists Admin disabled with it. Pending Admin invitations sent before stay valid (owner, 2026-11-10). Route and helper tests fail against the old rule.
+
+### F-238 [P1] open - An Admin with no stored permission set is shown Edit and Publish, and the database refuses them
+
+**File:** `supabase/migrations/002_functions_triggers.sql:88-104` (`check_admin_permission`), `092_absence_times.sql:949-960` (publish); `packages/authz/src/index.ts:90-96`; writers that leave NULL: `apps/web/src/app/api/organizations/access/route.ts:280-286`, mobile `person-org-role.ts`, `change_user_role`, `invitation-permissions.ts:15` with `accept_invitation` (113)
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security, quality, UX)
+**Why it matters:** The app resolves a missing key to the Admin default (true for edit, publish, notes, recurring and series); SQL reads the raw key and treats missing as false. Run on the local stack in a rolled-back transaction: the seeded Admin's `check_admin_permission('canEditShifts')` was true with their stored set and false for edit, notes, series and recurring once it was NULL. Publish is called with the actor and checks the raw key, so it refuses; RLS hides drafts and recurring rows from the grid. Every User promoted to Admin and every Admin invited without custom permissions lands here until a Super Admin saves a full set. Fails closed, so not a leak, but the UI promises what the server refuses. Whether production holds such rows is unknown: `select count(*) from organization_memberships where org_role='admin' and archived_at is null and (admin_permissions is null or not admin_permissions ?& array['canEditShifts','canPublishSchedule','canEditNotes','canManageRecurringShifts','canManageShiftSeries'])`.
+**Suggested fix:** Store a complete set wherever someone becomes an Admin (promotion on web and mobile, `change_user_role`, invite acceptance), backfill existing NULL and partial rows with `ADMIN_DEFAULT_PERMS` in a migration, then add a CHECK or trigger that an Admin's set has every key. One source of defaults, not two.
+**Resolution:**
+
+### F-239 [P1] open - An Admin with Staff: Edit can suspend a Super Admin
+
+**File:** `apps/web/src/features/employees/server/status-change.ts:268` (tier guard covers offboard and restore only), `:440-462`; `packages/mobile-api-core/src/people-status.ts:527`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
+**Why it matters:** `canOffboardAtTier` runs for offboarding and restoring, not for `suspend` or a planned suspension. The only suspend guard is that another Super Admin can still sign in. So an Admin can sign an organization owner out everywhere and block their sign-in, from web or mobile. A lower tier acting on a higher one breaks the rule every other access path keeps. Traced in code, not run.
+**Suggested fix:** Apply the offboard tier rule to suspend, planned suspend and reinstate, on web, bulk and mobile, with a test per path.
+**Resolution:**
+
+### F-240 [P2] open - The mobile admin dashboard ignores Dashboard: View
+
+**File:** `packages/mobile-api-core/src/dashboard.ts:604`; `apps/web/src/features/mobile/server/routes/dashboard.ts:83`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
+**Why it matters:** It checks only that the caller is an Admin or Super Admin, while web's `/api/dashboard/analytics` requires `canViewDashboardAnalytics`. An Admin with every view off still gets org-wide coverage, every shift request in the range, publish history and staff hours on the phone. The comment assumes approvals default on; `ADMIN_DEFAULT_PERMS` has them off.
+**Suggested fix:** Require the resolved `canViewDashboardAnalytics` (and per-section keys where web has them), and add a contract test that web and mobile refuse the same Admin.
+**Resolution:**
+
+### F-241 [P2] unverified - A non-approver Admin may get a request approved, and published, in an approver's name
+
+**File:** `create_shift_request_unguarded` (099:98), `claim_shift_request` and `volunteer_for_open_shift` (130), `auto_approve_shift_request` (030:44-66); `apps/web/src/app/api/schedule/requests/route.ts:199`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
+**Why it matters:** The database lets any Admin act for another employee with no permission key; the route narrows it to Schedule or Staff edit, but PostgREST calls skip the route. An Admin without approve or publish rights could file a call-off as an approver's employee row, and auto-approval would then publish it as that approver. Traced by a subagent, not run.
+**Suggested fix:** Confirm on the stack. If it holds, require `canEditShifts` or `canManageEmployees` in the SQL for acting on someone else, and never auto-approve a request that someone other than the requester filed.
+**Resolution:**
+
+### F-242 [P2] open - The Staff row says it sets access roles, and doesn't say it can create Admins
+
+**File:** `packages/authz/src/permission-modules.ts:100-104`; `docs/reference/admin-permissions.mdx:23`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX)
+**Why it matters:** "With Edit, they can also ... set their access role" is wrong: changing a member's role is Super Admin only (`access/route.ts:90-94`). It also omits what Edit does allow: inviting people as Admin (F-237), suspending and offboarding. A Super Admin deciding who gets the strongest switch reads the wrong consequences.
+**Suggested fix:** Describe exactly what the server allows once F-237 and F-239 are settled, and show a one-line warning when Staff: Edit is turned on.
+**Resolution:**
+
+### F-243 [P2] open - An Admin never configured shows no permissions, and can't be edited on mobile
+
+**File:** `apps/mobile/src/features/people/screens/PersonDetailScreen.tsx:1051-1055, 1811`; `apps/web/src/components/staff-detail/PersonInfoCards.tsx:177-189`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX)
+**Why it matters:** Both gate on a stored set. For an Admin with `NULL` (F-238's common case), web drops the Permissions line and mobile hides the Permissions row, so a Super Admin on the phone has no way to set them.
+**Suggested fix:** Gate on `orgRole === "admin"` and count from `buildInitialPermissions(stored)`.
+**Resolution:**
+
+### F-244 [P3] open - Re-promotion restores a stale permission set, and stored sets aren't normalized
+
+**File:** `change_user_role` (053:202-204, 126:311); `apps/web/src/lib/db/organizations.ts:327-334`; mobile `person-org-role.ts:92`; `apps/web/src/app/api/organizations/access/route.ts:44`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security, quality)
+**Why it matters:** Only the web access route clears permissions on demotion. Demote through mobile, the RPC or a Gridmaster path, then promote again, and the old set comes back, possibly with Staff: Edit or approvals from a past stint nobody re-reviewed. The route also accepts and stores `canManageOrgSettings: true` (6 of 7 local seeded Admins carry it), which the resolver forces off and SQL never reads, and its comment says partial sets resolve against the read-only base when they resolve against Admin defaults.
+**Suggested fix:** Clear the set inside `change_user_role` whenever the role leaves Admin, write a reviewed set on every promotion (with F-238), and drop non-configurable keys on save.
+**Resolution:**
+
+### F-245 [P3] open - Permission counts and change summaries disagree with the editor
+
+**File:** `apps/web/src/components/staff-detail/PersonInfoCards.tsx:177, 191`; `access-management.ts:53-63` (`formatAdminPermissionsSummary`); `admin-permission-count.ts`; `access/route.ts:400` and `notifications/server/events.ts:1278`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX, quality)
+**Why it matters:** Seen locally for the same Admin: the Access card reads "24 of 25" (raw stored keys, a total no Admin can reach) while the editor reads "16 of 16 turned on". The save review says "10 permissions enabled → 12", not which areas changed, so granting Staff: Edit looks like granting Reports. For a first edit of a `NULL` set, the alert, email and activity log list every standard permission as newly added.
+**Suggested fix:** Count with `countPermissionLevels` everywhere, list each flipped area and level in the review and alert ("Staff: Edit on"), diff against `buildInitialPermissions(before)`, and remove the unused raw counter.
+**Resolution:**
+
+### F-246 [P3] open - The editor hides the Recurring dependency, mobile shows no notes, and Select all grants Staff: Edit unchecked
+
+**File:** `apps/web/src/components/PermissionsEditor.tsx:177, 282-288`; `apps/mobile/src/features/people/components/PermissionsSheet.tsx:97, 178-183`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX)
+**Why it matters:** `impliedNote ?? mod.note` replaces "Applying to the grid and creating series also need Schedule: Edit." with "Included with Edit." whenever Recurring Edit is on, which is the default (seen locally). The phone sheet shows neither note, so "Included" and "Off" come with no reason, and swiping it down discards edits without asking. Select all turns on every switch, Staff: Edit included, in one click.
+**Suggested fix:** Show both lines, warn inline when Recurring Edit is on without Schedule Edit, render notes on mobile, prompt before discarding, and leave Staff: Edit out of Select all (or confirm it).
+**Resolution:**
+
+### F-247 [P3] open - Permission alerts and the activity log use a second, hardcoded vocabulary
+
+**File:** `permission-labels.ts:18-23` (`PERMISSION_LABELS`)
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: quality, UX)
+**Why it matters:** Alerts, email and the activity log say "Manage schedule areas" and "Manage repeating shifts", which match neither the editor's rows nor the organization's own term for focus areas (a standards rule).
+**Suggested fix:** Derive these labels from `PERMISSION_MODULES` and the organization's labels.
+**Resolution:**
+
+### F-248 [P3] open - Super Admins grant Super Admin and change permissions without fresh proof
+
+**File:** `apps/web/src/app/api/organizations/access/route.ts:300-303`; `change_user_role` (053:95)
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
+**Why it matters:** Fresh proof is required only of a Gridmaster. A stolen or left-open Super Admin session can mint another Super Admin (who then holds billing and can change the original's role) with no password or code. Step-up already guards credential changes and exports; granting authority is the same class.
+**Suggested fix:** Require `requireSensitiveActionAuth` for any role change and any permission change that turns a switch on; the client already runs these through `useStepUpAction`.
+**Resolution:**
+
+### F-249 [P3] open - The server never applies the impersonation narrowing the app shows
+
+**File:** `apps/web/src/app/api/shared/permissions.ts:563-567`; `packages/authz/src/index.ts:109-121`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
+**Why it matters:** `buildPermissionContext` turns off staff, settings, approvals and notes while a Gridmaster impersonates, but `requireOrgPermissions` never passes `isImpersonating`, so routes grant all of it and only the client hides it. Part of F-201's gap.
+**Suggested fix:** Pass the impersonation state into the resolver in `requireOrgPermissions` and the mobile auth context, with F-201.
+**Resolution:**
+
+### F-250 [P3] open - `departments.permissions` is written from client input and read by nothing
+
+**File:** `supabase/migrations/001_schema.sql:257-262`; `apps/web/src/app/api/settings/config/route.ts:2406`; `apps/web/src/lib/db/employees.ts:71`
+**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: quality)
+**Why it matters:** The column's comment still says it "defines what members can do", the settings route stores whatever the client sends, and nothing reads it. A future change that trusts it would grant permissions from data anyone with Departments: Edit can write. Beside the Access card's "Administrative Teams" line, it also suggests teams grant something.
+**Suggested fix:** Drop the column (or at least stop writing it and fix the comment) in a forward migration.
 **Resolution:**

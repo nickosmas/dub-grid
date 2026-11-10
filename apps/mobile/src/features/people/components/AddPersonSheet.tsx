@@ -162,9 +162,9 @@ export function AddPersonSheet({
   const emailToCheck = emailFormatError ? "" : email.trim();
   // An invite needs an address, so the choice appears once one is typed.
   const canInvite = emailToCheck !== "";
-  const canGrantSuperAdmin = bootstrapQuery.data?.effectiveRole === "super_admin";
+  const canGrantElevatedRoles = bootstrapQuery.data?.effectiveRole === "super_admin";
   // Only a Super Admin sets an Admin's permissions; anyone else's invite gets the standard set.
-  const setsPermissions = canGrantSuperAdmin && orgRole === "admin";
+  const setsPermissions = canGrantElevatedRoles && orgRole === "admin";
   useEffect(() => {
     if (!accessToken || !emailToCheck) {
       setServerFieldErrors((current) =>
@@ -440,7 +440,7 @@ export function AddPersonSheet({
               </ProfileSection>
               {invite ? (
                 <OrgRoleChoice
-                  canGrantSuperAdmin={canGrantSuperAdmin}
+                  canGrantElevatedRoles={canGrantElevatedRoles}
                   value={orgRole}
                   onChange={setOrgRole}
                 />

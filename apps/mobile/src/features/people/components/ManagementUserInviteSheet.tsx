@@ -68,7 +68,7 @@ function getEmailError(value: string): string | null {
 export function ManagementUserInviteSheet({
   visible,
   managementDepartments,
-  canGrantSuperAdmin,
+  canGrantElevatedRoles,
   permissionLabels,
   isPending,
   error,
@@ -78,7 +78,7 @@ export function ManagementUserInviteSheet({
   visible: boolean;
   managementDepartments: MobileDepartment[];
   /** Only a Super Admin may invite another one, or set an Admin's permissions, as on web. */
-  canGrantSuperAdmin: boolean;
+  canGrantElevatedRoles: boolean;
   permissionLabels: PermissionEditorLabels;
   isPending: boolean;
   /**
@@ -120,7 +120,7 @@ export function ManagementUserInviteSheet({
     draft.phone !== "" ||
     draft.adminPermissions !== null ||
     draft.managementDepartmentIds.length > 0;
-  const setsPermissions = canGrantSuperAdmin && draft.orgRole === "admin";
+  const setsPermissions = canGrantElevatedRoles && draft.orgRole === "admin";
 
   // Deliberately no `onDiscard`: the draft is cleared on open, above, so that
   // the fields are never seen emptying themselves as the sheet slides away.
@@ -237,7 +237,7 @@ export function ManagementUserInviteSheet({
           </ProfilePanel>
 
           <OrgRoleChoice
-            canGrantSuperAdmin={canGrantSuperAdmin}
+            canGrantElevatedRoles={canGrantElevatedRoles}
             disabled={isPending}
             value={draft.orgRole}
             onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}

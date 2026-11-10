@@ -608,7 +608,9 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
     );
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN });
+    expect(await response.json()).toEqual({
+      error: "Only a Super Admin can invite someone as a Super Admin.",
+    });
     expect(canAssignOrgRole).toHaveBeenCalledWith(
       expect.anything(),
       "actor-1",
@@ -672,6 +674,75 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
 
     expect(response.status).toBe(200);
     expect(canAssignOrgRole).toHaveBeenCalledWith(expect.anything(), "actor-1", ORG_ID, "user");
+  });
+});
+
+describe("PATCH /api/organizations/invitations - Admin tier ceiling (F-237, F-218)", () => {
+  it("refuses an Admin raising a pending invitation to Admin", async () => {
+    canAssignOrgRole.mockResolvedValue(false);
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        roleToAssign: "admin",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Only a Super Admin can invite someone as an Admin.",
+    });
+    expect(canAssignOrgRole).toHaveBeenCalledWith(expect.anything(), "actor-1", ORG_ID, "admin");
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+
+  it("refuses an Admin moving a pending Admin invitation to another address", async () => {
+    invitationSelectMaybeSingle.mockResolvedValue({
+      data: { ...CURRENT_INVITATION_ROW, role_to_assign: "admin" },
+      error: null,
+    });
+    canAssignOrgRole.mockResolvedValue(false);
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        email: "mine@test.com",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(canAssignOrgRole).toHaveBeenCalledWith(expect.anything(), "actor-1", ORG_ID, "admin");
+    expect(invitationUpdateOperations).toHaveLength(0);
+  });
+
+  it("lets an Admin edit a pending Admin invitation that resends its unchanged role", async () => {
+    const current = { ...CURRENT_INVITATION_ROW, role_to_assign: "admin" };
+    invitationSelectMaybeSingle.mockResolvedValue({ data: current, error: null });
+    invitationUpdateMaybeSingle.mockResolvedValue({
+      data: { ...current, first_name: "Sam" },
+      error: null,
+    });
+    canAssignOrgRole.mockResolvedValue(false);
+
+    const { PATCH } = await importRoute();
+    const response = await PATCH(
+      makePatchRequest({
+        orgId: ORG_ID,
+        invitationId: INVITATION_ID,
+        expectedUpdatedAt: EXPECTED_UPDATED_AT,
+        firstName: "Sam",
+        roleToAssign: "admin",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(canAssignOrgRole).not.toHaveBeenCalled();
   });
 });
 
@@ -788,7 +859,9 @@ describe("POST /api/organizations/invitations - replace_access tier ceiling", ()
     );
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN });
+    expect(await response.json()).toEqual({
+      error: "Only a Super Admin can invite someone as a Super Admin.",
+    });
     // The RPC stamps invited_by with the caller, so refusing before it runs is
     // what keeps a lower tier from writing an inviter that outranks them.
     expect(serviceRpc).not.toHaveBeenCalled();
@@ -1081,7 +1154,9 @@ describe("a Gridmaster's invitation changes (41d4, F-59)", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN });
+    expect(await response.json()).toEqual({
+      error: "Only a Super Admin can invite someone as a Super Admin.",
+    });
     expect(sendInvitationEmail).not.toHaveBeenCalled();
   });
 });

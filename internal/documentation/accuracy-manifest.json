@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3e2512020fcb0358e34c152ac265f9400bcba5adb5a26a304f3b96672ae3e0a5"
+      "evidenceFingerprint": "sha256:4f0e11e9e1aae9b440e6bcbdb23f5d840e334d7e0bedf38bf34d86dd8769c8c7"
     },
     {
       "id": "introduction",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:261e9960554d4062a340b87708afb7e5b6000398a8aece48f585b0598496df7f"
+      "evidenceFingerprint": "sha256:46287487cde0bc5756cd32449af779d70e5b84c3b173f150272b9f5ac0bda914"
     },
     {
       "id": "quickstart",
@@ -238,7 +238,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6f9cb51d81651a441010865b210593eab4dea9651e20297d66a851cdc82231e5"
+      "evidenceFingerprint": "sha256:25b8a20f751436019398252cbc47fd23a819ae584926fbdacd56dbe9095bf474"
     },
     {
       "id": "onboarding",
@@ -764,7 +764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:154aacdf472e4bd2f57e18351033c0c527c1798e0df94abd010cdaa79bfa20ad"
+      "evidenceFingerprint": "sha256:43e47c1c741b9109d55bdc31d835092a3893c4832ae9e8608ccc1ecdc6890b80"
     },
     {
       "id": "person-detail",
@@ -845,7 +845,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:feb5c0c130202cc62af03e5bb4d93d71ae95436ff29aba2d48f1303a4d154b3a"
+      "evidenceFingerprint": "sha256:76ce90d7b61f5b1881deb425779e499e23f8a54111325a32001f4a7590755327"
     },
     {
       "id": "invitations",
@@ -908,7 +908,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:629b4c0e5ac51d16f129aef227b717b59988162f40c6715ef30a54eaffe8b58b"
+      "evidenceFingerprint": "sha256:4f0dd157673e902c006ed6a0f4165d008cefbf0a7ab54a0f2495cac818a2a901"
     },
     {
       "id": "organization",
@@ -1121,7 +1121,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:76525a6dd06be15717114fdc26455d4922e3821f73e64c0385a6f2e5bebe6386"
+      "evidenceFingerprint": "sha256:698484773e27633350f29967706e9dbd6c1ca13ed2d4b009f50fe1e0dc8173ed"
     },
     {
       "id": "admin-permissions",
@@ -1321,7 +1321,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:92a5b84760d986f0504dd41a9c7493b7270f4e0ff14bdf7692438a2752c2f473"
+      "evidenceFingerprint": "sha256:ed6931b906cabf1c1038e1b1da313514cec59385b3222875e89b5727f14b9d0f"
     },
     {
       "id": "alerts",

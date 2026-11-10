@@ -4,6 +4,7 @@ import { BILLING_ACCESS_SELECT, evaluateOrgBillingAccess } from "@/lib/billing-p
 import { createNameMismatchResponseBody } from "@/lib/account-linking";
 import { getServiceClient } from "@/lib/supabase-service";
 import type { NameMismatchDetails } from "@/types";
+import { canGrantOrgRole } from "@dubgrid/domain";
 
 export type ServiceClient = ReturnType<typeof getServiceClient>;
 
@@ -44,19 +45,21 @@ export async function isGridmasterActor(
   return profile?.platform_role === "gridmaster";
 }
 
-// The super_admin tier is handed out only by a super admin of that
-// organization or a gridmaster. Creation, editing and replacement of an
-// invitation all apply it, so the rule lives in one place: a pending
-// invitation raised to super_admin after the fact is the same escalation as
-// one created that way.
+/**
+ * Whether this person may give `role` through an invitation (F-237): only a
+ * Super Admin or Gridmaster gives an elevated tier. Creation, editing,
+ * redirecting and replacement of an invitation all apply it, since raising or
+ * moving a pending invitation is the same grant as creating it.
+ */
 export async function canAssignOrgRole(
   serviceClient: ServiceClient,
   actorId: string,
   orgId: string,
   role: string,
 ): Promise<boolean> {
-  if (role !== "super_admin") return true;
-  return isOrgSuperAdminOrGridmaster(serviceClient, actorId, orgId);
+  if (role === "user") return true;
+  const elevated = await isOrgSuperAdminOrGridmaster(serviceClient, actorId, orgId);
+  return canGrantOrgRole({ isSuperAdmin: elevated, isGridmaster: false }, role);
 }
 
 /**

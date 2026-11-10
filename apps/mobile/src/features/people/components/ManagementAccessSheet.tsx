@@ -67,7 +67,7 @@ export function ManagementAccessSheet({
 }) {
   const accessToken = useAccessToken();
   // Only a Super Admin may invite another one, as on web.
-  const canGrantSuperAdmin = useBootstrap(accessToken).data?.effectiveRole === "super_admin";
+  const canGrantElevatedRoles = useBootstrap(accessToken).data?.effectiveRole === "super_admin";
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
 
@@ -306,7 +306,7 @@ export function ManagementAccessSheet({
                 else. */}
           {needsRoleForInvite ? (
             <OrgRoleChoice
-              canGrantSuperAdmin={canGrantSuperAdmin}
+              canGrantElevatedRoles={canGrantElevatedRoles}
               disabled={mutation.isPending}
               value={draft.orgRole}
               onChange={(orgRole) => setDraft((current) => ({ ...current, orgRole }))}

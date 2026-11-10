@@ -14,6 +14,7 @@ import type { AdminPermissions, AssignableOrganizationRole } from "@/types";
 import { InviteOptionBox } from "@/components/staff/InviteOptionBox";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import type { NewStaffInvite } from "@/features/employees/client/new-staff-invites";
+import { inviteRoleOptions } from "@/features/employees/client/invite-on-save";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { FirstDayField } from "@/components/staff/FirstDayField";
@@ -56,12 +57,6 @@ function makeRow(certificationId: number | null, focusAreaIds: number[]): RowEnt
   };
 }
 
-const ROLE_OPTIONS: { value: AssignableOrganizationRole; label: string }[] = [
-  { value: "user", label: "User" },
-  { value: "admin", label: "Admin" },
-];
-const SUPER_ADMIN_OPTION = { value: "super_admin" as const, label: "Super Admin" };
-
 function serializeRows(rows: RowDraft[]): string {
   return JSON.stringify(
     rows.map((row) => ({
@@ -81,8 +76,8 @@ interface AddEmployeeModalProps {
   certifications: NamedItem[];
   focusAreaLabel?: string;
   certificationLabel?: string;
-  /** Super Admin is offered only by someone who holds it. */
-  canGrantSuperAdmin?: boolean;
+  /** Whether this is a Super Admin or Gridmaster, who alone invites Admins and Super Admins. */
+  canGrantElevatedRoles?: boolean;
   /** Return the add's promise so the button shows it working. */
   onAdd: (employees: NewEmployeeData[], invites: NewStaffInvite[]) => void | Promise<unknown>;
   onClose: () => void;
@@ -93,11 +88,11 @@ export default function AddEmployeeModal({
   certifications,
   focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   certificationLabel = "Certification",
-  canGrantSuperAdmin = false,
+  canGrantElevatedRoles = false,
   onAdd,
   onClose,
 }: AddEmployeeModalProps) {
-  const roleOptions = canGrantSuperAdmin ? [...ROLE_OPTIONS, SUPER_ADMIN_OPTION] : ROLE_OPTIONS;
+  const roleOptions = inviteRoleOptions(canGrantElevatedRoles);
   const isMobile = useMediaQuery(MOBILE);
   const descriptionId = useId();
   const defaultCertId: number | null = null;
@@ -251,12 +246,12 @@ export default function AddEmployeeModal({
         email: normalizeOptionalStaffEmail(r.email),
         role: r.role,
         // Only a Super Admin sets an Admin's permissions; the others get the standard set.
-        ...(canGrantSuperAdmin && r.role === "admin" && r.adminPermissions
+        ...(canGrantElevatedRoles && r.role === "admin" && r.adminPermissions
           ? { adminPermissions: { ...r.adminPermissions } }
           : {}),
       })),
     );
-  }, [validRows, invitedRows, onAdd, canGrantSuperAdmin]);
+  }, [validRows, invitedRows, onAdd, canGrantElevatedRoles]);
 
   const scrollMaxHeight = isMobile ? "calc(100dvh - 300px)" : "min(620px, calc(100vh - 250px))";
 
@@ -407,24 +402,28 @@ export default function AddEmployeeModal({
                   />
                   Invite everyone with an email
                 </label>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ ...fieldLabelStyle, whiteSpace: "nowrap" }}>Set everyone to</span>
-                  <CustomSelect<AssignableOrganizationRole | "mixed">
-                    ariaLabel="Set everyone's access role"
-                    value={bulkRole}
-                    options={roleOptions}
-                    placeholder={invitingRows.length === 0 ? "No one invited" : "Mixed"}
-                    disabled={invitingRows.length === 0}
-                    onChange={(role) => {
-                      if (role === "mixed") return;
-                      setRows((prev) =>
-                        prev.map((r, index) =>
-                          canInviteRow(r, index) && r.invite ? { ...r, role } : r,
-                        ),
-                      );
-                    }}
-                  />
-                </div>
+                {roleOptions.length > 1 ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ ...fieldLabelStyle, whiteSpace: "nowrap" }}>
+                      Set everyone to
+                    </span>
+                    <CustomSelect<AssignableOrganizationRole | "mixed">
+                      ariaLabel="Set everyone's access role"
+                      value={bulkRole}
+                      options={roleOptions}
+                      placeholder={invitingRows.length === 0 ? "No one invited" : "Mixed"}
+                      disabled={invitingRows.length === 0}
+                      onChange={(role) => {
+                        if (role === "mixed") return;
+                        setRows((prev) =>
+                          prev.map((r, index) =>
+                            canInviteRow(r, index) && r.invite ? { ...r, role } : r,
+                          ),
+                        );
+                      }}
+                    />
+                  </div>
+                ) : null}
               </div>
             </div>
             <div
@@ -686,7 +685,7 @@ export default function AddEmployeeModal({
                           onChange: (role) => updateRow(row._id, { role }),
                         }}
                         permissions={
-                          canGrantSuperAdmin && row.role === "admin"
+                          canGrantElevatedRoles && row.role === "admin"
                             ? {
                                 value: row.adminPermissions,
                                 onChange: (adminPermissions) =>

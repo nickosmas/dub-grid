@@ -113,3 +113,23 @@ export function getOwnOrgRoleChange(
 export function getOwnOrgRoleChangedMessage(role: OrgRole): string {
   return `Your role changed to ${ORG_ROLE_LABELS[role]}, so what you can see has updated.`;
 }
+
+/**
+ * Whether this person may give `role` through an invitation (F-237). Only a
+ * Super Admin or Gridmaster gives an elevated tier: an invited Admin gets the
+ * standard Admin permissions whatever the inviter holds, so an Admin trusted
+ * only with staff records could otherwise mint themselves publish rights.
+ */
+export function canGrantOrgRole(
+  actor: { isSuperAdmin: boolean; isGridmaster: boolean },
+  role: OrgRole | string,
+): boolean {
+  return actor.isSuperAdmin || actor.isGridmaster || role === "user";
+}
+
+/** Why an invite can't give `role`, shown beside it where it's out of reach. */
+export function getOrgRoleGrantRefusal(role: OrgRole | string): string {
+  return role === "super_admin"
+    ? "Only a Super Admin can invite someone as a Super Admin."
+    : "Only a Super Admin can invite someone as an Admin.";
+}

@@ -1,4 +1,5 @@
 import { getOptionalStaffEmailError } from "@dubgrid/contracts";
+import { ORG_ROLE_LABELS, ORG_ROLE_PRIVILEGE_ORDER, canGrantOrgRole } from "@dubgrid/domain";
 import type { AdminPermissions, AssignableOrganizationRole, Employee, Invitation } from "@/types";
 
 /** "invite" for someone not invited (or whose invite expired); "reinvite" replaces a pending one. */
@@ -35,15 +36,19 @@ export const INVITE_ON_SAVE_LABELS: Record<InviteOnSaveKind, string> = {
   reinvite: "Send a new invitation to this email",
 };
 
-/** The access roles an invite can give; only a Super Admin or Gridmaster gives Super Admin. */
-export function inviteRoleOptions(
-  canGrantSuperAdmin: boolean,
-): { value: AssignableOrganizationRole; label: string }[] {
-  return [
-    { value: "user", label: "User" },
-    { value: "admin", label: "Admin" },
-    ...(canGrantSuperAdmin ? [{ value: "super_admin" as const, label: "Super Admin" }] : []),
-  ];
+export type InviteRoleOption = { value: AssignableOrganizationRole; label: string };
+
+/**
+ * The access roles this person's invite can give, least privileged first.
+ * Only a Super Admin or Gridmaster gives an elevated tier (F-237), so anyone
+ * else gets User alone, and `InviteRoleField` says why instead of a dropdown.
+ */
+export function inviteRoleOptions(isSuperAdminOrGridmaster: boolean): InviteRoleOption[] {
+  const actor = { isSuperAdmin: isSuperAdminOrGridmaster, isGridmaster: false };
+  return [...ORG_ROLE_PRIVILEGE_ORDER]
+    .reverse()
+    .filter((role) => canGrantOrgRole(actor, role))
+    .map((role) => ({ value: role, label: ORG_ROLE_LABELS[role] }));
 }
 
 const normalize = (email: string) => email.trim().toLowerCase();

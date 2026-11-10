@@ -392,7 +392,7 @@ export default function PeopleScreen() {
   // Mirrors web's Add menu: both kinds ask which, one kind goes straight there.
   const canAddScheduled = canManageEmployees;
   const canAddManagement = canManageManagementAccess && managementDepartments.length > 0;
-  const canGrantSuperAdmin = bootstrapQuery.data?.effectiveRole === "super_admin";
+  const canGrantElevatedRoles = bootstrapQuery.data?.effectiveRole === "super_admin";
 
   function openAddPersonKind(kind: AddPersonKind) {
     if (kind === "scheduled") setShowAddPerson(true);
@@ -1116,7 +1116,7 @@ export default function PeopleScreen() {
       />
       <AddPersonSheet onDismiss={() => setShowAddPerson(false)} visible={showAddPerson} />
       <ManagementUserInviteSheet
-        canGrantSuperAdmin={canGrantSuperAdmin}
+        canGrantElevatedRoles={canGrantElevatedRoles}
         permissionLabels={{ focusAreaLabel, certificationLabel, roleLabel }}
         error={inviteError}
         isPending={inviteManagementUserMutation.isPending}

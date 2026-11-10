@@ -265,7 +265,7 @@ describe("AddPersonSheet", () => {
     });
   });
 
-  it("invites with the access role picked", async () => {
+  it("offers an Admin User only, with Admin listed and out of reach (F-237)", async () => {
     createMobilePerson.mockResolvedValue({ success: true, person: { id: "emp-1" } });
     createMobilePersonInvitation.mockResolvedValue({});
     renderWithMutation();
@@ -275,16 +275,20 @@ describe("AddPersonSheet", () => {
     expect(screen.queryByLabelText("Invite to the app")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "nia@dubgrid.com" } });
     expect(screen.getByLabelText("Invite to the app")).toBeChecked();
-    // Super Admin is offered only by someone who holds it.
     expect(screen.queryByRole("button", { name: /^Super Admin/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^Admin/ }));
+    const adminRow = screen.getByRole("button", { name: /^Admin/ });
+    expect(adminRow).toBeDisabled();
+    expect(
+      screen.getByText("Only a Super Admin can invite someone as an Admin."),
+    ).toBeInTheDocument();
+    fireEvent.click(adminRow);
     fireEvent.click(screen.getByText("Skilled Nursing"));
     fireEvent.click(screen.getByRole("button", { name: "Add person" }));
 
     await waitFor(() => {
       expect(createMobilePersonInvitation).toHaveBeenCalledWith("token-123", "emp-1", {
         email: "nia@dubgrid.com",
-        orgRole: "admin",
+        orgRole: "user",
       });
     });
   });

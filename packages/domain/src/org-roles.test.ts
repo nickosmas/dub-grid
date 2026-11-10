@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ORG_ROLE_PRIVILEGE_ORDER,
+  canGrantOrgRole,
+  getOrgRoleGrantRefusal,
   getEffectiveOrgRole,
   getOrgRoleInsignia,
   getOwnOrgRoleChange,
@@ -104,6 +106,39 @@ describe("getOwnOrgRoleChangedMessage", () => {
   it("names the new role", () => {
     expect(getOwnOrgRoleChangedMessage("super_admin")).toBe(
       "Your role changed to Super Admin, so what you can see has updated.",
+    );
+  });
+});
+
+describe("canGrantOrgRole", () => {
+  const admin = { isSuperAdmin: false, isGridmaster: false };
+  const superAdmin = { isSuperAdmin: true, isGridmaster: false };
+  const gridmaster = { isSuperAdmin: false, isGridmaster: true };
+
+  it("lets an Admin invite only Users (F-237)", () => {
+    expect(canGrantOrgRole(admin, "user")).toBe(true);
+    expect(canGrantOrgRole(admin, "admin")).toBe(false);
+    expect(canGrantOrgRole(admin, "super_admin")).toBe(false);
+  });
+
+  it("lets a Super Admin or Gridmaster give every tier", () => {
+    for (const actor of [superAdmin, gridmaster]) {
+      for (const role of ORG_ROLE_PRIVILEGE_ORDER) {
+        expect(canGrantOrgRole(actor, role)).toBe(true);
+      }
+    }
+  });
+
+  it("refuses a role it doesn't know", () => {
+    expect(canGrantOrgRole(admin, "owner")).toBe(false);
+  });
+
+  it("names the tier that is out of reach", () => {
+    expect(getOrgRoleGrantRefusal("admin")).toBe(
+      "Only a Super Admin can invite someone as an Admin.",
+    );
+    expect(getOrgRoleGrantRefusal("super_admin")).toBe(
+      "Only a Super Admin can invite someone as a Super Admin.",
     );
   });
 });

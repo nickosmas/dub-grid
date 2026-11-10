@@ -3,6 +3,7 @@ import {
   describeInviteOnSave,
   describeInviteOnSaveNote,
   invitationRequestForSave,
+  inviteRoleOptions,
   type InviteOnSaveInput,
 } from "./invite-on-save";
 import type { Invitation } from "@/types";
@@ -149,5 +150,19 @@ describe("invitationRequestForSave", () => {
       departmentIds: [3],
       deptAdminIds: [4],
     });
+  });
+});
+
+describe("inviteRoleOptions", () => {
+  it("offers an Admin only User (F-237)", () => {
+    expect(inviteRoleOptions(false)).toEqual([{ value: "user", label: "User" }]);
+  });
+
+  it("offers a Super Admin or Gridmaster every tier, least privileged first", () => {
+    expect(inviteRoleOptions(true).map((option) => option.value)).toEqual([
+      "user",
+      "admin",
+      "super_admin",
+    ]);
   });
 });

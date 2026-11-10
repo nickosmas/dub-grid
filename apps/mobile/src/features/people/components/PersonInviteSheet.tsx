@@ -27,7 +27,7 @@ export function PersonInviteSheet({
   visible,
   personName,
   email,
-  canGrantSuperAdmin,
+  canGrantElevatedRoles,
   permissionLabels,
   isPending,
   error,
@@ -38,7 +38,7 @@ export function PersonInviteSheet({
   personName: string;
   email: string;
   /** A Super Admin, who alone grants Super Admin and sets an Admin's permissions. */
-  canGrantSuperAdmin: boolean;
+  canGrantElevatedRoles: boolean;
   permissionLabels: PermissionEditorLabels;
   isPending: boolean;
   error?: string | null;
@@ -57,7 +57,7 @@ export function PersonInviteSheet({
       setPermissions(null);
     }
   }
-  const setsPermissions = canGrantSuperAdmin && orgRole === "admin";
+  const setsPermissions = canGrantElevatedRoles && orgRole === "admin";
 
   return (
     <BottomSheetModal
@@ -89,7 +89,7 @@ export function PersonInviteSheet({
         </ProfileList>
       </ProfileSection>
       <OrgRoleChoice
-        canGrantSuperAdmin={canGrantSuperAdmin}
+        canGrantElevatedRoles={canGrantElevatedRoles}
         disabled={isPending}
         value={orgRole}
         onChange={setOrgRole}
