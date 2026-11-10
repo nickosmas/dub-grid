@@ -329,7 +329,7 @@ function AbsenceTypeRow({
         <div
           id={editorId}
           style={{
-            background: "var(--dg-color-bg-secondary)",
+            background: "var(--dg-color-surface-editor)",
             borderRadius: "var(--dg-radius-lg)",
             border: "1px solid var(--dg-color-border-light)",
             margin: "0 0 8px",
@@ -430,6 +430,7 @@ function AbsenceTypeRow({
 
           <EditorActionRow
             className="dg-footer-bar dg-footer-bar--in-box"
+            floating
             destructiveAction={
               canEdit && !absenceType.isNew ? (
                 <Button
@@ -615,7 +616,7 @@ export default function AbsenceTypesSettings({
             action={
               canManageScheduleDefinitions ? (
                 <Button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
-                  + Add Absence Type
+                  Add Absence Type
                 </Button>
               ) : undefined
             }
@@ -629,7 +630,7 @@ export default function AbsenceTypesSettings({
               className="dg-btn dg-btn-dashed dg-btn-sm"
               style={{ width: "100%" }}
             >
-              + Add Absence Type
+              Add Absence Type
             </Button>
           </div>
         )}
