@@ -265,7 +265,10 @@ function IndicatorRow({
           transition: "grid-template-rows 220ms ease",
         }}
       >
-        <div style={{ overflow: "hidden" }}>
+        {/* The floating footer turns this `overflow` into `clip`, which no longer
+            zeroes a grid item's minimum height, so the closed row would keep the
+            editor's full height. */}
+        <div style={{ overflow: "hidden", minHeight: 0 }}>
           <div
             style={{
               background: "var(--dg-color-surface-editor)",
