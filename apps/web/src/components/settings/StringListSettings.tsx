@@ -61,7 +61,7 @@ export default function StringListSettings({
   onSave: (items: NamedItem[], hardDeleteIds: number[]) => Promise<void>;
   placeholder: string;
   /**
-   * Noun for the dashed add button ("+ Add role"). Defaults to the singular
+   * Noun for the dashed add button ("Add role"). Defaults to the singular
    * of `label`; the placeholder is input hint copy and reads wrong there.
    */
   addLabel?: string;
@@ -625,7 +625,7 @@ export default function StringListSettings({
           action={
             canEdit ? (
               <Button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
-                + Add {label.replace(/s$/, "")}
+                Add {label.replace(/s$/, "")}
               </Button>
             ) : undefined
           }
@@ -1091,7 +1091,7 @@ export default function StringListSettings({
           {isEditing && (
             <div style={{ padding: "8px 16px 12px" }}>
               <Button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
-                + Add {addLabel ?? label.replace(/s$/, "")}
+                Add {addLabel ?? label.replace(/s$/, "")}
               </Button>
             </div>
           )}

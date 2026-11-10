@@ -183,7 +183,7 @@ export default function PlatformFeatureFlagsView() {
         >
           Platform Feature Controls
           <Button className="dg-btn dg-btn-secondary dg-btn-sm" onClick={() => openAddModal()}>
-            + Add Feature Control
+            Add Feature Control
           </Button>
         </div>
         {suggestedKeys.length > 0 && (
@@ -208,7 +208,7 @@ export default function PlatformFeatureFlagsView() {
                 className="dg-btn dg-btn-secondary dg-btn-sm"
                 onClick={() => openAddModal({ key, description: FLAG_INFO[key].description })}
               >
-                + {FLAG_INFO[key].label}
+                {FLAG_INFO[key].label}
               </Button>
             ))}
           </div>

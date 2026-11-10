@@ -530,7 +530,7 @@ function ShiftCategoriesSettings({
       <div
         key={cat.id}
         style={{
-          background: "var(--dg-color-bg-secondary)",
+          background: "var(--dg-color-surface-editor)",
           borderRadius: "var(--dg-radius-lg)",
           padding: "14px 16px 0",
           overflow: "hidden",
@@ -824,7 +824,7 @@ function ShiftCategoriesSettings({
                       onClick={() => handleAdd(focusArea.id)}
                       className="dg-btn dg-btn-secondary dg-btn-sm"
                     >
-                      + Add Shift
+                      Add Shift
                     </Button>
                   ) : undefined
                 }
@@ -838,7 +838,7 @@ function ShiftCategoriesSettings({
                   className={addBtnClass}
                   style={{ width: "100%" }}
                 >
-                  + Add Shift
+                  Add Shift
                 </Button>
               </div>
             )}

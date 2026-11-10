@@ -343,8 +343,8 @@ describe("MembersSection — management-only view access", () => {
     expect(screen.getByText("Jamie Rivera")).toBeInTheDocument();
     expect(screen.getByText("Sam Lee")).toBeInTheDocument();
 
-    // No edit affordances: no "+ Add" (invite to management) button.
-    expect(screen.queryByRole("button", { name: /^\+ Add$/ })).not.toBeInTheDocument();
+    // No edit affordances: no "Add" (invite to management) button.
+    expect(screen.queryByRole("button", { name: /^\+? ?Add$/ })).not.toBeInTheDocument();
 
     // Opening a member's detail panel is read-only.
     // The name itself links to the profile page (stopPropagation on click),
@@ -376,7 +376,7 @@ describe("MembersSection — management-only view access", () => {
     mockDirectory = [makePerson({ personId: "person-1", firstName: "Jamie", lastName: "Rivera" })];
 
     // Inviting/editing management access requires canManageManagementAccess
-    // (super_admin/gridmaster), not just canManageEmployees — see the "+ Add"
+    // (super_admin/gridmaster), not just canManageEmployees — see the "Add"
     // gate on the Management tab in MembersSection.tsx.
     renderMembersSection({
       canManageEmployees: false,

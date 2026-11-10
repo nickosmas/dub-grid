@@ -1783,6 +1783,8 @@ button.dg-cc-sg-main {
    the fill. */
 .dg-footer-bar--in-box {
   --dg-footer-bar-px: 16px;
+  /* It bleeds 16px past the box's padding, so 8px clear is -8px from there. */
+  --dg-floating-footer-inset: -8px;
   margin: 0 -16px;
   border-top-color: var(--dg-color-border);
   background: transparent;
@@ -1815,7 +1817,7 @@ button.dg-cc-sg-main {
 }
 .dg-floating-footer[data-placement="floating"] {
   /* 8px clear of the box's edges at any width, 12px inside on every side. */
-  margin-inline: -8px;
+  margin-inline: var(--dg-floating-footer-inset, 8px);
   padding-inline: 12px;
   border-radius: var(--dg-floating-bar-radius);
   box-shadow:

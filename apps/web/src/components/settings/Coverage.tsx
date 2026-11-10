@@ -477,7 +477,7 @@ function CoverageOptionRow({
         <div
           id={panelId}
           style={{
-            background: "var(--dg-color-bg-secondary)",
+            background: "var(--dg-color-surface-editor)",
             borderRadius: "var(--dg-radius-lg)",
             border: "1px solid var(--dg-color-border-light)",
             margin: "0 0 8px",
@@ -805,30 +805,30 @@ function FocusAreaCoverageCard({
             ))}
           </div>
 
-          <div className="dg-footer-bar [--dg-footer-bar-px:16px]">
-            <EditorActionRow
-              secondaryAction={
-                isDirty ? (
-                  <Button
-                    onClick={handleDiscard}
-                    disabled={saving}
-                    className="dg-btn dg-btn-secondary dg-btn-sm"
-                  >
-                    {EDITOR_ACTION_LABELS.discard}
-                  </Button>
-                ) : null
-              }
-              primaryAction={
+          <EditorActionRow
+            className="dg-footer-bar [--dg-footer-bar-px:16px]"
+            floating={isDirty || saving}
+            secondaryAction={
+              isDirty ? (
                 <Button
-                  onClick={handleSave}
-                  disabled={saving || !canEdit || !isDirty}
-                  className="dg-btn dg-btn-primary dg-btn-sm"
+                  onClick={handleDiscard}
+                  disabled={saving}
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
                 >
-                  <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
+                  {EDITOR_ACTION_LABELS.discard}
                 </Button>
-              }
-            />
-          </div>
+              ) : null
+            }
+            primaryAction={
+              <Button
+                onClick={handleSave}
+                disabled={saving || !canEdit || !isDirty}
+                className="dg-btn dg-btn-primary dg-btn-sm"
+              >
+                <ButtonLoading loading={saving}>{EDITOR_ACTION_LABELS.save}</ButtonLoading>
+              </Button>
+            }
+          />
         </>
       )}
     </div>
