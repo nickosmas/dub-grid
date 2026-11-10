@@ -188,12 +188,19 @@ screen or control needs no per-platform work.
 
 | Native (the platform supplies it)                                              | One shared DubGrid control                                           |
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| Navigation bar, its buttons and back (`HeaderBarAction`, `HeaderFilterAction`) | Segmented switch (`SegmentedSwitch`)                                 |
-| Tab bar (one list in `src/shared/navigation/app-tabs.ts`)                      | Toast (`ToastSurface`, at the top)                                   |
-| Search (`ScreenSearch`, `Stack.SearchBar`)                                     | Tab strip (`ScrollableTabStripTab`)                                  |
-| System alerts (`ConfirmationModal.native`), discards included                  | Pick-one and pick-many marks (`SelectionCheck`, `SelectionCheckbox`) |
-| Sheets (`BottomSheetModal.native`, `SheetBarAction.native`)                    | Status symbols (`ToneSymbol`, Material icons)                        |
-| iOS date calendar (`NativeDateCalendar.ios`), share, haptics                   | Round header button (`ChromeIconButton`), text fields, lists         |
+| Navigation bar, its buttons and back (`HeaderBarAction`, `HeaderFilterAction`) | Toast (`ToastSurface`, at the top)                                   |
+| Tab bar (one list in `src/shared/navigation/app-tabs.ts`)                      | Tab strip (`ScrollableTabStripTab`)                                  |
+| Segmented switch (`SegmentedSwitch`: SwiftUI picker, Material 3 buttons)       | Pick-one and pick-many marks (`SelectionCheck`, `SelectionCheckbox`) |
+| Search (`ScreenSearch`, `Stack.SearchBar`)                                     | Status symbols (`ToneSymbol`, Material icons)                        |
+| System alerts (`ConfirmationModal.native`), discards included                  | Round header button (`ChromeIconButton`), text fields, lists         |
+| Sheets (`BottomSheetModal.native`, `SheetBarAction.native`)                    |                                                                      |
+| iOS date calendar (`NativeDateCalendar.ios`), share, haptics                   |                                                                      |
+
+The segmented switch (admin Home's My schedule | Team, People's filter
+section) went back to each platform's own control on 2026-11-10 (owner): UIKit's
+segmented control through SwiftUI on iOS, Liquid Glass on iOS 26, and Material 3
+segmented buttons on Android in DubGrid's colors. Drawn controls that switch a
+screen's view, such as `SegmentedControl` with counts, stay shared.
 
 - **Materials, not layouts.** A shared control may use a platform material
   where it exists: Liquid Glass through `isLiquidGlassAvailable()` (read once
@@ -208,7 +215,8 @@ screen or control needs no per-platform work.
   and in `src/features/**/{screens,components}`.
 - **Platform files allowed:** `app/(tabs)/_layout.*`,
   `BottomSheetModal.native`, `ConfirmationModal.native`,
-  `SheetBarAction.native`, `NativeDateCalendar.ios`. Anything new needs a
+  `SheetBarAction.native`, `NativeDateCalendar.ios`,
+  `SegmentedSwitch.ios` and `SegmentedSwitch.android`. Anything new needs a
   reason added here. `platform-variants.test.ts` fails when a platform file
   exports less than its base, which TypeScript cannot see.
 - **Should this control be native?** Only if it is in the left column, or the
