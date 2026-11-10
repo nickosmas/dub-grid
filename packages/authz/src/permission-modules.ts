@@ -9,7 +9,7 @@ import { ADMIN_DEFAULT_PERMS, VIEW_IMPLICATIONS } from "./permission-sets";
 
 export type PermissionKey = keyof AdminPermissions;
 
-export type PermissionCategory = "CORE" | "ADMINISTRATION";
+export type PermissionCategory = "CORE" | "INSIGHTS" | "SETTINGS";
 
 /** Org-customizable terms the row descriptions mention. */
 export interface PermissionEditorLabels {
@@ -49,11 +49,12 @@ export interface PermissionModule {
   note?: string;
 }
 
-export const PERMISSION_CATEGORY_ORDER: PermissionCategory[] = ["CORE", "ADMINISTRATION"];
+export const PERMISSION_CATEGORY_ORDER: PermissionCategory[] = ["CORE", "INSIGHTS", "SETTINGS"];
 
 export const PERMISSION_CATEGORY_LABELS: Record<PermissionCategory, string> = {
   CORE: "Scheduling and staff",
-  ADMINISTRATION: "Administration",
+  INSIGHTS: "Dashboard and reports",
+  SETTINGS: "Settings",
 };
 
 export const DEFAULT_PERMISSION_LABELS: PermissionEditorLabels = {
@@ -66,6 +67,7 @@ function inSentence(label: string): string {
   return label.toLowerCase();
 }
 
+/** In the order work happens: build, publish and answer requests, then insights, then Settings in its menu's order. */
 export const PERMISSION_MODULES: PermissionModule[] = [
   {
     id: "schedule",
@@ -78,15 +80,6 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     alwaysOnView: true,
   },
   {
-    id: "publish",
-    title: "Publish schedule",
-    description: "Make draft schedule changes live for staff.",
-    icon: "send",
-    category: "CORE",
-    viewKeys: [],
-    editKeys: ["canPublishSchedule"],
-  },
-  {
     id: "recurring-shifts",
     title: "Recurring shifts",
     description: "Manage recurring shift templates and series, and apply them to date ranges.",
@@ -97,14 +90,13 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     note: "Applying to the grid and creating series also need Schedule: Edit.",
   },
   {
-    id: "staff",
-    title: "Staff",
-    description: (labels) =>
-      `See staff profiles, contact details, and ${inSentence(labels.certificationLabel)}. With Edit, they can also add people, invite them as Users, and change their status.`,
-    icon: "users",
+    id: "publish",
+    title: "Publish schedule",
+    description: "Make draft schedule changes live for staff.",
+    icon: "send",
     category: "CORE",
-    viewKeys: ["canViewEmployeeDetails"],
-    editKeys: ["canManageEmployees"],
+    viewKeys: [],
+    editKeys: ["canPublishSchedule"],
   },
   {
     id: "shift-requests",
@@ -118,39 +110,21 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     note: "Seeing everyone's requests comes with Approve, Staff: Edit, or Schedule: Edit.",
   },
   {
-    id: "coverage",
-    title: "Coverage",
-    description: "Set staffing minimums and coverage targets.",
-    icon: "barChart",
-    category: "ADMINISTRATION",
-    viewKeys: ["canViewCoverageRequirements"],
-    editKeys: ["canManageCoverageRequirements"],
-  },
-  {
-    id: "departments-labels",
-    title: "Departments & labels",
+    id: "staff",
+    title: "Staff",
     description: (labels) =>
-      `Manage departments and ${inSentence(labels.focusAreaLabel)}, plus the ${inSentence(labels.roleLabel)}, ${inSentence(labels.certificationLabel)}, and terminology labels.`,
-    icon: "tag",
-    category: "ADMINISTRATION",
-    viewKeys: ["canViewFocusAreas", "canViewOrgLabels"],
-    editKeys: ["canManageFocusAreas", "canManageOrgLabels"],
-  },
-  {
-    id: "scheduling-config",
-    title: "Shifts, jobs & schedule notes",
-    description: "Manage shift codes, jobs, absence types, and schedule note types.",
-    icon: "settings",
-    category: "ADMINISTRATION",
-    viewKeys: ["canViewScheduleDefinitions", "canViewIndicatorTypes"],
-    editKeys: ["canManageScheduleDefinitions", "canManageIndicatorTypes"],
+      `See staff profiles, contact details, and ${inSentence(labels.certificationLabel)}. With Edit, they can also add people, invite them as Users, and change their status.`,
+    icon: "users",
+    category: "CORE",
+    viewKeys: ["canViewEmployeeDetails"],
+    editKeys: ["canManageEmployees"],
   },
   {
     id: "dashboard",
     title: "Dashboard",
     description: "View analytics and statistics.",
     icon: "pieChart",
-    category: "ADMINISTRATION",
+    category: "INSIGHTS",
     viewKeys: ["canViewDashboardAnalytics"],
     editKeys: [],
   },
@@ -159,9 +133,37 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     title: "Reports",
     description: "View staff hours, staff activity, and shift category reports, and export them.",
     icon: "fileText",
-    category: "ADMINISTRATION",
+    category: "INSIGHTS",
     viewKeys: ["canViewReports"],
     editKeys: [],
+  },
+  {
+    id: "departments-labels",
+    title: "Departments & labels",
+    description: (labels) =>
+      `Manage departments and ${inSentence(labels.focusAreaLabel)}, plus the ${inSentence(labels.roleLabel)}, ${inSentence(labels.certificationLabel)}, and terminology labels.`,
+    icon: "tag",
+    category: "SETTINGS",
+    viewKeys: ["canViewFocusAreas", "canViewOrgLabels"],
+    editKeys: ["canManageFocusAreas", "canManageOrgLabels"],
+  },
+  {
+    id: "scheduling-config",
+    title: "Shifts, jobs & schedule notes",
+    description: "Manage shift codes, jobs, absence types, and schedule note types.",
+    icon: "settings",
+    category: "SETTINGS",
+    viewKeys: ["canViewScheduleDefinitions", "canViewIndicatorTypes"],
+    editKeys: ["canManageScheduleDefinitions", "canManageIndicatorTypes"],
+  },
+  {
+    id: "coverage",
+    title: "Coverage",
+    description: "Set staffing minimums and coverage targets.",
+    icon: "barChart",
+    category: "SETTINGS",
+    viewKeys: ["canViewCoverageRequirements"],
+    editKeys: ["canManageCoverageRequirements"],
   },
 ];
 
