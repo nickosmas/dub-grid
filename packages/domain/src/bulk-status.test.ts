@@ -14,6 +14,8 @@ import {
   NOT_SUSPENDABLE_MESSAGE,
   OFFBOARD_OUT_OF_REACH_MESSAGE,
   RESTORE_OUT_OF_REACH_MESSAGE,
+  SUSPEND_OUT_OF_REACH_MESSAGE,
+  REINSTATE_OUT_OF_REACH_MESSAGE,
 } from "./employment-status";
 
 function person(overrides: Partial<BulkStatusPerson> = {}): BulkStatusPerson {
@@ -57,14 +59,19 @@ describe("bulkStatusSkipReason", () => {
     );
   });
 
-  it("skips a Super Admin the manager can't offboard or restore (51k)", () => {
+  it("skips a Super Admin the manager can't offboard, restore, suspend or reinstate (51k, F-239)", () => {
     expect(bulkStatusSkipReason("archive", active, { canOffboard: false })).toBe(
       OFFBOARD_OUT_OF_REACH_MESSAGE,
     );
     expect(bulkStatusSkipReason("restore", offboarded, { canOffboard: false })).toBe(
       RESTORE_OUT_OF_REACH_MESSAGE,
     );
-    expect(bulkStatusSkipReason("suspend", active, { canOffboard: false })).toBeNull();
+    expect(bulkStatusSkipReason("suspend", active, { canOffboard: false })).toBe(
+      SUSPEND_OUT_OF_REACH_MESSAGE,
+    );
+    expect(bulkStatusSkipReason("reinstate", suspended, { canOffboard: false })).toBe(
+      REINSTATE_OUT_OF_REACH_MESSAGE,
+    );
     expect(bulkStatusSkipReason("markActive", away, { canOffboard: false })).toBeNull();
     const plan = planBulkStatusChange(
       "archive",

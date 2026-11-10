@@ -112,7 +112,7 @@ count query first so we know how many Admins it fills.
 
    **Done when:** that test passes and `npm run db:migrations:check` passes.
 
-4. [ ] **Suspension tier guard.** Extend the tier check in `applyStatusChange` and mobile
+4. [x] **Suspension tier guard.** Extend the tier check in `applyStatusChange` and mobile
        `people-status.ts` to suspend, planned suspension, `setSuspendedUntil` and `reinstate`.
        Add the reason message to `@dubgrid/domain`, and show it in the status dialogs and bulk as
        prototyped. Tests cover an Admin refused on each action for a Super Admin, and allowed for

@@ -435,9 +435,25 @@ describe("POST /api/employees/status/bulk", () => {
     ]);
   });
 
-  it("never suspends every Super Admin, even one after another", async () => {
+  it("refuses an Admin suspending a Super Admin, and suspends the rest (F-239)", async () => {
     tables.organization_memberships = [
       { user_id: ME, org_id: ORG, org_role: "admin", archived_at: null },
+      { user_id: user(1), org_id: ORG, org_role: "super_admin", archived_at: null },
+      { user_id: user(2), org_id: ORG, org_role: "user", archived_at: null },
+    ];
+    tables.employees = [employee(1), employee(2)];
+
+    const list = await results(await POST(request({ action: "suspend", people: people(1, 2) })));
+
+    expect(list.map((r) => r.ok)).toEqual([false, true]);
+    expect(list[0].error).toBe("Only a Super Admin can suspend a Super Admin.");
+    expect(tables.employees[0].suspended_at ?? null).toBeNull();
+  });
+
+  it("never suspends every Super Admin, even one after another", async () => {
+    // A Gridmaster, so the tier allows it and the last-Super-Admin rule is what answers.
+    tables.profiles = [{ id: ME, platform_role: "gridmaster" }];
+    tables.organization_memberships = [
       { user_id: user(1), org_id: ORG, org_role: "super_admin", archived_at: null },
       { user_id: user(2), org_id: ORG, org_role: "super_admin", archived_at: null },
     ];

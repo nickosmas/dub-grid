@@ -33,6 +33,8 @@ import {
   OFFBOARD_OUT_OF_REACH_CODE,
   OFFBOARD_OUT_OF_REACH_MESSAGE,
   RESTORE_OUT_OF_REACH_MESSAGE,
+  REINSTATE_OUT_OF_REACH_MESSAGE,
+  SUSPEND_OUT_OF_REACH_MESSAGE,
   NOT_AWAY_CODE,
   NOT_AWAY_MESSAGE,
   NOT_ON_SCHEDULE_CODE,
@@ -254,9 +256,10 @@ export async function applyStatusChange(
     return respond({ error: skipReason, code: STATUS_NOT_APPLICABLE_CODE }, { status: 400 });
   }
 
-  // Offboarding ends their membership and Restore reopens it (51k), so only
-  // a Super Admin or Gridmaster reaches a Super Admin, as when the role is
-  // given; that includes planning, moving or cancelling their return (51l).
+  // Offboarding ends their membership and Restore reopens it (51k), and a
+  // suspension ends and reopens their sign-in (F-239), so only a Super Admin
+  // or Gridmaster reaches a Super Admin, as when the role is given. That
+  // includes planning, moving or cancelling a return (51l) or a suspension.
   const restoringFromOffboard = action === "activate" && currentEmployee.status === "removed";
   const editingReturn = action === "setPlannedChange" && currentEmployee.plannedStatus === "active";
   const restoring =
@@ -266,7 +269,18 @@ export async function applyStatusChange(
   const offboarding =
     action === "remove" ||
     (action === "setPlannedChange" && currentEmployee.plannedStatus === "removed");
-  if ((offboarding || restoring) && !isGridmaster && !isSuperAdmin && currentEmployee.userId) {
+  const reinstating = action === "reinstate";
+  const suspending =
+    action === "suspend" ||
+    action === "setSuspendedUntil" ||
+    ((action === "setPlannedChange" || action === "cancelPlannedChange") &&
+      currentEmployee.plannedStatus === "suspended");
+  if (
+    (offboarding || restoring || suspending || reinstating) &&
+    !isGridmaster &&
+    !isSuperAdmin &&
+    currentEmployee.userId
+  ) {
     const { data: targetMembership, error: targetError } = await serviceClient
       .from("organization_memberships")
       .select("org_role")
@@ -277,7 +291,13 @@ export async function applyStatusChange(
     if (!canOffboardAtTier(actor, targetMembership?.org_role)) {
       return respond(
         {
-          error: restoring ? RESTORE_OUT_OF_REACH_MESSAGE : OFFBOARD_OUT_OF_REACH_MESSAGE,
+          error: restoring
+            ? RESTORE_OUT_OF_REACH_MESSAGE
+            : reinstating
+              ? REINSTATE_OUT_OF_REACH_MESSAGE
+              : suspending
+                ? SUSPEND_OUT_OF_REACH_MESSAGE
+                : OFFBOARD_OUT_OF_REACH_MESSAGE,
           code: OFFBOARD_OUT_OF_REACH_CODE,
         },
         { status: 403 },

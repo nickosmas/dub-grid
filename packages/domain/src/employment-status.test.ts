@@ -23,6 +23,8 @@ import {
   canOffboardAtTier,
   OFFBOARD_OUT_OF_REACH_MESSAGE,
   RESTORE_OUT_OF_REACH_MESSAGE,
+  REINSTATE_OUT_OF_REACH_MESSAGE,
+  SUSPEND_OUT_OF_REACH_MESSAGE,
   availableStatusChoices,
   NO_ACCOUNT_MESSAGE,
   NOT_ON_SCHEDULE_MESSAGE,
@@ -404,15 +406,27 @@ describe("statusChoices", () => {
     ]);
   });
 
-  it("lists Offboard and Restore disabled when the manager can't reach them (51k)", () => {
+  it("lists Offboard, Suspend and the ways back disabled when the manager can't reach them (51k, F-239)", () => {
     const active = { status: "active" as const, ...onSchedule };
     const offboarded = { status: "removed" as const, ...onSchedule };
+    const suspended = { ...active, suspendedAt: "2026-10-26T12:00:00Z" };
     const activeChoices = statusChoices(active, { canOffboard: false });
     expect(activeChoices.find((option) => option.action === "archive")).toMatchObject({
       available: false,
       unavailableReason: OFFBOARD_OUT_OF_REACH_MESSAGE,
     });
-    expect(activeChoices.find((option) => option.action === "suspend")?.available).toBe(true);
+    expect(activeChoices.find((option) => option.action === "suspend")).toMatchObject({
+      available: false,
+      unavailableReason: SUSPEND_OUT_OF_REACH_MESSAGE,
+    });
+    expect(activeChoices.find((option) => option.action === "markAway")?.available).toBe(true);
+    expect(
+      statusChoices(suspended, { canOffboard: false }).find(
+        (option) => option.action === "reinstate",
+      ),
+    ).toMatchObject({ available: false, unavailableReason: REINSTATE_OUT_OF_REACH_MESSAGE });
+    expect(suggestedStatusChoice(suspended, { canOffboard: false })).toBeNull();
+    expect(suggestedStatusChoice(suspended)?.action).toBe("reinstate");
     expect(
       statusChoices(offboarded, { canOffboard: false }).find(
         (option) => option.action === "restore",

@@ -980,13 +980,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Store a complete set wherever someone becomes an Admin (promotion on web and mobile, `change_user_role`, invite acceptance), backfill existing NULL and partial rows with `ADMIN_DEFAULT_PERMS` in a migration, then add a CHECK or trigger that an Admin's set has every key. One source of defaults, not two.
 **Resolution:** Fixed on fix/admin-tier-boundary (2026-11-10): migration 131 adds a trigger on `organization_memberships` that stores, for every Admin, the set the app resolves (the defaults overlaid with the stored boolean keys it knows, View and Staff on, organization settings off, each View its Edit implies) and NULL for anyone else, and backfills existing rows without logging a permission change or moving `updated_at`. `check_admin_permission` and publish therefore grant what the app shows. `admin_default_permissions()` must equal `ADMIN_DEFAULT_PERMS`; `admin-permissions-complete.integration.test.ts` compares them and the resolver, and promotes a User through `change_user_role` to prove edit and publish pass. Local stack: 7 Admins filled, 6 of them losing a stored `canManageOrgSettings: true`. Production needs 131 applied.
 
-### F-239 [P1] open - An Admin with Staff: Edit can suspend a Super Admin
+### F-239 [P1] fixed - An Admin with Staff: Edit can suspend a Super Admin
 
 **File:** `apps/web/src/features/employees/server/status-change.ts:268` (tier guard covers offboard and restore only), `:440-462`; `packages/mobile-api-core/src/people-status.ts:527`
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
 **Why it matters:** `canOffboardAtTier` runs for offboarding and restoring, not for `suspend` or a planned suspension. The only suspend guard is that another Super Admin can still sign in. So an Admin can sign an organization owner out everywhere and block their sign-in, from web or mobile. A lower tier acting on a higher one breaks the rule every other access path keeps. Traced in code, not run.
 **Suggested fix:** Apply the offboard tier rule to suspend, planned suspend and reinstate, on web, bulk and mobile, with a test per path.
-**Resolution:**
+**Resolution:** Fixed on fix/admin-tier-boundary (2026-11-10): suspending, planning, moving or cancelling a suspension and reinstating now follow the offboard tier rule on web (single and bulk, `applyStatusChange`) and mobile (`tierRefusal`), answering "Only a Super Admin can suspend a Super Admin." or "...reinstate a Super Admin." with 403. `statusChoices` lists Suspended and Reinstate disabled with that reason when the manager can't reach the tier, so Change status, the app's sheet and bulk Skipped agree; an Admin looking at an active Super Admin has Away left, so the card names it Mark away (the single-choice rule). Route, bulk, mobile and domain tests fail against the old guard.
 
 ### F-240 [P2] open - The mobile admin dashboard ignores Dashboard: View
 

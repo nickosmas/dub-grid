@@ -33,6 +33,8 @@ import {
   OFFBOARD_OUT_OF_REACH_CODE,
   OFFBOARD_OUT_OF_REACH_MESSAGE,
   RESTORE_OUT_OF_REACH_MESSAGE,
+  REINSTATE_OUT_OF_REACH_MESSAGE,
+  SUSPEND_OUT_OF_REACH_MESSAGE,
   RETURN_DATE_INVALID_CODE,
   RETURN_DATE_INVALID_MESSAGE,
   PLANNED_RETURN_INVALID_MESSAGE,
@@ -500,8 +502,10 @@ export async function updateMobilePersonStatus(
 }
 
 /**
- * Offboarding ends a membership and Restore reopens one (51k), so only a
- * Super Admin offboards, plans a last day for or restores a Super Admin.
+ * Offboarding ends a membership and Restore reopens one (51k), and a
+ * suspension ends and reopens sign-in (F-239), so only a Super Admin
+ * offboards, restores, suspends or reinstates a Super Admin, or plans,
+ * moves or cancels any of those.
  */
 async function tierRefusal(
   auth: PeopleStatusContext,
@@ -516,7 +520,17 @@ async function tierRefusal(
       employee.plannedStatus === "active");
   const offboarding =
     action === "remove" || (action === "setPlannedChange" && employee.plannedStatus === "removed");
-  if (!(offboarding || restoring) || auth.permissions.isSuperAdmin || !employee.userId) {
+  const reinstating = action === "reinstate";
+  const suspending =
+    action === "suspend" ||
+    action === "setSuspendedUntil" ||
+    ((action === "setPlannedChange" || action === "cancelPlannedChange") &&
+      employee.plannedStatus === "suspended");
+  if (
+    !(offboarding || restoring || suspending || reinstating) ||
+    auth.permissions.isSuperAdmin ||
+    !employee.userId
+  ) {
     return null;
   }
   const role = await deps.fetchMembershipOrgRole(
@@ -527,7 +541,13 @@ async function tierRefusal(
   if (canOffboardAtTier({ isSuperAdmin: false, isGridmaster: false }, role)) return null;
   return {
     kind: "out_of_reach",
-    error: restoring ? RESTORE_OUT_OF_REACH_MESSAGE : OFFBOARD_OUT_OF_REACH_MESSAGE,
+    error: restoring
+      ? RESTORE_OUT_OF_REACH_MESSAGE
+      : reinstating
+        ? REINSTATE_OUT_OF_REACH_MESSAGE
+        : suspending
+          ? SUSPEND_OUT_OF_REACH_MESSAGE
+          : OFFBOARD_OUT_OF_REACH_MESSAGE,
     code: OFFBOARD_OUT_OF_REACH_CODE,
     status: 403,
   };

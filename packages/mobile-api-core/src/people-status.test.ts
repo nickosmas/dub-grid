@@ -4,6 +4,8 @@ import {
   OFFBOARD_OUT_OF_REACH_CODE,
   OFFBOARD_OUT_OF_REACH_MESSAGE,
   RESTORE_OUT_OF_REACH_MESSAGE,
+  REINSTATE_OUT_OF_REACH_MESSAGE,
+  SUSPEND_OUT_OF_REACH_MESSAGE,
   type Employee,
 } from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -845,6 +847,55 @@ describe("updateMobilePersonStatus offboarding and restoring (51k)", () => {
       error: RESTORE_OUT_OF_REACH_MESSAGE,
     });
     expect(restore.deps.reopenRestoredAccess).not.toHaveBeenCalled();
+  });
+
+  it("refuses an Admin suspending, planning a suspension for or reinstating a Super Admin (F-239)", async () => {
+    const asAdmin = { isSuperAdmin: false, targetRole: "super_admin" };
+    const suspend = run(employee({ userId: "user-9" }), { action: "suspend" }, asAdmin);
+    expect(await suspend.result).toEqual({
+      kind: "out_of_reach",
+      error: SUSPEND_OUT_OF_REACH_MESSAGE,
+      code: OFFBOARD_OUT_OF_REACH_CODE,
+      status: 403,
+    });
+    expect(suspend.deps.updateEmployeeSuspension).not.toHaveBeenCalled();
+
+    const suspended = employee({ userId: "user-9", suspendedAt: "2026-10-26T00:00:00Z" });
+    const endDate = run(
+      suspended,
+      { action: "setSuspendedUntil", returnDate: "2026-12-01" },
+      asAdmin,
+    );
+    expect(await endDate.result).toMatchObject({
+      kind: "out_of_reach",
+      error: SUSPEND_OUT_OF_REACH_MESSAGE,
+    });
+
+    const reinstate = run(suspended, { action: "reinstate" }, asAdmin);
+    expect(await reinstate.result).toMatchObject({
+      kind: "out_of_reach",
+      error: REINSTATE_OUT_OF_REACH_MESSAGE,
+    });
+    expect(reinstate.deps.updateEmployeeSuspension).not.toHaveBeenCalled();
+
+    const planned = employee({
+      userId: "user-9",
+      plannedStatus: "suspended",
+      plannedFrom: "2026-12-01",
+    });
+    const cancel = run(planned, { action: "cancelPlannedChange" }, asAdmin);
+    expect(await cancel.result).toMatchObject({ kind: "out_of_reach" });
+  });
+
+  it("lets an Admin suspend an Admin or a User", async () => {
+    for (const targetRole of ["admin", "user"]) {
+      const { result } = run(
+        employee({ userId: "user-9" }),
+        { action: "suspend" },
+        { isSuperAdmin: false, targetRole },
+      );
+      expect(await result).not.toMatchObject({ kind: "out_of_reach" });
+    }
   });
 
   it("lets a Super Admin offboard without reading the role", async () => {
