@@ -364,6 +364,7 @@ export function OverviewTab({
               </div>
               <EditorActionRow
                 className="dg-footer-bar dg-footer-bar--bleed"
+                floating
                 secondaryAction={
                   <Button
                     className="dg-btn dg-btn-secondary"

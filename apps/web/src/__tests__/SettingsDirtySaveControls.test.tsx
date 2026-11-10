@@ -374,7 +374,7 @@ describe("settings dirty save controls", () => {
     }
   });
 
-  it("pre-selects a day off absence detected by name and asks to save it", () => {
+  it("pre-selects a day off absence detected by name without asking to save it", () => {
     render(
       <ScheduleRules
         organization={baseOrganization}
@@ -404,9 +404,9 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    expect(screen.getByText(/Picked from its name; save to confirm it\./)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
-    // Nothing was edited, so there is nothing to discard.
+    expect(screen.getByText(/Picked from its name\./)).toBeInTheDocument();
+    // Auto-build already uses it, so nothing is unsaved until something is edited.
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 

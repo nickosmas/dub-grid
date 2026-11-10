@@ -124,10 +124,13 @@ function AccountCard({
   title,
   action,
   children,
+  after,
 }: {
   title: string;
   action?: ReactNode;
   children: ReactNode;
+  /** Further sections of the same card, such as one a shared save covers. */
+  after?: ReactNode;
 }) {
   return (
     <section className="dg-card">
@@ -136,7 +139,22 @@ function AccountCard({
         {action}
       </div>
       <div className="dg-card-body">{children}</div>
+      {after}
     </section>
+  );
+}
+
+function AccountCardSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <>
+      <div
+        className="dg-card-header"
+        style={{ borderTop: "1px solid var(--dg-color-border-light)" }}
+      >
+        <h3 className="dg-card-title">{title}</h3>
+      </div>
+      <div className="dg-card-body">{children}</div>
+    </>
   );
 }
 
@@ -657,7 +675,36 @@ export function ProfilePanel({
   return (
     <>
       <UnsavedChangesScope>
-        <AccountCard title="Your details">
+        <AccountCard
+          title="Personal details"
+          after={
+            canEditProfileDirectly && employee ? (
+              <AccountCardSection title="Work">
+                <EditEmployeePanel
+                  flushHorizontal
+                  ref={workEditorRef}
+                  employee={employee}
+                  focusAreas={focusAreas}
+                  certifications={certifications}
+                  certificationLabel={certificationLabel}
+                  roles={roles}
+                  roleLabel={roleLabel}
+                  focusAreaLabel={focusAreaLabel}
+                  isManagementUser={showManagementAccess}
+                  hideIdentityFields
+                  hideActions
+                  persistent
+                  onDirtyChange={setWorkHasChanges}
+                  onSaveBlockedChange={setWorkSaveBlocked}
+                  onSave={async (updatedEmployee) => {
+                    await saveWorkDetails(updatedEmployee);
+                  }}
+                  onCancel={() => undefined}
+                />
+              </AccountCardSection>
+            ) : undefined
+          }
+        >
           <Form
             onSubmit={(e) => {
               e.preventDefault();
@@ -784,31 +831,6 @@ export function ProfilePanel({
           </Form>
         </AccountCard>
 
-        {canEditProfileDirectly && employee && (
-          <AccountCard title="Work">
-            <EditEmployeePanel
-              flushHorizontal
-              ref={workEditorRef}
-              employee={employee}
-              focusAreas={focusAreas}
-              certifications={certifications}
-              certificationLabel={certificationLabel}
-              roles={roles}
-              roleLabel={roleLabel}
-              focusAreaLabel={focusAreaLabel}
-              isManagementUser={showManagementAccess}
-              hideIdentityFields
-              hideActions
-              persistent
-              onDirtyChange={setWorkHasChanges}
-              onSaveBlockedChange={setWorkSaveBlocked}
-              onSave={async (updatedEmployee) => {
-                await saveWorkDetails(updatedEmployee);
-              }}
-              onCancel={() => undefined}
-            />
-          </AccountCard>
-        )}
         <UnsavedChangesBar
           dirty={hasAnyChanges}
           saveDisabled={hasInvalidDraft}

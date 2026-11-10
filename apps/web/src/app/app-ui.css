@@ -1799,7 +1799,11 @@ button.dg-cc-sg-main {
    gray every save footer does, in both states, so it docks seamlessly. */
 .dg-floating-footer {
   position: sticky;
-  bottom: 16px;
+  /* The page's scroll area pads its end (16px on a phone, up to 32px) and a
+     sticky box stays inside that padding, so it already floats clear of the
+     screen's edge. Any offset here would hold a box that ends the page above
+     its resting place, so it could never dock. */
+  bottom: 0;
   z-index: 20;
   background: var(--dg-color-surface-footer);
   transition:
@@ -1860,7 +1864,8 @@ button.dg-cc-sg-main {
 /* Only while one of its buttons can be pressed. */
 .dg-unsaved-bar[data-sticky] {
   position: sticky;
-  bottom: 16px;
+  /* No offset, as for `.dg-floating-footer`. */
+  bottom: 0;
   z-index: 20;
 }
 .dg-unsaved-bar[data-placement="floating"] {
