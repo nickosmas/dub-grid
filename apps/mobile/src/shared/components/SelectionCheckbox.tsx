@@ -4,30 +4,35 @@ import { StyleSheet, View } from "react-native";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import type { MobileColors } from "../theme/tokens";
 
-/** A Material 3 checkbox, for a pick-many list on Android. */
+/**
+ * The pick-many mark in every list, as iOS's edit-mode selection
+ * draws it: an empty ring on every row, filled with the tint and a white
+ * checkmark once chosen, so each chosen row stands out from the rest (owner,
+ * 2026-10-31).
+ */
 export function SelectionCheckbox({ checked }: { checked: boolean }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
-    <View style={[styles.box, checked && styles.boxChecked]}>
-      {checked ? <Ionicons color={mobileColors.onBrandText} name="checkmark" size={16} /> : null}
+    <View style={[styles.ring, checked && styles.ringChecked]}>
+      {checked ? <Ionicons color={mobileColors.onBrandText} name="checkmark" size={15} /> : null}
     </View>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    box: {
-      width: 18,
-      height: 18,
-      borderRadius: 2,
-      borderWidth: 2,
-      borderColor: mobileColors.textMuted,
+    ring: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: mobileColors.textSubtle,
       alignItems: "center",
       justifyContent: "center",
     },
-    boxChecked: {
-      backgroundColor: mobileColors.brand,
+    ringChecked: {
       borderColor: mobileColors.brand,
+      backgroundColor: mobileColors.brand,
     },
   });

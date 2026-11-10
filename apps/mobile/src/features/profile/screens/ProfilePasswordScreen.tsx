@@ -17,7 +17,7 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { InlineError } from "../../../shared/components/InlineError";
 import { Screen } from "../../../shared/components/Screen";
-import { IS_IOS_LIST, IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
@@ -437,7 +437,7 @@ export default function ProfilePasswordScreen() {
               placeholder="Current password"
               secureTextEntry={!visiblePasswordFields.currentPassword}
               trailingAccessory={
-                IS_IOS_LIST ? undefined : (
+                IS_NATIVE_LIST ? undefined : (
                   <PasswordVisibilityToggle
                     isVisible={visiblePasswordFields.currentPassword}
                     label="current password"
@@ -474,7 +474,7 @@ export default function ProfilePasswordScreen() {
               placeholder="New password"
               secureTextEntry={!visiblePasswordFields.newPassword}
               trailingAccessory={
-                IS_IOS_LIST ? undefined : (
+                IS_NATIVE_LIST ? undefined : (
                   <PasswordVisibilityToggle
                     isVisible={visiblePasswordFields.newPassword}
                     label="new password"
@@ -500,7 +500,7 @@ export default function ProfilePasswordScreen() {
               placeholder="Confirm new password"
               secureTextEntry={!visiblePasswordFields.confirmPassword}
               trailingAccessory={
-                IS_IOS_LIST ? undefined : (
+                IS_NATIVE_LIST ? undefined : (
                   <PasswordVisibilityToggle
                     isVisible={visiblePasswordFields.confirmPassword}
                     label="confirm password"

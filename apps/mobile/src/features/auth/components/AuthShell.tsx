@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { getActionItems } from "../../../shared/components/action-button-layout";
@@ -9,6 +9,7 @@ import { Pressable } from "../../../shared/components/Pressable";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
+import { KEYBOARD_DISMISS_MODE } from "../../../shared/components/keyboard-dismiss";
 
 /**
  * Keeps the form readable on tablets without stretching the fields. The brand
@@ -71,7 +72,7 @@ export function AuthShell({
             styles.scrollContent,
             { paddingBottom: getScreenBottomPadding("stack", insets.bottom) },
           ]}
-          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          keyboardDismissMode={KEYBOARD_DISMISS_MODE}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           style={styles.keyboardArea}

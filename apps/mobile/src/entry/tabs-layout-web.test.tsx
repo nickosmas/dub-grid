@@ -50,6 +50,14 @@ vi.mock("../features/auth/hooks/useTabsGate", () => ({
   useTabsGate,
 }));
 
+// The tab error screen is covered by its own route; stubbed so its
+// components need no React Native mock here.
+vi.mock("../shared/components/TabsErrorBoundary", () => ({
+  TabsErrorBoundary: function TabsErrorBoundary() {
+    return null;
+  },
+}));
+
 let TabsLayoutWeb: (typeof import("../../app/(tabs)/_layout.web"))["default"];
 
 beforeAll(async () => {

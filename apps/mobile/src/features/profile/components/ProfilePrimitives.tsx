@@ -25,7 +25,7 @@ import { AppSwitch } from "../../../shared/components/AppSwitch";
 import { AccessInsignia } from "../../../shared/components/AccessInsignia";
 import { SelectionCheck } from "../../../shared/components/SelectionCheck";
 import { SelectionCheckbox } from "../../../shared/components/SelectionCheckbox";
-import { IS_ANDROID_LIST, IS_IOS_LIST, IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useIsInsideSheet } from "../../../shared/components/BottomSheetModal";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
@@ -215,15 +215,7 @@ export function ProfileSection({
   return (
     <View style={[styles.section, style]}>
       {title ? (
-        <Text
-          style={[
-            styles.sectionTitle,
-            IS_IOS_LIST && styles.sectionTitleIos,
-            IS_ANDROID_LIST && styles.sectionTitleAndroid,
-          ]}
-        >
-          {title}
-        </Text>
+        <Text style={[styles.sectionTitle, IS_NATIVE_LIST && styles.sectionTitleIos]}>{title}</Text>
       ) : null}
       {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
       {children}
@@ -248,7 +240,7 @@ export function ProfilePanel({
   // else in it, such as password hints, is a padded row of its own.
   const rows = Children.toArray(children);
   const isField = (child: ReactNode) => isValidElement(child) && child.type === ProfileTextInput;
-  if (IS_IOS_LIST && rows.some(isField)) {
+  if (IS_NATIVE_LIST && rows.some(isField)) {
     return (
       <View style={[styles.list, insideSheet ? styles.flatInSheet : null, style]}>
         <View style={styles.listClip}>
@@ -436,9 +428,7 @@ export function ProfileTextInput({
   const { inputAccessoryViewID, keyboardDoneAccessory } = useKeyboardDoneAccessory(inputProps);
   const inFormRow = useContext(FormRowContext);
   const insideSheet = useIsInsideSheet();
-  const nativeInputStyle = IS_ANDROID_LIST ? styles.inputAndroid : null;
-
-  if (IS_IOS_LIST) {
+  if (IS_NATIVE_LIST) {
     // A grouped-form row as Contacts draws one (owner, 2026-10-31): the
     // field's name is its placeholder, left-aligned, so it is said once and
     // gives way to what is typed. A multi-line field keeps a placeholder of
@@ -487,12 +477,7 @@ export function ProfileTextInput({
       <Text style={styles.fieldLabel}>{label}</Text>
       {trailingAccessory ? (
         <View
-          style={[
-            styles.inputShell,
-            nativeInputStyle,
-            focused && (IS_ANDROID_LIST ? styles.inputFocusedAndroid : styles.inputFocused),
-            error && styles.inputError,
-          ]}
+          style={[styles.inputShell, focused && styles.inputFocused, error && styles.inputError]}
         >
           <TextInput
             // The visible <Text> label isn't associated with the input on
@@ -505,7 +490,6 @@ export function ProfileTextInput({
             selectionColor={mobileColors.brand}
             style={[
               styles.input,
-              nativeInputStyle,
               styles.inputInShell,
               resolvedInputProps.multiline && styles.inputMultiline,
               textInputStyle,
@@ -524,9 +508,8 @@ export function ProfileTextInput({
           selectionColor={mobileColors.brand}
           style={[
             styles.input,
-            nativeInputStyle,
             resolvedInputProps.multiline && styles.inputMultiline,
-            focused && (IS_ANDROID_LIST ? styles.inputFocusedAndroid : styles.inputFocused),
+            focused && styles.inputFocused,
             error && styles.inputError,
             textInputStyle,
             inputStyle,
@@ -590,11 +573,9 @@ export function ProfileChoiceGroup<TId extends string | number>({
       {label ? (
         <Text
           style={
-            IS_IOS_LIST
+            IS_NATIVE_LIST
               ? [styles.sectionTitle, styles.sectionTitleIos]
-              : IS_ANDROID_LIST
-                ? [styles.sectionTitle, styles.sectionTitleAndroid]
-                : [styles.fieldLabel, styles.choiceGroupLabel]
+              : [styles.fieldLabel, styles.choiceGroupLabel]
           }
         >
           {label}
@@ -1128,10 +1109,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     // Material 3: a list subheader in the brand colour.
-    sectionTitleAndroid: {
-      ...mobileTextWeighted("body", "semibold"),
-      color: mobileColors.brand,
-    },
     sectionDescription: {
       ...mobileText.body,
       color: mobileColors.textMuted,
@@ -1306,16 +1283,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     iosFieldError: {
       paddingHorizontal: 16,
       paddingBottom: mobileSpace.md,
-    },
-    // Material 3's outlined text field.
-    inputAndroid: {
-      backgroundColor: "transparent",
-      borderColor: mobileColors.textMuted,
-      borderRadius: 4,
-    },
-    inputFocusedAndroid: {
-      borderColor: mobileColors.brand,
-      borderWidth: 2,
     },
     inputFocused: {
       backgroundColor: mobileColors.surface,

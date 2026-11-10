@@ -1075,3 +1075,43 @@ Re-reviewed 2026-11-07 against d021b5fc3, with an independent reader and on a st
 **Why it matters:** The new membership doesn't exist until they accept, so the fallback finds nothing, the hook refuses them, and accepting needs a session. Traced, not run.
 **Suggested fix:** Let an invitation's token carry them through acceptance without a session, or have the hook allow a session with no organization for this case.
 **Resolution:**
+
+### F-230 [P2] fixed - Android's tab layout drops the tab-level error boundary
+
+**File:** `apps/mobile/app/(tabs)/_layout.android.tsx`; `apps/mobile/app/(tabs)/_layout.tsx:18` (`ErrorBoundary`)
+**Found:** 2026-11-09 by /audit (scope: apps/mobile; lens: quality, platform divergence)
+**Why it matters:** Expo Router takes a route's `ErrorBoundary` from the file it resolves, and on Android that is `_layout.android.tsx`, which exports none. A render error in any tab therefore reaches the root boundary on Android and replaces the whole app, where iOS shows "This tab ran into a problem" and keeps the providers alive, which is what the base file's comment promises. Found by comparing each platform file's exports with its base; it is the only mismatch among the 19 variants. The tab list itself (names, labels, order, role gates) is written three times, in the iOS, Android and web layouts, which is how the boundary was missed.
+**Suggested fix:** Re-export `ErrorBoundary` from `_layout.android.tsx` (and `.web.tsx`). Then declare the tabs once (name, label, SF Symbol, Material icon, gate) in a shared module that each layout maps over, and add a test that every platform file exports what its base exports.
+**Resolution:** Fixed on feature/56d-platform-consolidation (step 1, 2026-11-09): the tabs are declared once in `src/shared/navigation/app-tabs.ts`, every tab layout maps over it, and each re-exports `TabsErrorBoundary` from a shared module (a re-export from `./_layout` resolves to the Android file itself on Android). `platform-variants.test.ts` fails when any platform file exports less than its base, and failed on the old Android layout. On an Android 17 emulator a thrown render in Profile shows the tab error screen.
+
+### F-231 [P2] fixed - Unit tests run the web fallbacks, so the iOS and Android code that ships is untested
+
+**File:** `apps/mobile/vitest.config.mts` (resolves base files under the react-native-web shim); `apps/mobile/src/shared/components/ConfirmationModal.native.tsx`, `BottomSheetModal.native.tsx` and the 16 other `.ios`, `.android` and `.native` files
+**Found:** 2026-11-09 by /audit (scope: apps/mobile; lens: quality, platform divergence)
+**Why it matters:** Vitest resolves `ConfirmationModal.tsx`, the drawn card, so `ConfirmationModal.test.tsx` proves pending, duplicate-confirm and in-place error behaviour that no phone shows. On a device every word-only confirmation is `Alert.alert`, which closes when answered and reports a failure as a second alert with Try again. None of the 18 platform files (1,794 lines, every sheet, confirmation, toast, segmented switch and tab strip) has a test, and only `top-level-stack.ios.test.tsx` runs as a platform. A change to a shared primitive can pass every test and break both apps.
+**Suggested fix:** Add Vitest projects for `ios` and `android` that put `.ios.tsx` or `.android.tsx`, then `.native.tsx`, ahead of `.tsx` in `resolve.extensions` and set `Platform.OS`, and run the primitives' tests in all three. Start with `ConfirmationModal.native.tsx`: move its button and message building into a pure, tested function.
+**Resolution:** Fixed on feature/56d-platform-consolidation (steps 3 to 13, 2026-11-09), by removing most of what the tests could not reach rather than by adding iOS and Android Vitest projects: 13 platform files are folded into shared controls, so Vitest runs the code both phones ship for them. The five platform files left are tested directly: `ConfirmationModal.native.test.tsx` imports the native file with `Alert` mocked (cancel, destructive, a second action, dismiss as cancel, a failure as Try again, shown again on reopen), and the alert's buttons and message and the native sheet's opening size are pure tested functions (`confirmation-alert.ts`, `sheet-open-size.ts`); each test fails when its behavior is broken on purpose. Not done: a render test of `BottomSheetModal.native` through an `@expo/ui` shim.
+
+### F-232 [P3] fixed - Screens build platform-specific navigation bar buttons themselves
+
+**File:** `apps/mobile/src/features/notifications/screens/NotificationsScreen.tsx:498-524` (`MarkAllReadBarAction`); `apps/mobile/src/features/people/components/PeopleHeaderActions.tsx:20-36`
+**Found:** 2026-11-09 by /audit (scope: apps/mobile; lens: quality, platform divergence)
+**Why it matters:** `HeaderTextBarAction`, `HeaderFilterAction` and `EditBarActions` keep the iOS and Android forms of a bar button in `shared/navigation`, but these two screens call `Stack.Toolbar` and `useToolbarIcon` directly and branch on `Platform.OS` (words on iOS, a Material icon on Android, waiting for the Android image). The next screen with a bar button will copy one of them.
+**Suggested fix:** A shared `HeaderBarAction({ label, sfSymbol, materialIcon, placement, onPress })` that holds the platform choice and the image wait, used by both screens.
+**Resolution:** Fixed on feature/56d-platform-consolidation (step 2, 2026-11-09): `HeaderBarAction` in `shared/navigation` holds the platform choice (words or the SF Symbol on iOS, the Material icon on Android once its image exists), and Mark all read and Add person use it. Neither screen imports `Platform` or `Stack.Toolbar`, and no file under `src/features` names `Stack.Toolbar`. Tested in `HeaderBarAction.test.tsx`; seen on the iOS Simulator and an Android 17 emulator.
+
+### F-233 [P3] fixed - A searchable screen has to know where each platform draws its search field
+
+**File:** `apps/mobile/app/_layout.tsx:48-56, 162` (`ALERTS_SEARCH_BAR`); `apps/mobile/src/features/people/screens/PeopleScreen.tsx:707-713` (`headerGap`)
+**Found:** 2026-11-09 by /audit (scope: apps/mobile; lens: quality, platform divergence)
+**Why it matters:** `ScreenSearch` hides the iOS bar against Android's docked field, but Alerts repeats its placeholder and an iOS check in the root layout (the route needs the bar before the push, or iOS 26 draws it over the title), and People adds a gap under the field on Android only. Each new searchable screen has to rediscover both.
+**Suggested fix:** Export a `screenSearchRouteOptions(placeholder)` from `ScreenSearch` for the route, and give the Android field its own bottom spacing so screens set none.
+**Resolution:** Fixed on feature/56d-platform-consolidation (step 11, 2026-11-09): `ScreenSearch` is `Stack.SearchBar` on both phones (the app-bar search action on Android, in DubGrid's colors), its `.android` docked bar is deleted, and it exports `screenSearchRouteOptions(placeholder, colors)` and `ALERTS_SEARCH_PLACEHOLDER` for the Alerts route, so no screen or layout repeats the placeholder or checks the platform. People's Android-only gap is gone. Seen filtering and clearing on an Android 17 emulator and unchanged on iOS 26.
+
+### F-234 [P3] fixed - Small platform duplications outside the primitives
+
+**File:** `keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}` in `Screen.tsx:347, 382`, `BottomSheetModalDrawn.tsx:315` and `features/auth/components/AuthShell.tsx:74`; inline prop types in `SelectionCheck.{ios,android}.tsx` and `SelectionCheckbox.ios.tsx`
+**Found:** 2026-11-09 by /audit (scope: apps/mobile; lens: quality, platform divergence)
+**Why it matters:** The keyboard rule is copied four times, one in a feature. The selection controls repeat their props in each platform file, where every other variant set shares a `.types.ts`, so their signatures can drift without a type error.
+**Suggested fix:** One `KEYBOARD_DISMISS_MODE` constant in `screen-layout.ts`, and `SelectionCheck.types.ts` and `SelectionCheckbox.types.ts` like the other variants.
+**Resolution:** Fixed on feature/56d-platform-consolidation (steps 4 and 14, 2026-11-09): one `KEYBOARD_DISMISS_MODE` in `src/shared/components/keyboard-dismiss.ts` serves `Screen`, the drawn sheet and `AuthShell`; the selection controls are single files, so their props can no longer drift. A monospace token and `features/profile/lib/device-copy.ts` took the remaining screen checks, and `design/no-platform-branch-in-mobile-ui` keeps `Platform.OS`, `Platform.select`, `Platform.Version` and platform-suffixed files out of `app/` and feature screens and components.

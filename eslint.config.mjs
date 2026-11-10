@@ -10,6 +10,7 @@ import { noFloatingAsyncHandler } from "./eslint-rules/no-floating-async-handler
 import { noMisplacedUseClient } from "./eslint-rules/no-misplaced-use-client.mjs";
 import { noRawMobileMetrics } from "./eslint-rules/no-raw-mobile-metrics.mjs";
 import { noFloatingServerWork } from "./eslint-rules/no-floating-server-work.mjs";
+import { noPlatformBranchInMobileUi } from "./eslint-rules/no-platform-branch-in-mobile-ui.mjs";
 import { noUnscopedTenantWrite } from "./eslint-rules/no-unscoped-tenant-write.mjs";
 import { noRawErrorInToast, noTechnicalUserCopy } from "./eslint-rules/no-technical-user-copy.mjs";
 import { noCopyStyleDrift } from "./eslint-rules/no-copy-style-drift.mjs";
@@ -29,6 +30,7 @@ const designPlugin = {
     "no-misplaced-use-client": noMisplacedUseClient,
     "no-raw-mobile-metrics": noRawMobileMetrics,
     "no-floating-server-work": noFloatingServerWork,
+    "no-platform-branch-in-mobile-ui": noPlatformBranchInMobileUi,
     "no-unscoped-tenant-write": noUnscopedTenantWrite,
   },
 };
@@ -204,6 +206,26 @@ const eslintConfig = defineConfig([
     plugins: { design: designPlugin },
     rules: {
       "design/no-raw-mobile-metrics": "error",
+    },
+  },
+  {
+    // One design on both phones (item 56d): screens and feature components
+    // never branch on the platform. The difference lives in a shared
+    // primitive under src/shared; the tab layouts and the iOS date calendar
+    // are the native pieces allowed here.
+    files: [
+      "apps/mobile/app/**/*.{ts,tsx}",
+      "apps/mobile/src/features/**/screens/**/*.{ts,tsx}",
+      "apps/mobile/src/features/**/components/**/*.{ts,tsx}",
+    ],
+    ignores: [
+      "apps/mobile/**/*.test.{ts,tsx}",
+      "apps/mobile/app/(tabs)/_layout.*",
+      "apps/mobile/src/features/people/components/NativeDateCalendar.ios.tsx",
+    ],
+    plugins: { design: designPlugin },
+    rules: {
+      "design/no-platform-branch-in-mobile-ui": "error",
     },
   },
   {

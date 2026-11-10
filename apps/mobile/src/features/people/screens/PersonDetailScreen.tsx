@@ -56,10 +56,6 @@ import { Button } from "../../../shared/components/Button";
 import { InlineError } from "../../../shared/components/InlineError";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import {
-  AnchoredConfirmation,
-  CAN_ANCHOR_CONFIRMATION,
-} from "../../../shared/components/AnchoredConfirmation";
-import {
   FocusAreaShiftsCancelledError,
   useFocusAreaShiftsQuestion,
 } from "../../../shared/hooks/useFocusAreaShiftsQuestion";
@@ -2467,49 +2463,31 @@ function PlanCancelRow({
   const keepLabel = copy.label.replace(/^Cancel /, "Keep ");
   return (
     <>
-      <AnchoredConfirmation
-        fullWidth
-        request={
-          CAN_ANCHOR_CONFIRMATION && confirming
-            ? {
-                title: copy.title,
-                body,
-                confirmLabel: copy.label,
-                cancelLabel: keepLabel,
-                onConfirm: () => void onConfirm(),
-                onCancel: onDismiss,
-              }
-            : null
-        }
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        onPress={onRequest}
+        style={({ pressed }) => [
+          planCancelStyles.row,
+          { backgroundColor: mobileColors.surface },
+          pressed && planCancelStyles.pressed,
+        ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled }}
-          disabled={disabled}
-          onPress={onRequest}
-          style={({ pressed }) => [
-            planCancelStyles.row,
-            { backgroundColor: mobileColors.surface },
-            pressed && planCancelStyles.pressed,
-          ]}
-        >
-          <Text style={[planCancelStyles.label, { color: mobileColors.dangerText }]}>
-            {copy.label}
-          </Text>
-        </Pressable>
-      </AnchoredConfirmation>
-      {CAN_ANCHOR_CONFIRMATION ? null : (
-        <ConfirmationModal
-          body={body}
-          cancelLabel={keepLabel}
-          confirmLabel={copy.label}
-          confirmTone="danger"
-          onCancel={onDismiss}
-          onConfirm={() => onConfirm() ?? undefined}
-          title={copy.title}
-          visible={confirming}
-        />
-      )}
+        <Text style={[planCancelStyles.label, { color: mobileColors.dangerText }]}>
+          {copy.label}
+        </Text>
+      </Pressable>
+      <ConfirmationModal
+        body={body}
+        cancelLabel={keepLabel}
+        confirmLabel={copy.label}
+        confirmTone="danger"
+        onCancel={onDismiss}
+        onConfirm={() => onConfirm() ?? undefined}
+        title={copy.title}
+        visible={confirming}
+      />
     </>
   );
 }

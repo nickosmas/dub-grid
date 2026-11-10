@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
+import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileRadii } from "../theme/tokens";
 import { ICON_CONTROL_SIZE } from "./icon-control-style";
@@ -16,10 +17,13 @@ export type ChromeIconButtonProps = {
   disabled?: boolean;
 };
 
+// Fixed for the app's run: the glass APIs are a property of the OS version.
+const HAS_LIQUID_GLASS = isLiquidGlassAvailable();
+
 /**
- * A round icon button in a screen's own header. Android draws Material 3's
- * filled tonal icon button with its ripple; iOS has its own version in Liquid
- * Glass (`ChromeIconButton.ios.tsx`).
+ * A round icon button in a screen's own header: Liquid Glass where the OS
+ * has it (iOS 26), otherwise a tonal circle with Android's ripple. Shape,
+ * size and content are the same on both phones.
  */
 export function ChromeIconButton({
   accessibilityLabel,
@@ -37,12 +41,24 @@ export function ChromeIconButton({
         accessibilityRole="button"
         accessibilityState={disabled ? { disabled } : undefined}
         disabled={disabled}
-        android_ripple={{ color: mobileColors.rippleNeutral, borderless: false }}
+        android_ripple={
+          HAS_LIQUID_GLASS ? undefined : { color: mobileColors.rippleNeutral, borderless: false }
+        }
         hitSlop={10}
         onPress={onPress}
-        style={[styles.button, { backgroundColor: mobileColors.controlSecondaryBg }]}
+        style={
+          HAS_LIQUID_GLASS
+            ? styles.frame
+            : [styles.circle, { backgroundColor: mobileColors.controlSecondaryBg }]
+        }
       >
-        {children}
+        {HAS_LIQUID_GLASS ? (
+          <GlassView glassEffectStyle="regular" isInteractive style={styles.circle}>
+            {children}
+          </GlassView>
+        ) : (
+          children
+        )}
       </Pressable>
       {badge}
     </View>
@@ -54,7 +70,7 @@ const styles = StyleSheet.create({
     width: ICON_CONTROL_SIZE,
     height: ICON_CONTROL_SIZE,
   },
-  button: {
+  circle: {
     width: ICON_CONTROL_SIZE,
     height: ICON_CONTROL_SIZE,
     borderRadius: mobileRadii.pill,

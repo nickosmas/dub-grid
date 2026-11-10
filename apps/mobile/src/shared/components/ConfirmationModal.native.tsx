@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Alert, StyleSheet, View, type AlertButton } from "react-native";
 import { hapticImpact } from "../lib/haptics";
 import { useAsyncAction } from "../hooks/useAsyncAction";
@@ -6,10 +6,10 @@ import { mobileSpace } from "../theme/tokens";
 import { AppText } from "./AppText";
 import { BottomSheetModal, SheetActions, SheetHeader } from "./BottomSheetModal";
 import { Button } from "./Button";
-import { ConfirmSummaryBox, type ConfirmSummary } from "./ConfirmSummaryBox";
+import { ConfirmSummaryBox } from "./ConfirmSummaryBox";
+import { confirmationAlertSpec } from "./confirmation-alert";
 import { InlineError } from "./InlineError";
 import type { ConfirmationModalProps } from "./ConfirmationModal";
-import { AnchoredConfirmationContext } from "./anchored-confirmation";
 
 export type { ConfirmationModalProps } from "./ConfirmationModal";
 
@@ -17,18 +17,10 @@ export type { ConfirmationModalProps } from "./ConfirmationModal";
  * A confirmation in each platform's own element: the system alert (UIKit's
  * alert on iOS, Material's AlertDialog on Android) when it is only words, and
  * a native sheet when it carries controls of its own, such as a choice to make
- * before confirming. The web and the tests keep the drawn card in
- * `ConfirmationModal.tsx`.
+ * before confirming. The web keeps the drawn card in `ConfirmationModal.tsx`.
  */
 export function ConfirmationModal(props: ConfirmationModalProps) {
   return props.children ? <ConfirmationSheet {...props} /> : <ConfirmationAlert {...props} />;
-}
-
-function summaryLines(summary: ConfirmSummary | undefined): string[] {
-  if (!summary || summary.points.length === 0) return [];
-  if (summary.points.length === 1 && !summary.title) return [summary.points[0]!];
-  const bullets = summary.points.map((point) => `• ${point}`).join("\n");
-  return [summary.title ? `${summary.title}\n${bullets}` : bullets];
 }
 
 function ConfirmationAlert(props: ConfirmationModalProps) {
@@ -37,33 +29,6 @@ function ConfirmationAlert(props: ConfirmationModalProps) {
   const latest = useRef(props);
   latest.current = props;
   const shownRef = useRef(false);
-  // A plain destructive question inside an iOS sheet opens from its close
-  // button instead of the middle of the screen.
-  const showAnchored = useContext(AnchoredConfirmationContext);
-  const anchored =
-    showAnchored != null &&
-    props.confirmTone === "danger" &&
-    !props.secondaryAction &&
-    !props.summary;
-
-  useEffect(() => {
-    if (!anchored || !showAnchored) return;
-    if (!visible) {
-      showAnchored(null);
-      return;
-    }
-    const current = latest.current;
-    showAnchored({
-      title: current.title,
-      body: current.body,
-      confirmLabel: current.confirmLabel,
-      cancelLabel: current.cancelLabel ?? "Cancel",
-      onConfirm: confirm,
-      onCancel: () => latest.current.onCancel(),
-    });
-    return () => showAnchored(null);
-  }, [anchored, showAnchored, visible]);
-
   const confirm = () => {
     const current = latest.current;
     if (current.confirmTone === "danger") hapticImpact("medium");
@@ -74,7 +39,6 @@ function ConfirmationAlert(props: ConfirmationModalProps) {
   };
 
   useEffect(() => {
-    if (anchored) return;
     if (!visible) {
       shownRef.current = false;
       return;
@@ -82,20 +46,18 @@ function ConfirmationAlert(props: ConfirmationModalProps) {
     if (shownRef.current) return;
     shownRef.current = true;
     const current = latest.current;
-    const buttons: AlertButton[] = [
-      { text: current.cancelLabel ?? "Cancel", style: "cancel", onPress: current.onCancel },
-    ];
-    if (current.secondaryAction) {
-      const secondary = current.secondaryAction;
-      buttons.push({ text: secondary.label, onPress: () => void secondary.onPress() });
-    }
-    buttons.push({
-      text: current.confirmLabel,
-      style: current.confirmTone === "danger" ? "destructive" : "default",
-      onPress: confirm,
-    });
-    const message = [current.body, ...summaryLines(current.summary)].filter(Boolean).join("\n\n");
-    Alert.alert(current.title, message || undefined, buttons, {
+    const spec = confirmationAlertSpec(current);
+    const buttons: AlertButton[] = spec.buttons.map((button) => ({
+      text: button.text,
+      style: button.style,
+      onPress:
+        button.kind === "cancel"
+          ? current.onCancel
+          : button.kind === "secondary"
+            ? () => void current.secondaryAction?.onPress()
+            : confirm,
+    }));
+    Alert.alert(spec.title, spec.message, buttons, {
       cancelable: true,
       onDismiss: () => latest.current.onCancel(),
     });

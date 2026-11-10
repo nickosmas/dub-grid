@@ -19,12 +19,8 @@ import { AppText } from "./AppText";
 import { ChromeIconButton } from "./ChromeIconButton";
 import { ICON_CONTROL_SIZE } from "./icon-control-style";
 import { liftSheetActions, type ButtonProps } from "./sheet-bar-actions";
+import { sheetOpenSize, type SheetSizes } from "./sheet-open-size";
 import { BarAction } from "./SheetBarAction";
-import { AnchoredConfirmation } from "./AnchoredConfirmation";
-import {
-  AnchoredConfirmationContext,
-  type AnchoredConfirmationRequest,
-} from "./anchored-confirmation";
 import {
   BottomSheetModal as DrawnBottomSheetModal,
   InsideSheetContext,
@@ -40,14 +36,7 @@ export * from "./BottomSheetModalDrawn";
  * sheet full height and scrolls (owner, 2026-11-02).
  */
 const SCROLL_BODY_MAX_SHARE = 0.62;
-/** The space `@expo/ui` puts between the grabber and a detent sheet's content. */
-const IOS_GRABBER_SPACE = 16;
-/** Before the content is measured, a sheet that scrolls opens at this share. */
-const UNMEASURED_OPEN_SHARE = 0.7;
-/** How far below the status bar the system's full-height sheet starts. */
-const FULL_SHEET_TOP_GAP = 10;
 
-type SheetSizes = { header: number; content: number; footer: number };
 /**
  * Room the title row, the footer and the sheet's own insets take, so a body
  * sized to the space above the keyboard leaves the whole sheet in view. The
@@ -84,8 +73,6 @@ type SheetClose = {
   primary?: ButtonProps;
   /** A second action that isn't a cancel, such as Clear all. */
   secondary?: ButtonProps;
-  /** A discard confirmation opening from the close button (iOS). */
-  confirmation: AnchoredConfirmationRequest | null;
 };
 
 /** Set inside a native sheet, so its header draws the platform's own bar. */
@@ -117,7 +104,6 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
     setSizes((current) => (current[part] === rounded ? current : { ...current, [part]: rounded }));
   };
   const androidResizableRef = useRef<boolean | null>(null);
-  const [confirmation, setConfirmation] = useState<AnchoredConfirmationRequest | null>(null);
 
   if (props.presentationKind === "gate" || props.backdrop === "cover") {
     return <DrawnBottomSheetModal {...props} />;
@@ -137,40 +123,23 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
 
   const lifted = liftSheetActions(footer);
   const barFooter = lifted.primary ? lifted.rest : footer;
-  // A list with nothing under it pads for the home indicator and runs one
-  // inset past the sheet's foot. Before iOS 26 a detent stops at the home
-  // indicator and the system adds the inset below it; iOS 26's floating sheet
-  // adds nothing, so its detent holds the whole sheet.
-  const footerHeight = barFooter ? sizes.footer : -(IOS_FLOATING_SHEETS ? 1 : 2) * bottomInset;
-  const naturalHeight =
-    sizes.content > 0
-      ? IOS_GRABBER_SPACE + sizes.header + sizes.content + footerHeight + mobileSpace.sm
-      : 0;
-  // The tallest a sheet gets: the system's full-height sheet, which stops
-  // short of the status bar.
-  const fullHeight = windowHeight - topInset - FULL_SHEET_TOP_GAP;
-  const overflows = naturalHeight > fullHeight;
+  const { overflows, resizable, snapPoints } = sheetOpenSize({
+    isIos: IS_IOS,
+    floating: IOS_FLOATING_SHEETS,
+    sizes,
+    hasBarFooter: Boolean(barFooter),
+    bottomInset,
+    topInset,
+    windowHeight,
+    scrollable,
+    expandable,
+    androidResizable: androidResizableRef.current,
+  });
   // Android's sheet is either sized to its content or full screen, and
   // changing how it is sized remounts its content, so the choice holds while
   // it shows.
   if (!visible) androidResizableRef.current = null;
-  else if (androidResizableRef.current === null) {
-    androidResizableRef.current = overflows;
-  }
-  // A sheet that scrolls opens at its content's height, so everything in it
-  // shows; only content taller than the screen opens it full height to
-  // scroll. iOS sizes it by detents throughout, so a height change while it
-  // shows just moves the detent.
-  const resizable = scrollable && (IS_IOS || androidResizableRef.current === true);
-  const snapPoints = !resizable
-    ? undefined
-    : !IS_IOS || overflows
-      ? ["100%"]
-      : naturalHeight === 0
-        ? [Math.round(windowHeight * UNMEASURED_OPEN_SHARE)]
-        : expandable
-          ? [naturalHeight, "100%"]
-          : [naturalHeight];
+  else if (androidResizableRef.current === null) androidResizableRef.current = overflows;
 
   return (
     <BottomSheet
@@ -193,54 +162,49 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
             label: props.accessibilityLabel ?? "Close",
             primary: lifted.primary,
             secondary: lifted.secondary,
-            confirmation,
           }}
         >
-          <AnchoredConfirmationContext.Provider
-            value={IS_IOS && !lifted.secondary ? setConfirmation : null}
-          >
-            {/* A sheet sized to its content lays React Native out without a set
+          {/* A sheet sized to its content lays React Native out without a set
             width, so text in a row never wraps. The app is phone-only, where
             a sheet is as wide as the screen. */}
-            <BottomSheetView
-              style={[styles.sheet, { width: windowWidth }, resizable && styles.sheetFill]}
-            >
-              <View onLayout={(event) => measure("header", event.nativeEvent.layout.height)}>
-                {header ?? (IS_IOS || lifted.primary ? <SheetHeader title="" /> : null)}
+          <BottomSheetView
+            style={[styles.sheet, { width: windowWidth }, resizable && styles.sheetFill]}
+          >
+            <View onLayout={(event) => measure("header", event.nativeEvent.layout.height)}>
+              {header ?? (IS_IOS || lifted.primary ? <SheetHeader title="" /> : null)}
+            </View>
+            {scrollable ? (
+              <BottomSheetScrollView
+                automaticallyAdjustKeyboardInsets
+                contentContainerStyle={[
+                  styles.body,
+                  !barFooter && { paddingBottom: bottomInset + mobileSpace.lg },
+                ]}
+                keyboardShouldPersistTaps="handled"
+                onContentSizeChange={(_width, height) => measure("content", height)}
+                // With nothing below it, the list runs on under the home
+                // indicator, as a system sheet's does, rather than stopping
+                // on a hard line above the system's bottom inset.
+                style={[
+                  resizable ? styles.scrollFill : { maxHeight: scrollBodyMaxHeight },
+                  !barFooter && { marginBottom: -bottomInset },
+                ]}
+              >
+                {children}
+              </BottomSheetScrollView>
+            ) : (
+              <View style={styles.body}>{children}</View>
+            )}
+            {barFooter ? (
+              <View
+                onLayout={(event) => measure("footer", event.nativeEvent.layout.height)}
+                style={[styles.footer, { borderTopColor: mobileColors.borderSubtle }]}
+              >
+                {barFooter}
               </View>
-              {scrollable ? (
-                <BottomSheetScrollView
-                  automaticallyAdjustKeyboardInsets
-                  contentContainerStyle={[
-                    styles.body,
-                    !barFooter && { paddingBottom: bottomInset + mobileSpace.lg },
-                  ]}
-                  keyboardShouldPersistTaps="handled"
-                  onContentSizeChange={(_width, height) => measure("content", height)}
-                  // With nothing below it, the list runs on under the home
-                  // indicator, as a system sheet's does, rather than stopping
-                  // on a hard line above the system's bottom inset.
-                  style={[
-                    resizable ? styles.scrollFill : { maxHeight: scrollBodyMaxHeight },
-                    !barFooter && { marginBottom: -bottomInset },
-                  ]}
-                >
-                  {children}
-                </BottomSheetScrollView>
-              ) : (
-                <View style={styles.body}>{children}</View>
-              )}
-              {barFooter ? (
-                <View
-                  onLayout={(event) => measure("footer", event.nativeEvent.layout.height)}
-                  style={[styles.footer, { borderTopColor: mobileColors.borderSubtle }]}
-                >
-                  {barFooter}
-                </View>
-              ) : null}
-              {overlay}
-            </BottomSheetView>
-          </AnchoredConfirmationContext.Provider>
+            ) : null}
+            {overlay}
+          </BottomSheetView>
         </SheetCloseContext.Provider>
       </InsideSheetContext.Provider>
     </BottomSheet>
@@ -308,18 +272,16 @@ function IosSheetBar({ title, subtitle }: { title?: string; subtitle?: string })
             {close?.secondary ? (
               <BarAction action={close.secondary} kind="secondary" />
             ) : close ? (
-              <AnchoredConfirmation request={close.confirmation}>
-                <ChromeIconButton
-                  accessibilityLabel={close.label}
-                  onPress={close.disabled ? () => undefined : close.onClose}
-                >
-                  <Ionicons
-                    color={close.disabled ? mobileColors.textSubtle : mobileColors.textPrimary}
-                    name="close"
-                    size={22}
-                  />
-                </ChromeIconButton>
-              </AnchoredConfirmation>
+              <ChromeIconButton
+                accessibilityLabel={close.label}
+                onPress={close.disabled ? () => undefined : close.onClose}
+              >
+                <Ionicons
+                  color={close.disabled ? mobileColors.textSubtle : mobileColors.textPrimary}
+                  name="close"
+                  size={22}
+                />
+              </ChromeIconButton>
             ) : null}
           </View>
         </View>

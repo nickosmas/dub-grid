@@ -179,6 +179,42 @@ container's height, which is what left button labels tiny beside large copy. At
 a raised scale, stack squeezed columns (a role pill under the name) rather than
 `flexWrap` a pill.
 
+## One Design, Native Only Where the Platform Supplies It
+
+The app follows the industry standard for a cross-platform app (owner,
+2026-11-09, item 56d): one DubGrid design on iOS and Android, with native
+controls only where iOS, Android or the navigation library supply them. A new
+screen or control needs no per-platform work.
+
+| Native (the platform supplies it)                                              | One shared DubGrid control                                           |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Navigation bar, its buttons and back (`HeaderBarAction`, `HeaderFilterAction`) | Segmented switch (`SegmentedSwitch`)                                 |
+| Tab bar (one list in `src/shared/navigation/app-tabs.ts`)                      | Toast (`ToastSurface`, at the top)                                   |
+| Search (`ScreenSearch`, `Stack.SearchBar`)                                     | Tab strip (`ScrollableTabStripTab`)                                  |
+| System alerts (`ConfirmationModal.native`), discards included                  | Pick-one and pick-many marks (`SelectionCheck`, `SelectionCheckbox`) |
+| Sheets (`BottomSheetModal.native`, `SheetBarAction.native`)                    | Status symbols (`ToneSymbol`, Material icons)                        |
+| iOS date calendar (`NativeDateCalendar.ios`), share, haptics                   | Round header button (`ChromeIconButton`), text fields, lists         |
+
+- **Materials, not layouts.** A shared control may use a platform material
+  where it exists: Liquid Glass through `isLiquidGlassAvailable()` (read once
+  at module scope) and Android's ripple through `android_ripple`. Shape, size,
+  position, content and behavior are the same on both phones.
+- **Where a platform check may live.** Only in `src/shared` (a primitive, a
+  `src/shared/lib` constant such as `KEYBOARD_DISMISS_MODE`, or a feature's
+  `lib` helper such as `features/profile/lib/device-copy.ts`). Screens and
+  feature components never branch on the platform:
+  `design/no-platform-branch-in-mobile-ui` refuses `Platform.OS`,
+  `Platform.select`, `Platform.Version` and platform-suffixed files in `app/`
+  and in `src/features/**/{screens,components}`.
+- **Platform files allowed:** `app/(tabs)/_layout.*`,
+  `BottomSheetModal.native`, `ConfirmationModal.native`,
+  `SheetBarAction.native`, `NativeDateCalendar.ios`. Anything new needs a
+  reason added here. `platform-variants.test.ts` fails when a platform file
+  exports less than its base, which TypeScript cannot see.
+- **Should this control be native?** Only if it is in the left column, or the
+  platform draws it for us with no styling of ours. Otherwise draw it once in
+  `src/shared/components`. Android keeps DubGrid's brand colors.
+
 ## Platform Rules
 
 - Do not use browser-only APIs (`window`, `document`, `localStorage`) in native
@@ -326,7 +362,8 @@ Choose the surface by the user's task:
   not one: its Submit is the commitment. A call-off is, since it takes the
   requester off the roster.
 - **FullPageSheet:** the platform's card sheet (iOS `pageSheet`, Android
-  full-screen slide) with a header, Close, scrolling body and pinned footer,
+  full-screen slide) with one centred-title bar on both phones, Close, a
+  scrolling body and pinned footer,
   for a task that needs the page but is still modal to the screen beneath it.
   Same `onDismiss` funnel and one-task-sheet rule as `BottomSheetModal`.
 - **BottomSheetModal:** contextual choices, filters, short forms, and compact

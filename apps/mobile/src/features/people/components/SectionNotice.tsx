@@ -32,12 +32,7 @@ export function SectionNotice({
 
   return (
     <View accessibilityRole="summary" style={styles.notice}>
-      <ToneSymbol
-        color={iconColor}
-        markColor={tone === "warning" ? mobileColors.warningSoft : mobileColors.dangerSoft}
-        size={18}
-        tone={tone}
-      />
+      <ToneSymbol color={iconColor} size={18} tone={tone} />
       <View style={styles.messages}>
         {messages.map((message) => (
           <AppText key={message} tone={tone} variant="meta">
