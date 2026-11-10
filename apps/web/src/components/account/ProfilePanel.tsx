@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import {
   getOptionalUsPhoneError,
   getRequiredStaffEmailError,
@@ -28,7 +27,7 @@ import { extractErrorMessage } from "@/lib/error-handling";
 import { formatClientLabel } from "@/lib/client-facing";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { useOwnContactCheck } from "@/components/account/useOwnContactCheck";
-import { UnsavedChangesBar } from "@/components/ui/UnsavedChangesBar";
+import { UnsavedChangesBar, UnsavedChangesScope } from "@/components/ui/UnsavedChangesBar";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import {
@@ -102,8 +101,6 @@ interface ProfilePanelProps {
   /** Refreshes the whole self-profile query after the management-access modal
    *  saves - the shared editor doesn't hand back the new department list. */
   refetchProfile: () => Promise<unknown>;
-  /** Where the Unsaved changes bar goes, so it can stay in view over the whole tab. */
-  saveBarSlot?: HTMLElement | null;
   /** False when the page shows a plain access role in its record card instead. */
   showAccessRole?: boolean;
 }
@@ -184,7 +181,6 @@ export function ProfilePanel({
   setProfile,
   setEmployee,
   refetchProfile,
-  saveBarSlot,
   showAccessRole = true,
 }: ProfilePanelProps) {
   const stepUp = useStepUpAction();
@@ -658,170 +654,170 @@ export function ProfilePanel({
           }
         : null;
 
-  const saveBarNode = hasAnyChanges ? (
-    <UnsavedChangesBar
-      saveDisabled={hasInvalidDraft}
-      saving={saving}
-      onDiscard={cancelEditing}
-      onSave={requestSave}
-    />
-  ) : null;
-  const saveBar = saveBarSlot && saveBarNode ? createPortal(saveBarNode, saveBarSlot) : saveBarNode;
-
   return (
     <>
-      <AccountCard title="Your details">
-        <Form
-          onSubmit={(e) => {
-            e.preventDefault();
-            requestSave();
-          }}
-          className="flex flex-col gap-4"
-        >
-          {canEditProfileDirectly ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="dg-label">First name</label>
-                <input
-                  aria-label="First name"
-                  value={editFirstName}
-                  onChange={(e) => {
-                    accountDraftTouchedRef.current = true;
-                    setEditFirstName(e.target.value);
-                  }}
-                  className="dg-input"
-                />
-                {firstNameError && <p className="dg-form-error">{firstNameError}</p>}
-              </div>
-              <div>
-                <label className="dg-label">Last name</label>
-                <input
-                  aria-label="Last name"
-                  value={editLastName}
-                  onChange={(e) => {
-                    accountDraftTouchedRef.current = true;
-                    setEditLastName(e.target.value);
-                  }}
-                  className="dg-input"
-                />
-                {lastNameError && <p className="dg-form-error">{lastNameError}</p>}
-              </div>
-            </div>
-          ) : (
-            <div>
-              <span className="dg-label">Name</span>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[14px] text-[var(--dg-color-text-primary)]">
-                  {displayName}
-                </span>
-                {pendingNameRequest ? null : (
-                  <Button
-                    type="button"
-                    onClick={() => setRequestingNameChange(true)}
-                    disabled={!orgId}
-                    className="dg-btn dg-btn-secondary dg-btn-sm"
-                  >
-                    Request a name change
-                  </Button>
-                )}
-              </div>
-              {pendingNameRequest ? (
-                <div className="mt-2">
-                  <Banner
-                    tone="warning"
-                    icon={Clock}
-                    action={
-                      <Button
-                        type="button"
-                        onClick={() => cancelRequest(pendingNameRequest)}
-                        disabled={cancellingId === pendingNameRequest.id}
-                        className="dg-btn dg-btn-secondary dg-btn-sm"
-                      >
-                        <ButtonLoading loading={cancellingId === pendingNameRequest.id}>
-                          Cancel request
-                        </ButtonLoading>
-                      </Button>
-                    }
-                  >
-                    Your name change is waiting for an admin.
-                  </Banner>
+      <UnsavedChangesScope>
+        <AccountCard title="Your details">
+          <Form
+            onSubmit={(e) => {
+              e.preventDefault();
+              requestSave();
+            }}
+            className="flex flex-col gap-4"
+          >
+            {canEditProfileDirectly ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="dg-label">First name</label>
+                  <input
+                    aria-label="First name"
+                    value={editFirstName}
+                    onChange={(e) => {
+                      accountDraftTouchedRef.current = true;
+                      setEditFirstName(e.target.value);
+                    }}
+                    className="dg-input"
+                  />
+                  {firstNameError && <p className="dg-form-error">{firstNameError}</p>}
                 </div>
-              ) : null}
-            </div>
-          )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="dg-label">Email</label>
-              <input
-                aria-label="Email"
-                type="email"
-                value={editEmail}
-                onChange={(e) => {
-                  accountDraftTouchedRef.current = true;
-                  setEditEmail(e.target.value);
-                }}
-                className="dg-input"
-              />
-              {emailError && <p className="dg-form-error">{emailError}</p>}
-              {!emailError && contactCheck.emailTaken && (
-                <p className="dg-form-error" role="alert">
-                  {EMAIL_BELONGS_TO_SOMEONE_ELSE}
-                </p>
-              )}
-            </div>
-            {employee && (
+                <div>
+                  <label className="dg-label">Last name</label>
+                  <input
+                    aria-label="Last name"
+                    value={editLastName}
+                    onChange={(e) => {
+                      accountDraftTouchedRef.current = true;
+                      setEditLastName(e.target.value);
+                    }}
+                    className="dg-input"
+                  />
+                  {lastNameError && <p className="dg-form-error">{lastNameError}</p>}
+                </div>
+              </div>
+            ) : (
               <div>
-                <label className="dg-label">Phone</label>
+                <span className="dg-label">Name</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[14px] text-[var(--dg-color-text-primary)]">
+                    {displayName}
+                  </span>
+                  {pendingNameRequest ? null : (
+                    <Button
+                      type="button"
+                      onClick={() => setRequestingNameChange(true)}
+                      disabled={!orgId}
+                      className="dg-btn dg-btn-secondary dg-btn-sm"
+                    >
+                      Request a name change
+                    </Button>
+                  )}
+                </div>
+                {pendingNameRequest ? (
+                  <div className="mt-2">
+                    <Banner
+                      tone="warning"
+                      icon={Clock}
+                      action={
+                        <Button
+                          type="button"
+                          onClick={() => cancelRequest(pendingNameRequest)}
+                          disabled={cancellingId === pendingNameRequest.id}
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
+                        >
+                          <ButtonLoading loading={cancellingId === pendingNameRequest.id}>
+                            Cancel request
+                          </ButtonLoading>
+                        </Button>
+                      }
+                    >
+                      Your name change is waiting for an admin.
+                    </Banner>
+                  </div>
+                ) : null}
+              </div>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="dg-label">Email</label>
                 <input
-                  aria-label="Phone"
-                  value={editPhone}
+                  aria-label="Email"
+                  type="email"
+                  value={editEmail}
                   onChange={(e) => {
                     accountDraftTouchedRef.current = true;
-                    setEditPhone(e.target.value);
+                    setEditEmail(e.target.value);
                   }}
-                  onBlur={() => {
-                    if (!phoneError && editPhone.trim()) setEditPhone(normalizedPhone);
-                  }}
-                  placeholder="Phone"
                   className="dg-input"
                 />
-                {phoneError && <p className="dg-form-error">{phoneError}</p>}
-                {!phoneError && contactCheck.phoneTaken && (
+                {emailError && <p className="dg-form-error">{emailError}</p>}
+                {!emailError && contactCheck.emailTaken && (
                   <p className="dg-form-error" role="alert">
-                    {PHONE_BELONGS_TO_SOMEONE_ELSE}
+                    {EMAIL_BELONGS_TO_SOMEONE_ELSE}
                   </p>
                 )}
               </div>
-            )}
-          </div>
-        </Form>
-      </AccountCard>
-
-      {canEditProfileDirectly && employee && (
-        <AccountCard title="Work">
-          <EditEmployeePanel
-            flushHorizontal
-            ref={workEditorRef}
-            employee={employee}
-            focusAreas={focusAreas}
-            certifications={certifications}
-            certificationLabel={certificationLabel}
-            roles={roles}
-            roleLabel={roleLabel}
-            focusAreaLabel={focusAreaLabel}
-            isManagementUser={showManagementAccess}
-            hideIdentityFields
-            hideActions
-            persistent
-            onDirtyChange={setWorkHasChanges}
-            onSaveBlockedChange={setWorkSaveBlocked}
-            onSave={async (updatedEmployee) => {
-              await saveWorkDetails(updatedEmployee);
-            }}
-            onCancel={() => undefined}
-          />
+              {employee && (
+                <div>
+                  <label className="dg-label">Phone</label>
+                  <input
+                    aria-label="Phone"
+                    value={editPhone}
+                    onChange={(e) => {
+                      accountDraftTouchedRef.current = true;
+                      setEditPhone(e.target.value);
+                    }}
+                    onBlur={() => {
+                      if (!phoneError && editPhone.trim()) setEditPhone(normalizedPhone);
+                    }}
+                    placeholder="Phone"
+                    className="dg-input"
+                  />
+                  {phoneError && <p className="dg-form-error">{phoneError}</p>}
+                  {!phoneError && contactCheck.phoneTaken && (
+                    <p className="dg-form-error" role="alert">
+                      {PHONE_BELONGS_TO_SOMEONE_ELSE}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </Form>
         </AccountCard>
-      )}
+
+        {canEditProfileDirectly && employee && (
+          <AccountCard title="Work">
+            <EditEmployeePanel
+              flushHorizontal
+              ref={workEditorRef}
+              employee={employee}
+              focusAreas={focusAreas}
+              certifications={certifications}
+              certificationLabel={certificationLabel}
+              roles={roles}
+              roleLabel={roleLabel}
+              focusAreaLabel={focusAreaLabel}
+              isManagementUser={showManagementAccess}
+              hideIdentityFields
+              hideActions
+              persistent
+              onDirtyChange={setWorkHasChanges}
+              onSaveBlockedChange={setWorkSaveBlocked}
+              onSave={async (updatedEmployee) => {
+                await saveWorkDetails(updatedEmployee);
+              }}
+              onCancel={() => undefined}
+            />
+          </AccountCard>
+        )}
+        {hasAnyChanges ? (
+          <UnsavedChangesBar
+            saveDisabled={hasInvalidDraft}
+            saving={saving}
+            onDiscard={cancelEditing}
+            onSave={requestSave}
+          />
+        ) : null}
+      </UnsavedChangesScope>
 
       {isGridmaster || canManageManagementAccess || showAccessRole ? (
         <AccountCard title="Access">
@@ -1010,8 +1006,6 @@ export function ProfilePanel({
           </div>
         </Modal>
       ) : null}
-
-      {saveBar}
 
       {confirmation && !stepUp.dialog && (
         <ConfirmDialog

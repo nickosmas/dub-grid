@@ -203,13 +203,12 @@ describe("EditEmployeePanel", () => {
       expect(screen.getByText("First day")).toBeInTheDocument();
     });
 
-    it("offers Set first day to someone who hasn't worked a shift yet", async () => {
+    it("offers an empty First day field to someone who hasn't worked a shift yet", async () => {
       vi.mocked(fetchEmployeeHasStarted).mockResolvedValueOnce(false);
       renderPanel({ employee: { ...employee, firstDay: null }, orgId: "org-1" });
 
-      fireEvent.click(await screen.findByRole("button", { name: "Set first day" }));
-
-      expect(screen.getByText("First day")).toBeInTheDocument();
+      expect(await screen.findByText("First day")).toBeInTheDocument();
+      expect(screen.getByText("Set first day")).toBeInTheDocument();
       expect(fetchEmployeeHasStarted).toHaveBeenCalledWith("org-1", employee.id);
     });
 
@@ -218,7 +217,7 @@ describe("EditEmployeePanel", () => {
       renderPanel({ employee: { ...employee, firstDay: null }, orgId: "org-1" });
 
       await waitFor(() => expect(fetchEmployeeHasStarted).toHaveBeenCalled());
-      expect(screen.queryByRole("button", { name: "Set first day" })).not.toBeInTheDocument();
+      expect(screen.queryByText("First day")).not.toBeInTheDocument();
     });
 
     it("leaves a first day that has passed to the record", () => {
