@@ -129,7 +129,7 @@ export interface EditEmployeePanelProps {
   hideActions?: boolean;
   /** Persistent page editors have no meaningful pristine Close action. */
   persistent?: boolean;
-  /** Draws Details and Work as the page's own cards, for editing in place. */
+  /** Draws Details and Work as one card on the page, for editing in place. */
   sectioned?: boolean;
   /** Drops the editor's own side padding so an embedding card owns the inner
    *  padding and the fields line up with that card's heading. */
@@ -625,16 +625,13 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
               below already carries its own `readOnly`/`disabled`, so dimming the
               whole card only made the record look broken and blocked selecting
               text out of it. */}
+          {/* Sectioned, Details and Work share one card: one save covers both. */}
           <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: sectioned ? 16 : undefined,
-            }}
+            className={sectioned ? "dg-card" : undefined}
+            style={{ display: "flex", flexDirection: "column" }}
           >
             {/* ── Details section ── */}
             <div
-              className={sectioned ? "dg-card" : undefined}
               style={
                 sectioned
                   ? undefined
@@ -1032,7 +1029,6 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
 
             {showScheduleAssignments && (
               <div
-                className={sectioned ? "dg-card" : undefined}
                 style={
                   sectioned
                     ? undefined
@@ -1044,7 +1040,10 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 }
               >
                 {sectioned ? (
-                  <div className="dg-card-header">
+                  <div
+                    className="dg-card-header"
+                    style={{ borderTop: "1px solid var(--dg-color-border-light)" }}
+                  >
                     <div className="dg-card-title">Work</div>
                   </div>
                 ) : hideIdentityFields ? null : (
