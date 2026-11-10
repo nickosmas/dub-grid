@@ -42,8 +42,8 @@ export interface PermissionReviewConfig {
 }
 
 const iconProps = {
-  width: 20,
-  height: 20,
+  width: 16,
+  height: 16,
   viewBox: "0 0 24 24",
   fill: "none",
   stroke: "currentColor",
@@ -149,10 +149,18 @@ function AccessCell({
     return <ToggleSwitch on={state.on} label={label} onChange={onToggle} />;
   }
   if (state.kind === "text") {
-    return <span className="text-[12px] text-[var(--dg-color-text-faint)]">{state.label}</span>;
+    return (
+      <span className="text-center text-[12px] leading-tight text-[var(--dg-color-text-faint)] md:whitespace-nowrap">
+        {state.label}
+      </span>
+    );
   }
   return null;
 }
+
+// One width for the View and Edit columns, so each group's heading labels sit
+// over its switches.
+const ACCESS_COLUMN = "flex w-12 shrink-0 justify-center md:w-[72px]";
 
 function ModuleRow({
   mod,
@@ -177,37 +185,28 @@ function ModuleRow({
   const note = impliedNote(mod, perms) ?? mod.note;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-4 hover:bg-[var(--dg-color-bg)] transition-colors items-center">
-      <div className="col-span-1 md:col-span-8 flex items-start">
-        <div
-          className={`p-2 rounded-lg mr-4 shrink-0 ${isActive ? "bg-[var(--dg-color-brand-bg)] text-[var(--dg-color-brand)]" : "bg-[var(--dg-color-bg-secondary)] text-[var(--dg-color-text-faint)]"}`}
-        >
-          <Icon />
-        </div>
-        <div>
-          <h4 className="font-medium text-[14px] text-[var(--dg-color-text-primary)]">
-            {mod.title}
-          </h4>
-          <p className="text-[13px] text-[var(--dg-color-text-muted)] mt-0.5 pr-4 leading-relaxed">
-            {describeModule(mod, labels)}
-          </p>
-          {note && (
-            <p className="text-[12px] text-[var(--dg-color-text-faint)] mt-1 pr-4 leading-relaxed">
-              {note}
-            </p>
-          )}
-        </div>
+    <div className="flex items-center gap-2.5 py-3 md:gap-3">
+      <div
+        className={`grid size-8 shrink-0 place-items-center rounded-lg ${isActive ? "bg-[var(--dg-color-brand-bg)] text-[var(--dg-color-brand)]" : "bg-[var(--dg-color-bg-secondary)] text-[var(--dg-color-text-faint)]"}`}
+      >
+        <Icon />
       </div>
-
-      <div className="col-span-1 md:col-span-4 grid grid-cols-2 gap-4 mt-3 md:mt-0 pt-3 md:pt-0 border-t md:border-t-0 border-[var(--dg-color-border-light)]">
-        <div className="flex flex-col items-center justify-center gap-1.5 text-center">
-          <span className="dg-type-table-heading md:hidden">View</span>
-          <AccessCell state={view} label={`${mod.title} view`} onToggle={onToggleView} />
-        </div>
-        <div className="flex flex-col items-center justify-center gap-1.5 text-center">
-          <span className="dg-type-table-heading md:hidden">Edit</span>
-          <AccessCell state={edit} label={`${mod.title} edit`} onToggle={onToggleEdit} />
-        </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <h4 className="text-[14px] font-medium leading-snug text-[var(--dg-color-text-primary)]">
+          {mod.title}
+        </h4>
+        <p className="text-[13px] leading-normal text-[var(--dg-color-text-muted)]">
+          {describeModule(mod, labels)}
+        </p>
+        {note && (
+          <p className="text-[12px] leading-normal text-[var(--dg-color-text-faint)]">{note}</p>
+        )}
+      </div>
+      <div className={ACCESS_COLUMN}>
+        <AccessCell state={view} label={`${mod.title} view`} onToggle={onToggleView} />
+      </div>
+      <div className={ACCESS_COLUMN}>
+        <AccessCell state={edit} label={`${mod.title} edit`} onToggle={onToggleEdit} />
       </div>
     </div>
   );
@@ -215,7 +214,7 @@ function ModuleRow({
 
 interface PermissionsEditorProps {
   title: string;
-  subtitle: React.ReactNode;
+  subtitle: string;
   initialPermissions: AdminPermissions | null | undefined;
   showPermissionCounter?: boolean;
   labels?: Partial<PermissionEditorLabels>;
@@ -328,12 +327,12 @@ export default function PermissionsEditor({
     <>
       <Modal
         title={title}
+        subtitle={subtitle}
         onClose={onClose}
         onRequestClose={() => !saving && requestClose()}
         style={{ maxWidth: 680 }}
         footer={
           <EditorActionRow
-            className="px-6"
             secondaryAction={
               <Button
                 className="dg-btn dg-btn-secondary"
@@ -357,45 +356,43 @@ export default function PermissionsEditor({
           />
         }
       >
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="px-6 py-4 border-b border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg)] shrink-0">
-            <p className="text-[14px] text-[var(--dg-color-text-muted)] leading-relaxed">
-              {subtitle}
-            </p>
-            {showPermissionCounter && (
-              <p className="text-[12px] text-[var(--dg-color-text-faint)] mt-1">
-                {levelCount.enabled} of {levelCount.total} turned on
-              </p>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--dg-color-border-light)] pb-2 md:pb-3">
+            {showPermissionCounter ? (
+              <span className="dg-tabular-nums text-[13px] text-[var(--dg-color-text-muted)]">
+                <strong className="font-semibold text-[var(--dg-color-text-primary)]">
+                  {levelCount.enabled}
+                </strong>{" "}
+                of {levelCount.total} turned on
+              </span>
+            ) : (
+              <span />
             )}
-            <div className="flex gap-2 mt-3">
-              <Button
-                className="dg-btn dg-btn-ghost"
-                onClick={() => setAll(true)}
-                style={{ fontSize: 12 }}
-              >
+            <div className="flex gap-1">
+              <Button className="dg-btn dg-btn-ghost" onClick={() => setAll(true)}>
                 Select all
               </Button>
-              <Button
-                className="dg-btn dg-btn-ghost"
-                onClick={() => setAll(false)}
-                style={{ fontSize: 12 }}
-              >
+              <Button className="dg-btn dg-btn-ghost" onClick={() => setAll(false)}>
                 Clear all
               </Button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="dg-type-table-heading hidden grid-cols-12 gap-4 border-b border-[var(--dg-color-border-light)] px-6 py-3 md:grid">
-              <div className="col-span-8">Permission</div>
-              <div className="col-span-2 text-center">View</div>
-              <div className="col-span-2 text-center">Edit</div>
-            </div>
-
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {groupedModules.map((group) => (
-              <div key={group.category} className="pb-1">
-                <div className="px-6 py-3 bg-[var(--dg-color-bg)]">
-                  <h3 className="dg-type-content-group-heading">{group.label}</h3>
+              <section key={group.category} className="pt-5" aria-label={group.label}>
+                <div className="flex items-end border-b border-[var(--dg-color-border-light)] pb-2">
+                  <h3 className="dg-type-content-group-heading flex-1">{group.label}</h3>
+                  <span
+                    className={`${ACCESS_COLUMN} text-[12px] font-medium text-[var(--dg-color-text-faint)]`}
+                  >
+                    View
+                  </span>
+                  <span
+                    className={`${ACCESS_COLUMN} text-[12px] font-medium text-[var(--dg-color-text-faint)]`}
+                  >
+                    Edit
+                  </span>
                 </div>
 
                 <div className="divide-y divide-[var(--dg-color-border-light)]">
@@ -410,7 +407,7 @@ export default function PermissionsEditor({
                     />
                   ))}
                 </div>
-              </div>
+              </section>
             ))}
           </div>
         </div>
