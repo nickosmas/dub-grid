@@ -7,7 +7,9 @@ import {
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { InlineError } from "../../../shared/components/InlineError";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
   ProfileInfoRow,
   ProfileList,
@@ -58,9 +60,19 @@ export function PersonInviteSheet({
     }
   }
   const setsPermissions = canGrantSuperAdmin && orgRole === "admin";
+  // No Save: sending the invitation is a decision, not a save of edits. The
+  // draft is reset on open, above, so there is no `onDiscard`.
+  const guard = useUnsavedChangesGuard({
+    isDirty: orgRole !== "user" || permissions !== null,
+    disabled: isPending,
+    onClose: onDismiss,
+  });
 
   return (
     <BottomSheetModal
+      dismissDisabled={isPending}
+      hasUnsavedChanges={guard.isDirty}
+      overlay={<ConfirmationModal presentation="inline" {...guard.confirmationProps} />}
       footer={
         <>
           {error ? <InlineError message={error} /> : null}
@@ -74,14 +86,19 @@ export function PersonInviteSheet({
               />
             }
           >
-            <Button disabled={isPending} label="Cancel" onPress={onDismiss} tone="neutral" />
+            <Button
+              disabled={isPending}
+              label="Cancel"
+              onPress={guard.requestClose}
+              tone="neutral"
+            />
           </SheetActions>
         </>
       }
       header={<SheetHeader subtitle={personName} title="Invite to the app" />}
       scrollable
       visible={visible}
-      onDismiss={onDismiss}
+      onDismiss={guard.requestClose}
     >
       <ProfileSection>
         <ProfileList>

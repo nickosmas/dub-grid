@@ -11,6 +11,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import Modal from "@/components/Modal";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -109,6 +110,8 @@ export default function PlatformFeatureFlagsView() {
   const [newKey, setNewKey] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newEnabled, setNewEnabled] = useState(true);
+  // A suggested control opens filled in, which isn't anything typed yet.
+  const [addBaseline, setAddBaseline] = useState({ key: "", description: "" });
 
   const flagsQuery = useQuery({
     queryKey: queryKeys.gridmaster.platformFlags(),
@@ -153,7 +156,18 @@ export default function PlatformFeatureFlagsView() {
     setNewEnabled(true);
   }
 
+  const { requestClose: requestAddClose, unsavedChangesDialog: addLeaveDialog } =
+    useUnsavedChangesPrompt({
+      hasUnsavedChanges:
+        addModalOpen && (newKey !== addBaseline.key || newDescription !== addBaseline.description),
+      onDiscard: closeAddModal,
+    });
+  const cancelAdd = () => {
+    if (requestAddClose()) closeAddModal();
+  };
+
   function openAddModal(prefill?: { key: string; description: string }) {
+    setAddBaseline({ key: prefill?.key ?? "", description: prefill?.description ?? "" });
     setNewKey(prefill?.key ?? "");
     setNewDescription(prefill?.description ?? "");
     setNewEnabled(true);
@@ -328,10 +342,11 @@ export default function PlatformFeatureFlagsView() {
         <Modal
           title="Add Feature Control"
           onClose={closeAddModal}
+          onRequestClose={requestAddClose}
           style={{ maxWidth: 480 }}
           footer={
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <Button className="dg-btn dg-btn-secondary" onClick={closeAddModal}>
+              <Button className="dg-btn dg-btn-secondary" onClick={cancelAdd}>
                 Cancel
               </Button>
               <Button
@@ -410,6 +425,7 @@ export default function PlatformFeatureFlagsView() {
           </div>
         </Modal>
       )}
+      {addLeaveDialog}
     </div>
   );
 }

@@ -110,6 +110,14 @@ export type BottomSheetModalProps = {
    */
   backdrop?: "scrim" | "cover";
   dismissDisabled?: boolean;
+  /**
+   * The sheet holds unsaved input behind an unsaved-changes guard. The native
+   * sheet closes itself on a drag, scrim tap or Android back before
+   * `onDismiss` can refuse, so while this is true it takes none of them and
+   * the close button and Cancel ask instead. The drawn sheet already defers
+   * every exit to `onDismiss`, so it needs nothing here.
+   */
+  hasUnsavedChanges?: boolean;
   scrollable?: boolean;
   /**
    * A list that can drag up to fill the screen even when it fits, such as

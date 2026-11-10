@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AlertButton } from "react-native";
 import { createReactNativeModule } from "../../test/native";
@@ -12,6 +12,7 @@ vi.mock("react-native", async () => ({
 vi.mock("../lib/haptics", () => ({ hapticImpact: vi.fn() }));
 
 import { ConfirmationModal } from "./ConfirmationModal.native";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 
 type AlertCall = [string, string | undefined, AlertButton[], { onDismiss?: () => void }?];
 const lastAlert = () => alert.mock.calls.at(-1) as AlertCall;
@@ -110,5 +111,37 @@ describe("ConfirmationModal (native alert)", () => {
     );
     rerender(<ConfirmationModal {...props} onCancel={vi.fn()} onConfirm={vi.fn()} />);
     expect(alert).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks an unsaved-changes question with Save, Discard and Keep editing", async () => {
+    const onSave = vi.fn(async () => true);
+    const onDiscard = vi.fn();
+    function Guarded() {
+      const guard = useUnsavedChangesGuard({ isDirty: true, onDiscard, onSave });
+      return (
+        <>
+          <button onClick={guard.requestClose} type="button">
+            Close
+          </button>
+          <ConfirmationModal {...guard.confirmationProps} />
+        </>
+      );
+    }
+    const view = render(<Guarded />);
+
+    act(() => view.getByText("Close").click());
+
+    expect(lastAlert()[0]).toBe("Save your changes?");
+    expect(lastAlert()[2].map((button) => [button.text, button.style])).toEqual([
+      ["Keep editing", "cancel"],
+      ["Discard", "default"],
+      ["Save", "default"],
+    ]);
+    await act(async () => {
+      press("Save");
+      await flush();
+    });
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onDiscard).not.toHaveBeenCalled();
   });
 });

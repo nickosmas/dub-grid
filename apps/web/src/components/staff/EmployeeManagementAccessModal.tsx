@@ -41,6 +41,11 @@ interface EmployeeManagementAccessEditorProps {
   directoryPerson?: DirectoryPerson | null;
   pendingInvitation?: Invitation;
   onClose: () => void;
+  /**
+   * Asks before the editor's own Cancel throws a new team assignment away;
+   * true when it may close. The frame's `onRequestClose` covers X and Escape.
+   */
+  requestClose?: () => boolean;
   onCompleted: (updatedEmployee?: Employee | null) => void | Promise<void>;
   onDirtyChange?: (isDirty: boolean) => void;
   hideActions?: boolean;
@@ -84,6 +89,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
     directoryPerson,
     pendingInvitation,
     onClose,
+    requestClose,
     onCompleted,
     onDirtyChange,
     hideActions = false,
@@ -228,8 +234,9 @@ export const EmployeeManagementAccessEditor = forwardRef<
       discardChanges();
       return;
     }
+    if (requestClose && !requestClose()) return;
     onClose();
-  }, [isCreating, hasUnsavedChanges, discardChanges, onClose]);
+  }, [isCreating, hasUnsavedChanges, discardChanges, onClose, requestClose]);
 
   useEffect(() => {
     onDirtyChange?.(hasUnsavedChanges);

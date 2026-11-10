@@ -26,13 +26,10 @@ import {
 import { isRoleCertificationBlocked } from "../../profile/lib/role-certification";
 import { PersonFormSkeleton } from "../components/PersonFormSkeleton";
 import { usePersonEditor } from "../hooks/usePersonEditor";
+import { scheduleAssignmentsChanged, type ScheduleAssignmentsDraft } from "../lib/personDraft";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
-type ScheduleDraft = {
-  certificationId: number | null;
-  focusAreaIds: number[];
-  roleIds: number[];
-};
+type ScheduleDraft = ScheduleAssignmentsDraft;
 
 /**
  * Put a management-only person onto the schedule by giving them the scheduling
@@ -69,13 +66,7 @@ export default function AddToScheduleScreen() {
     });
   }
 
-  const hasUnsavedChanges = Boolean(
-    draft &&
-    person &&
-    (draft.certificationId !== person.certificationId ||
-      draft.focusAreaIds.length !== person.focusAreaIds.length ||
-      draft.roleIds.length !== person.roleIds.length),
-  );
+  const hasUnsavedChanges = Boolean(draft && person && scheduleAssignmentsChanged(draft, person));
 
   const mutation = useMutation({
     mutationFn: async (scheduleDraft: ScheduleDraft) => {

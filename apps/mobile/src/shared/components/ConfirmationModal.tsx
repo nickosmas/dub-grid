@@ -123,9 +123,15 @@ export type ConfirmationModalProps = {
   /**
    * A second answer beside the confirm, such as Keep shifts beside Clear
    * shifts. It takes the plain Cancel button's place; closing the popup from
-   * its corner or the backdrop still cancels.
+   * its corner or the backdrop still cancels. With `keepsCancel` it sits
+   * beside Cancel instead, for a question with three answers (Save, Discard,
+   * Keep editing).
    */
-  secondaryAction?: { label: string; onPress: () => void | Promise<unknown> };
+  secondaryAction?: {
+    label: string;
+    onPress: () => void | Promise<unknown>;
+    keepsCancel?: boolean;
+  };
   /**
    * `"inline"` draws the same backdrop and card as an absolute overlay in
    * the parent instead of its own Modal, for a confirmation raised inside
@@ -291,6 +297,14 @@ export function ConfirmationModal({
                   />
                 }
               >
+                {!secondaryAction || secondaryAction.keepsCancel ? (
+                  <Button
+                    disabled={isBusy}
+                    label={cancelLabel}
+                    onPress={handleDismiss}
+                    tone="plain"
+                  />
+                ) : null}
                 {secondaryAction ? (
                   <Button
                     disabled={isBusy}
@@ -298,14 +312,7 @@ export function ConfirmationModal({
                     onPress={secondaryAction.onPress}
                     tone="neutral"
                   />
-                ) : (
-                  <Button
-                    disabled={isBusy}
-                    label={cancelLabel}
-                    onPress={handleDismiss}
-                    tone="plain"
-                  />
-                )}
+                ) : null}
               </ActionButtons>
             </View>
           </Animated.View>

@@ -67,6 +67,7 @@ import type {
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { formatDateTimeLabel } from "@/lib/client-facing";
 
 type ShiftCellPopoverProps = {
@@ -693,6 +694,9 @@ export function RecurringScheduleSection({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedDraftTimestamp, setSavedDraftTimestamp] = useState<string | null>(null);
+  // A restored or saved draft is already on the server; only edits made since
+  // would be lost by leaving.
+  const [editedSinceDraft, setEditedSinceDraft] = useState(false);
   const [pendingRecurringAction, setPendingRecurringAction] = useState<"save" | "discard" | null>(
     null,
   );
@@ -744,6 +748,7 @@ export function RecurringScheduleSection({
           if (Object.keys(migrated).length > 0) {
             setDirtySchedules(migrated);
             setSavedDraftTimestamp(draft.savedAt);
+            setEditedSinceDraft(false);
           }
         }
       } catch {
@@ -874,6 +879,7 @@ export function RecurringScheduleSection({
 
   function handleCellChange(empId: string, dayIndex: number, newValue: ScheduleCellInput | null) {
     const original = allSchedules[empId]?.[dayIndex] ?? null;
+    setEditedSinceDraft(true);
     setDirtySchedules((current) => {
       const employeeDirty = { ...(current[empId] ?? {}) };
       if (JSON.stringify(newValue) === JSON.stringify(original)) {
@@ -952,6 +958,7 @@ export function RecurringScheduleSection({
         return next;
       });
       setSavedDraftTimestamp(null);
+      setEditedSinceDraft(false);
       if (currentUserId) {
         await deleteRecurringDraft(orgId, currentUserId).catch(() => {});
       }
@@ -964,22 +971,26 @@ export function RecurringScheduleSection({
     }
   }
 
-  async function handleSaveDraft() {
+  async function handleSaveDraft(): Promise<boolean> {
     try {
       if (!currentUserId) {
         toast.error("Not authenticated");
-        return;
+        return false;
       }
       await saveRecurringDraft(orgId, currentUserId, dirtySchedules);
       setSavedDraftTimestamp(new Date().toISOString());
+      setEditedSinceDraft(false);
       toast.success("Draft saved");
+      return true;
     } catch (err: unknown) {
       Sentry.captureException(err);
       toast.error(formatClientErrorMessage(err, "We couldn't save that draft."));
+      return false;
     }
   }
 
   async function handleDiscardDraft() {
+    setEditedSinceDraft(false);
     setDirtySchedules({});
     setSavedDraftTimestamp(null);
     if (currentUserId) {
@@ -990,6 +1001,12 @@ export function RecurringScheduleSection({
   // Latched so a double-click can't write the same draft twice and stamp two
   // "Draft saved" toasts on top of each other.
   const saveDraft = useAsyncAction(handleSaveDraft);
+  // Saving publishes to Auto-build after a confirmation, so leaving offers to
+  // keep the edits as a draft instead, which is what Save draft does.
+  useNavigationGuard("recurring-schedule", {
+    isDirty: () => hasDirtyChanges && editedSinceDraft && !saving,
+    save: currentUserId ? handleSaveDraft : undefined,
+  });
 
   const filteredEmployees = useMemo(
     () =>

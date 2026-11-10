@@ -390,9 +390,11 @@ Choose the surface by the user's task:
   unmounting it; only a `presentationKind="gate"` sheet has no close button.
   It renders as a sibling of the pan `GestureDetector`, never inside it, so a
   slidy thumb tap cannot be swallowed as the start of a drag.
-- **Dirty means work the user cannot redo in one tap.** A single radio or list
-  choice does not arm the discard confirmation; typed text or a selection that
-  took browsing to reach (a swap target) does. The request sheet's guard splits
+- **Dirty means anything changed and not yet saved** (owner, 2026-11-10), a
+  single radio choice included, compared against the values the surface opened
+  on: id lists as sets (`sameIds`), text trimmed on both sides, and a baseline
+  read once at open rather than from a record a refetch can replace. The
+  request sheet's guard splits
   `onDiscard` (reset selections) from `onClose` (drop the mode) for the
   sequencing reason `useModalHandoff` documents.
   Use specific sentence-case action labels and an action-specific `iconName`
@@ -514,8 +516,21 @@ shared.
 - **`useUnsavedChangesGuard()`** owns the decision. Point the sheet's
   `onDismiss` _and_ its Cancel button at `guard.requestClose`, and render
   `<ConfirmationModal {...guard.confirmationProps} />` as a sibling. Its
-  `onDiscard` runs on **every** exit through the guard, clean or dirty: it is
-  the reset, not a side effect of confirming.
+  `onDiscard` runs on **every** exit through the guard, clean or dirty, except
+  after a Save: it is the reset, not a side effect of confirming.
+- **Pass `onSave` where the surface has a plain save of edits**, returning
+  whether it worked: the question becomes "Save your changes?" with Save,
+  Discard and Keep editing (three buttons in the system alert on both phones).
+  Pass none while the form is invalid, when the save asks a question of its
+  own (an email change, a removal), or when the surface's commit is a decision
+  rather than a save (a create, an invite, a request, a status change, a
+  password or two-factor step); it then asks "Discard your changes?" with two
+  answers. Nothing in it is red: discarding unsaved edits isn't destructive.
+- **Pass `hasUnsavedChanges={guard.isDirty}` to a guarded `BottomSheetModal`**
+  (and `dismissDisabled` while it saves). The native sheet closes itself on a
+  swipe, scrim tap or Android back before `onDismiss` can refuse, so while it
+  is dirty those are off, Android gains a close button, and the close button
+  and Cancel ask instead.
 - **`useNavigationDiscardGuard(guard)`** adds back navigation to that same
   guard, for a screen with an inline editor. One guard, one confirmation, three
   triggers — a second guard would mean two modals racing. It covers stack

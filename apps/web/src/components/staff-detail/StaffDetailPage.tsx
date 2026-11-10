@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useConfirmLeave } from "@/components/NavigationGuardProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -165,6 +166,7 @@ function rangeDates(range: { startDate: string; endDate: string }): Date[] {
 
 export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const router = useRouter();
+  const confirmLeave = useConfirmLeave();
   const searchParams = useSearchParams();
   const perms = usePermissions();
   const { user: currentUser } = useAuth();
@@ -1271,8 +1273,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     const person = directory.find((entry) => entry.employeeId === id);
     return person ? `${person.firstName} ${person.lastName}`.trim() : null;
   };
+  // The pager loads the next person into this page, which would replace an
+  // unsaved edit of this one without a word.
   const openPerson = (id: string) =>
-    router.push(activeTab === "account" ? `/people/${id}` : `/people/${id}?tab=${activeTab}`);
+    confirmLeave(() =>
+      router.push(activeTab === "account" ? `/people/${id}` : `/people/${id}?tab=${activeTab}`),
+    );
   const pager = neighbors ? (
     <PersonPager
       position={neighbors.position}
@@ -1707,6 +1713,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           pendingInvitation={pendingInvite ?? undefined}
           onDirtyChange={setManagementAccessDirty}
           onClose={closeManagementAccessEditor}
+          requestClose={requestManagementAccessClose}
           onCompleted={async (updatedEmployee) => {
             if (updatedEmployee) syncEmployeeCaches(updatedEmployee);
             await refreshInvitations();

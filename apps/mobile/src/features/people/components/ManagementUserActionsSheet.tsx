@@ -351,8 +351,8 @@ export function ManagementUserActionsSheet({
           isPendingInvite ? setInvitationConfirmAction("revoke") : setShowRemoveConfirmation(true)
         }
         onSubmit={(draft) =>
-          new Promise<void>((resolve) => {
-            accessMutation.mutate(draft, { onSettled: () => resolve() });
+          new Promise<boolean>((resolve) => {
+            accessMutation.mutate(draft, { onSettled: (_data, error) => resolve(!error) });
           })
         }
         visible={showAccessSheet}

@@ -21,6 +21,7 @@ import { NumberField } from "@/components/ui/number-field";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import {
   getCodeError,
   getLineTextError,
@@ -239,6 +240,14 @@ function ShiftCategoriesSettings({
       discardCategoryChanges(currentEditingCategory, true);
       completePendingExit();
     },
+    onSave: currentEditingCategory ? () => handleSave(currentEditingCategory) : undefined,
+    onSaved: completePendingExit,
+  });
+  // The prompt covers opening another shift or adding one; this covers a link,
+  // a section switch and a refresh.
+  useNavigationGuard("shift-categories-editor", {
+    isDirty: () => hasUnsavedEditingChanges && saving === null,
+    save: currentEditingCategory ? () => handleSave(currentEditingCategory) : undefined,
   });
 
   const attemptOpenCategory = (categoryId: number) => {
@@ -268,7 +277,7 @@ function ShiftCategoriesSettings({
     setEditingId(null);
   };
 
-  const handleSave = async (cat: ShiftCategory & { isNew?: boolean }) => {
+  const handleSave = async (cat: ShiftCategory & { isNew?: boolean }): Promise<boolean> => {
     const nameError = getLineTextError(cat.name, {
       label: "Shift name",
       maxLength: 50,
@@ -284,7 +293,7 @@ function ShiftCategoriesSettings({
             uppercase: true,
           })
         : null;
-    if (nameError || abbrError) return;
+    if (nameError || abbrError) return false;
     setSaving(cat.id);
     try {
       const saved = await upsertShiftCategory({
@@ -320,9 +329,11 @@ function ShiftCategoriesSettings({
 
       setEditingId(null);
       toast.success("Category saved");
+      return true;
     } catch (err) {
       toast.error(formatClientErrorMessage(err, "We couldn't save that shift. Try again."));
       Sentry.captureException(err);
+      return false;
     } finally {
       setSaving(null);
     }

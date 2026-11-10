@@ -69,6 +69,12 @@ import {
   formatProfileStatus,
 } from "../components/ProfilePrimitives";
 import { isRoleCertificationBlocked } from "../lib/role-certification";
+import {
+  makeProfileDraft as makeDraft,
+  profileDraftHasChanges,
+  profileWorkChanged,
+  type ProfileDraft,
+} from "../lib/profile-draft";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
 import { getMobileStepUpMethod } from "../lib/step-up";
@@ -76,83 +82,10 @@ import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
 
-type LinkedEmployee = NonNullable<MobileProfileResponse["linkedEmployee"]>;
-
-type ProfileDraft = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  employmentType: LinkedEmployee["employmentType"];
-  certificationId: number | null;
-  focusAreaIds: number[];
-  roleIds: number[];
-  departmentIds: number[];
-  contactNotes: string;
-  requestNote: string;
-};
-
-function makeDraft(
-  profile: MobileProfileResponse,
-  linkedEmployee: LinkedEmployee | null,
-): ProfileDraft {
-  return {
-    firstName: profile.user.firstName ?? "",
-    lastName: profile.user.lastName ?? "",
-    email: profile.user.email ?? "",
-    phone: linkedEmployee?.phone ?? "",
-    employmentType: linkedEmployee?.employmentType ?? "full_time",
-    certificationId: linkedEmployee?.certificationId ?? null,
-    focusAreaIds: linkedEmployee?.focusAreaIds ?? [],
-    roleIds: linkedEmployee?.roleIds ?? [],
-    departmentIds: linkedEmployee?.departmentIds ?? [],
-    contactNotes: linkedEmployee?.contactNotes ?? "",
-    requestNote: "",
-  };
-}
-
-function arrayEqual(left: number[], right: number[]) {
-  if (left.length !== right.length) return false;
-  return left.every((value, index) => value === right[index]);
-}
-
-/**
- * Whether the draft differs from what is saved.
- *
- * Module scope, and used by both the edit panel's buttons and the screen's
- * unsaved-changes guard. While this lived inside the panel the screen couldn't
- * see it, so back navigation had no idea there was anything to lose; computing
- * it twice would be worse still, because then Cancel and the back button could
- * disagree about whether to ask.
- *
- * `requestNote` deliberately doesn't count, matching the Save button: the note
- * only ever accompanies a change, so on its own there is nothing to send.
- */
-function profileDraftHasChanges(
-  draft: ProfileDraft,
-  profile: MobileProfileResponse,
-  linkedEmployee: LinkedEmployee | null,
-): boolean {
-  const saved = makeDraft(profile, linkedEmployee);
-
-  return (
-    draft.firstName.trim() !== saved.firstName.trim() ||
-    draft.lastName.trim() !== saved.lastName.trim() ||
-    draft.email.trim().toLowerCase() !== saved.email.trim().toLowerCase() ||
-    (linkedEmployee != null &&
-      (draft.phone.trim() !== saved.phone ||
-        draft.employmentType !== saved.employmentType ||
-        draft.certificationId !== saved.certificationId ||
-        !arrayEqual(draft.focusAreaIds, saved.focusAreaIds) ||
-        !arrayEqual(draft.roleIds, saved.roleIds) ||
-        draft.contactNotes.trim() !== saved.contactNotes.trim()))
-  );
-}
-
 /**
  * Field-level validation for the edit form.
  *
- * Module scope, same reasoning as `profileDraftHasChanges` above: the footer
+ * Module scope, same reasoning as `profileDraftHasChanges`: the footer
  * Save button's `disabled` state and the panel's inline per-field errors both
  * need this, and computing it twice by hand risks the two disagreeing about
  * whether the draft is actually valid.
@@ -303,13 +236,7 @@ export default function ProfileWorkScreen() {
         normalizedLast !== (profile.user.lastName ?? "");
       const phoneChanged =
         Boolean(linkedEmployee) && normalizedPhone !== (linkedEmployee?.phone ?? "");
-      const workChanged =
-        Boolean(linkedEmployee) &&
-        (draft.employmentType !== linkedEmployee?.employmentType ||
-          draft.certificationId !== linkedEmployee?.certificationId ||
-          !arrayEqual(draft.focusAreaIds, linkedEmployee?.focusAreaIds ?? []) ||
-          !arrayEqual(draft.roleIds, linkedEmployee?.roleIds ?? []) ||
-          draft.contactNotes.trim() !== (linkedEmployee?.contactNotes ?? "").trim());
+      const workChanged = linkedEmployee != null && profileWorkChanged(draft, linkedEmployee);
 
       // The sign-in email is account-wide, so nothing in this save is written
       // until the caller has freshly confirmed their identity.
@@ -459,12 +386,6 @@ export default function ProfileWorkScreen() {
   const hasChanges = Boolean(
     profile && draft && profileDraftHasChanges(draft, profile, linkedEmployee),
   );
-  // No `onClose`: unlike PersonDetailScreen there is no view mode to fall back
-  // to, so nothing here calls `requestClose`. Leaving is `router.back()`, and
-  // `useNavigationDiscardGuard` below is what puts the confirmation in front of
-  // it. `hasChanges` alone is a tight enough flag on a screen that is only ever
-  // the editor: on iOS the whole surface is a back-swipe target, so a guard
-  // keyed on anything looser would interrupt an ordinary swipe back.
   const saveConfirmationPoints = hasEmailChange
     ? [
         ...(isNameRequest ? ["An admin reviews your new name."] : []),
@@ -474,14 +395,6 @@ export default function ProfileWorkScreen() {
         "We'll email a link to your current address and your new one. Your email changes once you confirm both.",
       ]
     : [];
-  const guard = useUnsavedChangesGuard({
-    isDirty: hasChanges,
-    disabled: saveMutation.isPending,
-    onDiscard: discardChanges,
-  });
-  // Header back, Android hardware back and the iOS back swipe ask too, through
-  // this same confirmation rather than a second one of their own.
-  useNavigationDiscardGuard(guard);
   const pushSettled = usePushSettled();
 
   const editFieldErrors =
@@ -496,6 +409,31 @@ export default function ProfileWorkScreen() {
   const hasValidationErrors = editFieldErrors
     ? Object.values(editFieldErrors).some(Boolean)
     : false;
+  // Save is offered from the prompt only for a plain save: a name change
+  // request and an email change each confirm first, and an invalid form can't
+  // save at all.
+  const canSaveFromPrompt = hasChanges && !hasValidationErrors && !isNameRequest && !hasEmailChange;
+  // No `onClose`: unlike PersonDetailScreen there is no view mode to fall back
+  // to, so nothing here calls `requestClose`. Leaving is `router.back()`, and
+  // `useNavigationDiscardGuard` below is what puts the confirmation in front of
+  // it. `hasChanges` alone is a tight enough flag on a screen that is only ever
+  // the editor: on iOS the whole surface is a back-swipe target, so a guard
+  // keyed on anything looser would interrupt an ordinary swipe back.
+  const guard = useUnsavedChangesGuard({
+    isDirty: hasChanges,
+    disabled: saveMutation.isPending,
+    onDiscard: discardChanges,
+    onSave: canSaveFromPrompt
+      ? () =>
+          saveMutation.mutateAsync(null).then(
+            () => true,
+            () => false,
+          )
+      : undefined,
+  });
+  // Header back, Android hardware back and the iOS back swipe ask too, through
+  // this same confirmation rather than a second one of their own.
+  useNavigationDiscardGuard(guard);
 
   function handleSave() {
     if (!profile || !draft || !editFieldErrors) return;

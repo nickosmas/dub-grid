@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmLeave } from "@/components/NavigationGuardProvider";
 import CustomSelect from "@/components/CustomSelect";
 import { Button } from "@/components/Button";
 import { StatusDot, InfoRow, MiniStat } from "@/components/gridmaster/organization-detail/shared";
@@ -143,6 +144,8 @@ export default function OrganizationDetail({
   onImpersonate?: (userId: string, orgId?: string) => void;
 }) {
   const [tab, setTab] = useState<OrganizationDetailTab>(initialTab ?? "overview");
+  // A tab switch unmounts the one before it, edits included.
+  const confirmLeave = useConfirmLeave();
   const queryClient = useQueryClient();
 
   // Reset state when organization changes
@@ -425,7 +428,7 @@ export default function OrganizationDetail({
             role="tab"
             aria-selected={tab === t.id}
             aria-controls={`tabpanel-${t.id}`}
-            onClick={() => setTab(t.id)}
+            onClick={() => confirmLeave(() => setTab(t.id))}
             style={{
               padding: "10px 18px",
               fontSize: "var(--dg-fs-label)",

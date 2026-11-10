@@ -1,4 +1,5 @@
 import { User, Trash2 } from "lucide-react";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { changedElsewhereMessage, REMOVE_FROM_ORGANIZATION_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
@@ -72,6 +73,7 @@ export function UsersTab({
   const [removeConfirm, setRemoveConfirm] = useState<OrganizationUser | null>(null);
   const [removing, setRemoving] = useState(false);
   const [addEmail, setAddEmail] = useState("");
+  useNavigationGuard("gridmaster-add-user", { isDirty: () => addEmail.trim().length > 0 });
   const [addRole, setAddRole] = useState<AssignableOrganizationRole>("user");
   const [addUserConfirm, setAddUserConfirm] = useState<{
     email: string;

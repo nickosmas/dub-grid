@@ -92,7 +92,8 @@ export default function OrganizationGeneral({
 
   // Covers both the sidebar click and the tab close; the provider owns the
   // `beforeunload` this panel used to register for itself.
-  useNavigationGuard("organization-general", { isDirty: () => isModified });
+  // The Unsaved changes bar asks outside the wizard; in it, this one does.
+  useNavigationGuard("organization-general", { isDirty: () => isModified }, isWizardMode);
 
   // Tracks whether the most recent handleSave call completed successfully.
   // Wizard mode reads this after `save()` returns to decide whether to advance.
