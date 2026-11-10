@@ -10,7 +10,7 @@ import {
 } from "@dubgrid/schedule-core";
 import { Button } from "../../../shared/components/Button";
 import { Text } from "../../../shared/components/Text";
-import { IS_IOS_LIST } from "../../../shared/lib/native-list";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { HAS_NATIVE_DATE_CALENDAR, NativeDateCalendar } from "./NativeDateCalendar";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
@@ -154,7 +154,7 @@ export function ReturnDateField({
   const shown = value ? formatReturnDate(value, { weekday: true }) : emptyLabel;
   const accessibilityLabel = value ? `${label}, ${shown}` : `${label}, none`;
 
-  if (IS_IOS_LIST) {
+  if (IS_NATIVE_LIST) {
     // Picking a day closes the calendar under the row (owner, 2026-10-31).
     const pick = (date: string) => {
       onChange(date);

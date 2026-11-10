@@ -5,9 +5,9 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import type { Stack } from "expo-router";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 
-type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
+export type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type ToolbarIcon = NonNullable<React.ComponentProps<typeof Stack.Toolbar.Button>["icon"]>;
-type SFSymbol = Extract<ToolbarIcon, string>;
+export type SFSymbol = Extract<ToolbarIcon, string>;
 
 /**
  * The icon for a native header button: an SF Symbol on iOS, and on Android a

@@ -1241,13 +1241,14 @@
   - [x] 55f. **Requests** - pickups, swaps, call-offs and profile change
         requests involving them in the period, with state and who decided.
         Overview gains a Waiting on you card.
-- [ ] 56. **Native iOS and Android** - the app feels built for each phone:
+- [x] 56. **Native iOS and Android** - the app feels built for each phone:
       Liquid Glass and native controls on iOS, Material 3 Expressive on
       Android, built from shared components with one version per platform so
       screens don't fork. Android keeps DubGrid's brand colors (no wallpaper
       colors). The admin Home gets a My schedule | Team switch. Every element
       is polished to the standard of a top company's app. Owner decisions,
-      2026-10-31.
+      2026-10-31. Narrowed on 2026-11-09 (56d): native for what the platform
+      supplies, one DubGrid design for every other control.
   - [x] 56a. **Expo SDK 57** - Expo 54 to 57 with the React Native, React
         Native Screens and Expo Router it pins, so native bar buttons, menus
         and segmented controls work as each platform intends and iOS device
@@ -1273,7 +1274,15 @@
         Android; confirmations as the system alert on iOS and Material's
         AlertDialog on Android, keeping each confirmation's wording (owner,
         2026-10-31).
-  - [ ] 56d. **Polish pass** - every screen reviewed on both platforms with
-        before and after screenshots: platform icons, long-press menus on
-        rows, haptics and ripples, native sheets, segmented controls, and
-        snackbars on Android.
+  - [x] 56d. **Platform consolidation** - the app follows the industry
+        standard (owner, 2026-11-09, replacing the polish pass): one DubGrid
+        design on both phones, native only where iOS, Android or the
+        navigation library supply it (the navigation bar and its buttons, the
+        tab bar, search, system alerts, sheets, the date picker, share and
+        haptics). Controls drawn once per platform become one: the segmented
+        switch, toasts, the tab strip, selection marks, status symbols and
+        the round header button, with Liquid Glass and ripples kept as
+        materials on them, and Android's text fields and lists take the iOS
+        form. A sheet's discard asks in the system alert. The
+        tab list is written once, the remaining platform files are tested,
+        and screens can't branch on the platform.

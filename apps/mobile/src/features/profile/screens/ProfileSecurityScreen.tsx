@@ -2,7 +2,6 @@ import { router } from "expo-router";
 import { useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Platform } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
@@ -35,11 +34,7 @@ import {
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { formatSessionCount } from "../components/session-format";
-
-const APP_LOCK_DESCRIPTION = Platform.select({
-  ios: "Ask for Face ID, Touch ID, or your passcode whenever you come back to the app.",
-  default: "Ask for your fingerprint, face, or screen lock whenever you come back to the app.",
-});
+import { APP_LOCK_DESCRIPTION } from "../lib/device-copy";
 
 const PENDING_ACCOUNT_DELETION_MESSAGE =
   "An account deletion request is pending Super Admin review.";

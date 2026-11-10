@@ -85,6 +85,7 @@ import {
   getScreenGutter,
   type ScreenBottomPaddingMode,
 } from "./screen-layout";
+import { KEYBOARD_DISMISS_MODE } from "./keyboard-dismiss";
 
 export type ScreenScrollHandle = ScrollView;
 export type { ScreenBottomPaddingMode } from "./screen-layout";
@@ -344,7 +345,7 @@ export function Screen<T = never>({
       bounces={scrollEnabled}
       alwaysBounceHorizontal={false}
       directionalLockEnabled={Platform.OS === "ios"}
-      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      keyboardDismissMode={KEYBOARD_DISMISS_MODE}
       keyboardShouldPersistTaps="handled"
       onScroll={onScroll}
       onScrollBeginDrag={onScrollBeginDrag}
@@ -379,7 +380,7 @@ export function Screen<T = never>({
       // page as a white corner at the top-right of a light screen.
       alwaysBounceHorizontal={false}
       directionalLockEnabled={Platform.OS === "ios"}
-      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      keyboardDismissMode={KEYBOARD_DISMISS_MODE}
       keyboardShouldPersistTaps="handled"
       onScroll={onScroll}
       onScrollBeginDrag={onScrollBeginDrag}

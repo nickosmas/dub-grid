@@ -7,7 +7,7 @@ import {
 } from "@dubgrid/domain";
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useMemo, useState } from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -705,12 +705,7 @@ export default function PeopleScreen() {
         renderItem: renderRosterItem,
         // Under the search field the list starts close by; a People requests
         // section above it keeps the full section gap.
-        headerGap:
-          canManageEmployees && profileRequests.length > 0
-            ? undefined
-            : Platform.OS === "android"
-              ? mobileSpace.md
-              : 0,
+        headerGap: canManageEmployees && profileRequests.length > 0 ? undefined : 0,
       }}
     >
       <FilterSheet

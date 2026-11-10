@@ -372,8 +372,7 @@ describe("ProfilePasswordScreen", () => {
     expect(screen.getByText("Strong")).toBeInTheDocument();
   });
 
-  // Material's password field keeps its eye, one per field.
-  it("masks each field on Android until its own toggle is pressed", async () => {
+  it("keeps every field masked on Android too, with no reveal", async () => {
     getSupabaseClient.mockReturnValue({ auth: {} } as never);
     vi.resetModules();
     vi.doMock("react-native", async () =>
@@ -384,12 +383,8 @@ describe("ProfilePasswordScreen", () => {
     render(<AndroidScreen />);
 
     expect(screen.getByLabelText("New password")).toHaveAttribute("type", "password");
-    fireEvent.click(screen.getByRole("button", { name: "Show new password" }));
-    fireEvent.click(screen.getByRole("button", { name: "Show confirm password" }));
-
-    expect(screen.getByLabelText("New password")).toHaveAttribute("type", "text");
-    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "text");
-    expect(screen.getByRole("button", { name: "Hide new password" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "password");
+    expect(screen.queryByRole("button", { name: /^Show / })).not.toBeInTheDocument();
     vi.doUnmock("react-native");
   });
 

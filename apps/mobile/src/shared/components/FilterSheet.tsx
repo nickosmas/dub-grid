@@ -14,7 +14,7 @@ import { Button } from "./Button";
 import { NumericBadge } from "./NumericBadge";
 import { PressableRow } from "./PressableRow";
 import { SelectionCheck } from "./SelectionCheck";
-import { IS_ANDROID_LIST, IS_IOS_LIST, IS_NATIVE_LIST } from "../lib/native-list";
+import { IS_NATIVE_LIST } from "../lib/native-list";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
   mobileRadii,
@@ -108,13 +108,7 @@ export function SelectionSection({
   return (
     <View style={styles.section}>
       {label ? (
-        <Text
-          style={[
-            styles.sectionTitle,
-            IS_IOS_LIST && styles.sectionTitleIos,
-            IS_ANDROID_LIST && styles.sectionTitleAndroid,
-          ]}
-        >
+        <Text style={[styles.sectionTitle, IS_NATIVE_LIST && styles.sectionTitleNative]}>
           {label}
         </Text>
       ) : null}
@@ -179,7 +173,7 @@ export function SelectionRow({
           </Text>
           {detail ? <Text style={styles.selectionRowDetail}>{detail}</Text> : null}
         </View>
-        {selected || IS_ANDROID_LIST ? <SelectionCheck selected={selected} /> : null}
+        {selected ? <SelectionCheck /> : null}
       </PressableRow>
     </View>
   );
@@ -278,13 +272,9 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingHorizontal: mobileSpace.lg,
     },
     // The group header of the owner's grouped lists: 17pt semibold, sentence case.
-    sectionTitleIos: {
+    sectionTitleNative: {
       ...mobileTextWeighted("sectionTitle", "semibold"),
       color: mobileColors.textPrimary,
-    },
-    sectionTitleAndroid: {
-      ...mobileTextWeighted("meta", "semibold"),
-      color: mobileColors.brand,
     },
     selectionRowSelected: {
       // The same control fill the organization picker uses for its current row,

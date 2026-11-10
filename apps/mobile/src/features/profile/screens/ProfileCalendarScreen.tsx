@@ -6,7 +6,7 @@ import {
   type CalendarSubscribeTarget,
 } from "@dubgrid/domain";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Linking, Platform, Share, StyleSheet } from "react-native";
+import { Linking, StyleSheet } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
@@ -32,6 +32,7 @@ import {
   ProfileSection,
 } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
+import { CAN_OPEN_APPLE_CALENDAR, shareLink } from "../lib/device-copy";
 
 type CalendarAction = CalendarSubscribeTarget | "share";
 
@@ -56,7 +57,7 @@ const ACTIONS: ReadonlyArray<{
 
 async function openCalendarAction(action: CalendarAction, feedUrl: string) {
   if (action === "share") {
-    await Share.share({ url: feedUrl, message: Platform.OS === "android" ? feedUrl : undefined });
+    await shareLink(feedUrl);
     return;
   }
   await Linking.openURL(buildCalendarSubscribeLinks(feedUrl)[action]);
@@ -161,7 +162,7 @@ export default function ProfileCalendarScreen() {
     }
   }
 
-  const visibleActions = ACTIONS.filter((entry) => !entry.iosOnly || Platform.OS === "ios");
+  const visibleActions = ACTIONS.filter((entry) => !entry.iosOnly || CAN_OPEN_APPLE_CALENDAR);
 
   return (
     <Screen

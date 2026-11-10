@@ -79,6 +79,14 @@ vi.mock("../features/auth/hooks/useBootstrap", () => ({ useBootstrap }));
 vi.mock("../shared/lib/auth-reset", () => ({ handleExpiredMobileSession: vi.fn() }));
 vi.mock("../shared/providers/AuthSessionProvider", () => ({ useSessionState }));
 
+// The tab error screen is covered by its own route; stubbed so its
+// components need no React Native mock here.
+vi.mock("../shared/components/TabsErrorBoundary", () => ({
+  TabsErrorBoundary: function TabsErrorBoundary() {
+    return null;
+  },
+}));
+
 let TabsLayoutAndroid: (typeof import("../../app/(tabs)/_layout.android"))["default"];
 
 beforeAll(async () => {
@@ -122,6 +130,12 @@ describe("TabsLayoutAndroid", () => {
   // StartupSplashGate owns the launch splash and is still covering the
   // screen for the entire window the session takes to restore, so this
   // renders nothing rather than a second, competing loading screen.
+  it("exports the tab error screen, as the iOS layout does", async () => {
+    const androidLayout = await import("../../app/(tabs)/_layout.android");
+    const { TabsErrorBoundary } = await import("../shared/components/TabsErrorBoundary");
+    expect(androidLayout.ErrorBoundary).toBe(TabsErrorBoundary);
+  });
+
   it("renders nothing while the session is restoring", () => {
     useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
 

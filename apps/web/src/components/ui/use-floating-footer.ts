@@ -11,6 +11,27 @@ export function footerSection(footer: HTMLElement): HTMLElement | null {
   return section;
 }
 
+/** How far a floating footer sits above the bottom of the screen, as from the sides. */
+export const FLOATING_FOOTER_GAP_PX = 8;
+
+function scrollPort(element: HTMLElement): HTMLElement | null {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if (overflowY === "auto" || overflowY === "scroll") return node;
+  }
+  return null;
+}
+
+/**
+ * A sticky box stays inside its scroll area's padding, so the bottom offset
+ * reaches back into that padding to sit the gap above the screen's edge. At the
+ * end of the scroll area the footer still rests at its natural place.
+ */
+function placeAboveScreenEdge(footer: HTMLElement, port: HTMLElement | null) {
+  const padding = port ? parseFloat(getComputedStyle(port).paddingBottom) || 0 : 0;
+  footer.style.setProperty("--dg-floating-footer-bottom", `${FLOATING_FOOTER_GAP_PX - padding}px`);
+}
+
 /**
  * Whether a `position: sticky` footer is floating: lifted above the inner end
  * of its section, where it otherwise rests as the section's last child. Off while
@@ -29,9 +50,11 @@ export function useFloatingFooter(
       setFloating(false);
       return;
     }
+    const port = scrollPort(section);
     let frame = 0;
     const measure = () => {
       frame = 0;
+      placeAboveScreenEdge(footer, port);
       const style = getComputedStyle(section);
       const innerBottom =
         section.getBoundingClientRect().bottom -
@@ -53,6 +76,7 @@ export function useFloatingFooter(
       document.removeEventListener("scroll", schedule, { capture: true });
       window.removeEventListener("resize", schedule);
       resizeObserver?.disconnect();
+      footer.style.removeProperty("--dg-floating-footer-bottom");
     };
   }, [footerRef, enabled]);
 

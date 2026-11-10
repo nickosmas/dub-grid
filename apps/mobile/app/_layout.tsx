@@ -12,7 +12,6 @@ import {
 import { DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -40,20 +39,14 @@ import {
 } from "../src/shared/providers/ThemeModeProvider";
 import { ToastProvider } from "../src/shared/providers/ToastProvider";
 import {
+  ALERTS_SEARCH_PLACEHOLDER,
+  screenSearchRouteOptions,
+} from "../src/shared/components/ScreenSearch";
+import {
   createCommonStackOptions,
   createDetailStackOptions,
 } from "../src/shared/navigation/top-level-stack";
 import { mobileTypography } from "../src/shared/theme/tokens";
-
-// Android draws Material's docked search bar in the content (ScreenSearch).
-const ALERTS_SEARCH_BAR =
-  Platform.OS === "ios"
-    ? ({
-        placement: "stacked",
-        hideWhenScrolling: false,
-        placeholder: "Search title or message",
-      } as const)
-    : undefined;
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 markMobileAuthRuntimeStarted();
@@ -159,7 +152,10 @@ function RootLayoutContent({
                                     // The search field belongs to the route, not only the
                                     // screen: added after the push had laid out the large
                                     // title, iOS 26 drew it over the title.
-                                    headerSearchBarOptions: ALERTS_SEARCH_BAR,
+                                    ...screenSearchRouteOptions(
+                                      ALERTS_SEARCH_PLACEHOLDER,
+                                      mobileColors,
+                                    ),
                                   }}
                                 />
                                 <Stack.Screen

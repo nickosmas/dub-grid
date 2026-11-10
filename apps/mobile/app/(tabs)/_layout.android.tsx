@@ -1,7 +1,10 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
+import { visibleAppTabs } from "../../src/shared/navigation/app-tabs";
 import { useMobileColors } from "../../src/shared/providers/ThemeModeProvider";
 import { mobileText, mobileTypography } from "../../src/shared/theme/tokens";
+
+export { TabsErrorBoundary as ErrorBoundary } from "../../src/shared/components/TabsErrorBoundary";
 
 const { Icon, Label } = NativeTabs.Trigger;
 
@@ -16,8 +19,6 @@ export default function TabsLayoutAndroid() {
   if (gate.kind === "blocked") {
     return gate.element;
   }
-
-  const { canViewTeamSchedule, canViewRequestsTab, canViewHomeTab } = gate;
 
   return (
     <NativeTabs
@@ -41,32 +42,12 @@ export default function TabsLayoutAndroid() {
       labelVisibilityMode="labeled"
       rippleColor={mobileColors.rippleNeutral}
     >
-      {canViewHomeTab ? (
-        <NativeTabs.Trigger name="home">
-          <Label>Home</Label>
-          <Icon md="home" />
+      {visibleAppTabs(gate).map((tab) => (
+        <NativeTabs.Trigger key={tab.name} name={tab.name}>
+          <Label>{tab.label}</Label>
+          <Icon md={tab.material} />
         </NativeTabs.Trigger>
-      ) : null}
-      {canViewTeamSchedule ? (
-        <NativeTabs.Trigger name="team">
-          <Label>Schedule</Label>
-          <Icon md="calendar_month" />
-        </NativeTabs.Trigger>
-      ) : null}
-      {canViewRequestsTab ? (
-        <NativeTabs.Trigger name="requests">
-          <Label>Requests</Label>
-          <Icon md="swap_horiz" />
-        </NativeTabs.Trigger>
-      ) : null}
-      <NativeTabs.Trigger name="people">
-        <Label>People</Label>
-        <Icon md="group" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="profile">
-        <Label>Profile</Label>
-        <Icon md="account_circle" />
-      </NativeTabs.Trigger>
+      ))}
     </NativeTabs>
   );
 }

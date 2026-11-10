@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Factor } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatClientErrorMessage } from "@dubgrid/client-errors";
-import { Platform, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
@@ -33,6 +33,7 @@ import {
   mobileText,
   type MobileColors,
 } from "../../../shared/theme/tokens";
+import { mobileMonospaceFamily } from "../../../shared/theme/monospace";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import {
   ProfileInfoRow,
@@ -536,9 +537,7 @@ const createStyles = (mobileColors: MobileColors) =>
     mfaSecretText: {
       ...mobileText.body,
       color: mobileColors.textPrimary,
-      // "monospace" is an Android alias with no iOS equivalent, so recovery
-      // codes silently rendered in the system font there.
-      fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
+      fontFamily: mobileMonospaceFamily,
       letterSpacing: 1,
     },
   });

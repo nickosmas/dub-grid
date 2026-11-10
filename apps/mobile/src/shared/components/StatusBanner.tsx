@@ -97,12 +97,7 @@ export function StatusBanner({
     <View style={[styles.banner, { backgroundColor: palette.backgroundColor }]}>
       <View style={styles.copyRow}>
         <View style={styles.icon}>
-          <ToneSymbol
-            color={iconColor}
-            markColor={palette.backgroundColor}
-            size={24}
-            tone={palette.symbolTone}
-          />
+          <ToneSymbol color={iconColor} size={24} tone={palette.symbolTone} />
         </View>
         <View style={styles.copy}>
           <Text
@@ -156,12 +151,7 @@ function CenteredStatus({
   return (
     <View style={[centeredStyles.card, fillScreen ? fillScreenAnchorStyles.fill : null]}>
       {fillScreen ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
-      <ToneSymbol
-        color={iconColor}
-        markColor="#FFFFFF"
-        size={CONTENT_UNAVAILABLE_ICON_SIZE}
-        tone={symbolTone}
-      />
+      <ToneSymbol color={iconColor} size={CONTENT_UNAVAILABLE_ICON_SIZE} tone={symbolTone} />
       <View style={centeredStyles.copy}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={centeredStyles.title}>
           {title}

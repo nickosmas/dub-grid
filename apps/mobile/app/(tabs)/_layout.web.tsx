@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
+import { visibleAppTabs } from "../../src/shared/navigation/app-tabs";
 import { useMobileColors } from "../../src/shared/providers/ThemeModeProvider";
 import { mobileText, mobileTypography } from "../../src/shared/theme/tokens";
 
@@ -9,6 +10,8 @@ import { mobileText, mobileTypography } from "../../src/shared/theme/tokens";
  * re-derived here — a second copy silently drifted from the native one before.
  * The push hooks it mounts are no-ops on web.
  */
+export { TabsErrorBoundary as ErrorBoundary } from "../../src/shared/components/TabsErrorBoundary";
+
 export default function TabsLayoutWeb() {
   const gate = useTabsGate();
   const mobileColors = useMobileColors();
@@ -16,8 +19,6 @@ export default function TabsLayoutWeb() {
   if (gate.kind === "blocked") {
     return gate.element;
   }
-
-  const { canViewTeamSchedule, canViewRequestsTab, canViewHomeTab } = gate;
 
   return (
     <Tabs
@@ -35,11 +36,9 @@ export default function TabsLayoutWeb() {
         },
       }}
     >
-      {canViewHomeTab ? <Tabs.Screen name="home" options={{ title: "Home" }} /> : null}
-      {canViewTeamSchedule ? <Tabs.Screen name="team" options={{ title: "Schedule" }} /> : null}
-      {canViewRequestsTab ? <Tabs.Screen name="requests" options={{ title: "Requests" }} /> : null}
-      <Tabs.Screen name="people" options={{ title: "People" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
+      {visibleAppTabs(gate).map((tab) => (
+        <Tabs.Screen key={tab.name} name={tab.name} options={{ title: tab.label }} />
+      ))}
     </Tabs>
   );
 }

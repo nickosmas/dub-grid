@@ -1,7 +1,7 @@
 import { ActionButtons } from "./ActionButtons";
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Modal, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Pressable } from "./Pressable";
 import { AppLockOverlay } from "./AppLockSurface";
 import { useAppLockSurface } from "../lib/app-lock";
@@ -22,6 +22,7 @@ import {
 import { AppText } from "./AppText";
 import { SHEET_OVERDRAG_LIMIT, useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
+import { KEYBOARD_DISMISS_MODE } from "./keyboard-dismiss";
 
 /**
  * Whether the subtree is rendered inside a sheet.
@@ -312,7 +313,7 @@ export function BottomSheetModal({
                       // swallowed dismissing the keyboard, and the user had to tap
                       // twice. Every sheet with a form sits in here.
                       keyboardShouldPersistTaps="handled"
-                      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                      keyboardDismissMode={KEYBOARD_DISMISS_MODE}
                       // The two together say whether the list has anywhere left to
                       // scroll, which is what decides who owns an upward drag.
                       onContentSizeChange={onScrollContentSizeChange}

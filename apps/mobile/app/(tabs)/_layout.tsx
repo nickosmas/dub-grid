@@ -1,33 +1,17 @@
 import { useEffect, useState } from "react";
 import type { ParamListBase } from "expo-router/react-navigation";
 import type { NativeStackNavigationProp } from "expo-router/native-stack";
-import { useNavigation, type ErrorBoundaryProps } from "expo-router";
+import { useNavigation } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 
 const { Icon, Label } = NativeTabs.Trigger;
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
-import { RouteErrorScreen } from "../../src/shared/components/RouteErrorScreen";
+import { visibleAppTabs } from "../../src/shared/navigation/app-tabs";
 import { NativeTabBarPresenceProvider } from "../../src/shared/navigation/NativeTabBarPresence";
 import { useMobileColors, useThemeMode } from "../../src/shared/providers/ThemeModeProvider";
 import { mobileText, mobileTypography } from "../../src/shared/theme/tokens";
 
-/**
- * Keeps a crash inside the authed tab tree from unmounting the whole app —
- * the provider tree above stays alive, so "Try again" can actually recover.
- */
-export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
-  return (
-    <RouteErrorScreen
-      actionLabel="Try again"
-      body="Something went wrong loading this tab. Trying again usually clears it."
-      detail={error.message}
-      onAction={() => {
-        void retry();
-      }}
-      title="This tab ran into a problem"
-    />
-  );
-}
+export { TabsErrorBoundary as ErrorBoundary } from "../../src/shared/components/TabsErrorBoundary";
 
 export default function TabsLayout() {
   const gate = useTabsGate();
@@ -52,55 +36,12 @@ export default function TabsLayout() {
     return gate.element;
   }
 
-  const { canViewTeamSchedule, canViewRequestsTab, canViewHomeTab } = gate;
-
-  const tabTriggers = [
-    ...(canViewHomeTab
-      ? [
-          <NativeTabs.Trigger key="home" name="home">
-            <Label>Home</Label>
-            {/* An SF Symbol like the other tabs: a vector glyph loads its two
-                images separately, and when the selected one lands first
-                react-native-screens throws and the whole tab tree fails. */}
-            <Icon sf={{ default: "house", selected: "house.fill" }} />
-          </NativeTabs.Trigger>,
-        ]
-      : []),
-    ...(canViewTeamSchedule
-      ? [
-          <NativeTabs.Trigger key="team" name="team">
-            <Label>Schedule</Label>
-            <Icon sf={{ default: "calendar", selected: "calendar" }} />
-          </NativeTabs.Trigger>,
-        ]
-      : []),
-    ...(canViewRequestsTab
-      ? [
-          <NativeTabs.Trigger key="requests" name="requests">
-            <Label>Requests</Label>
-            <Icon
-              sf={{
-                default: "arrow.left.arrow.right",
-                selected: "arrow.left.arrow.right.circle.fill",
-              }}
-            />
-          </NativeTabs.Trigger>,
-        ]
-      : []),
-    <NativeTabs.Trigger key="people" name="people">
-      <Label>People</Label>
-      <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
-    </NativeTabs.Trigger>,
-    <NativeTabs.Trigger key="profile" name="profile">
-      <Label>Profile</Label>
-      <Icon
-        sf={{
-          default: "person.crop.circle",
-          selected: "person.crop.circle.fill",
-        }}
-      />
-    </NativeTabs.Trigger>,
-  ];
+  const tabTriggers = visibleAppTabs(gate).map((tab) => (
+    <NativeTabs.Trigger key={tab.name} name={tab.name}>
+      <Label>{tab.label}</Label>
+      <Icon sf={tab.sf} />
+    </NativeTabs.Trigger>
+  ));
 
   return (
     <NativeTabBarPresenceProvider>
