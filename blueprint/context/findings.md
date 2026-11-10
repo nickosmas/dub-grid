@@ -963,3 +963,11 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** Switching organization into one that suspended you answers `ACCOUNT_SUSPENDED` without `suspendedUntil`, though F-224's resolution says the route returns the date. And someone suspended at this address and in every other organization is refused with the date from their default organization's staff row, not this one's. Neither grants access; both can tell the person the wrong day. Read in code, not run.
 **Suggested fix:** Return `suspendedUntil` from the switch route as the login route does, and have the hook name the date of the organization it refused for.
 **Resolution:**
+
+### F-237 [P2] open - The People filter sheet doesn't open on Android
+
+**File:** `apps/mobile/src/shared/navigation/HeaderFilterAction.tsx:30`; `apps/mobile/src/shared/components/BottomSheetModal.native.tsx` (Android path); `apps/mobile/src/features/people/screens/PeopleScreen.tsx:711`
+**Found:** 2026-11-10 while restoring the native segmented switch
+**Why it matters:** On the Android emulator, tapping People's Filter calls `onPress` (logged) and sets the sheet visible, but no sheet appears and nothing is logged. It happens with the drawn switch and the native one, and with People's search action removed from the bar, so neither causes it. iOS opens the same sheet. Only the emulator's development build was tried, not a release build or a phone, and other native sheets on Android weren't checked.
+**Suggested fix:** Check whether any `BottomSheetModal.native` sheet opens on Android, then whether 56d's `sheetOpenSize` refactor changed the Android first render (it now reads `androidResizableRef` before setting it).
+**Resolution:**
