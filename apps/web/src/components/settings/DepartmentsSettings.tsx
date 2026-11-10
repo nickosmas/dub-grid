@@ -957,7 +957,7 @@ function DepartmentSection({
           action={
             canEdit ? (
               <Button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
-                + Add {addLabel}
+                Add {addLabel}
               </Button>
             ) : undefined
           }
@@ -1157,7 +1157,7 @@ function DepartmentSection({
                           className={addBtnClass}
                           style={{ width: "100%" }}
                         >
-                          + Add {focusAreaLabel.replace(/s$/i, "")}
+                          Add {focusAreaLabel.replace(/s$/i, "")}
                         </Button>
                       </div>
                     )}
@@ -1175,7 +1175,7 @@ function DepartmentSection({
                       className="dg-btn dg-btn-secondary dg-btn-sm"
                       style={{ fontSize: "var(--dg-fs-caption)" }}
                     >
-                      + Split into {focusAreaLabel}
+                      Split into {focusAreaLabel}
                     </Button>
                   </div>
                 )}
@@ -1187,7 +1187,7 @@ function DepartmentSection({
           {isEditing && (
             <div style={{ padding: "8px 16px 12px" }}>
               <Button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
-                + Add {addLabel}
+                Add {addLabel}
               </Button>
             </div>
           )}

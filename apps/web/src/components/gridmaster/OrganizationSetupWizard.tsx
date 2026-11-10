@@ -1115,7 +1115,7 @@ export default function OrganizationSetupWizard({
               }
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
-              + Add department
+              Add department
             </Button>
           </div>
         </div>
@@ -1191,7 +1191,7 @@ export default function OrganizationSetupWizard({
               onClick={addFocusAreaRow}
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
-              + Add {focusAreaLabel.replace(/s$/, "").toLowerCase()}
+              Add {focusAreaLabel.replace(/s$/, "").toLowerCase()}
             </Button>
           </div>
         </div>
@@ -1248,7 +1248,7 @@ export default function OrganizationSetupWizard({
               onClick={() => addNamedItemRow(setCertifications)}
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
-              + Add {certificationLabel.replace(/s$/, "").toLowerCase()}
+              Add {certificationLabel.replace(/s$/, "").toLowerCase()}
             </Button>
           </div>
         </div>
@@ -1301,7 +1301,7 @@ export default function OrganizationSetupWizard({
               onClick={() => addNamedItemRow(setOrgRoles)}
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
-              + Add {roleLabel.replace(/s$/, "").toLowerCase()}
+              Add {roleLabel.replace(/s$/, "").toLowerCase()}
             </Button>
           </div>
         </div>
@@ -1419,7 +1419,7 @@ export default function OrganizationSetupWizard({
               }
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
-              + Add shift
+              Add shift
             </Button>
           </div>
         </div>
@@ -1645,7 +1645,7 @@ export default function OrganizationSetupWizard({
               }
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
-              + Add job
+              Add job
             </Button>
           </div>
         </div>
@@ -1834,7 +1834,7 @@ export default function OrganizationSetupWizard({
               onClick={() => addEmployeeRows(5)}
               style={{ fontSize: "var(--dg-fs-label)", marginTop: 8 }}
             >
-              + Add 5 more rows
+              Add 5 more rows
             </Button>
           </div>
         </div>

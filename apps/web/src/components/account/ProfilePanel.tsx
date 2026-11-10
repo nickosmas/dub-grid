@@ -809,14 +809,13 @@ export function ProfilePanel({
             />
           </AccountCard>
         )}
-        {hasAnyChanges ? (
-          <UnsavedChangesBar
-            saveDisabled={hasInvalidDraft}
-            saving={saving}
-            onDiscard={cancelEditing}
-            onSave={requestSave}
-          />
-        ) : null}
+        <UnsavedChangesBar
+          dirty={hasAnyChanges}
+          saveDisabled={hasInvalidDraft}
+          saving={saving}
+          onDiscard={cancelEditing}
+          onSave={requestSave}
+        />
       </UnsavedChangesScope>
 
       {isGridmaster || canManageManagementAccess || showAccessRole ? (

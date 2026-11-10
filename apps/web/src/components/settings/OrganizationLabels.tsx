@@ -170,14 +170,15 @@ export default function OrganizationLabels({
   return (
     <SectionCard
       saveBar={
-        !readOnly && !isWizardMode && isModified ? (
+        readOnly || isWizardMode ? null : (
           <UnsavedChangesBar
+            dirty={isModified}
             saving={saving}
             saveDisabled={hasFieldErrors}
             onDiscard={handleDiscard}
             onSave={() => void handleSave()}
           />
-        ) : null
+        )
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
