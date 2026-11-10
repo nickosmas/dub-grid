@@ -6,6 +6,8 @@ import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import type { UnsavedChangesSave } from "@/components/UnsavedChangesDialog";
 
 /**
  * Extra things the manager should know before confirming, one short point
@@ -65,6 +67,16 @@ interface ConfirmDialogProps {
   wrapActions?: boolean;
   confirmDisabled?: boolean;
   secondaryConfirmDisabled?: boolean;
+  /**
+   * The dialog holds typed input (a reason, dates, a form): Cancel and Escape
+   * then ask before throwing it away.
+   */
+  hasUnsavedChanges?: boolean;
+  /**
+   * Offered as Save in that question. Only for a plain save of edits; a dialog
+   * whose confirm is a decision (suspend, send, approve) leaves it out.
+   */
+  unsavedSave?: UnsavedChangesSave;
 }
 
 export default function ConfirmDialog({
@@ -87,6 +99,8 @@ export default function ConfirmDialog({
   wrapActions = false,
   confirmDisabled = false,
   secondaryConfirmDisabled = false,
+  hasUnsavedChanges = false,
+  unsavedSave,
 }: ConfirmDialogProps) {
   // Confirming is the press most worth double-clicking: the dialog has just
   // told the user something irreversible is about to happen, and a slow
@@ -110,6 +124,15 @@ export default function ConfirmDialog({
   // Opening on Cancel: the safe choice is the one a stray Enter takes.
   const cancelRef = useRef<HTMLButtonElement>(null);
   const actionDisabled = confirmBusy || secondaryBusy;
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges,
+    onDiscard: onCancel,
+    onSave: unsavedSave,
+    onSaved: onCancel,
+  });
+  const cancel = () => {
+    if (requestClose()) onCancel();
+  };
   const cancelButtonStyle = wrapActions ? { minWidth: 120 } : undefined;
   const confirmButtonStyle = wrapActions
     ? {
@@ -131,7 +154,7 @@ export default function ConfirmDialog({
       <Button
         ref={cancelRef}
         className="dg-btn dg-btn-secondary"
-        onClick={onCancel}
+        onClick={cancel}
         disabled={actionDisabled}
         style={cancelButtonStyle}
       >
@@ -163,44 +186,47 @@ export default function ConfirmDialog({
   );
 
   return (
-    <Modal
-      title={title}
-      alert={{ icon: icon ?? VARIANT_ICONS[variant], tone: VARIANT_TONES[variant] }}
-      returnFocus={returnFocus}
-      initialFocus={cancelRef}
-      onClose={onCancel}
-      onRequestClose={() => !actionDisabled}
-      style={{ maxWidth }}
-      aria-describedby={descId}
-      footer={actions}
-    >
-      <div id={descId} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {message ? (
-          <div
-            style={{
-              fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--dg-color-text-secondary)",
-              lineHeight: 1.5,
-            }}
-          >
-            {message}
-          </div>
-        ) : null}
-        {summary && summary.points.length === 1 ? (
-          // A box with one item reads oddly; a lone fact reads as a sentence.
-          <div
-            style={{
-              fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--dg-color-text-secondary)",
-              lineHeight: 1.5,
-            }}
-          >
-            {summary.points[0]}
-          </div>
-        ) : null}
-        {summary && summary.points.length > 1 ? <ConfirmSummaryBox summary={summary} /> : null}
-      </div>
-    </Modal>
+    <>
+      <Modal
+        title={title}
+        alert={{ icon: icon ?? VARIANT_ICONS[variant], tone: VARIANT_TONES[variant] }}
+        returnFocus={returnFocus}
+        initialFocus={cancelRef}
+        onClose={onCancel}
+        onRequestClose={() => !actionDisabled && requestClose()}
+        style={{ maxWidth }}
+        aria-describedby={descId}
+        footer={actions}
+      >
+        <div id={descId} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {message ? (
+            <div
+              style={{
+                fontSize: "var(--dg-fs-body-sm)",
+                color: "var(--dg-color-text-secondary)",
+                lineHeight: 1.5,
+              }}
+            >
+              {message}
+            </div>
+          ) : null}
+          {summary && summary.points.length === 1 ? (
+            // A box with one item reads oddly; a lone fact reads as a sentence.
+            <div
+              style={{
+                fontSize: "var(--dg-fs-body-sm)",
+                color: "var(--dg-color-text-secondary)",
+                lineHeight: 1.5,
+              }}
+            >
+              {summary.points[0]}
+            </div>
+          ) : null}
+          {summary && summary.points.length > 1 ? <ConfirmSummaryBox summary={summary} /> : null}
+        </div>
+      </Modal>
+      {unsavedChangesDialog}
+    </>
   );
 }
 

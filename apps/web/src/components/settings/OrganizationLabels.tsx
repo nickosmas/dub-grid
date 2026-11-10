@@ -76,20 +76,21 @@ export default function OrganizationLabels({
 
   // Covers both the sidebar click and the tab close; the provider owns the
   // `beforeunload` this panel used to register for itself.
-  useNavigationGuard("organization-labels", { isDirty: () => isModified });
+  // The Unsaved changes bar asks outside the wizard; in it, this one does.
+  useNavigationGuard("organization-labels", { isDirty: () => isModified }, isWizardMode);
 
   const lastSaveErrorRef = useRef<unknown>(null);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (): Promise<boolean> => {
     lastSaveErrorRef.current = null;
     if (hasFieldErrors) {
       lastSaveErrorRef.current = new Error("Validation errors prevent save.");
-      return;
+      return false;
     }
     if (!organization.updatedAt) {
       lastSaveErrorRef.current = new Error(changedElsewhereMessage("these settings"));
       toast.error(changedElsewhereMessage("these settings"));
-      return;
+      return false;
     }
     setSaving(true);
     try {
@@ -138,13 +139,15 @@ export default function OrganizationLabels({
           roleLabel: result.organization.roleLabel,
         });
         toast.info("Labels were refreshed to the latest saved values.");
-        return;
+        return false;
       }
       toast.success("Labels saved");
+      return true;
     } catch (err) {
       lastSaveErrorRef.current = err;
       toast.error("We couldn't save your labels. Try again.");
       Sentry.captureException(err);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -177,6 +180,7 @@ export default function OrganizationLabels({
             saveDisabled={hasFieldErrors}
             onDiscard={handleDiscard}
             onSave={() => void handleSave()}
+            leaveSave={handleSave}
           />
         )
       }

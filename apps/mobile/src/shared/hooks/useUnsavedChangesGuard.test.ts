@@ -116,7 +116,18 @@ describe("useUnsavedChangesGuard", () => {
     const { view } = renderGuard();
 
     expect(view.result.current.confirmationProps.cancelLabel).toBe("Keep editing");
-    expect(view.result.current.confirmationProps.confirmTone).toBe("danger");
+  });
+
+  it("asks Discard or Keep editing, in neither case red, when the surface can't save", () => {
+    const { view } = renderGuard();
+    const props = view.result.current.confirmationProps;
+
+    expect(props.title).toBe("Discard your changes?");
+    expect(props.body).toBe("You haven't saved what you changed here.");
+    expect(props.confirmLabel).toBe("Discard");
+    // Throwing away unsaved edits isn't destructive under the button rules.
+    expect(props.confirmTone).toBe("primary");
+    expect(props.secondaryAction).toBeUndefined();
   });
 
   it("swallows an exit while a write is in flight", () => {
@@ -162,5 +173,115 @@ describe("useUnsavedChangesGuard", () => {
     requestClose();
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+function renderSavingGuard(save: () => boolean | Promise<boolean>) {
+  const onDiscard = vi.fn();
+  const onClose = vi.fn();
+  const onSave = vi.fn(save);
+  const view = renderHook(() =>
+    useUnsavedChangesGuard({ isDirty: true, onDiscard, onClose, onSave }),
+  );
+  act(() => view.result.current.requestClose());
+  return { onClose, onDiscard, onSave, view };
+}
+
+describe("useUnsavedChangesGuard with a save", () => {
+  it("offers Save, Discard and Keep editing", () => {
+    const { view } = renderSavingGuard(() => true);
+    const props = view.result.current.confirmationProps;
+
+    expect(props.title).toBe("Save your changes?");
+    expect(props.body).toBe("You haven't saved what you changed here.");
+    expect(props.confirmLabel).toBe("Save");
+    expect(props.confirmTone).toBe("primary");
+    expect(props.secondaryAction?.label).toBe("Discard");
+    expect(props.cancelLabel).toBe("Keep editing");
+  });
+
+  it("saves, then leaves once the save worked", async () => {
+    const { onClose, onDiscard, onSave, view } = renderSavingGuard(async () => true);
+
+    await act(async () => {
+      await view.result.current.confirmationProps.onConfirm();
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(view.result.current.confirmationProps.visible).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
+    completeModalHandoff();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // The saved draft is the surface's to settle; resetting it to the old
+    // baseline would show the old values until the refetch lands.
+    expect(onDiscard).not.toHaveBeenCalled();
+  });
+
+  it("stays when the save fails, with the question closed", async () => {
+    const { onClose, onDiscard, view } = renderSavingGuard(async () => false);
+
+    await act(async () => {
+      await view.result.current.confirmationProps.onConfirm();
+    });
+    completeModalHandoff();
+
+    expect(view.result.current.confirmationProps.visible).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onDiscard).not.toHaveBeenCalled();
+  });
+
+  it("stays when the save throws", async () => {
+    const { onClose, view } = renderSavingGuard(() => Promise.reject(new Error("offline")));
+
+    await act(async () => {
+      await view.result.current.confirmationProps.onConfirm();
+    });
+    completeModalHandoff();
+
+    expect(view.result.current.confirmationProps.visible).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("keeps the question up while the save runs", async () => {
+    let finish: (saved: boolean) => void = () => undefined;
+    const { onClose, view } = renderSavingGuard(
+      () => new Promise<boolean>((resolve) => (finish = resolve)),
+    );
+
+    let pending: Promise<void> | void = undefined;
+    act(() => {
+      pending = view.result.current.confirmationProps.onConfirm();
+    });
+    expect(view.result.current.confirmationProps.visible).toBe(true);
+
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    completeModalHandoff();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("discards and leaves from the Discard answer without saving", () => {
+    const { onClose, onDiscard, onSave, view } = renderSavingGuard(() => true);
+
+    act(() => view.result.current.confirmationProps.secondaryAction?.onPress());
+    completeModalHandoff();
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onDiscard).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps everything from Keep editing", () => {
+    const { onClose, onDiscard, onSave, view } = renderSavingGuard(() => true);
+
+    act(() => view.result.current.confirmationProps.onCancel());
+    completeModalHandoff();
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onDiscard).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(view.result.current.confirmationProps.visible).toBe(false);
   });
 });

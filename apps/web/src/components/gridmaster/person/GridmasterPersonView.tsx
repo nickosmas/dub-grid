@@ -416,6 +416,7 @@ export default function GridmasterPersonView({
           isLoading={busy}
           onConfirm={handleTerminate}
           onCancel={closeDialog}
+          hasUnsavedChanges={terminateReason.trim().length > 0}
         />
       )}
 
@@ -516,6 +517,10 @@ export default function GridmasterPersonView({
             )
           }
           onCancel={closeDialog}
+          hasUnsavedChanges={
+            nameDraft.firstName !== (profile?.firstName ?? "") ||
+            nameDraft.lastName !== (profile?.lastName ?? "")
+          }
         />
       )}
 
@@ -557,6 +562,7 @@ export default function GridmasterPersonView({
             );
           }}
           onCancel={closeDialog}
+          hasUnsavedChanges={emailDraft.trim() !== (account?.email ?? "")}
         />
       )}
       {mfaResetConfirm && !stepUp.dialog && (
@@ -600,6 +606,7 @@ export default function GridmasterPersonView({
             );
           }}
           onCancel={closeDialog}
+          hasUnsavedChanges={resetReason.trim().length > 0}
         />
       )}
       {internalConfirm && !stepUp.dialog && (

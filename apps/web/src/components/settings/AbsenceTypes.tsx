@@ -20,6 +20,7 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import {
   getCodeError,
   getLineTextError,
@@ -157,25 +158,8 @@ function AbsenceTypeRow({
     setExpanded(false);
   }, [absenceType.id, absenceType.isNew, onDeleted]);
 
-  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
-    hasUnsavedChanges: expanded && isDirty,
-    onDiscard: () => discardDraft(true),
-  });
-
-  const toggleExpanded = useCallback(() => {
-    if (!expanded) {
-      setExpanded(true);
-      return;
-    }
-    if (isDirty) {
-      requestClose();
-      return;
-    }
-    closeEditor();
-  }, [closeEditor, expanded, isDirty, requestClose]);
-
-  const handleSave = useCallback(async () => {
-    if (!canSave) return;
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (!canSave) return false;
     setSaving(true);
     try {
       const saved = await upsertAbsenceType({
@@ -204,13 +188,39 @@ function AbsenceTypeRow({
       onSaved(saved, absenceType.id);
       setExpanded(false);
       toast.success("Absence type saved");
+      return true;
     } catch (error) {
       Sentry.captureException(error);
       toast.error(formatClientErrorMessage(error, "We couldn't save that absence type."));
+      return false;
     } finally {
       setSaving(false);
     }
   }, [absenceType.id, absenceType.isNew, absenceType.sortOrder, canSave, form, onSaved, orgId]);
+
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: expanded && isDirty,
+    onDiscard: () => discardDraft(true),
+    onSave: canSave ? handleSave : undefined,
+  });
+  // The prompt covers collapsing the row; this covers a link, a section switch
+  // and a refresh, which would otherwise drop the row's edits silently.
+  useNavigationGuard(`absenceTypes-row-${absenceType.id}`, {
+    isDirty: () => expanded && isDirty && !saving,
+    save: canSave ? handleSave : undefined,
+  });
+
+  const toggleExpanded = useCallback(() => {
+    if (!expanded) {
+      setExpanded(true);
+      return;
+    }
+    if (isDirty) {
+      requestClose();
+      return;
+    }
+    closeEditor();
+  }, [closeEditor, expanded, isDirty, requestClose]);
 
   const handleDeleteClick = useCallback(async () => {
     if (absenceType.isNew) {

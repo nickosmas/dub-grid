@@ -1,6 +1,12 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { NavigationGuardProvider } from "@/components/NavigationGuardProvider";
 import { UnsavedChangesBar, UnsavedChangesScope } from "./UnsavedChangesBar";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
 
 const region = () => screen.queryByRole("region", { name: "Unsaved changes" });
 const footer = () => document.querySelector<HTMLElement>(".dg-unsaved-bar");
@@ -59,5 +65,64 @@ describe("UnsavedChangesBar", () => {
     renderBar({ onDiscard: vi.fn() });
 
     expect(footer()?.closest(".dg-card")).toBeNull();
+  });
+});
+
+describe("UnsavedChangesBar leave guard", () => {
+  function renderGuarded(props: Partial<Parameters<typeof UnsavedChangesBar>[0]>) {
+    const navigate = vi.fn();
+    render(
+      <NavigationGuardProvider>
+        <a
+          href="/settings?section=jobs"
+          onClick={(event) => {
+            event.preventDefault();
+            navigate();
+          }}
+        >
+          Jobs
+        </a>
+        <UnsavedChangesScope>
+          <UnsavedChangesBar dirty onSave={vi.fn()} {...props} />
+        </UnsavedChangesScope>
+      </NavigationGuardProvider>,
+    );
+    return navigate;
+  }
+
+  it("asks before a link leaves a dirty section", async () => {
+    const navigate = renderGuarded({});
+
+    await userEvent.click(screen.getByRole("link", { name: "Jobs" }));
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
+  });
+
+  it("lets a link through while nothing changed", async () => {
+    const navigate = renderGuarded({ dirty: false });
+
+    await userEvent.click(screen.getByRole("link", { name: "Jobs" }));
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Save with a leave save, and leaves once it worked", async () => {
+    const leaveSave = vi.fn(async () => true);
+    const navigate = renderGuarded({ leaveSave });
+
+    await userEvent.click(screen.getByRole("link", { name: "Jobs" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(leaveSave).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't offer Save while the section can't be saved", async () => {
+    renderGuarded({ leaveSave: vi.fn(async () => true), saveDisabled: true });
+
+    await userEvent.click(screen.getByRole("link", { name: "Jobs" }));
+
+    expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
   });
 });

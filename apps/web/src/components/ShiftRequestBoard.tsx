@@ -170,7 +170,6 @@ export default function ShiftRequestBoard({
   assignmentNameMap,
 }: ShiftRequestBoardProps) {
   const isMobile = useMediaQuery(MOBILE);
-  const { closing, close } = useSlideoverClose(onClose);
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
   // A deep link may name the approval tab for someone who cannot see it;
@@ -239,6 +238,13 @@ export default function ShiftRequestBoard({
   };
   // One optional note per pending card, sent with whichever decision is made.
   const [resolveNotes, setResolveNotes] = useState<Record<string, string>>({});
+  // A note is part of a decision, not something to save, so leaving asks only
+  // whether to throw it away.
+  const { closing, close, unsavedChangesDialog } = useSlideoverClose(onClose, {
+    unsaved: {
+      hasUnsavedChanges: Object.values(resolveNotes).some((note) => note.trim().length > 0),
+    },
+  });
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [runningConfirmationKey, setRunningConfirmationKey] = useState<string | null>(null);
   const managerQueue = [...(approvalQueue ?? pendingApproval)].sort((left, right) => {
@@ -1162,6 +1168,7 @@ export default function ShiftRequestBoard({
         </div>
         <ScrollOverflowCue />
       </div>
+      {unsavedChangesDialog}
     </>,
     document.body,
   );

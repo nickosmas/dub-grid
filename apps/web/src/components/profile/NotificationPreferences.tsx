@@ -180,7 +180,7 @@ export function NotificationPreferences({
     };
   }, [authLoading, user]);
 
-  async function save() {
+  async function save(): Promise<boolean> {
     setSaving(true);
     try {
       if (!user) throw new Error("Not authenticated");
@@ -188,8 +188,10 @@ export function NotificationPreferences({
       setPrefs(normalizedPrefs);
       setSavedPrefs(normalizedPrefs);
       toast.success("Notification preferences saved.");
+      return true;
     } catch {
       toast.error("We couldn't save your notification settings. Try again.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -347,6 +349,7 @@ export function NotificationPreferences({
         saving={saving}
         onDiscard={discard}
         onSave={() => void save()}
+        leaveSave={save}
       />
     </div>
   );

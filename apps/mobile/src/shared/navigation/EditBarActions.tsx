@@ -9,7 +9,7 @@ const IS_IOS = Platform.OS === "ios";
 
 /** The words `useUnsavedChangesGuard` asks with, for an editor's X. */
 export const DISCARD_CONFIRM = {
-  title: "Discard unsaved changes?",
+  title: "Discard your changes?",
   label: "Discard",
   keepLabel: "Keep editing",
 };

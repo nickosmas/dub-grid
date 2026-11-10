@@ -51,6 +51,7 @@ export function InvitePermissionsRow({
         onSave={(next) => {
           onChange(next);
           setOpen(false);
+          return true;
         }}
         personName={personName}
         stored={value}

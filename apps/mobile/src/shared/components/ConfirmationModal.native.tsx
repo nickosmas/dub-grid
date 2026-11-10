@@ -112,6 +112,9 @@ function ConfirmationSheet({
             />
           }
         >
+          {!secondaryAction || secondaryAction.keepsCancel ? (
+            <Button disabled={isBusy} label={cancelLabel} onPress={onCancel} tone="plain" />
+          ) : null}
           {secondaryAction ? (
             <Button
               disabled={isBusy}
@@ -119,9 +122,7 @@ function ConfirmationSheet({
               onPress={secondaryAction.onPress}
               tone="neutral"
             />
-          ) : (
-            <Button disabled={isBusy} label={cancelLabel} onPress={onCancel} tone="plain" />
-          )}
+          ) : null}
         </SheetActions>
       }
       header={<SheetHeader title={title} />}

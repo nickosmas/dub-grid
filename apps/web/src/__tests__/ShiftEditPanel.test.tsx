@@ -1094,7 +1094,7 @@ describe("ShiftEditPanel", () => {
       const { rerender } = render(panelElement(base, onSelect, vi.fn()));
       rerender(panelElement({ ...base, currentSegments: [segment(true)] }, onSelect, vi.fn()));
 
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      await user.click(screen.getByRole("button", { name: "Discard" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -2243,7 +2243,7 @@ describe("ShiftEditPanel", () => {
       expect(screen.queryByText("Before")).not.toBeInTheDocument();
     });
 
-    it("shows no Before and After for an added absence, and Cancel undoes it", async () => {
+    it("shows no Before and After for an added absence, and Discard undoes it", async () => {
       const user = userEvent.setup();
       const onSelect = vi.fn();
       const onClose = vi.fn();
@@ -2260,7 +2260,7 @@ describe("ShiftEditPanel", () => {
 
       expect(screen.queryByText("Before")).not.toBeInTheDocument();
       expect(screen.queryByText("After")).not.toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      await user.click(screen.getByRole("button", { name: "Discard" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -2686,7 +2686,7 @@ describe("ShiftEditPanel", () => {
         expect(screen.getByRole("alertdialog")).not.toHaveTextContent("goes back to");
       });
 
-      it("brings back the absence and its time with Cancel", async () => {
+      it("brings back the absence and its time with Discard", async () => {
         const user = userEvent.setup();
         const onSelect = vi.fn();
         const onClose = vi.fn();
@@ -2712,7 +2712,7 @@ describe("ShiftEditPanel", () => {
           ),
         );
         rerender(panelElement(base, onSelect, onClose));
-        await user.click(screen.getByRole("button", { name: "Cancel" }));
+        await user.click(screen.getByRole("button", { name: "Discard" }));
 
         expect(onSelect).toHaveBeenLastCalledWith(
           expect.objectContaining({
@@ -3204,10 +3204,10 @@ describe("ShiftEditPanel", () => {
       render(<ConfirmDraftHarness onConfirmDraft={onConfirmDraft} />);
 
       await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
-      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
-      expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Discard" }));
+      expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
       expect(onConfirmDraft).not.toHaveBeenCalled();
 
       await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
@@ -3267,5 +3267,51 @@ describe("ShiftEditPanel", () => {
         screen.queryByText((_, element) => element?.textContent === "END*"),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("ShiftEditPanel leaving with edits", () => {
+  const base = { currentShift: null, absenceTypesOverride: absenceTypes };
+
+  function renderDirtyPanel() {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(panelElement(base, onSelect, onClose));
+    rerender(panelElement({ ...base, currentAbsenceTypeId: 7 }, onSelect, onClose));
+    return { onClose };
+  }
+
+  it("closes on Escape without asking while nothing changed", async () => {
+    const onClose = vi.fn();
+    render(panelElement(base, vi.fn(), onClose));
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("Discard your changes?")).not.toBeInTheDocument();
+  });
+
+  it("asks before Escape, the X or the backdrop throws the edits away", async () => {
+    const { onClose } = renderDirtyPanel();
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Close" })[0]);
+    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+
+    fireEvent.click(document.querySelector(".dg-panel-overlay")!);
+    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it("names its reset button Discard while there are edits", () => {
+    renderDirtyPanel();
+
+    expect(screen.getByRole("button", { name: "Discard" })).toBeInTheDocument();
   });
 });

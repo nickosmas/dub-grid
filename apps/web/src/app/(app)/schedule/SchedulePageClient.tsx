@@ -5271,15 +5271,15 @@ function SchedulerContent({
   );
 
   const handleConfirmEditPanel = useCallback(
-    async (seriesScope?: SeriesScope) => {
+    async (seriesScope?: SeriesScope): Promise<boolean> => {
       const orgId = org?.id;
       const session = editSessionDraftRef.current;
       const panel = editPanel;
-      if (!orgId || !session || !panel) return;
+      if (!orgId || !session || !panel) return false;
 
       if (session.isStale) {
         toast.error("This cell changed while you were editing. Close and reopen it.");
-        return;
+        return false;
       }
 
       const shiftIsDeleted = (shift: ShiftMap[string] | null) =>
@@ -5292,7 +5292,7 @@ function SchedulerContent({
         const previousShifts = shiftsRef.current;
         const previousNotes = notesRef.current;
         await (pendingShiftWrites.current.get(session.cellKey) ?? Promise.resolve());
-        if (!guardActiveSession()) return;
+        if (!guardActiveSession()) return false;
 
         const currentShift = cloneShiftEntry(shiftsRef.current[session.cellKey]);
         const currentNotes = collectCellNotesSnapshot(panel.empId, panel.date);
@@ -5301,12 +5301,12 @@ function SchedulerContent({
           setEditSessionDraft((prev) => (prev ? { ...prev, isStale: true } : prev));
           toast.error("This shift changed in another tab or by another editor.");
           await refetchScheduleDataRef.current();
-          return;
+          return false;
         }
 
         if (!session.isDirty) {
           closeEditPanel();
-          return;
+          return true;
         }
 
         let workingShift = currentShift;
@@ -5556,6 +5556,7 @@ function SchedulerContent({
 
         closeEditPanel();
         toast.success("Shift changes saved to draft");
+        return true;
       } catch (err) {
         if (err instanceof OptimisticLockError) {
           setEditSessionDraft((prev) => (prev ? { ...prev, isStale: true } : prev));
@@ -5571,6 +5572,7 @@ function SchedulerContent({
           void refetchScheduleDataRef.current();
           Sentry.captureException(err);
         }
+        return false;
       } finally {
         isApplyingEditSessionRef.current = false;
       }

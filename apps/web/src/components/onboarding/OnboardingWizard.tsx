@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirmLeave } from "@/components/NavigationGuardProvider";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useOnboardingState, type StepConfig } from "./useOnboardingState";
@@ -84,6 +85,9 @@ export default function OnboardingWizard({
   }, [effectiveRole, effectiveIsOrgSetup]);
   const { currentStepIndex, currentStep, goNext, goBack, completeOnboarding, isFirstStep } =
     useOnboardingState(userId, orgId, steps, variant);
+  // Back drops the step's unsaved edits; Continue saves them, so it isn't guarded here.
+  const confirmLeave = useConfirmLeave();
+  const back = () => confirmLeave(goBack);
 
   const [skipLoading, setSkipLoading] = useState(false);
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
@@ -110,17 +114,17 @@ export default function OnboardingWizard({
           <WelcomeStep role={effectiveRole} onNext={goNext} isOrgSetup={effectiveIsOrgSetup} />
         );
       case "identity":
-        return <IdentityStep onNext={goNext} onBack={goBack} />;
+        return <IdentityStep onNext={goNext} onBack={back} />;
       case "structure":
-        return <StructureStep onNext={goNext} onBack={goBack} />;
+        return <StructureStep onNext={goNext} onBack={back} />;
       case "schedule":
-        return <ScheduleStep onNext={goNext} onBack={goBack} />;
+        return <ScheduleStep onNext={goNext} onBack={back} />;
       case "invite-team":
-        return <InviteTeamStep onNext={goNext} onBack={goBack} />;
+        return <InviteTeamStep onNext={goNext} onBack={back} />;
       case "orientation":
-        return <AdminOrientationStep onNext={goNext} onBack={goBack} />;
+        return <AdminOrientationStep onNext={goNext} onBack={back} />;
       case "sa-orientation":
-        return <SuperAdminOrientationStep onNext={goNext} onBack={goBack} />;
+        return <SuperAdminOrientationStep onNext={goNext} onBack={back} />;
       case "completion":
         return (
           <CompletionStep
@@ -145,7 +149,7 @@ export default function OnboardingWizard({
         steps={steps}
         currentStepIndex={currentStepIndex}
         stepsComplete={currentStep.id === "completion"}
-        onSkip={canSkip ? () => setShowSkipConfirm(true) : undefined}
+        onSkip={canSkip ? () => confirmLeave(() => setShowSkipConfirm(true)) : undefined}
         skipLoading={skipLoading}
         centerContent={isFirstStep || currentStep.id === "completion"}
       >

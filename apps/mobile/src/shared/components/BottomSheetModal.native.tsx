@@ -73,6 +73,11 @@ type SheetClose = {
   primary?: ButtonProps;
   /** A second action that isn't a cancel, such as Clear all. */
   secondary?: ButtonProps;
+  /**
+   * Swipe, scrim and back are off for unsaved changes, so Android, whose
+   * sheets otherwise have no close button, needs one to leave by.
+   */
+  needsCloseButton: boolean;
 };
 
 /** Set inside a native sheet, so its header draws the platform's own bar. */
@@ -113,6 +118,7 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
     visible,
     onDismiss,
     dismissDisabled = false,
+    hasUnsavedChanges = false,
     scrollable = false,
     expandable = false,
     header,
@@ -147,7 +153,11 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
       // groups and cards are white on it, with no outline.
       backgroundStyle={{ backgroundColor: mobileColors.background }}
       enableDynamicSizing={!resizable}
-      enablePanDownToClose={!dismissDisabled}
+      // The native sheet closes itself on a swipe, scrim tap or Android back and
+      // only then reports it, so a guard's Keep editing would leave `visible`
+      // true with no sheet on screen. With unsaved changes those exits are off
+      // and the close button and Cancel ask instead, as `FullPageSheet` does.
+      enablePanDownToClose={!dismissDisabled && !hasUnsavedChanges}
       index={visible ? 0 : -1}
       onClose={() => {
         if (visibleRef.current) onDismiss();
@@ -162,6 +172,7 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
             label: props.accessibilityLabel ?? "Close",
             primary: lifted.primary,
             secondary: lifted.secondary,
+            needsCloseButton: hasUnsavedChanges,
           }}
         >
           {/* A sheet sized to its content lays React Native out without a set
@@ -221,7 +232,8 @@ const SUBTITLE_IN_BAR_MAX = 32;
  * trailing edge (Human Interface Guidelines, Sheets). Material 3 sets the
  * title left-aligned under the drag handle with the action as a text button
  * at the end, and no close button, since a swipe, the scrim and Back close the
- * sheet. Outside a native sheet (the app lock) it is the drawn header.
+ * sheet, except while unsaved changes turn those off. Outside a native sheet
+ * (the app lock) it is the drawn header.
  */
 export function SheetHeader(props: SheetHeaderProps) {
   const close = useContext(SheetCloseContext);
@@ -229,6 +241,7 @@ export function SheetHeader(props: SheetHeaderProps) {
   if (IS_IOS) return <IosSheetBar subtitle={props.subtitle} title={props.title} />;
   return (
     <View style={styles.materialHeader}>
+      {close.needsCloseButton ? <MaterialCloseButton close={close} /> : null}
       <View style={styles.materialTitles}>
         {props.title ? (
           <AppText allowFontScaling={false} numberOfLines={2} variant="screenTitle">
@@ -246,6 +259,23 @@ export function SheetHeader(props: SheetHeaderProps) {
         <BarAction action={close.primary} kind="primary" title={props.title} />
       ) : null}
     </View>
+  );
+}
+
+function MaterialCloseButton({ close }: { close: SheetClose }) {
+  const mobileColors = useMobileColors();
+  return (
+    <ChromeIconButton
+      accessibilityLabel={close.label}
+      disabled={close.disabled}
+      onPress={close.onClose}
+    >
+      <Ionicons
+        color={close.disabled ? mobileColors.textSubtle : mobileColors.textPrimary}
+        name="close"
+        size={22}
+      />
+    </ChromeIconButton>
   );
 }
 

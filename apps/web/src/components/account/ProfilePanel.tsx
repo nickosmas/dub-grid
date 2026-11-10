@@ -210,6 +210,23 @@ export function ProfilePanel({
   const [requestFirstName, setRequestFirstName] = useState("");
   const [requestLastName, setRequestLastName] = useState("");
   const [requestNote, setRequestNote] = useState("");
+  // Sending is a request to a manager, not a save, so leaving only asks
+  // whether to throw the typed name away.
+  const { requestClose: requestNameChangeClose, unsavedChangesDialog: nameChangeLeaveDialog } =
+    useUnsavedChangesPrompt({
+      hasUnsavedChanges: [requestFirstName, requestLastName, requestNote].some(
+        (value) => value.trim().length > 0,
+      ),
+      onDiscard: () => {
+        setRequestFirstName("");
+        setRequestLastName("");
+        setRequestNote("");
+        setRequestingNameChange(false);
+      },
+    });
+  const closeNameChange = () => {
+    if (requestNameChangeClose()) setRequestingNameChange(false);
+  };
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [requestingNameChange, setRequestingNameChange] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -622,18 +639,21 @@ export function ProfilePanel({
     }
   }
 
-  async function saveWork() {
-    if (savingWork || workSaveBlocked || !workHasChanges) return;
+  async function saveWork(): Promise<boolean> {
+    if (savingWork || workSaveBlocked || !workHasChanges) return false;
     setSavingWork(true);
     try {
-      if (await workEditorRef.current?.save()) toast.success("Work details saved.");
+      const saved = Boolean(await workEditorRef.current?.save());
+      if (saved) toast.success("Work details saved.");
+      return saved;
     } catch (err) {
       if (err instanceof EmployeeProfileConflictError) {
         setEmployee(err.latestEmployee);
         toast.error(changedElsewhereMessage("your work details"));
-        return;
+        return false;
       }
       toast.error(extractErrorMessage(err, "We couldn't save your work details. Try again."));
+      return false;
     } finally {
       setSavingWork(false);
     }
@@ -839,6 +859,7 @@ export function ProfilePanel({
             saving={savingWork}
             onDiscard={() => workEditorRef.current?.requestDismiss()}
             onSave={() => void saveWork()}
+            leaveSave={saveWork}
           />
         </UnsavedChangesScope>
       ) : null}
@@ -914,6 +935,7 @@ export function ProfilePanel({
           directoryPerson={selfDirectoryPerson}
           onDirtyChange={setManagementAccessDirty}
           onClose={closeManagementAccessEditor}
+          requestClose={requestManagementAccessClose}
           onCompleted={async (updatedEmployee) => {
             if (updatedEmployee) setEmployee(updatedEmployee);
             await refetchProfile();
@@ -959,15 +981,12 @@ export function ProfilePanel({
         <Modal
           title="Request a name change"
           onClose={() => setRequestingNameChange(false)}
+          onRequestClose={() => !submittingRequest && requestNameChangeClose()}
           className="dg-modal--tight-header"
           style={{ maxWidth: 480, width: "100%" }}
           footer={
             <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                onClick={() => setRequestingNameChange(false)}
-                className="dg-btn dg-btn-secondary"
-              >
+              <Button type="button" onClick={closeNameChange} className="dg-btn dg-btn-secondary">
                 Cancel
               </Button>
               <Button
@@ -1030,6 +1049,7 @@ export function ProfilePanel({
           </div>
         </Modal>
       ) : null}
+      {nameChangeLeaveDialog}
 
       {confirmation && !stepUp.dialog && (
         <ConfirmDialog
