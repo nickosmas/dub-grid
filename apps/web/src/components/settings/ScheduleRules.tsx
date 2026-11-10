@@ -58,7 +58,7 @@ export default function ScheduleRules({
   const savedDayOff = organization.coverageRuleConfig?.dayOffAbsenceTypeId;
   const resolvedDayOff = resolveDayOffAbsenceType(organization.coverageRuleConfig, absenceTypes);
   const organizationDayOff: DayOffChoice = resolvedDayOff?.absenceType.id ?? "none";
-  // A detected absence has not been saved yet, so saving it is a change.
+  // Auto-build uses a detected absence whether or not it is saved, so it is not a change.
   const dayOffDetected = resolvedDayOff?.detected === true && savedDayOff === undefined;
   const [dayOffChoice, setDayOffChoice] = useState<DayOffChoice>(organizationDayOff);
   const [enforceConflictPrevention, setEnforceConflictPrevention] = useState(
@@ -110,8 +110,6 @@ export default function ScheduleRules({
     dayOffChoice !== organizationDayOff ||
     coverageGapVisibility !== organizationCoverageGapVisibility ||
     calloffVisibility !== organizationCalloffVisibility;
-  // A day off absence detected by name is still unsaved, with nothing to discard.
-  const isModified = hasEdits || dayOffDetected;
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
@@ -191,9 +189,9 @@ export default function ScheduleRules({
     <SectionCard
       saveBar={
         <UnsavedChangesBar
-          dirty={isModified}
+          dirty={hasEdits}
           saving={saving}
-          onDiscard={hasEdits ? resetForm : undefined}
+          onDiscard={resetForm}
           onSave={() => setConfirmOpen(true)}
         />
       }
@@ -278,7 +276,7 @@ export default function ScheduleRules({
             <div style={ruleDescriptionStyle}>
               The absence that means a regular day off. Auto-build writes it into the empty days of
               everyone it schedules.
-              {dayOffDetected && " Picked from its name; save to confirm it."}
+              {dayOffDetected && " Picked from its name."}
             </div>
           </div>
           <CustomSelect

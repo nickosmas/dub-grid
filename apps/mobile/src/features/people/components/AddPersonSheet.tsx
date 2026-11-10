@@ -370,7 +370,7 @@ export function AddPersonSheet({
         />
       ) : (
         <>
-          <ProfileSection title="Basic info">
+          <ProfileSection title="Name">
             <ProfilePanel>
               <ProfileTextInput
                 accessibilityLabel="First name"
