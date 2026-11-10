@@ -16,7 +16,10 @@ import { canOffboardAtTier, isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
-import InlineEditEmployee, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
+import InlineEditEmployee, {
+  type EditEmployeePanelHandle,
+  type EditEmployeePanelProps,
+} from "@/components/EditEmployeePanel";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
@@ -54,13 +57,8 @@ interface StaffDetailPanelProps {
   /** Whether they can sign in, and if not where their invitation stands, for the invite card. */
   accountState?: PersonAccountState | null;
   onSave: (emp: Employee) => boolean | Promise<boolean>;
-  /** Called instead of `onSave` when the admin confirms changing the email
-   *  while a pending invitation exists — see EditEmployeePanel. */
-  onSaveWithReinvite?: (
-    updatedEmployee: Employee,
-    oldInvitation: Invitation,
-    runStepUp: StepUpRun,
-  ) => boolean | Promise<boolean>;
+  /** The editor's invite option beside the email; Save reads Save & invite while it's ticked. */
+  inviteOnSave?: EditEmployeePanelProps["inviteOnSave"];
   onRemove: (empId: string, note?: string, lastDay?: string) => void | Promise<boolean>;
   onDeactivate: (
     empId: string,
@@ -120,7 +118,7 @@ export function StaffDetailPanel({
   pendingInviteByEmployeeId,
   accountState = null,
   onSave,
-  onSaveWithReinvite,
+  inviteOnSave,
   onRemove,
   onDeactivate,
   onSetReturnDate,
@@ -152,6 +150,7 @@ export function StaffDetailPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveLabel, setSaveLabel] = useState<string>();
   const [isEditorSaveBlocked, setIsEditorSaveBlocked] = useState(false);
   const { closing, close: closePanel } = useSlideoverClose(onClose, { escape: false });
   const pendingInvitation = canManageEmployees
@@ -437,7 +436,8 @@ export function StaffDetailPanel({
             onDirtyChange={setHasUnsavedChanges}
             onSaveBlockedChange={setIsEditorSaveBlocked}
             pendingInvitation={pendingInvitation}
-            onSaveWithReinvite={onSaveWithReinvite}
+            inviteOnSave={inviteOnSave}
+            onSaveLabelChange={setSaveLabel}
           />
         </div>
 
@@ -510,7 +510,7 @@ export function StaffDetailPanel({
                     disabled={!hasUnsavedChanges || isEditorSaveBlocked}
                     className="dg-btn dg-btn-primary"
                   >
-                    {EDITOR_ACTION_LABELS.save}
+                    {saveLabel ?? EDITOR_ACTION_LABELS.save}
                   </Button>
                 ) : undefined
               }
