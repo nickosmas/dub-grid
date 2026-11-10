@@ -1,4 +1,5 @@
 import type { MobilePerson } from "@dubgrid/contracts";
+import { sameIds } from "../../../shared/lib/same-ids";
 
 /**
  * The tiers a management grant can carry. Super Admin is only ever offered on
@@ -41,3 +42,33 @@ export type ManagementAccessSubject = Pick<
   | "managementDepartmentIds"
   | "pendingInvitation"
 >;
+
+/** What the management-access sheet edits: a role (for a new invitation) and departments. */
+export type ManagementAccessDraft = {
+  orgRole: ManagementAccessRole;
+  managementDepartmentIds: number[];
+};
+
+/**
+ * The values the sheet opens on. Read once, when it opens: compared against
+ * the live record, a refetch mid-edit would move the baseline under the draft
+ * and an untouched sheet could ask, or a changed one stop asking.
+ */
+export function managementAccessBaseline(person: ManagementAccessSubject): ManagementAccessDraft {
+  return {
+    orgRole: (person.orgRole ??
+      person.pendingInvitation?.roleToAssign ??
+      "user") as ManagementAccessRole,
+    managementDepartmentIds: [...person.managementDepartmentIds],
+  };
+}
+
+export function managementAccessDraftChanged(
+  draft: ManagementAccessDraft,
+  baseline: ManagementAccessDraft,
+): boolean {
+  return (
+    draft.orgRole !== baseline.orgRole ||
+    !sameIds(draft.managementDepartmentIds, baseline.managementDepartmentIds)
+  );
+}

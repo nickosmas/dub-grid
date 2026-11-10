@@ -849,7 +849,7 @@ describe("updateMobilePersonStatus offboarding and restoring (51k)", () => {
     expect(restore.deps.reopenRestoredAccess).not.toHaveBeenCalled();
   });
 
-  it("refuses an Admin suspending, planning a suspension for or reinstating a Super Admin (F-239)", async () => {
+  it("refuses an Admin suspending, planning a suspension for or reinstating a Super Admin (F-240)", async () => {
     const asAdmin = { isSuperAdmin: false, targetRole: "super_admin" };
     const suspend = run(employee({ userId: "user-9" }), { action: "suspend" }, asAdmin);
     expect(await suspend.result).toEqual({

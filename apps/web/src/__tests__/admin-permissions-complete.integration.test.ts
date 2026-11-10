@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 /**
- * Migration 131 (F-238, F-244): every Admin stores the permission set the app
+ * Migration 131 (F-239, F-245): every Admin stores the permission set the app
  * resolves, so the database grants what the app shows, and anyone else stores
  * none, so a later promotion starts from the defaults. Runs 131 inside
  * BEGIN/ROLLBACK on the local database.
@@ -172,7 +172,7 @@ describe.skipIf(!reachable)("131 complete Admin permission sets (live DB)", () =
     expect(rows[0].completed).toEqual(resolved({ canPublishSchedule: false }));
   });
 
-  it("lets a User promoted by change_user_role edit and publish (F-238)", async () => {
+  it("lets a User promoted by change_user_role edit and publish (F-239)", async () => {
     expect(await storedPermissions()).toBeNull();
     await changeRole("admin");
 
@@ -183,7 +183,7 @@ describe.skipIf(!reachable)("131 complete Admin permission sets (live DB)", () =
     expect(await memberMay("canManageEmployees")).toBe(false);
   });
 
-  it("clears the set on demotion, so a re-promotion starts from the defaults (F-244)", async () => {
+  it("clears the set on demotion, so a re-promotion starts from the defaults (F-245)", async () => {
     await changeRole("admin");
     await db.query(
       `UPDATE organization_memberships SET admin_permissions = $3 WHERE user_id = $1 AND org_id = $2`,

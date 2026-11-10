@@ -227,7 +227,7 @@ describe("POST /api/organizations/invitations/create", () => {
     );
   });
 
-  it("lets an Admin who manages staff invite a User (F-237)", async () => {
+  it("lets an Admin who manages staff invite a User (F-238)", async () => {
     const rpc = invitationRpc();
     getServiceClient.mockReturnValue({ rpc });
 
@@ -241,7 +241,7 @@ describe("POST /api/organizations/invitations/create", () => {
     );
   });
 
-  it("refuses an Admin inviting an Admin, records it, and sends nothing (F-237)", async () => {
+  it("refuses an Admin inviting an Admin, records it, and sends nothing (F-238)", async () => {
     const rpc = vi.fn();
     const auditInsert = vi.fn(async () => ({ error: null }));
     getServiceClient.mockReturnValue({ rpc, from: () => ({ insert: auditInsert }) });

@@ -505,7 +505,7 @@ describe("mobile person invitation route", () => {
     );
   });
 
-  it("refuses an Admin inviting an Admin and sends nothing (F-237)", async () => {
+  it("refuses an Admin inviting an Admin and sends nothing (F-238)", async () => {
     const serviceClient = makeServiceClient({ existingMemberUserId: null });
     requireMobileAuth.mockResolvedValue({
       currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },

@@ -46,7 +46,7 @@ export async function isGridmasterActor(
 }
 
 /**
- * Whether this person may give `role` through an invitation (F-237): only a
+ * Whether this person may give `role` through an invitation (F-238): only a
  * Super Admin or Gridmaster gives an elevated tier. Creation, editing,
  * redirecting and replacement of an invitation all apply it, since raising or
  * moving a pending invitation is the same grant as creating it.

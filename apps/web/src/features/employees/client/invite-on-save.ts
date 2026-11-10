@@ -40,7 +40,7 @@ export type InviteRoleOption = { value: AssignableOrganizationRole; label: strin
 
 /**
  * The access roles this person's invite can give, least privileged first.
- * Only a Super Admin or Gridmaster gives an elevated tier (F-237), so anyone
+ * Only a Super Admin or Gridmaster gives an elevated tier (F-238), so anyone
  * else gets User alone, and `InviteRoleField` says why instead of a dropdown.
  */
 export function inviteRoleOptions(isSuperAdminOrGridmaster: boolean): InviteRoleOption[] {

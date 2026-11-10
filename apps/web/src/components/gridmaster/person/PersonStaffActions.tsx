@@ -111,12 +111,12 @@ export function PersonStaffActions({
     }
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
     const firstName = draft.firstName.trim();
     const lastName = draft.lastName.trim();
     if (!firstName || !lastName) {
       toast.error("Enter a first and last name.");
-      return;
+      return false;
     }
     setBusy(true);
     try {
@@ -136,12 +136,14 @@ export function PersonStaffActions({
       toast.success("Staff record saved");
       setEditing(false);
       onChanged();
+      return true;
     } catch (error) {
       if (error instanceof EmployeeContactConflictError) {
         toast.error(formatClientErrorMessage(error, "Those contact details are already in use."));
-        return;
+        return false;
       }
       handleFailure(error, "We couldn't save that staff record. Try again.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -245,6 +247,7 @@ export function PersonStaffActions({
             setStatusChange(null);
             setStatusNote("");
           }}
+          hasUnsavedChanges={statusNote.trim().length > 0}
         />
       )}
 
@@ -303,6 +306,14 @@ export function PersonStaffActions({
           isLoading={busy}
           onConfirm={handleSave}
           onCancel={() => setEditing(false)}
+          hasUnsavedChanges={
+            draft.firstName !== employee.firstName ||
+            draft.lastName !== employee.lastName ||
+            (draft.phone ?? "") !== (employee.phone ?? "") ||
+            (draft.email ?? "") !== (employee.email ?? "") ||
+            (draft.contactNotes ?? "") !== (employee.contactNotes ?? "")
+          }
+          unsavedSave={handleSave}
         />
       )}
       {stepUp.dialog}

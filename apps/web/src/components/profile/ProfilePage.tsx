@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useConfirmLeave } from "@/components/NavigationGuardProvider";
 import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 
 import ProgressBar from "@/components/ProgressBar";
@@ -77,6 +78,7 @@ function SettingsSection({
  */
 export function ProfilePage() {
   const router = useRouter();
+  const confirmLeave = useConfirmLeave();
   const searchParams = useSearchParams();
   const scrollerRef = useClipTrailingWhitespace();
   const {
@@ -124,11 +126,14 @@ export function ProfilePage() {
     { tab: searchParams.get("tab"), section: searchParams.get("section") },
     tabs,
   );
+  // Each tab unmounts the one before it, edits included, so a switch asks first.
   const openTab = useCallback(
     (tab: ProfileTab) => {
-      router.replace(tab === tabs[0] ? "/profile" : `/profile?tab=${tab}`, { scroll: false });
+      confirmLeave(() =>
+        router.replace(tab === tabs[0] ? "/profile" : `/profile?tab=${tab}`, { scroll: false }),
+      );
     },
-    [router, tabs],
+    [confirmLeave, router, tabs],
   );
 
   const canEditProfileDirectly =

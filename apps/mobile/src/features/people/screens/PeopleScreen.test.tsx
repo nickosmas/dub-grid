@@ -617,7 +617,7 @@ describe("PeopleScreen", () => {
     // The chooser leaves first, then the form is presented: iOS refuses a
     // present that overlaps a dismiss.
     expect(await screen.findByText("Invite to an administrative team")).toBeInTheDocument();
-    // Access roles are the described list; an admin gives neither Admin nor Super Admin (F-237).
+    // Access roles are the described list; an admin gives neither Admin nor Super Admin (F-238).
     expect(screen.getByText("Sees their own schedule and submits requests.")).toBeInTheDocument();
     expect(
       screen.getByText("Only a Super Admin can invite someone as an Admin."),

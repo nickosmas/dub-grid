@@ -315,6 +315,8 @@ export function AddPersonSheet({
 
   return (
     <BottomSheetModal
+      dismissDisabled={createMutation.isPending}
+      hasUnsavedChanges={hasUnsavedChanges}
       // Inside the sheet: iOS refuses a second Modal while one is up.
       overlay={<ConfirmationModal presentation="inline" {...guard.confirmationProps} />}
       footer={

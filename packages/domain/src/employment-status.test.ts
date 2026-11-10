@@ -406,7 +406,7 @@ describe("statusChoices", () => {
     ]);
   });
 
-  it("lists Offboard, Suspend and the ways back disabled when the manager can't reach them (51k, F-239)", () => {
+  it("lists Offboard, Suspend and the ways back disabled when the manager can't reach them (51k, F-240)", () => {
     const active = { status: "active" as const, ...onSchedule };
     const offboarded = { status: "removed" as const, ...onSchedule };
     const suspended = { ...active, suspendedAt: "2026-10-26T12:00:00Z" };

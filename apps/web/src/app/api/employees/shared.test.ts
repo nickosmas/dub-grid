@@ -266,7 +266,7 @@ describe("isGridmasterActor (F-69)", () => {
   });
 });
 
-describe("canAssignOrgRole (F-237)", () => {
+describe("canAssignOrgRole (F-238)", () => {
   const admin = makeServiceClient({
     membership: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
     profile: { platform_role: null },

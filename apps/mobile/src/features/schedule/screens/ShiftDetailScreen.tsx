@@ -1639,6 +1639,7 @@ export default function ShiftDetailScreen() {
         // the same rule the old close button enforced on its own.
         dismissDisabled={createRequestMutation.isPending}
         footer={requestSheetFooter}
+        hasUnsavedChanges={requestGuard.isDirty}
         header={<SheetHeader title={getRequestModeTitle(requestMode)} />}
         overlay={requestSheetOverlay}
         scrollable

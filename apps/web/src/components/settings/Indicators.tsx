@@ -20,6 +20,7 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { getLineTextError, normalizeLineText } from "@/lib/form-validation";
 import { labelStyle } from "./shared";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -110,25 +111,8 @@ function IndicatorRow({
     setExpanded(false);
   }, [indicator.id, indicator.isNew, onDeleted]);
 
-  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
-    hasUnsavedChanges: expanded && isDirty,
-    onDiscard: () => discardDraft(true),
-  });
-
-  const toggleExpanded = useCallback(() => {
-    if (!expanded) {
-      setExpanded(true);
-      return;
-    }
-    if (isDirty) {
-      requestClose();
-      return;
-    }
-    closeEditor();
-  }, [closeEditor, expanded, isDirty, requestClose]);
-
-  const handleSave = useCallback(async () => {
-    if (!canSave) return;
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (!canSave) return false;
     setSaving(true);
     try {
       const saved = await upsertIndicatorType({
@@ -148,13 +132,39 @@ function IndicatorRow({
       setExpanded(false);
       onSaved(saved, indicator.id);
       toast.success("Schedule note saved");
+      return true;
     } catch (error) {
       Sentry.captureException(error);
       toast.error(formatClientErrorMessage(error, "We couldn't save that schedule note."));
+      return false;
     } finally {
       setSaving(false);
     }
   }, [canSave, color, indicator.id, indicator.isNew, indicator.sortOrder, name, onSaved, orgId]);
+
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: expanded && isDirty,
+    onDiscard: () => discardDraft(true),
+    onSave: canSave ? handleSave : undefined,
+  });
+  // The prompt covers collapsing the row; this covers a link, a section switch
+  // and a refresh, which would otherwise drop the row's edits silently.
+  useNavigationGuard(`indicators-row-${indicator.id}`, {
+    isDirty: () => expanded && isDirty && !saving,
+    save: canSave ? handleSave : undefined,
+  });
+
+  const toggleExpanded = useCallback(() => {
+    if (!expanded) {
+      setExpanded(true);
+      return;
+    }
+    if (isDirty) {
+      requestClose();
+      return;
+    }
+    closeEditor();
+  }, [closeEditor, expanded, isDirty, requestClose]);
 
   const handleDeleteClick = useCallback(async () => {
     if (indicator.isNew) {
@@ -265,7 +275,10 @@ function IndicatorRow({
           transition: "grid-template-rows 220ms ease",
         }}
       >
-        <div style={{ overflow: "hidden" }}>
+        {/* The floating footer turns this `overflow` into `clip`, which no longer
+            zeroes a grid item's minimum height, so the closed row would keep the
+            editor's full height. */}
+        <div style={{ overflow: "hidden", minHeight: 0 }}>
           <div
             style={{
               background: "var(--dg-color-surface-editor)",

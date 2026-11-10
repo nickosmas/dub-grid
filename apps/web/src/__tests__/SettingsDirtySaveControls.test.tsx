@@ -597,13 +597,13 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByText("Daily Readings"));
 
     expect(
-      await screen.findByRole("alertdialog", { name: /discard your changes/i }),
+      await screen.findByRole("alertdialog", { name: /(save|discard) your changes/i }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
     expect(
-      screen.queryByRole("alertdialog", { name: /discard your changes/i }),
+      screen.queryByRole("alertdialog", { name: /(save|discard) your changes/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Daily Readings")).toBeInTheDocument();
   });
@@ -1755,13 +1755,13 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /^edit$/i }));
 
     expect(
-      await screen.findByRole("alertdialog", { name: /discard your changes/i }),
+      await screen.findByRole("alertdialog", { name: /(save|discard) your changes/i }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
     expect(
-      screen.queryByRole("alertdialog", { name: /discard your changes/i }),
+      screen.queryByRole("alertdialog", { name: /(save|discard) your changes/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Days Updated")).toBeInTheDocument();
   });
@@ -2111,13 +2111,13 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByText("Mentor Updated"));
 
     expect(
-      await screen.findByRole("alertdialog", { name: /discard your changes/i }),
+      await screen.findByRole("alertdialog", { name: /(save|discard) your changes/i }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
     expect(
-      screen.queryByRole("alertdialog", { name: /discard your changes/i }),
+      screen.queryByRole("alertdialog", { name: /(save|discard) your changes/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Mentor Updated")).toBeInTheDocument();
   });

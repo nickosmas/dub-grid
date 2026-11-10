@@ -293,7 +293,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   }
 
   const orgRole = parsed.data.orgRole;
-  // The same ceiling as web's invite routes (F-237): an Admin invites Users.
+  // The same ceiling as web's invite routes (F-238): an Admin invites Users.
   if (!canGrantOrgRole(loaded.auth.permissions, orgRole)) {
     return NextResponse.json({ error: getOrgRoleGrantRefusal(orgRole) }, { status: 403 });
   }

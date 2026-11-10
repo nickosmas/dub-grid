@@ -12,8 +12,8 @@ export const EDITOR_ACTION_LABELS = {
   /**
    * Throw away unsaved edits. On a dismiss button this resets the fields in
    * place and deliberately leaves the editor open, so the reset values can be
-   * carried on with; it is also the destructive button in the unsaved-changes
-   * dialog, where confirming does leave.
+   * carried on with. In the unsaved-changes dialog it is the choice that leaves
+   * without saving; throwing away unsaved edits isn't destructive, so it isn't red.
    */
   discard: "Discard",
   /** Abandon a draft that was never saved. Dismisses, and drops the new row. */

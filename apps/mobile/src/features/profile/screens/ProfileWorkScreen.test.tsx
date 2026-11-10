@@ -640,7 +640,7 @@ describe("ProfileWorkScreen", () => {
       expect(pressBack()).toBe(true);
     });
     expect(navigatedActions).toHaveLength(0);
-    expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+    expect(screen.getByText("Save your changes?")).toBeInTheDocument();
 
     fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Discard" }));
 
@@ -666,7 +666,45 @@ describe("ProfileWorkScreen", () => {
     );
 
     expect(navigatedActions).toHaveLength(0);
-    expect(screen.queryByText("Discard unsaved changes?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Save your changes?")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
+  });
+
+  it("saves from the back press's question, then leaves", async () => {
+    render(<ProfileWorkScreen />);
+    fireEvent.click(screen.getByRole("radio", { name: "RN" }));
+
+    act(() => {
+      pressBack();
+    });
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updateMobilePerson).toHaveBeenCalledWith(
+        "token-123",
+        "d660d308-4e0d-4daf-84fd-6753405e6740",
+        expect.objectContaining({ certificationId: 5 }),
+      );
+    });
+    await waitFor(() => {
+      expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+    });
+  });
+
+  it("stays when the save from the question fails", async () => {
+    updateMobilePerson.mockRejectedValue(new Error("offline"));
+    render(<ProfileWorkScreen />);
+    fireEvent.click(screen.getByRole("radio", { name: "RN" }));
+
+    act(() => {
+      pressBack();
+    });
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Save your changes?")).not.toBeInTheDocument();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(navigatedActions).toHaveLength(0);
   });
 });

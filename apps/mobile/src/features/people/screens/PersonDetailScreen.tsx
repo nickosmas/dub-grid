@@ -139,6 +139,11 @@ import {
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
 import { PersonInviteSheet } from "../components/PersonInviteSheet";
 import { PermissionsSheet } from "../components/PermissionsSheet";
+import {
+  makePersonDraft as makeDraft,
+  personDraftHasChanges,
+  type PersonEditDraft as EditDraft,
+} from "../lib/personDraft";
 import { buildInitialPermissions, countPermissionLevels } from "@dubgrid/authz";
 import type { AdminPermissions } from "@dubgrid/domain";
 import { statusForViewer } from "../lib/statusForViewer";
@@ -187,19 +192,6 @@ const LINKED_EMAIL_REQUIRED_MESSAGE = "An account needs an email to sign in with
 
 type ContactField = "email" | "phone";
 
-type EditDraft = {
-  firstName: string;
-  lastName: string;
-  employmentType: MobilePerson["employmentType"];
-  phone: string;
-  email: string;
-  contactNotes: string;
-  certificationId: number | null;
-  focusAreaIds: number[];
-  roleIds: number[];
-  departmentIds: number[];
-};
-
 function getFullName(person: MobilePerson): string {
   return `${person.firstName} ${person.lastName}`.trim() || person.email || "Unnamed person";
 }
@@ -218,51 +210,10 @@ function formatInviteDay(value: string): string {
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function makeDraft(person: MobilePerson): EditDraft {
-  return {
-    firstName: person.firstName,
-    lastName: person.lastName,
-    employmentType: person.employmentType,
-    phone: person.phone,
-    email: person.email,
-    contactNotes: person.contactNotes,
-    certificationId: person.certificationId,
-    focusAreaIds: person.focusAreaIds,
-    roleIds: person.roleIds,
-    departmentIds: person.departmentIds,
-  };
-}
-
-/**
- * Whether the draft differs from the saved person.
- *
- * Module scope, and used by both the edit panel's buttons and the screen's
- * unsaved-changes guard. While this lived inside the panel the screen couldn't
- * see it, so back navigation had no idea there was anything to lose; computing
- * it twice would be worse still, because then Cancel and the back button could
- * disagree about whether to ask.
- */
-function personDraftHasChanges(draft: EditDraft, person: MobilePerson): boolean {
-  const saved = makeDraft(person);
-
-  return (
-    draft.firstName.trim() !== saved.firstName ||
-    draft.lastName.trim() !== saved.lastName ||
-    draft.employmentType !== saved.employmentType ||
-    draft.phone.trim() !== saved.phone ||
-    draft.email.trim() !== saved.email ||
-    draft.contactNotes !== saved.contactNotes ||
-    draft.certificationId !== saved.certificationId ||
-    !sameIds(draft.focusAreaIds, saved.focusAreaIds) ||
-    !sameIds(draft.roleIds, saved.roleIds) ||
-    !sameIds(draft.departmentIds, saved.departmentIds)
-  );
-}
-
 /**
  * Field-level validation for the edit form.
  *
- * Module scope, same reasoning as `personDraftHasChanges` above: the footer
+ * Module scope, same reasoning as `personDraftHasChanges`: the footer
  * Save button's `disabled` state and the panel's inline per-field errors both
  * need this, and computing it twice by hand risks the two disagreeing about
  * whether the draft is actually valid.
@@ -745,6 +696,25 @@ export default function PersonDetailScreen() {
   // `editing && hasChanges`, not just `editing`: on iOS the whole screen is a
   // back-swipe target, so a guard that fired for an untouched open panel would
   // put a confirmation in front of an ordinary swipe back.
+  // Save is offered from the prompt only when Save would go straight through:
+  // a form with errors, or a staff email change, which asks a question of its
+  // own first, gets Discard and Keep editing.
+  const canSaveFromPrompt = Boolean(
+    editing &&
+    hasChanges &&
+    person &&
+    draft &&
+    !Object.values(
+      getPersonEditFieldErrors(
+        draft,
+        serverFieldErrors,
+        person.managementDepartmentIds.length > 0,
+        focusAreaLabel,
+        Boolean(person.userId),
+      ),
+    ).some(Boolean) &&
+    normalizeOptionalStaffEmail(draft.email) === person.email,
+  );
   const guard = useUnsavedChangesGuard({
     isDirty: editing && hasChanges,
     disabled: updateMutation.isPending,
@@ -752,6 +722,13 @@ export default function PersonDetailScreen() {
       if (person) setDraft(makeDraft(person));
     },
     onClose: () => setEditing(false),
+    onSave: canSaveFromPrompt
+      ? () =>
+          updateMutation.mutateAsync(buildUpdateBody()).then(
+            () => true,
+            () => false,
+          )
+      : undefined,
   });
   // Header back, Android hardware back and the iOS back swipe ask too, through
   // this same confirmation rather than a second one of their own.
@@ -2086,6 +2063,7 @@ export default function PersonDetailScreen() {
       <BottomSheetModal
         debugName="Change status"
         dismissDisabled={statusMutation.isPending}
+        hasUnsavedChanges={statusGuard.isDirty}
         header={
           <SheetHeader
             title={
@@ -2395,8 +2373,8 @@ export default function PersonDetailScreen() {
           setShowPermissions(false);
         }}
         onSave={(next) =>
-          new Promise<void>((resolve) => {
-            permissionsMutation.mutate(next, { onSettled: () => resolve() });
+          new Promise<boolean>((resolve) => {
+            permissionsMutation.mutate(next, { onSettled: (_data, error) => resolve(!error) });
           })
         }
         personName={fullName}
@@ -2605,13 +2583,6 @@ function buildLookupMaps(data: MobileBootstrapResponse | undefined) {
       ]),
     ),
   };
-}
-
-function sameIds(left: number[], right: number[]): boolean {
-  if (left.length !== right.length) return false;
-  const sortedLeft = [...left].sort((a, b) => a - b);
-  const sortedRight = [...right].sort((a, b) => a - b);
-  return sortedLeft.every((value, index) => value === sortedRight[index]);
 }
 
 /** Names in the map's order, which is the order Settings lists them. */

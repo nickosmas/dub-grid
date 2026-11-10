@@ -11,13 +11,13 @@
 **Type:** Fix
 **Status:** in progress
 **Branch:** `fix/admin-tier-boundary` (worktree `.claude/worktrees/fix-admin-tier-boundary`)
-**Fixes:** F-237, F-238, F-239, F-218, F-244, F-242
+**Fixes:** F-238, F-239, F-240, F-218, F-245, F-243
 
 ### The problem
 
 The 2026-11-10 permissions audit found three ways an Admin's power doesn't match their tier:
 
-1. **Admins create stronger Admins (F-237, and F-218).** Inviting needs only Staff: Edit
+1. **Admins create stronger Admins (F-238, and F-218).** Inviting needs only Staff: Edit
    (`canManageEmployees`), and `canAssignOrgRole` (`apps/web/src/app/api/employees/shared.ts:52`)
    blocks only `super_admin`. An Admin invited this way gets the standard Admin set (edit,
    publish, notes, recurring, reports) whatever the inviter holds, so an Admin trusted only
@@ -25,18 +25,18 @@ The 2026-11-10 permissions audit found three ways an Admin's power doesn't match
    a pending Admin invitation to a new address (F-218) is the same escalation. The mobile
    invite route (`features/mobile/server/routes/person-invitation.ts:297`) has its own copy of
    the super-admin-only check.
-2. **Admins with no stored set are refused (F-238, and F-244).** The app resolves a missing
+2. **Admins with no stored set are refused (F-239, and F-245).** The app resolves a missing
    permission key to the Admin default; the database (`check_admin_permission`, publish in
    `092`) reads it as false. Every User promoted to Admin, and every Admin invited without
    custom permissions, sees Edit and Publish but is refused, until a Super Admin saves a full
    set. Only the web access route clears the set on demotion, so demoting and re-promoting
    anywhere else restores an old, unreviewed set. A stored `canManageOrgSettings: true` is
    accepted though it can never apply.
-3. **Admins suspend Super Admins (F-239).** `canOffboardAtTier` guards offboard and restore,
+3. **Admins suspend Super Admins (F-240).** `canOffboardAtTier` guards offboard and restore,
    not suspend. An Admin with Staff: Edit can suspend an organization owner, which signs them
    out everywhere, on web (`features/employees/server/status-change.ts:268`, used by the
    single and bulk routes) and mobile (`packages/mobile-api-core/src/people-status.ts:527`).
-4. **The Staff row says the wrong thing (F-242).** "With Edit, they can also ... set their
+4. **The Staff row says the wrong thing (F-243).** "With Edit, they can also ... set their
    access role" (`packages/authz/src/permission-modules.ts:103`): only a Super Admin can.
 
 ### The fix
@@ -73,7 +73,7 @@ The 2026-11-10 permissions audit found three ways an Admin's power doesn't match
   rule, and invitations are written only by the server.
 - Away, Mark active and every other status change keep their current rules.
 
-**Production:** migration `131` is a stop before the release PR (`AGENTS.md`). Run the F-238
+**Production:** migration `131` is a stop before the release PR (`AGENTS.md`). Run the F-239
 count query first so we know how many Admins it fills.
 
 ### Build steps

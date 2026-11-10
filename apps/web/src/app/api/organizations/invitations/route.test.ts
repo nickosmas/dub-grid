@@ -677,7 +677,7 @@ describe("PATCH /api/organizations/invitations - super_admin tier ceiling", () =
   });
 });
 
-describe("PATCH /api/organizations/invitations - Admin tier ceiling (F-237, F-218)", () => {
+describe("PATCH /api/organizations/invitations - Admin tier ceiling (F-238, F-218)", () => {
   it("refuses an Admin raising a pending invitation to Admin", async () => {
     canAssignOrgRole.mockResolvedValue(false);
 

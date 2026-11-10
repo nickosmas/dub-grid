@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:9dae8fd2d618abfa4cbce05c28d4bdff5f024c4d0915ed5a6f93400172a7ccaa",
+  "sourceDigest": "sha256:8d9a2dbb09abf3fd53fb4fb3ab241bb4ef0d092608844f513646f7aa5cffbd86",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5147,7 +5147,7 @@
       "version": "131",
       "name": "admin_permissions_complete",
       "file": "131_admin_permissions_complete.sql",
-      "sha256": "24f26d0b61c83372b4cd56a07e3c31423665a92645922c785f5516ad319a649e",
+      "sha256": "1d2b16a687d7e113873034e2d323ab717a1d1a1c78fad9040b5bbc596e85dc31",
       "source": {
         "path": "supabase/migrations/131_admin_permissions_complete.sql"
       }

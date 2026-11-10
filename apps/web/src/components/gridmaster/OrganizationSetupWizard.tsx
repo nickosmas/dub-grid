@@ -1,4 +1,6 @@
 "use client";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
+import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { X } from "lucide-react";
 
 import { useCallback, useId, useMemo, useState } from "react";
@@ -129,6 +131,29 @@ export default function OrganizationSetupWizard({
       shiftCategoryIds: [],
     },
   ]);
+
+  // Before the organization exists, anything typed is lost by leaving; after,
+  // leaving mid-setup leaves it half configured.
+  const wizardDirty =
+    currentStep !== "decision" &&
+    (createdOrg !== null ||
+      [
+        name,
+        addressLine1,
+        addressLine2,
+        addressCity,
+        addressState,
+        addressPostalCode,
+        addressCountry,
+        phone,
+        timezone,
+      ].some((value) => value.trim().length > 0));
+  const { requestClose: requestWizardClose, unsavedChangesDialog: wizardLeaveDialog } =
+    useUnsavedChangesPrompt({ hasUnsavedChanges: wizardDirty, onDiscard: onCancel });
+  useNavigationGuard("create-organization", { isDirty: () => wizardDirty && !saving });
+  const cancelWizard = () => {
+    if (requestWizardClose()) onCancel();
+  };
 
   const scheduledDepartments = departments.filter((department) => department.type === "scheduled");
   const focusAreaOptions = focusAreas.filter((focusArea) => focusArea.name.trim());
@@ -660,7 +685,7 @@ export default function OrganizationSetupWizard({
         </div>
 
         <ActionBar>
-          <Button type="button" className="dg-btn dg-btn-secondary" onClick={onCancel}>
+          <Button type="button" className="dg-btn dg-btn-secondary" onClick={cancelWizard}>
             Cancel
           </Button>
           <Button
@@ -2102,7 +2127,7 @@ export default function OrganizationSetupWizard({
           {currentStep === "decision" ? "Organization Created" : "Create Organization"}
         </h2>
         {currentStep !== "decision" && (
-          <Button type="button" className="dg-btn dg-btn-ghost" onClick={onCancel}>
+          <Button type="button" className="dg-btn dg-btn-ghost" onClick={cancelWizard}>
             Cancel
           </Button>
         )}
@@ -2128,6 +2153,7 @@ export default function OrganizationSetupWizard({
           onCancel={() => setSetupConfirmAction(null)}
         />
       )}
+      {wizardLeaveDialog}
     </div>
   );
 }

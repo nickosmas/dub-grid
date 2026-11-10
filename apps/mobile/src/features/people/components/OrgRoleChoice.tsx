@@ -6,7 +6,7 @@ import { ORG_ROLE_OPTIONS, type OrgRole } from "./OrgRoleSheet";
 /**
  * The access role as the same described radio list `OrgRoleSheet` shows,
  * for the sheets that grant a role as part of an invitation. Only a Super
- * Admin gives an elevated tier, as on web (F-237): anyone else sees Admin
+ * Admin gives an elevated tier, as on web (F-238): anyone else sees Admin
  * listed but unavailable, with why, and no Super Admin.
  */
 export function OrgRoleChoice({

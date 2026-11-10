@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirmLeave } from "@/components/NavigationGuardProvider";
 import { getAvatarTypography } from "@dubgrid/design-tokens";
 import { ChevronDown, ChevronLeft, User } from "lucide-react";
 
@@ -419,6 +420,8 @@ export default function GridmasterPortal() {
     OrganizationDetailTab | undefined
   >();
   const [view, setView] = useState<GridmasterView>("dashboard");
+  // Views switch with state, not links, so the guard can't see them on its own.
+  const confirmLeave = useConfirmLeave();
   const [openAlertId, setOpenAlertId] = useState<string | null>(null);
   const [impersonateTargetId, setImpersonateTargetId] = useState<string | undefined>();
   const [impersonateOrgId, setImpersonateOrgId] = useState<string | undefined>();
@@ -681,15 +684,19 @@ export default function GridmasterPortal() {
   const selectedOrg = selectedId ? (organizations.find((c) => c.id === selectedId) ?? null) : null;
 
   function selectOrg(id: string, initialTab?: OrganizationDetailTab) {
-    setSelectedId(id);
-    setSelectedOrgInitialTab(initialTab);
-    setView("organization");
+    confirmLeave(() => {
+      setSelectedId(id);
+      setSelectedOrgInitialTab(initialTab);
+      setView("organization");
+    });
   }
 
   function handleImpersonate(userId: string, orgId?: string) {
-    setImpersonateTargetId(userId);
-    setImpersonateOrgId(orgId);
-    setView("impersonation");
+    confirmLeave(() => {
+      setImpersonateTargetId(userId);
+      setImpersonateOrgId(orgId);
+      setView("impersonation");
+    });
   }
 
   function handleOrgCreated(org: Organization) {
@@ -801,17 +808,21 @@ export default function GridmasterPortal() {
           <ThemeToggleButton appearance="header" />
           <NotificationBell
             hidden={view === "notifications"}
-            onViewAll={() => {
-              setView("notifications");
-              setSelectedId(null);
-              setSelectedOrgInitialTab(undefined);
-            }}
-            onOpenItem={(id) => {
-              setView("notifications");
-              setSelectedId(null);
-              setSelectedOrgInitialTab(undefined);
-              setOpenAlertId(id);
-            }}
+            onViewAll={() =>
+              confirmLeave(() => {
+                setView("notifications");
+                setSelectedId(null);
+                setSelectedOrgInitialTab(undefined);
+              })
+            }
+            onOpenItem={(id) =>
+              confirmLeave(() => {
+                setView("notifications");
+                setSelectedId(null);
+                setSelectedOrgInitialTab(undefined);
+                setOpenAlertId(id);
+              })
+            }
           />
         </div>
         {!isMobile && (
@@ -965,15 +976,17 @@ export default function GridmasterPortal() {
             <Button
               key={item.key}
               className={`dg-mobile-section-chip${view === item.key ? " active" : ""}`}
-              onClick={() => {
-                setView(item.key);
-                setSelectedId(null);
-                setSelectedOrgInitialTab(undefined);
-                if (item.key === "impersonation") {
-                  setImpersonateTargetId(undefined);
-                  setImpersonateOrgId(undefined);
-                }
-              }}
+              onClick={() =>
+                confirmLeave(() => {
+                  setView(item.key);
+                  setSelectedId(null);
+                  setSelectedOrgInitialTab(undefined);
+                  if (item.key === "impersonation") {
+                    setImpersonateTargetId(undefined);
+                    setImpersonateOrgId(undefined);
+                  }
+                })
+              }
             >
               {item.label}
             </Button>
@@ -1010,7 +1023,7 @@ export default function GridmasterPortal() {
                           <SidebarMenuButton
                             isActive={view === item.key}
                             tooltip={item.label}
-                            onClick={item.onClick}
+                            onClick={() => confirmLeave(item.onClick)}
                             className={SIDEBAR_MENU_BTN_CLASS}
                           >
                             <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
@@ -1043,7 +1056,7 @@ export default function GridmasterPortal() {
                           <SidebarMenuButton
                             isActive={view === item.key}
                             tooltip={item.label}
-                            onClick={item.onClick}
+                            onClick={() => confirmLeave(item.onClick)}
                             className={SIDEBAR_MENU_BTN_CLASS}
                           >
                             <span className="flex shrink-0 items-center justify-center text-[var(--dg-type-navigation-color)] transition-colors">
@@ -1094,10 +1107,12 @@ export default function GridmasterPortal() {
                 totalUsers={totalUsers}
                 totalEmployees={totalEmployees}
                 onSelectOrg={selectOrg}
-                onCreateOrg={() => {
-                  setView("create-organization");
-                  setSelectedId(null);
-                }}
+                onCreateOrg={() =>
+                  confirmLeave(() => {
+                    setView("create-organization");
+                    setSelectedId(null);
+                  })
+                }
               />
             )}
 

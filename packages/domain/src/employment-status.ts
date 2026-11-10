@@ -127,7 +127,7 @@ export const REMOVE_FROM_ORGANIZATION_MESSAGE =
 /**
  * Whether this manager may change the access of someone with `targetOrgRole`:
  * offboard or restore them (51k), suspend them, plan or end a suspension, or
- * reinstate them (F-239). Each ends or reopens their sign-in, so the Super
+ * reinstate them (F-240). Each ends or reopens their sign-in, so the Super
  * Admin tier stays with Super Admins and Gridmasters, as when it's given
  * (`canGrantOrgRole`); an Admin who can manage staff reaches the rest.
  */
@@ -1021,7 +1021,7 @@ export interface StatusChoiceOptions {
   /**
    * False when the manager may not change this person's access
    * (`canOffboardAtTier`): Offboarded, Suspended and the way back stay
-   * listed, disabled with the reason (51k, F-239).
+   * listed, disabled with the reason (51k, F-240).
    */
   canOffboard?: boolean;
 }

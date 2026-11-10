@@ -64,6 +64,9 @@ import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
+import type { UnsavedChangesSave } from "@/components/UnsavedChangesDialog";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { PersonAvatar } from "@/components/ui/person-avatar";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
@@ -187,7 +190,7 @@ interface ShiftEditPanelProps {
   /** Draft classification for this cell — used to show NEW badge on single-shift pills */
   draftKind?: DraftKind;
   /** Commits the current local draft to the server. */
-  onConfirmDraft?: (seriesScope?: SeriesScope) => void;
+  onConfirmDraft?: (seriesScope?: SeriesScope) => void | Promise<boolean>;
   /**
    * A past day being corrected (53b): the edit is saved as a correction, with
    * an optional typed reason, through `onSave` rather than as a draft.
@@ -500,7 +503,6 @@ export default function ShiftEditPanel({
     [focusAreas, jobs, shiftCategories, assignments],
   );
   const isMobile = useMediaQuery(MOBILE);
-  const { closing, close } = useSlideoverClose(onClose);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
   const [pendingDelete, setPendingDelete] = useState<
     { type: "all" } | { type: "pill"; index: number } | { type: "restOfDay" } | null
@@ -890,6 +892,30 @@ export default function ShiftEditPanel({
     unsavedChange.after.items.some((item) => item.status === "changed");
   const noteSummary = hasNoteEdit ? describeNoteChange() : null;
   const confirmBlocked = isStale || (enforceConflicts && overlapWarnings.length > 0);
+
+  // A repeat pattern being set up is work too, saved only by its own button.
+  const [repeatDirty, setRepeatDirty] = useState(false);
+  const panelDirty = hasEdits || (repeatFormOpen && repeatDirty);
+  // Save from the leave question only where the Save button would save in one
+  // press: not a series (it asks which days first), not a correction, and not
+  // with a repeat pattern open.
+  const saveBeforeLeaving: UnsavedChangesSave | undefined =
+    onConfirmDraft &&
+    !correction &&
+    !seriesId &&
+    !confirmBlocked &&
+    !(repeatFormOpen && repeatDirty)
+      ? async () => {
+          if (absenceBlocksSave()) return false;
+          return (await onConfirmDraft()) === true;
+        }
+      : undefined;
+  // Escape, the backdrop (which is also what clicking another cell hits) and
+  // the X all ask before the panel's edits are thrown away.
+  const { closing, close, forceClose, unsavedChangesDialog } = useSlideoverClose(onClose, {
+    unsaved: { hasUnsavedChanges: panelDirty, onSave: saveBeforeLeaving, closeAfterSave: false },
+  });
+  useNavigationGuard("shift-edit-panel", { isDirty: () => panelDirty, save: saveBeforeLeaving });
 
   function buildPanelInput(args: {
     segments: Array<Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">>;
@@ -4497,6 +4523,7 @@ export default function ShiftEditPanel({
               shiftCategories={shiftCategories}
               jobs={jobs}
               onConfirm={onRepeatConfirm}
+              onDirtyChange={setRepeatDirty}
               absenceType={
                 isAbsence ? absenceTypes?.find((at) => at.id === currentAbsenceTypeId) : undefined
               }
@@ -5087,7 +5114,7 @@ export default function ShiftEditPanel({
                 className="dg-btn dg-btn-secondary"
                 style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
               >
-                Cancel
+                {hasEdits ? EDITOR_ACTION_LABELS.discard : EDITOR_ACTION_LABELS.cancel}
               </Button>
               {correction ? (
                 <Button
@@ -5221,7 +5248,7 @@ export default function ShiftEditPanel({
             setPendingDelete(null);
             if (runRemoveScope === "all") {
               onRemoveAbsenceRun?.();
-              close();
+              forceClose();
               return;
             }
             removeWholeCell();
@@ -5283,6 +5310,7 @@ export default function ShiftEditPanel({
           onCancel={() => setPendingDelete(null)}
         />
       )}
+      {unsavedChangesDialog}
     </>,
     document.body,
   );

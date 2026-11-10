@@ -63,6 +63,7 @@ export function MoveEmailDialog({ employee, orgId, name, onMoved, onClose }: Mov
           onCancel={() => {
             if (!saving) onClose();
           }}
+          hasUnsavedChanges={email.trim().length > 0}
           onConfirm={handleMove}
           message={
             <div className="flex flex-col gap-3.5">

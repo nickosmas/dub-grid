@@ -392,10 +392,10 @@ export default function DisplayMode({
     staffSeeShiftChanges !== (organization.staffSeeShiftChanges ?? true) ||
     staffSeePublisher !== (organization.staffSeePublisher ?? true);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (): Promise<boolean> => {
     if (!organization.updatedAt) {
       toast.error(changedElsewhereMessage("these settings"));
-      return;
+      return false;
     }
     setSaving(true);
     try {
@@ -414,6 +414,7 @@ export default function DisplayMode({
       onSave(result.organization);
       if (result.status === "saved") {
         toast.success("Display mode updated");
+        return true;
       } else {
         setSelected(result.organization.shiftDisplayMode);
         setShowShiftDetailHoverCards(result.organization.showShiftDetailHoverCards ?? true);
@@ -421,10 +422,12 @@ export default function DisplayMode({
         setStaffSeeShiftChanges(result.organization.staffSeeShiftChanges ?? true);
         setStaffSeePublisher(result.organization.staffSeePublisher ?? true);
         toast.info("Display settings were refreshed to the latest saved value.");
+        return false;
       }
     } catch (err) {
       Sentry.captureException(err);
       toast.error("We couldn't save that display setting. Try again.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -692,6 +695,7 @@ export default function DisplayMode({
         saving={saving}
         onDiscard={handleCancel}
         onSave={() => void handleSave()}
+        leaveSave={handleSave}
       />
     </UnsavedChangesScope>
   );

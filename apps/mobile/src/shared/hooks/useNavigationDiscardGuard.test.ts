@@ -8,9 +8,16 @@ import {
 import { useNavigationDiscardGuard } from "./useNavigationDiscardGuard";
 import { useUnsavedChangesGuard } from "./useUnsavedChangesGuard";
 
-function renderGuardedScreen(options: { isDirty?: boolean; disabled?: boolean } = {}) {
+function renderGuardedScreen(
+  options: {
+    isDirty?: boolean;
+    disabled?: boolean;
+    onSave?: () => boolean | Promise<boolean>;
+  } = {},
+) {
   const onDiscard = vi.fn();
   const onClose = vi.fn();
+  const onSave = options.onSave;
   let props = { isDirty: options.isDirty ?? true, disabled: options.disabled ?? false };
   const view = renderHook(
     (next: { isDirty: boolean; disabled: boolean }) => {
@@ -19,6 +26,7 @@ function renderGuardedScreen(options: { isDirty?: boolean; disabled?: boolean } 
         disabled: next.disabled,
         onDiscard,
         onClose,
+        onSave,
       });
       useNavigationDiscardGuard(guard);
 
@@ -89,6 +97,33 @@ describe("useNavigationDiscardGuard", () => {
 
     expect(onDiscard).toHaveBeenCalledTimes(1);
     expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+  });
+
+  it("navigates once Save has worked", async () => {
+    const { back, onDiscard, view } = renderGuardedScreen({ onSave: async () => true });
+
+    back();
+    await act(async () => {
+      await view.result.current.confirmationProps.onConfirm();
+    });
+    completeModalHandoff();
+
+    expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+    expect(onDiscard).not.toHaveBeenCalled();
+  });
+
+  it("stays on the screen, still guarded, when Save fails", async () => {
+    const { back, view } = renderGuardedScreen({ onSave: async () => false });
+
+    back();
+    await act(async () => {
+      await view.result.current.confirmationProps.onConfirm();
+    });
+    completeModalHandoff();
+
+    expect(navigatedActions).toHaveLength(0);
+    expect(view.result.current.confirmationProps.visible).toBe(false);
+    expect(back()).toBe(true);
   });
 
   it("stays put, with the edit intact, when the discard is declined", () => {

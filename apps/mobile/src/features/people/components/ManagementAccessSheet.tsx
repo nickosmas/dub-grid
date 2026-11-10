@@ -27,17 +27,13 @@ import { ProfileChoiceGroup } from "../../profile/components/ProfilePrimitives";
 import { OrgRoleChoice } from "./OrgRoleChoice";
 import {
   hasManagementAccess,
+  managementAccessBaseline,
+  managementAccessDraftChanged,
+  type ManagementAccessDraft,
   type ManagementAccessRole,
   type ManagementAccessSubject,
 } from "../lib/managementAccess";
 import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
-
-function sameIds(left: number[], right: number[]): boolean {
-  if (left.length !== right.length) return false;
-  const sortedLeft = [...left].sort((a, b) => a - b);
-  const sortedRight = [...right].sort((a, b) => a - b);
-  return sortedLeft.every((value, index) => value === sortedRight[index]);
-}
 
 /**
  * Grant, edit or revoke management access for someone who already has a staff
@@ -71,12 +67,9 @@ export function ManagementAccessSheet({
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
 
-  const baseline = {
-    orgRole: (person.orgRole ??
-      person.pendingInvitation?.roleToAssign ??
-      "user") as ManagementAccessRole,
-    managementDepartmentIds: person.managementDepartmentIds,
-  };
+  const [baseline, setBaseline] = useState<ManagementAccessDraft>(() =>
+    managementAccessBaseline(person),
+  );
   const [draft, setDraft] = useState(baseline);
   const [wasVisible, setWasVisible] = useState(visible);
   const [error, setError] = useState<string | null>(null);
@@ -89,14 +82,14 @@ export function ManagementAccessSheet({
   if (visible !== wasVisible) {
     setWasVisible(visible);
     if (visible) {
-      setDraft(baseline);
+      const opened = managementAccessBaseline(person);
+      setBaseline(opened);
+      setDraft(opened);
       setError(null);
     }
   }
 
-  const hasUnsavedChanges =
-    draft.orgRole !== baseline.orgRole ||
-    !sameIds(draft.managementDepartmentIds, baseline.managementDepartmentIds);
+  const hasUnsavedChanges = managementAccessDraftChanged(draft, baseline);
 
   const mutation = useMutation({
     mutationFn: async (
@@ -160,16 +153,6 @@ export function ManagementAccessSheet({
     },
   });
 
-  const guard = useUnsavedChangesGuard({
-    isDirty: hasUnsavedChanges,
-    disabled: mutation.isPending,
-    body: isSelf
-      ? "Your changes to your administrative teams will be lost."
-      : "Your changes to their administrative teams will be lost.",
-    onDiscard: () => setDraft(baseline),
-    onClose: onDismiss,
-  });
-
   const isEditing = hasManagementAccess(person);
   // A role is asked for here only when nothing exists yet to hold one. A member
   // or an invitee changes theirs from the access badge, which is also where a
@@ -187,6 +170,24 @@ export function ManagementAccessSheet({
     hasUnsavedChanges &&
     (isRemoval || draft.managementDepartmentIds.length > 0) &&
     managementDepartments.length > 0;
+  // Save is offered only for a plain edit of someone with an account: an empty
+  // draft asks its own question about removal, and anything else sends an
+  // invitation, which is a decision rather than a save.
+  const canSaveFromPrompt = canSubmit && !isRemoval && Boolean(person.userId);
+
+  const guard = useUnsavedChangesGuard({
+    isDirty: hasUnsavedChanges,
+    disabled: mutation.isPending,
+    onDiscard: () => setDraft(baseline),
+    onClose: onDismiss,
+    onSave: canSaveFromPrompt
+      ? () =>
+          mutation.mutateAsync(draft).then(
+            () => true,
+            () => false,
+          )
+      : undefined,
+  });
 
   const removalNotices = isRemoval
     ? [
@@ -246,6 +247,8 @@ export function ManagementAccessSheet({
   return (
     <BottomSheetModal
       debugName="Management access"
+      dismissDisabled={mutation.isPending}
+      hasUnsavedChanges={hasUnsavedChanges}
       overlay={confirmationOverlay}
       footer={
         <>

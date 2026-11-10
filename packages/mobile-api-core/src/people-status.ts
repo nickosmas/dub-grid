@@ -503,7 +503,7 @@ export async function updateMobilePersonStatus(
 
 /**
  * Offboarding ends a membership and Restore reopens one (51k), and a
- * suspension ends and reopens sign-in (F-239), so only a Super Admin
+ * suspension ends and reopens sign-in (F-240), so only a Super Admin
  * offboards, restores, suspends or reinstates a Super Admin, or plans,
  * moves or cancels any of those.
  */

@@ -4,7 +4,7 @@ import type { SegmentedSwitchProps } from "./SegmentedSwitch.types";
 
 export type { SegmentedSwitchOption, SegmentedSwitchProps } from "./SegmentedSwitch.types";
 
-/** DubGrid's segmented control, stretched to its row, on both phones. */
+/** The web and test fallback: DubGrid's segmented control, stretched to its row. */
 export function SegmentedSwitch<Value extends string>({
   options,
   value,

@@ -159,6 +159,7 @@ export function OverrideStatusDialog({
       confirmDisabled={!reason.trim()}
       onConfirm={onConfirm}
       onCancel={onCancel}
+      hasUnsavedChanges={reason.trim().length > 0}
     />
   );
 }
@@ -277,6 +278,7 @@ export function EndTrialDialog({
       confirmDisabled={Boolean(choice === "lock" ? lockReason : graceReason)}
       onConfirm={onConfirm}
       onCancel={onCancel}
+      hasUnsavedChanges={Boolean(graceReason?.trim() || lockReason?.trim())}
     />
   );
 }
@@ -417,6 +419,7 @@ export function PauseBillingDialog({
       confirmDisabled={!reason.trim()}
       onConfirm={onConfirm}
       onCancel={onCancel}
+      hasUnsavedChanges={reason.trim().length > 0}
     />
   );
 }
@@ -497,6 +500,7 @@ export function ExtendGraceDialog({
       confirmDisabled={!valid || !reason.trim()}
       onConfirm={onConfirm}
       onCancel={onCancel}
+      hasUnsavedChanges={reason.trim().length > 0}
     />
   );
 }

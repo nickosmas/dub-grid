@@ -144,3 +144,64 @@ describe("ConfirmDialog dismissal", () => {
     },
   );
 });
+
+describe("ConfirmDialog with typed input", () => {
+  it("cancels at once while nothing was typed", async () => {
+    const onCancel = vi.fn();
+    render(<ConfirmDialog title="Suspend" onConfirm={vi.fn()} onCancel={onCancel} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks before Cancel throws typed input away", async () => {
+    const onCancel = vi.fn();
+    render(
+      <ConfirmDialog title="Suspend" onConfirm={vi.fn()} onCancel={onCancel} hasUnsavedChanges />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(onCancel).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks before Escape throws typed input away", async () => {
+    const onCancel = vi.fn();
+    render(
+      <ConfirmDialog title="Suspend" onConfirm={vi.fn()} onCancel={onCancel} hasUnsavedChanges />,
+    );
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeInTheDocument();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("offers Save, and closes after it worked", async () => {
+    const onCancel = vi.fn();
+    const unsavedSave = vi.fn(async () => true);
+    render(
+      <ConfirmDialog
+        title="Edit staff record"
+        onConfirm={vi.fn()}
+        onCancel={onCancel}
+        hasUnsavedChanges
+        unsavedSave={unsavedSave}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(unsavedSave).toHaveBeenCalledTimes(1);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+});

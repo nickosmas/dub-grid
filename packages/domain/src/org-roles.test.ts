@@ -115,7 +115,7 @@ describe("canGrantOrgRole", () => {
   const superAdmin = { isSuperAdmin: true, isGridmaster: false };
   const gridmaster = { isSuperAdmin: false, isGridmaster: true };
 
-  it("lets an Admin invite only Users (F-237)", () => {
+  it("lets an Admin invite only Users (F-238)", () => {
     expect(canGrantOrgRole(admin, "user")).toBe(true);
     expect(canGrantOrgRole(admin, "admin")).toBe(false);
     expect(canGrantOrgRole(admin, "super_admin")).toBe(false);

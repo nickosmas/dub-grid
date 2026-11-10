@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { Employee } from "@/types";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 
 interface UseStaffReorderOptions {
   sorted: Employee[];
@@ -25,12 +26,19 @@ export function useStaffReorder({ sorted, onSaveOrder }: UseStaffReorderOptions)
     setPendingOrder([...sorted]);
   }, [sorted]);
 
-  const saveOrder = useCallback(async () => {
-    if (!pendingOrder) return;
-    if (!(await onSaveOrder(pendingOrder))) return;
+  const commitOrder = useCallback(async (): Promise<boolean> => {
+    if (!pendingOrder) return false;
+    if (!(await onSaveOrder(pendingOrder))) return false;
     setIsReordering(false);
     setPendingOrder(null);
+    return true;
   }, [pendingOrder, onSaveOrder]);
+
+  const saveOrder = useCallback(async () => {
+    await commitOrder();
+  }, [commitOrder]);
+
+  useNavigationGuard("staff-reorder", { isDirty: () => isDirty, save: commitOrder });
 
   const discardReorder = useCallback(() => {
     setPendingOrder([...startingOrder]);

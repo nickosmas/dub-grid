@@ -115,7 +115,7 @@ export function getOwnOrgRoleChangedMessage(role: OrgRole): string {
 }
 
 /**
- * Whether this person may give `role` through an invitation (F-237). Only a
+ * Whether this person may give `role` through an invitation (F-238). Only a
  * Super Admin or Gridmaster gives an elevated tier: an invited Admin gets the
  * standard Admin permissions whatever the inviter holds, so an Admin trusted
  * only with staff records could otherwise mint themselves publish rights.

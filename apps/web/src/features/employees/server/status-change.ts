@@ -257,7 +257,7 @@ export async function applyStatusChange(
   }
 
   // Offboarding ends their membership and Restore reopens it (51k), and a
-  // suspension ends and reopens their sign-in (F-239), so only a Super Admin
+  // suspension ends and reopens their sign-in (F-240), so only a Super Admin
   // or Gridmaster reaches a Super Admin, as when the role is given. That
   // includes planning, moving or cancelling a return (51l) or a suspension.
   const restoringFromOffboard = action === "activate" && currentEmployee.status === "removed";

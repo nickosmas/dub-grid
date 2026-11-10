@@ -35,7 +35,7 @@ export interface EmployeeStatusActionsProps {
   /**
    * False when this manager may not change their access (`canOffboardAtTier`):
    * Offboarded, Suspended and the way back stay listed, disabled with the
-   * reason (51k, F-239).
+   * reason (51k, F-240).
    */
   canOffboard?: boolean;
   onDeactivate: (
@@ -964,6 +964,15 @@ export function EmployeeStatusActions({
         }
         onConfirm={confirm}
         onCancel={close}
+        // Picking a status alone isn't work to lose; a typed reason or a date is.
+        hasUnsavedChanges={
+          note.trim().length > 0 ||
+          returnDate !== initialReturnDate ||
+          absenceTypeId !== initialAbsenceTypeId ||
+          startDate !== initialStartDate ||
+          lastDay !== initialLastDay ||
+          until !== initialUntil
+        }
       />
     ) : null;
 

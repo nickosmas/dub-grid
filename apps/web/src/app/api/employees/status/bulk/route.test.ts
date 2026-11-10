@@ -435,7 +435,7 @@ describe("POST /api/employees/status/bulk", () => {
     ]);
   });
 
-  it("refuses an Admin suspending a Super Admin, and suspends the rest (F-239)", async () => {
+  it("refuses an Admin suspending a Super Admin, and suspends the rest (F-240)", async () => {
     tables.organization_memberships = [
       { user_id: ME, org_id: ORG, org_role: "admin", archived_at: null },
       { user_id: user(1), org_id: ORG, org_role: "super_admin", archived_at: null },

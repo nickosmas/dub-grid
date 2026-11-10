@@ -188,12 +188,19 @@ screen or control needs no per-platform work.
 
 | Native (the platform supplies it)                                              | One shared DubGrid control                                           |
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| Navigation bar, its buttons and back (`HeaderBarAction`, `HeaderFilterAction`) | Segmented switch (`SegmentedSwitch`)                                 |
-| Tab bar (one list in `src/shared/navigation/app-tabs.ts`)                      | Toast (`ToastSurface`, at the top)                                   |
-| Search (`ScreenSearch`, `Stack.SearchBar`)                                     | Tab strip (`ScrollableTabStripTab`)                                  |
-| System alerts (`ConfirmationModal.native`), discards included                  | Pick-one and pick-many marks (`SelectionCheck`, `SelectionCheckbox`) |
-| Sheets (`BottomSheetModal.native`, `SheetBarAction.native`)                    | Status symbols (`ToneSymbol`, Material icons)                        |
-| iOS date calendar (`NativeDateCalendar.ios`), share, haptics                   | Round header button (`ChromeIconButton`), text fields, lists         |
+| Navigation bar, its buttons and back (`HeaderBarAction`, `HeaderFilterAction`) | Toast (`ToastSurface`, at the top)                                   |
+| Tab bar (one list in `src/shared/navigation/app-tabs.ts`)                      | Tab strip (`ScrollableTabStripTab`)                                  |
+| Segmented switch (`SegmentedSwitch`: SwiftUI picker, Material 3 buttons)       | Pick-one and pick-many marks (`SelectionCheck`, `SelectionCheckbox`) |
+| Search (`ScreenSearch`, `Stack.SearchBar`)                                     | Status symbols (`ToneSymbol`, Material icons)                        |
+| System alerts (`ConfirmationModal.native`), discards included                  | Round header button (`ChromeIconButton`), text fields, lists         |
+| Sheets (`BottomSheetModal.native`, `SheetBarAction.native`)                    |                                                                      |
+| iOS date calendar (`NativeDateCalendar.ios`), share, haptics                   |                                                                      |
+
+The segmented switch (admin Home's My schedule | Team, People's filter
+section) went back to each platform's own control on 2026-11-10 (owner): UIKit's
+segmented control through SwiftUI on iOS, Liquid Glass on iOS 26, and Material 3
+segmented buttons on Android in DubGrid's colors. Drawn controls that switch a
+screen's view, such as `SegmentedControl` with counts, stay shared.
 
 - **Materials, not layouts.** A shared control may use a platform material
   where it exists: Liquid Glass through `isLiquidGlassAvailable()` (read once
@@ -208,7 +215,8 @@ screen or control needs no per-platform work.
   and in `src/features/**/{screens,components}`.
 - **Platform files allowed:** `app/(tabs)/_layout.*`,
   `BottomSheetModal.native`, `ConfirmationModal.native`,
-  `SheetBarAction.native`, `NativeDateCalendar.ios`. Anything new needs a
+  `SheetBarAction.native`, `NativeDateCalendar.ios`,
+  `SegmentedSwitch.ios` and `SegmentedSwitch.android`. Anything new needs a
   reason added here. `platform-variants.test.ts` fails when a platform file
   exports less than its base, which TypeScript cannot see.
 - **Should this control be native?** Only if it is in the left column, or the
@@ -382,9 +390,11 @@ Choose the surface by the user's task:
   unmounting it; only a `presentationKind="gate"` sheet has no close button.
   It renders as a sibling of the pan `GestureDetector`, never inside it, so a
   slidy thumb tap cannot be swallowed as the start of a drag.
-- **Dirty means work the user cannot redo in one tap.** A single radio or list
-  choice does not arm the discard confirmation; typed text or a selection that
-  took browsing to reach (a swap target) does. The request sheet's guard splits
+- **Dirty means anything changed and not yet saved** (owner, 2026-11-10), a
+  single radio choice included, compared against the values the surface opened
+  on: id lists as sets (`sameIds`), text trimmed on both sides, and a baseline
+  read once at open rather than from a record a refetch can replace. The
+  request sheet's guard splits
   `onDiscard` (reset selections) from `onClose` (drop the mode) for the
   sequencing reason `useModalHandoff` documents.
   Use specific sentence-case action labels and an action-specific `iconName`
@@ -506,8 +516,21 @@ shared.
 - **`useUnsavedChangesGuard()`** owns the decision. Point the sheet's
   `onDismiss` _and_ its Cancel button at `guard.requestClose`, and render
   `<ConfirmationModal {...guard.confirmationProps} />` as a sibling. Its
-  `onDiscard` runs on **every** exit through the guard, clean or dirty: it is
-  the reset, not a side effect of confirming.
+  `onDiscard` runs on **every** exit through the guard, clean or dirty, except
+  after a Save: it is the reset, not a side effect of confirming.
+- **Pass `onSave` where the surface has a plain save of edits**, returning
+  whether it worked: the question becomes "Save your changes?" with Save,
+  Discard and Keep editing (three buttons in the system alert on both phones).
+  Pass none while the form is invalid, when the save asks a question of its
+  own (an email change, a removal), or when the surface's commit is a decision
+  rather than a save (a create, an invite, a request, a status change, a
+  password or two-factor step); it then asks "Discard your changes?" with two
+  answers. Nothing in it is red: discarding unsaved edits isn't destructive.
+- **Pass `hasUnsavedChanges={guard.isDirty}` to a guarded `BottomSheetModal`**
+  (and `dismissDisabled` while it saves). The native sheet closes itself on a
+  swipe, scrim tap or Android back before `onDismiss` can refuse, so while it
+  is dirty those are off, Android gains a close button, and the close button
+  and Cancel ask instead.
 - **`useNavigationDiscardGuard(guard)`** adds back navigation to that same
   guard, for a screen with an inline editor. One guard, one confirmation, three
   triggers — a second guard would mean two modals racing. It covers stack

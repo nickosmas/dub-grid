@@ -1344,7 +1344,7 @@ describe("POST /api/employees/status", () => {
       expect(employeeUpdate).not.toHaveBeenCalled();
     });
 
-    it("refuses to suspend, move a suspension's end, reinstate or cancel a planned suspension for a Super Admin (F-239)", async () => {
+    it("refuses to suspend, move a suspension's end, reinstate or cancel a planned suspension for a Super Admin (F-240)", async () => {
       for (const [action, extra, message] of [
         ["suspend", {}, SUSPEND_OUT_OF_REACH_MESSAGE],
         [

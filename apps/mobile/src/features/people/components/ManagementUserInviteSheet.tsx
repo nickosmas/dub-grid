@@ -10,7 +10,6 @@ import {
 } from "@dubgrid/contracts";
 import type { PermissionEditorLabels } from "@dubgrid/authz";
 import { getMobileEditorDismissLabel } from "@dubgrid/design-tokens";
-import type { AdminPermissions } from "@dubgrid/domain";
 import { AppText } from "../../../shared/components/AppText";
 import {
   BottomSheetModal,
@@ -27,30 +26,14 @@ import {
 } from "../../profile/components/ProfilePrimitives";
 import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { mobileSpace } from "../../../shared/theme/tokens";
-import type { ManagementAccessRole } from "../lib/managementAccess";
+import {
+  EMPTY_MANAGEMENT_USER_INVITE as EMPTY_DRAFT,
+  managementUserInviteHasChanges,
+  type ManagementUserInviteDraft as InviteDraft,
+} from "../lib/managementUserInvite";
 import { InvitePermissionsRow } from "./InvitePermissionsRow";
 import { OrgRoleChoice } from "./OrgRoleChoice";
 import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
-
-type InviteDraft = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  orgRole: ManagementAccessRole;
-  adminPermissions: AdminPermissions | null;
-  managementDepartmentIds: number[];
-};
-
-const EMPTY_DRAFT: InviteDraft = {
-  firstName: "",
-  lastName: "",
-  email: "",
-  phone: "",
-  orgRole: "user",
-  adminPermissions: null,
-  managementDepartmentIds: [],
-};
 
 /** Mirrors the email rule the server's zod schema enforces. */
 function getEmailError(value: string): string | null {
@@ -113,13 +96,7 @@ export function ManagementUserInviteSheet({
       : null;
   const isValid =
     !firstNameError && !lastNameError && !emailError && !phoneError && !departmentError;
-  const hasUnsavedChanges =
-    draft.firstName !== "" ||
-    draft.lastName !== "" ||
-    draft.email !== "" ||
-    draft.phone !== "" ||
-    draft.adminPermissions !== null ||
-    draft.managementDepartmentIds.length > 0;
+  const hasUnsavedChanges = managementUserInviteHasChanges(draft);
   const setsPermissions = canGrantElevatedRoles && draft.orgRole === "admin";
 
   // Deliberately no `onDiscard`: the draft is cleared on open, above, so that
@@ -152,6 +129,8 @@ export function ManagementUserInviteSheet({
 
   return (
     <BottomSheetModal
+      dismissDisabled={isPending}
+      hasUnsavedChanges={hasUnsavedChanges}
       // Inside the sheet: iOS refuses a second Modal while one is up.
       overlay={<ConfirmationModal presentation="inline" {...guard.confirmationProps} />}
       footer={

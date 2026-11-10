@@ -1,4 +1,4 @@
--- 131: Every Admin stores a complete permission set (F-238, F-244).
+-- 131: Every Admin stores a complete permission set (F-239, F-245).
 --
 -- The app resolves an Admin's permissions as the Admin defaults overlaid with
 -- what is stored (packages/authz buildPermissionContext). check_admin_permission

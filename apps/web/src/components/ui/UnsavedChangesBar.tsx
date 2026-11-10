@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
   type CSSProperties,
@@ -11,6 +12,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/Button";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
+import type { UnsavedChangesSave } from "@/components/UnsavedChangesDialog";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { footerSection, useFloatingFooter } from "@/components/ui/use-floating-footer";
@@ -59,6 +62,13 @@ interface UnsavedChangesBarProps {
   /** Left out when there is nothing to put back, such as a value only suggested. */
   onDiscard?: () => void;
   onSave: () => void;
+  /**
+   * Save offered when someone leaves with changes, reporting whether it worked.
+   * Separate from `onSave` because some sections confirm before saving, and a
+   * leave can't wait on a second dialog; leave it out there and leaving offers
+   * Discard only.
+   */
+  leaveSave?: UnsavedChangesSave;
 }
 
 /**
@@ -73,8 +83,15 @@ export function UnsavedChangesBar({
   saveLabel = "Save",
   onDiscard,
   onSave,
+  leaveSave,
 }: UnsavedChangesBarProps) {
   const slot = useContext(UnsavedChangesSlotContext);
+  // Every section with this bar holds edits a link, a section switch or a
+  // refresh would throw away, so the bar asks for all of them.
+  useNavigationGuard(`unsaved-bar-${useId()}`, {
+    isDirty: () => dirty && !saving,
+    save: leaveSave && !saveDisabled ? leaveSave : undefined,
+  });
   const barRef = useRef<HTMLDivElement>(null);
   const showDiscard = dirty && Boolean(onDiscard);
   const canSave = dirty && !saveDisabled;
