@@ -285,6 +285,8 @@
   /* Fill for the footer strip under a line that holds a container's bottom
      buttons (cards, popups, slideovers): one faint step off the surface. */
   --dg-color-surface-footer: #f8f8f8;
+  /* An editor opened inside a list: lighter than its footer. */
+  --dg-color-surface-editor: #fcfcfc;
   /* Fill for an editable field (text, select, picker), one step off the card
      it sits on: a faint gray on white here, darker than the card in dark mode.
      A field on the page background takes `.dg-field-raised` instead, and a
@@ -485,6 +487,7 @@
   --dg-color-surface-alt: #0a0a0b;
   --dg-color-surface-hover: #1c1c1f;
   --dg-color-surface-footer: #17171a;
+  --dg-color-surface-editor: #151517;
   --dg-color-field: #0a0a0b;
   --dg-color-bg-secondary: #1c1c1f;
   --dg-color-row-alt: #0a0a0b;

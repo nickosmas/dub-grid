@@ -687,13 +687,12 @@ export default function DisplayMode({
           ariaLabel="Show staff who published"
         />
       </div>
-      {isModified ? (
-        <UnsavedChangesBar
-          saving={saving}
-          onDiscard={handleCancel}
-          onSave={() => void handleSave()}
-        />
-      ) : null}
+      <UnsavedChangesBar
+        dirty={isModified}
+        saving={saving}
+        onDiscard={handleCancel}
+        onSave={() => void handleSave()}
+      />
     </UnsavedChangesScope>
   );
 }
