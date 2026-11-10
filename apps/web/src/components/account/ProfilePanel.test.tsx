@@ -160,6 +160,9 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof ProfilePanel
   return { ...render(<ProfilePanel {...props} />), props };
 }
 
+// Personal details comes first, so its footer holds the first Save changes.
+const personalSave = () => screen.getAllByRole("button", { name: "Save changes" })[0];
+
 describe("ProfilePanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -173,7 +176,7 @@ describe("ProfilePanel", () => {
   });
 
   async function saveOnceChecked() {
-    const save = screen.getByRole("button", { name: "Save changes" });
+    const save = personalSave();
     await waitFor(() => expect(save).toBeEnabled());
     fireEvent.click(save);
   }
@@ -210,7 +213,7 @@ describe("ProfilePanel", () => {
     });
 
     renderPanel();
-    fireEvent.click(screen.getByRole("button", { name: "Change work details" }));
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "(503) 555-0142" } });
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "new@example.com" },
     });
@@ -230,7 +233,7 @@ describe("ProfilePanel", () => {
     );
 
     renderPanel();
-    fireEvent.click(screen.getByRole("button", { name: "Change work details" }));
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "(503) 555-0142" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
     await saveOnceChecked();
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save" }));
@@ -256,14 +259,14 @@ describe("ProfilePanel", () => {
       email: "taken@example.com",
       phone: "(503) 555-0142",
     });
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(personalSave()).toBeDisabled();
   });
 
   it("keeps Save off until the new email has been checked", async () => {
     renderPanel();
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
 
-    const save = screen.getByRole("button", { name: "Save changes" });
+    const save = personalSave();
     expect(save).toBeDisabled();
     await waitFor(() => expect(save).toBeEnabled());
   });
@@ -275,7 +278,7 @@ describe("ProfilePanel", () => {
     renderPanel();
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled());
+    await waitFor(() => expect(personalSave()).toBeEnabled());
     consoleError.mockRestore();
   });
 
@@ -292,7 +295,7 @@ describe("ProfilePanel", () => {
     expect(screen.getByLabelText("First name")).toHaveValue("Draft");
     expect(screen.getByLabelText("Email")).toHaveValue("new@example.com");
     expect(
-      screen.getByRole("alertdialog", { name: "Save your account and contact changes?" }),
+      screen.getByRole("alertdialog", { name: "Save your personal details?" }),
     ).toBeInTheDocument();
     expect(requireCredentialAssurance).not.toHaveBeenCalled();
     expect(updateEmployee).not.toHaveBeenCalled();
@@ -307,14 +310,53 @@ describe("ProfilePanel", () => {
     const setEmployee = vi.fn();
 
     renderPanel({ setEmployee });
-    fireEvent.click(screen.getByRole("button", { name: "Change work details" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Draft" } });
+    fireEvent.click(personalSave());
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(setEmployee).toHaveBeenCalledWith(latestEmployee));
     expect(toast.error).toHaveBeenCalledWith(
       "Someone else just changed your profile. Refresh and try again.",
     );
+  });
+
+  it("saves Work on its own, leaving the personal details draft", async () => {
+    vi.mocked(updateEmployee).mockResolvedValue({ ...employee, roleIds: [3], version: 5 });
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Draft" } });
+    fireEvent.click(screen.getByRole("button", { name: "Change work details" }));
+    const [personal, work] = screen.getAllByRole("button", { name: "Save changes" });
+    await waitFor(() => expect(work).toBeEnabled());
+    fireEvent.click(work);
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Work details saved."));
+    expect(updateEmployee).toHaveBeenCalledOnce();
+    expect(vi.mocked(updateEmployee).mock.calls[0][0]).toMatchObject({
+      firstName: "Alice",
+      roleIds: [3],
+    });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("First name")).toHaveValue("Draft");
+    expect(personal).toBeEnabled();
+  });
+
+  it("saves personal details on their own, leaving the Work draft", async () => {
+    vi.mocked(updateEmployee).mockResolvedValue({ ...employee, firstName: "Draft", version: 5 });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: "Change work details" }));
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Draft" } });
+    await saveOnceChecked();
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(updateEmployee).toHaveBeenCalledOnce());
+    expect(vi.mocked(updateEmployee).mock.calls[0][0]).toMatchObject({
+      firstName: "Draft",
+      roleIds: [],
+    });
+    const work = screen.getAllByRole("button", { name: "Save changes" })[1];
+    expect(work).toBeEnabled();
   });
 
   // The Access card used to render only when managementDepartmentIds was
