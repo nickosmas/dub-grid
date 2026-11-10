@@ -128,16 +128,25 @@ export default function CalendarDatePicker({
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 10,
+            gap: isInline ? 10 : 8,
             width: "100%",
-            minHeight: "var(--dg-toolbar-h)",
+            ...(isInline
+              ? { minHeight: "var(--dg-toolbar-h)", padding: "10px 12px", fontSize: 13 }
+              : // Sized like CustomSelect, so a date sits level with the selects beside it.
+                {
+                  height: "var(--dg-toolbar-h)",
+                  padding: "0 10px 0 12px",
+                  fontSize: "var(--dg-type-control-size)",
+                }),
             background: disabled ? "transparent" : "var(--dg-color-field)",
             border: "1px solid var(--dg-color-border)",
             borderRadius: "var(--dg-btn-radius)",
-            padding: "10px 12px",
-            fontSize: 13,
             fontWeight: 500,
-            color: hasSelection ? "var(--dg-color-text-secondary)" : "var(--dg-color-text-subtle)",
+            color: hasSelection
+              ? isInline
+                ? "var(--dg-color-text-secondary)"
+                : "var(--dg-type-control-color)"
+              : "var(--dg-color-text-subtle)",
             cursor: disabled ? "not-allowed" : "pointer",
             fontFamily: "inherit",
             textAlign: isInline ? "center" : "left",
@@ -167,7 +176,8 @@ export default function CalendarDatePicker({
           </span>
           {isInline ? null : (
             <ChevronDown
-              size={14}
+              size={12}
+              strokeWidth={2.5}
               style={{
                 color: "var(--dg-color-text-faint)",
                 flexShrink: 0,

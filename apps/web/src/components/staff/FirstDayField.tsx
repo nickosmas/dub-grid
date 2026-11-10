@@ -12,6 +12,7 @@ export function FirstDayField({
   labelStyle,
   disabled = false,
   placeholder = "Not set",
+  labelGap = 6,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -19,10 +20,12 @@ export function FirstDayField({
   disabled?: boolean;
   /** What the empty field says. */
   placeholder?: string;
+  /** Space under the label, to match the fields beside it. */
+  labelGap?: number;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <span style={labelStyle}>First day</span>
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <span style={{ ...labelStyle, marginBottom: labelGap }}>First day</span>
       <CalendarDatePicker
         value={value}
         onChange={onChange}
@@ -33,7 +36,13 @@ export function FirstDayField({
         disabled={disabled}
         allowClear
       />
-      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
+      <span
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          color: "var(--dg-color-text-muted)",
+          marginTop: 6,
+        }}
+      >
         {FIRST_DAY_FIELD_HINT}
       </span>
     </div>
