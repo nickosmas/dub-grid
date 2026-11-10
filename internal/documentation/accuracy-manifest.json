@@ -845,7 +845,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b32b002d0b5ac0ee5fc4bfcc601413ce823085e2dada2df34690dd39d1e4f56e"
+      "evidenceFingerprint": "sha256:7560c7f2e92443d88f1aaabeb8b8515ffa0af7d83042a03489c5994e006f6b11"
     },
     {
       "id": "invitations",
@@ -1514,7 +1514,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:86aa501937dd75f18c158902dc1ff560c35ea36c2c208fe71402f48ddd850324"
+      "evidenceFingerprint": "sha256:928d26dc3dd70f17765253dec1a8c256e10086beb3c7b9264de0775a4858e32f"
     },
     {
       "id": "security-sessions",

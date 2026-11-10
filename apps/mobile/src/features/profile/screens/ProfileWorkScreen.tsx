@@ -815,7 +815,7 @@ function EditPanel({
           tone="info"
         />
       ) : null}
-      <ProfileSection title="Name and contact">
+      <ProfileSection title="Personal details">
         <ProfilePanel>
           <ProfileTextInput
             accessibilityLabel="First name"

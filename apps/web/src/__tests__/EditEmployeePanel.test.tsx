@@ -191,26 +191,25 @@ describe("EditEmployeePanel", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
 
-    it("puts name and contact first and the work facts under Work", () => {
+    it("puts personal details first and the work facts under Work", () => {
       renderPanel({ sectioned: true });
 
       expect(screen.queryByText("Details")).not.toBeInTheDocument();
-      expect(follows("Name and contact", "Email")).toBe(true);
+      expect(follows("Personal details", "Email")).toBe(true);
       expect(follows("Email", "Work")).toBe(true);
       expect(follows("Work", "Employment")).toBe(true);
       expect(follows("Work", "Internal notes")).toBe(true);
     });
 
-    it("keeps everything in Details for someone with no Work section", () => {
+    it("keeps everything in Personal details for someone with no Work section", () => {
       renderPanel({
         sectioned: true,
         isManagementUser: true,
         employee: { ...employee, focusAreaIds: [], roleIds: [], certificationId: null },
       });
 
-      expect(screen.queryByText("Name and contact")).not.toBeInTheDocument();
       expect(screen.queryByText("Work")).not.toBeInTheDocument();
-      expect(follows("Details", "Internal notes")).toBe(true);
+      expect(follows("Personal details", "Internal notes")).toBe(true);
     });
   });
 

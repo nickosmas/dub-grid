@@ -129,7 +129,7 @@ export interface EditEmployeePanelProps {
   hideActions?: boolean;
   /** Persistent page editors have no meaningful pristine Close action. */
   persistent?: boolean;
-  /** Draws Name and contact and Work as one card on the page, for editing in place. */
+  /** Draws Personal details and Work as one card on the page, for editing in place. */
   sectioned?: boolean;
   /** Drops the editor's own side padding so an embedding card owns the inner
    *  padding and the fields line up with that card's heading. */
@@ -615,7 +615,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     const footerSidePadding = flushHorizontal ? "var(--dg-card-padding-x)" : sidePadding;
 
     // Sectioned, employment and notes are work facts and sit under Work, so the
-    // first section holds only the name and contact details its title names.
+    // first section holds only their personal details.
     const workHoldsProfileFields = sectioned && showScheduleAssignments;
     const employmentFields = showScheduleAssignments ? (
       <div
@@ -715,9 +715,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
             >
               {sectioned ? (
                 <div className="dg-card-header">
-                  <div className="dg-card-title">
-                    {workHoldsProfileFields ? "Name and contact" : "Details"}
-                  </div>
+                  <div className="dg-card-title">Personal details</div>
                 </div>
               ) : hideIdentityFields ? null : (
                 <div className="dg-type-content-group-heading" style={{ marginBottom: 8 }}>
