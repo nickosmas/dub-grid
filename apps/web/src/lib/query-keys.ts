@@ -97,6 +97,8 @@ export const queryKeys = {
       ["account", userId ?? "anon", orgId ?? "no-org", "permissions"] as const,
     self: (userId: string, orgId: string | null) =>
       ["account", userId, orgId ?? "no-org", "self"] as const,
+    selfShifts: (userId: string, orgId: string | null, startDate: string, endDate: string) =>
+      ["account", userId, orgId ?? "no-org", "self", "shifts", startDate, endDate] as const,
     sessions: (userId: string) => ["account", userId, "sessions"] as const,
     notificationPrefs: (userId: string) => ["account", userId, "notificationPrefs"] as const,
     terms: (userId: string) => ["account", userId, "terms"] as const,

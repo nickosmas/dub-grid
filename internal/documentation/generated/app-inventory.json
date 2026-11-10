@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:82c2907de05bd37f5c2e779b191770116c5775eebee2ab7ac27a63c38eb0edc5",
+  "sourceDigest": "sha256:958b2f56ed73a22169432ae0ec5692d212a858b055852ecb43e1e908b033c123",
   "webRoutes": [
     {
       "id": "web:/",
@@ -1153,6 +1153,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/account/self/route.ts"
+      }
+    },
+    {
+      "id": "http:GET:/api/account/self/shifts",
+      "method": "GET",
+      "path": "/api/account/self/shifts",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/account/self/shifts/route.ts"
       }
     },
     {

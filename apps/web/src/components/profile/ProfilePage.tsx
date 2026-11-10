@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useConfirmLeave } from "@/components/NavigationGuardProvider";
 import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 
@@ -13,6 +14,10 @@ import { usePermissions, useOrganizationData } from "@/hooks";
 import { useSelfProfileData } from "@/hooks/useSelfProfileData";
 import { useSkeletonGate } from "@/hooks/useSkeletonGate";
 import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
+import { usePersonPeriod } from "@/hooks/usePersonPeriod";
+import { fetchSelfPeriodShifts } from "@/features/account/client";
+import { formatPersonPeriodPhrase } from "@/lib/person-period";
+import { queryKeys } from "@/lib/query-keys";
 import {
   getProfileOverviewCurrentWeekDateKeys,
   getProfileOverviewDateRange,
@@ -29,6 +34,7 @@ import { EmployeeStatusCard } from "@/components/staff-detail/EmployeeStatusCard
 import { WorkAndRecordCard } from "@/components/staff-detail/PersonInfoCards";
 import { StaffOverviewTab } from "@/components/staff-detail/tabs/StaffOverviewTab";
 import { ScheduleTab } from "@/components/staff-detail/tabs/ScheduleTab";
+import { PersonPeriodControl } from "@/components/staff-detail/PersonPeriodControl";
 import { CalendarSubscriptionCard } from "./CalendarSubscriptionCard";
 import { UnsavedChangesScope } from "@/components/ui/UnsavedChangesBar";
 import { ProfileHeader } from "./ProfileHeader";
@@ -41,8 +47,6 @@ const TAB_LABELS: Record<ProfileTab, string> = {
   security: "Security",
   privacy: "Privacy",
 };
-
-const PERIOD_PHRASE = "in the last 12 weeks";
 
 const toLocalDate = (iso: string) => {
   const [year, month, day] = iso.split("-").map(Number);
@@ -145,14 +149,39 @@ export function ProfilePage() {
   // Read in the record card when nothing on Account lets you change it.
   const recordAccessRole = employee && !canManageManagementAccess ? orgRole : null;
 
-  const range = useMemo(
-    () => getProfileOverviewDateRange(new Date(), org?.timezone),
-    [org?.timezone],
-  );
+  const payPeriodStartDate = org?.payPeriodStartDate ?? null;
+  const {
+    span: periodSpan,
+    period,
+    today: periodToday,
+    setSpan: setPeriodSpan,
+    step: stepPeriod,
+    goToToday: goToPeriodToday,
+    setCustomRange: setPeriodRange,
+  } = usePersonPeriod(payPeriodStartDate);
+  const periodPhrase = formatPersonPeriodPhrase(period, periodToday, payPeriodStartDate);
+  const periodShiftsQuery = useQuery({
+    queryKey: queryKeys.account.selfShifts(
+      user?.id ?? "anonymous",
+      orgId,
+      period.range.startDate,
+      period.range.endDate,
+    ),
+    queryFn: () => fetchSelfPeriodShifts(orgId!, period.range),
+    enabled: Boolean(orgId && user && isOnSchedule) && activeTab === "schedule",
+    staleTime: 60_000,
+  });
+  // Looking at another period, this week would be off the subject.
+  const periodIncludesToday =
+    period.range.startDate <= periodToday && periodToday <= period.range.endDate;
+
   const today = useMemo(() => getIsoDateInTimeZone(new Date(), org?.timezone), [org?.timezone]);
   const thisWeek = useMemo(
-    () => getProfileOverviewCurrentWeekDateKeys(range).map(toLocalDate),
-    [range],
+    () =>
+      getProfileOverviewCurrentWeekDateKeys(
+        getProfileOverviewDateRange(new Date(), org?.timezone),
+      ).map(toLocalDate),
+    [org?.timezone],
   );
   const lookups = useMemo(
     () => ({
@@ -240,10 +269,17 @@ export function ProfilePage() {
                 onChange={(tab) => openTab(tab)}
               />
             </div>
-            {activeTab === "schedule" ? (
-              <span className="text-[13px] text-[var(--dg-color-text-subtle)]">
-                The last 12 weeks
-              </span>
+            {activeTab === "schedule" && isOnSchedule ? (
+              <PersonPeriodControl
+                span={periodSpan}
+                period={period}
+                today={periodToday}
+                payPeriodStartDate={payPeriodStartDate}
+                onSpanChange={setPeriodSpan}
+                onStep={stepPeriod}
+                onToday={goToPeriodToday}
+                onCustomRangeChange={setPeriodRange}
+              />
             ) : null}
           </div>
 
@@ -252,15 +288,15 @@ export function ProfilePage() {
               <>
                 <StaffOverviewTab
                   employee={employee}
-                  periodShifts={shifts}
-                  range={range}
-                  periodPhrase={PERIOD_PHRASE}
+                  periodShifts={periodShiftsQuery.data}
+                  range={period.range}
+                  periodPhrase={periodPhrase}
                   assignments={assignments}
                   shiftCategories={shiftCategories}
                   jobs={jobs}
                   absenceTypes={absenceTypes}
                   focusAreas={focusAreas}
-                  nextDays={{ dates: thisWeek, shifts }}
+                  nextDays={periodIncludesToday ? { dates: thisWeek, shifts } : null}
                   nextDaysCopy={{
                     title: "This week",
                     periodLabel: "Your published shifts",
@@ -272,11 +308,11 @@ export function ProfilePage() {
                 <div className="mt-6">
                   <ScheduleTab
                     employee={employee}
-                    shifts={shifts}
-                    loading={false}
-                    range={range}
+                    shifts={periodShiftsQuery.data}
+                    loading={periodShiftsQuery.isPending}
+                    range={period.range}
                     today={today}
-                    periodPhrase={PERIOD_PHRASE}
+                    periodPhrase={periodPhrase}
                     lookups={lookups}
                     absenceTypes={absenceTypes}
                     dayOffAbsenceTypeId={org?.coverageRuleConfig?.dayOffAbsenceTypeId ?? null}
