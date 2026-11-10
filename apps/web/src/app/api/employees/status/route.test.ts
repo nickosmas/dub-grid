@@ -1392,6 +1392,45 @@ describe("POST /api/employees/status", () => {
       expect(employeeUpdate).not.toHaveBeenCalled();
     });
 
+    it("refuses to plan Away over a Super Admin's planned suspension or last day (F-240)", async () => {
+      for (const [planned, message] of [
+        ["suspended", SUSPEND_OUT_OF_REACH_MESSAGE],
+        ["removed", OFFBOARD_OUT_OF_REACH_MESSAGE],
+      ] as const) {
+        arrange("active", "super_admin");
+        employeeCurrentSingle.mockResolvedValue({
+          data: {
+            id: EMP_ID,
+            org_id: ORG_ID,
+            status: "active",
+            version: 1,
+            user_id: EMPLOYEE_USER_ID,
+            planned_status: planned,
+            planned_from: "2026-12-01",
+          },
+          error: null,
+        });
+        const response = await POST(
+          new NextRequest("http://localhost/api/employees/status", {
+            method: "POST",
+            body: JSON.stringify({
+              empId: EMP_ID,
+              orgId: ORG_ID,
+              action: "deactivate",
+              expectedVersion: 1,
+              startDate: "2026-11-20",
+            }),
+          }),
+        );
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toEqual({
+          error: message,
+          code: OFFBOARD_OUT_OF_REACH_CODE,
+        });
+      }
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
     it("lets a Super Admin offboard without the tier read", async () => {
       arrange("active", "admin");
       membershipMaybeSingle.mockResolvedValue({

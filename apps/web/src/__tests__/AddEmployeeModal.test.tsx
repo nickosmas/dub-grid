@@ -1,4 +1,5 @@
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
@@ -33,17 +34,22 @@ function renderModal(
   overrides: {
     onAdd?: ReturnType<typeof vi.fn>;
     onClose?: ReturnType<typeof vi.fn>;
+    canGrantElevatedRoles?: boolean;
   } = {},
 ) {
   const onAdd = overrides.onAdd ?? vi.fn();
   const onClose = overrides.onClose ?? vi.fn();
+  // A Super Admin inviting an Admin also sees the permissions field, which reads org labels.
   render(
-    <AddEmployeeModal
-      focusAreas={focusAreas}
-      certifications={defaultCertifications}
-      onAdd={onAdd}
-      onClose={onClose}
-    />,
+    <QueryClientProvider client={new QueryClient()}>
+      <AddEmployeeModal
+        focusAreas={focusAreas}
+        certifications={defaultCertifications}
+        onAdd={onAdd}
+        onClose={onClose}
+        canGrantElevatedRoles={overrides.canGrantElevatedRoles}
+      />
+    </QueryClientProvider>,
   );
   return { onAdd, onClose };
 }
@@ -230,7 +236,7 @@ describe("AddEmployeeModal", () => {
     }
 
     it("invites only the people ticked, each with their access role", async () => {
-      const { onAdd } = renderModal();
+      const { onAdd } = renderModal({ canGrantElevatedRoles: true });
       const firstNames = getFirstNameInputs();
       const lastNames = getLastNameInputs();
       const emails = getEmailInputs();
@@ -248,8 +254,6 @@ describe("AddEmployeeModal", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Access role" }));
       await userEvent.click(screen.getByRole("option", { name: "Admin" }));
-      // Super Admin is offered only by someone who holds it.
-      expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
 
       expect(
         screen.getByText(
@@ -262,8 +266,26 @@ describe("AddEmployeeModal", () => {
       expect(onAdd.mock.calls[0][1]).toEqual([{ email: "jane@calmhaven.org", role: "admin" }]);
     });
 
-    it("sets everyone invited to one access role, which each can still change", async () => {
+    it("lets an Admin invite as a User only, and says why (F-238)", async () => {
       const { onAdd } = renderModal();
+      await userEvent.type(getFirstNameInputs()[0]!, "Jane");
+      await userEvent.type(getLastNameInputs()[0]!, "Doe");
+      await userEvent.type(getEmailInputs()[0]!, "jane@calmhaven.org");
+
+      expect(screen.queryByRole("button", { name: "Access role" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Set everyone's access role" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Only a Super Admin can invite someone as an Admin."),
+      ).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Add 1 & invite 1" }));
+      expect(onAdd.mock.calls[0][1]).toEqual([{ email: "jane@calmhaven.org", role: "user" }]);
+    });
+
+    it("sets everyone invited to one access role, which each can still change", async () => {
+      const { onAdd } = renderModal({ canGrantElevatedRoles: true });
       const firstNames = getFirstNameInputs();
       const lastNames = getLastNameInputs();
       const emails = getEmailInputs();

@@ -436,6 +436,25 @@ describe("statusChoices", () => {
     expect(suggestedStatusChoice(offboarded)?.action).toBe("restore");
   });
 
+  it("changes nothing for a Super Admin with a plan the manager can't reach (F-240)", () => {
+    const active = { status: "active" as const, ...onSchedule };
+    for (const [plannedStatus, reason] of [
+      ["suspended", SUSPEND_OUT_OF_REACH_MESSAGE],
+      ["removed", OFFBOARD_OUT_OF_REACH_MESSAGE],
+    ] as const) {
+      const planned = { ...active, plannedStatus, plannedFrom: "2026-12-01" };
+      const choices = statusChoices(planned, { canOffboard: false });
+      expect(choices.find((option) => option.action === "markAway")).toMatchObject({
+        available: false,
+        unavailableReason: reason,
+      });
+      expect(choices.every((option) => !option.available)).toBe(true);
+      expect(statusChoices(planned).find((option) => option.action === "markAway")?.available).toBe(
+        true,
+      );
+    }
+  });
+
   it("lists Away, disabled with a reason, for someone not on the schedule", () => {
     const state = { status: "active" as const, focusAreaIds: [] };
     expect(kinds(state)).toEqual([

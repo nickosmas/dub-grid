@@ -526,8 +526,13 @@ async function tierRefusal(
     action === "setSuspendedUntil" ||
     ((action === "setPlannedChange" || action === "cancelPlannedChange") &&
       employee.plannedStatus === "suspended");
+  // Any other change replaces or cancels a planned suspension, last day or return.
+  const replacingPlan =
+    employee.plannedStatus === "suspended" ||
+    employee.plannedStatus === "removed" ||
+    employee.plannedStatus === "active";
   if (
-    !(offboarding || restoring || suspending || reinstating) ||
+    !(offboarding || restoring || suspending || reinstating || replacingPlan) ||
     auth.permissions.isSuperAdmin ||
     !employee.userId
   ) {
@@ -541,13 +546,14 @@ async function tierRefusal(
   if (canOffboardAtTier({ isSuperAdmin: false, isGridmaster: false }, role)) return null;
   return {
     kind: "out_of_reach",
-    error: restoring
-      ? RESTORE_OUT_OF_REACH_MESSAGE
-      : reinstating
-        ? REINSTATE_OUT_OF_REACH_MESSAGE
-        : suspending
-          ? SUSPEND_OUT_OF_REACH_MESSAGE
-          : OFFBOARD_OUT_OF_REACH_MESSAGE,
+    error:
+      restoring || employee.plannedStatus === "active"
+        ? RESTORE_OUT_OF_REACH_MESSAGE
+        : reinstating
+          ? REINSTATE_OUT_OF_REACH_MESSAGE
+          : suspending || employee.plannedStatus === "suspended"
+            ? SUSPEND_OUT_OF_REACH_MESSAGE
+            : OFFBOARD_OUT_OF_REACH_MESSAGE,
     code: OFFBOARD_OUT_OF_REACH_CODE,
     status: 403,
   };

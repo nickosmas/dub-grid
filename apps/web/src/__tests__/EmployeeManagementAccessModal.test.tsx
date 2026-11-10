@@ -701,7 +701,7 @@ describe("EmployeeManagementAccessEditor", () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Leadership" }));
-    await user.click(screen.getByRole("button", { name: "User" }));
+    await user.click(screen.getByRole("button", { name: "Access role" }));
     await user.click(screen.getByRole("option", { name: "Admin" }));
     await act(async () => {
       await editorRef.current?.save();
@@ -716,38 +716,54 @@ describe("EmployeeManagementAccessEditor", () => {
   });
 
   it.each([
-    { caller: "a Super Admin", isSuperAdmin: true, isGridmaster: false, offered: true },
-    { caller: "a Gridmaster", isSuperAdmin: false, isGridmaster: true, offered: true },
-    { caller: "an Admin", isSuperAdmin: false, isGridmaster: false, offered: false },
-  ])(
-    "offers Super Admin as an invite role only to $caller when it can be granted",
-    async ({ isSuperAdmin, isGridmaster, offered }) => {
-      permissions.isSuperAdmin = isSuperAdmin;
-      permissions.isGridmaster = isGridmaster;
+    { caller: "a Super Admin", isSuperAdmin: true, isGridmaster: false },
+    { caller: "a Gridmaster", isSuperAdmin: false, isGridmaster: true },
+  ])("offers every invite role to $caller", async ({ isSuperAdmin, isGridmaster }) => {
+    permissions.isSuperAdmin = isSuperAdmin;
+    permissions.isGridmaster = isGridmaster;
 
-      render(
-        <EmployeeManagementAccessEditor
-          employee={employee}
-          orgId="org-1"
-          managementDepartments={managementDepartments}
-          onClose={vi.fn()}
-          onCompleted={vi.fn()}
-        />,
-      );
+    render(
+      <EmployeeManagementAccessEditor
+        employee={employee}
+        orgId="org-1"
+        managementDepartments={managementDepartments}
+        onClose={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
 
-      await waitFor(() => {
-        expect(fetchOrganizationUsersMock).toHaveBeenCalled();
-      });
-      await userEvent.setup().click(screen.getByRole("button", { name: "User" }));
+    await waitFor(() => {
+      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
+    });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Access role" }));
 
-      expect(screen.getByRole("option", { name: "Admin" })).toBeInTheDocument();
-      if (offered) {
-        expect(screen.getByRole("option", { name: "Super Admin" })).toBeInTheDocument();
-      } else {
-        expect(screen.queryByRole("option", { name: "Super Admin" })).not.toBeInTheDocument();
-      }
-    },
-  );
+    expect(screen.getByRole("option", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Super Admin" })).toBeInTheDocument();
+  });
+
+  it("gives an Admin's invite the User role, and says why (F-238)", async () => {
+    permissions.isSuperAdmin = false;
+    permissions.isGridmaster = false;
+
+    render(
+      <EmployeeManagementAccessEditor
+        employee={employee}
+        orgId="org-1"
+        managementDepartments={managementDepartments}
+        onClose={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole("button", { name: "Access role" })).not.toBeInTheDocument();
+    expect(screen.getByText("User")).toBeInTheDocument();
+    expect(
+      screen.getByText("Only a Super Admin can invite someone as an Admin."),
+    ).toBeInTheDocument();
+  });
 
   it("sends nothing further when the invitation's step-up is cancelled", async () => {
     const onClose = vi.fn();

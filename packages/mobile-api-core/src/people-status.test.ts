@@ -887,6 +887,24 @@ describe("updateMobilePersonStatus offboarding and restoring (51k)", () => {
     expect(await cancel.result).toMatchObject({ kind: "out_of_reach" });
   });
 
+  it("refuses an Admin planning Away over a Super Admin's planned suspension (F-240)", async () => {
+    const planned = employee({
+      userId: "user-9",
+      plannedStatus: "suspended",
+      plannedFrom: "2026-12-01",
+    });
+    const away = run(
+      planned,
+      { action: "deactivate", startDate: "2026-11-20" },
+      { isSuperAdmin: false, targetRole: "super_admin" },
+    );
+    expect(await away.result).toMatchObject({
+      kind: "out_of_reach",
+      error: SUSPEND_OUT_OF_REACH_MESSAGE,
+    });
+    expect(away.deps.updateEmployeePlannedChange).not.toHaveBeenCalled();
+  });
+
   it("lets an Admin suspend an Admin or a User", async () => {
     for (const targetRole of ["admin", "user"]) {
       const { result } = run(

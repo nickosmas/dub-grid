@@ -1070,7 +1070,42 @@ const EDIT_PLAN_HINT = "Change it with Edit plan.";
  */
 export function statusChoices(
   state: CurrentStatusState,
-  { canOffboard = true }: StatusChoiceOptions = {},
+  options: StatusChoiceOptions = {},
+): StatusChoice[] {
+  const choices = everyStatusChoice(state, options);
+  const reason = planOutOfReachReason(state, options);
+  return reason
+    ? choices.map((option) =>
+        option.available ? { ...option, available: false, unavailableReason: reason } : option,
+      )
+    : choices;
+}
+
+/**
+ * A Super Admin's planned suspension, last day or return is theirs to keep:
+ * any other status change would replace or cancel it, so a manager who can't
+ * reach the tier changes nothing while one is planned (F-240).
+ */
+function planOutOfReachReason(
+  state: CurrentStatusState,
+  { canOffboard = true }: StatusChoiceOptions,
+): string | null {
+  if (canOffboard) return null;
+  switch (state.plannedStatus) {
+    case "suspended":
+      return SUSPEND_OUT_OF_REACH_MESSAGE;
+    case "removed":
+      return OFFBOARD_OUT_OF_REACH_MESSAGE;
+    case "active":
+      return RESTORE_OUT_OF_REACH_MESSAGE;
+    default:
+      return null;
+  }
+}
+
+function everyStatusChoice(
+  state: CurrentStatusState,
+  { canOffboard = true }: StatusChoiceOptions,
 ): StatusChoice[] {
   const account = hasAccount(state);
   const kind = currentKind(state);

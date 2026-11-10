@@ -275,8 +275,14 @@ export async function applyStatusChange(
     action === "setSuspendedUntil" ||
     ((action === "setPlannedChange" || action === "cancelPlannedChange") &&
       currentEmployee.plannedStatus === "suspended");
+  // Any other change replaces or cancels a planned suspension, last day or
+  // return, so it reaches the same tier while one is planned.
+  const replacingPlan =
+    currentEmployee.plannedStatus === "suspended" ||
+    currentEmployee.plannedStatus === "removed" ||
+    currentEmployee.plannedStatus === "active";
   if (
-    (offboarding || restoring || suspending || reinstating) &&
+    (offboarding || restoring || suspending || reinstating || replacingPlan) &&
     !isGridmaster &&
     !isSuperAdmin &&
     currentEmployee.userId
@@ -291,13 +297,14 @@ export async function applyStatusChange(
     if (!canOffboardAtTier(actor, targetMembership?.org_role)) {
       return respond(
         {
-          error: restoring
-            ? RESTORE_OUT_OF_REACH_MESSAGE
-            : reinstating
-              ? REINSTATE_OUT_OF_REACH_MESSAGE
-              : suspending
-                ? SUSPEND_OUT_OF_REACH_MESSAGE
-                : OFFBOARD_OUT_OF_REACH_MESSAGE,
+          error:
+            restoring || currentEmployee.plannedStatus === "active"
+              ? RESTORE_OUT_OF_REACH_MESSAGE
+              : reinstating
+                ? REINSTATE_OUT_OF_REACH_MESSAGE
+                : suspending || currentEmployee.plannedStatus === "suspended"
+                  ? SUSPEND_OUT_OF_REACH_MESSAGE
+                  : OFFBOARD_OUT_OF_REACH_MESSAGE,
           code: OFFBOARD_OUT_OF_REACH_CODE,
         },
         { status: 403 },

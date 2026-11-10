@@ -11,7 +11,7 @@
 **Type:** Fix
 **Status:** in progress
 **Branch:** `fix/admin-tier-boundary` (worktree `.claude/worktrees/fix-admin-tier-boundary`)
-**Fixes:** F-238, F-239, F-240, F-218, F-245, F-243
+**Fixes:** F-238, F-239, F-240, F-218, F-245, F-243, F-252
 
 ### The problem
 
@@ -121,6 +121,12 @@ count query first so we know how many Admins it fills.
 5. [x] **Copy.** Update the Staff row description, and `docs/reference/admin-permissions.mdx`
        to match.
        **Done when:** `npm run docs:check` passes.
+
+6. [x] **Repair F-240's remaining path and F-252** (re-review, 2026-11-10). A Super Admin's
+       planned suspension, last day or return can't be replaced by an Admin's other status change
+       (web, bulk, mobile, and every choice disabled with the reason), and only a Gridmaster calls
+       `assign_org_role_by_email`. Migration 131 stores sets without the views an Edit implies and
+       applies them in `check_admin_permission`, so the editor keeps each view as chosen.
 
 ### Verify
 

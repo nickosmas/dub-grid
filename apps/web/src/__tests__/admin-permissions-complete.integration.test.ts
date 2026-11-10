@@ -1,8 +1,9 @@
 // @vitest-environment node
 
 /**
- * Migration 131 (F-239, F-245): every Admin stores the permission set the app
- * resolves, so the database grants what the app shows, and anyone else stores
+ * Migration 131 (F-239, F-245): every Admin stores a complete permission set,
+ * the one the editor starts from, and check_admin_permission resolves it as
+ * the app does, so the database grants what the app shows. Anyone else stores
  * none, so a later promotion starts from the defaults. Runs 131 inside
  * BEGIN/ROLLBACK on the local database.
  *
@@ -12,7 +13,11 @@
 import { readFileSync } from "node:fs";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
-import { ADMIN_DEFAULT_PERMS, buildPermissionContext } from "@dubgrid/authz";
+import {
+  ADMIN_DEFAULT_PERMS,
+  buildInitialPermissions,
+  buildPermissionContext,
+} from "@dubgrid/authz";
 import type { AdminPermissions } from "@dubgrid/domain";
 import { migrationPath } from "./helpers/sql-inventory";
 import { actAsAuthenticated } from "./helpers/simulated-jwt";
@@ -48,10 +53,15 @@ const PERMISSION_KEYS = Object.keys(ADMIN_DEFAULT_PERMS) as (keyof AdminPermissi
 
 let db: Client;
 
-/** What the app resolves for an Admin with `stored`, as the 25 stored keys. */
+/** What the app resolves for an Admin with `stored`, as the 25 permission keys. */
 function resolved(stored: Partial<AdminPermissions> | null): Record<string, boolean> {
   const context = buildPermissionContext("admin", ORG, stored as AdminPermissions | null);
   return Object.fromEntries(PERMISSION_KEYS.map((key) => [key, context[key]]));
+}
+
+/** The set the editor starts from for `stored`, which is what an Admin stores. */
+function completed(stored: Partial<AdminPermissions> | null): Record<string, boolean> {
+  return { ...buildInitialPermissions(stored), canManageOrgSettings: false };
 }
 
 async function asSuperuser(): Promise<void> {
@@ -154,11 +164,15 @@ describe.skipIf(!reachable)("131 complete Admin permission sets (live DB)", () =
       "approvals only",
       { canEditShifts: false, canPublishSchedule: false, canApproveShiftRequests: true },
     ],
-  ])("stores what the app resolves for %s", async (_name, stored) => {
-    const { rows } = await db.query(`SELECT public.complete_admin_permissions($1) AS completed`, [
-      stored === null ? null : JSON.stringify(stored),
-    ]);
-    expect(rows[0].completed).toEqual(resolved(stored));
+  ])("stores the editor's set and resolves it as the app does for %s", async (_name, stored) => {
+    const json = stored === null ? null : JSON.stringify(stored);
+    const { rows } = await db.query(
+      `SELECT public.complete_admin_permissions($1) AS completed,
+              public.resolve_admin_permissions($1) AS resolved`,
+      [json],
+    );
+    expect(rows[0].completed).toEqual(completed(stored));
+    expect(rows[0].resolved).toEqual(resolved(stored));
   });
 
   it("drops keys it doesn't know and values that aren't true or false", async () => {
@@ -169,14 +183,34 @@ describe.skipIf(!reachable)("131 complete Admin permission sets (live DB)", () =
         canViewReports: "no",
       }),
     ]);
-    expect(rows[0].completed).toEqual(resolved({ canPublishSchedule: false }));
+    expect(rows[0].completed).toEqual(completed({ canPublishSchedule: false }));
+  });
+
+  // One permission write each: the change log keys a row by the transaction's time.
+  it("stores a view as chosen and grants it while the Edit that implies it is on", async () => {
+    await changeRole("admin");
+    await db.query(
+      `UPDATE organization_memberships SET admin_permissions = $3 WHERE user_id = $1 AND org_id = $2`,
+      [MEMBER, ORG, JSON.stringify({ canManageEmployees: true, canViewEmployeeDetails: false })],
+    );
+    expect((await storedPermissions())?.canViewEmployeeDetails).toBe(false);
+    expect(await memberMay("canViewEmployeeDetails")).toBe(true);
+  });
+
+  it("drops the implied view once its Edit is off", async () => {
+    await changeRole("admin");
+    await db.query(
+      `UPDATE organization_memberships SET admin_permissions = $3 WHERE user_id = $1 AND org_id = $2`,
+      [MEMBER, ORG, JSON.stringify({ canManageEmployees: false, canViewEmployeeDetails: false })],
+    );
+    expect(await memberMay("canViewEmployeeDetails")).toBe(false);
   });
 
   it("lets a User promoted by change_user_role edit and publish (F-239)", async () => {
     expect(await storedPermissions()).toBeNull();
     await changeRole("admin");
 
-    expect(await storedPermissions()).toEqual(resolved(null));
+    expect(await storedPermissions()).toEqual(completed(null));
     expect(await memberMay("canEditShifts")).toBe(true);
     expect(await memberMay("canPublishSchedule")).toBe(true);
     expect(await memberMay("canManageRecurringShifts")).toBe(true);
@@ -198,7 +232,7 @@ describe.skipIf(!reachable)("131 complete Admin permission sets (live DB)", () =
     expect(await storedPermissions()).toBeNull();
 
     await changeRole("admin");
-    expect(await storedPermissions()).toEqual(resolved(null));
+    expect(await storedPermissions()).toEqual(completed(null));
   });
 
   it("stores the defaults for an Admin membership written without a set", async () => {
@@ -210,7 +244,7 @@ describe.skipIf(!reachable)("131 complete Admin permission sets (live DB)", () =
       `INSERT INTO organization_memberships (user_id, org_id, org_role) VALUES ($1,$2,'admin')`,
       [MEMBER, ORG],
     );
-    expect(await storedPermissions()).toEqual(resolved(null));
+    expect(await storedPermissions()).toEqual(completed(null));
   });
 
   it("never stores the organization settings permission", async () => {

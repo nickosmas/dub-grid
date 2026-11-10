@@ -78,8 +78,6 @@ export function bulkStatusSkipReason(
   if (kind === TARGET_KIND[action]) return `Already ${KIND_LABELS[kind]}.`;
   const backToActive = BACK_TO_ACTIVE[action];
   if (backToActive && kind !== backToActive.from) return backToActive.only;
-  // Mark active needs nothing more; Restore and Reinstate can be out of the manager's tier.
-  if (backToActive && action === "markActive") return null;
   const option = statusChoices(person, { canOffboard }).find((choice) => choice.action === action);
   return option?.unavailableReason ?? null;
 }
