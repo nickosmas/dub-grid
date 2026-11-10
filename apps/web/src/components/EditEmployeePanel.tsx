@@ -791,7 +791,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       <FirstDayField
                         value={form.firstDay}
                         onChange={(firstDay) => setForm((p) => ({ ...p, firstDay }))}
-                        labelStyle={{ ...fieldLabel, marginBottom: 0 }}
+                        labelStyle={fieldLabel}
+                        labelGap={4}
                         disabled={readOnly}
                         placeholder="Set first day"
                       />
