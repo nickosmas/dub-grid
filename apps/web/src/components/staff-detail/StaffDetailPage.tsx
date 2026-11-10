@@ -196,17 +196,23 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [isEditingAccess, setIsEditingAccess] = useState(false);
   const detailsEditorRef = useRef<EditEmployeePanelHandle>(null);
   const contentScrollerRef = useClipTrailingWhitespace();
+  const payPeriodStartDate = org?.payPeriodStartDate ?? null;
   const {
+    span: periodSpan,
     period,
     today: periodToday,
+    setSpan: setPeriodSpan,
     step: stepPeriod,
     goToToday: goToPeriodToday,
     goToMonthOf: goToPeriodMonthOf,
     setCustomRange: setPeriodRange,
-  } = usePersonPeriod();
+  } = usePersonPeriod(payPeriodStartDate);
   const periodRange = useMemo(
-    () => ({ ...period.range, phrase: formatPersonPeriodPhrase(period, periodToday) }),
-    [period, periodToday],
+    () => ({
+      ...period.range,
+      phrase: formatPersonPeriodPhrase(period, periodToday, payPeriodStartDate),
+    }),
+    [payPeriodStartDate, period, periodToday],
   );
 
   const orgId = perms.orgId ?? org?.id ?? null;
@@ -1444,8 +1450,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 </div>
                 {activeTab !== "account" ? (
                   <PersonPeriodControl
+                    span={periodSpan}
                     period={period}
                     today={periodToday}
+                    payPeriodStartDate={payPeriodStartDate}
+                    onSpanChange={setPeriodSpan}
                     onStep={stepPeriod}
                     onToday={goToPeriodToday}
                     onCustomRangeChange={setPeriodRange}

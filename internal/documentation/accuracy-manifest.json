@@ -813,6 +813,7 @@
             "apps/web/src/lib/people-order.ts",
             "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
             "apps/web/src/components/staff-detail/PersonPeriodControl.tsx",
+            "apps/web/src/lib/person-period.ts",
             "apps/web/src/components/staff-detail/tabs/ScheduleTab.tsx",
             "apps/web/src/lib/schedule-rows.ts",
             "apps/web/src/components/staff-detail/tabs/ActivityTab.tsx",
@@ -845,7 +846,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8083901ade94569229283c93aa39766aa5c582f979f099344a912d064befe5c6"
+      "evidenceFingerprint": "sha256:c2683962be4b18be4d3e686586fb6d3c799d229f669dafc0b305d82732f9750e"
     },
     {
       "id": "invitations",
@@ -1489,6 +1490,9 @@
             "apps/web/src/components/staff-detail/tabs/ScheduleTab.tsx",
             "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
             "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
+            "apps/web/src/components/staff-detail/PersonPeriodControl.tsx",
+            "apps/web/src/lib/person-period.ts",
+            "apps/web/src/app/api/account/self/shifts/route.ts",
             "apps/web/src/components/account/ProfilePanel.tsx",
             "apps/web/src/components/account/DeleteAccountCard.tsx",
             "apps/web/src/app/api/auth/delete-account/route.ts",
@@ -1514,7 +1518,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fc1df40d6e1f3739ca9352af740a7b8ad2b346270695cc71430cdb780899fedc"
+      "evidenceFingerprint": "sha256:b6c3aba4d07a1b028f4e8f9362e815938a552bf27d0c46aa87cb14798f1898df"
     },
     {
       "id": "security-sessions",

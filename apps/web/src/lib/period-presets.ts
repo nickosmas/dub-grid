@@ -23,7 +23,7 @@ export const PERIOD_PRESET_LABELS: Record<PeriodPreset, string> = {
 /** The longest custom range, matching the shift query's own limit. */
 export const MAX_CUSTOM_RANGE_DAYS = 366;
 
-const PAY_PERIOD_DAYS = 14;
+export const PAY_PERIOD_DAYS = 14;
 const DAY_MS = 86_400_000;
 
 export function toIsoDate(date: Date): string {

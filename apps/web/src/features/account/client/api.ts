@@ -204,6 +204,15 @@ export function fetchSelfProfileData(orgId: string | null): Promise<AccountSelfP
   return requestJson<AccountSelfProfileData>(`/api/account/self${suffix ? `?${suffix}` : ""}`);
 }
 
+export async function fetchSelfPeriodShifts(
+  orgId: string,
+  range: { startDate: string; endDate: string },
+): Promise<ShiftMap> {
+  const params = new URLSearchParams({ orgId, start: range.startDate, end: range.endDate });
+  const { shifts } = await requestJson<{ shifts: ShiftMap }>(`/api/account/self/shifts?${params}`);
+  return shifts;
+}
+
 export function fetchCalendarSubscriptionStatus(): Promise<CalendarSubscriptionStatus> {
   return requestJson<CalendarSubscriptionStatus>("/api/account/calendar-subscription");
 }

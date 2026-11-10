@@ -35,4 +35,40 @@ describe("usePersonPeriod", () => {
       range: { startDate: "2026-10-01", endDate: "2026-10-31" },
     });
   });
+
+  it("switches span around today while the period holds it, else around its start", () => {
+    const { result } = renderHook(() => usePersonPeriod("2026-01-04"));
+    act(() => result.current.setSpan("pay-period"));
+    expect(result.current.span).toBe("pay-period");
+    expect(result.current.period.range).toEqual({
+      startDate: "2026-10-25",
+      endDate: "2026-11-07",
+    });
+
+    act(() => result.current.step(-1));
+    expect(result.current.period.range.startDate).toBe("2026-10-11");
+
+    act(() => result.current.setSpan("week"));
+    expect(result.current.period.range).toEqual({
+      startDate: "2026-10-11",
+      endDate: "2026-10-17",
+    });
+
+    act(() => result.current.goToToday());
+    expect(result.current.period).toEqual({
+      kind: "week",
+      range: { startDate: "2026-10-25", endDate: "2026-10-31" },
+    });
+  });
+
+  it("steps out of picked dates by the chosen span", () => {
+    const { result } = renderHook(() => usePersonPeriod());
+    act(() => result.current.setSpan("year"));
+    act(() => result.current.setCustomRange({ startDate: "2025-12-20", endDate: "2026-01-10" }));
+    act(() => result.current.step(-1));
+    expect(result.current.period).toEqual({
+      kind: "year",
+      range: { startDate: "2025-01-01", endDate: "2025-12-31" },
+    });
+  });
 });
