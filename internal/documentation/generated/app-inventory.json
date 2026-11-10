@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:82c2907de05bd37f5c2e779b191770116c5775eebee2ab7ac27a63c38eb0edc5",
+  "sourceDigest": "sha256:e8422b9dc7468287eb7da60e108ebfd4538581e73619107b991c7486d6d51728",
   "webRoutes": [
     {
       "id": "web:/",
@@ -1153,6 +1153,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/account/self/route.ts"
+      }
+    },
+    {
+      "id": "http:GET:/api/account/self/shifts",
+      "method": "GET",
+      "path": "/api/account/self/shifts",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/account/self/shifts/route.ts"
       }
     },
     {
@@ -5140,6 +5149,16 @@
       "sha256": "3cd45525a754c48c4083aa0b4927903f12e84bcbfde5aaeff63232097e712a64",
       "source": {
         "path": "supabase/migrations/130_archived_jobs_stay_on_history.sql"
+      }
+    },
+    {
+      "id": "migration:131_admin_permissions_complete.sql",
+      "version": "131",
+      "name": "admin_permissions_complete",
+      "file": "131_admin_permissions_complete.sql",
+      "sha256": "1bbb8c8dc6c73425cec31563485ef93b7b4a322d2d7096bbf295c92d7e9f75b7",
+      "source": {
+        "path": "supabase/migrations/131_admin_permissions_complete.sql"
       }
     }
   ],

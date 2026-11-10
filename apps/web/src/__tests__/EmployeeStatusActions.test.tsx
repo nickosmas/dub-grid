@@ -426,7 +426,7 @@ describe("EmployeeStatusActions", () => {
     expect(onSetReturnDate).toHaveBeenCalledWith("emp-1", "2099-01-05", 135);
   });
 
-  it("lists Offboarded and Restore disabled for a Super Admin an Admin can't reach (51k)", async () => {
+  it("lists Offboarded and Suspended disabled for a Super Admin an Admin can't reach (51k, F-240)", async () => {
     const user = userEvent.setup();
     renderActions(makeEmployee(), [], { canOffboard: false });
 
@@ -434,7 +434,10 @@ describe("EmployeeStatusActions", () => {
     const offboard = within(dialog).getByRole("radio", { name: /^Offboarded/ });
     expect(offboard).toHaveAttribute("aria-disabled", "true");
     expect(offboard).toHaveTextContent("Only a Super Admin can offboard a Super Admin.");
-    expect(within(dialog).getByRole("radio", { name: /^Suspended/ })).not.toHaveAttribute(
+    const suspend = within(dialog).getByRole("radio", { name: /^Suspended/ });
+    expect(suspend).toHaveAttribute("aria-disabled", "true");
+    expect(suspend).toHaveTextContent("Only a Super Admin can suspend a Super Admin.");
+    expect(within(dialog).getByRole("radio", { name: /^Away/ })).not.toHaveAttribute(
       "aria-disabled",
       "true",
     );

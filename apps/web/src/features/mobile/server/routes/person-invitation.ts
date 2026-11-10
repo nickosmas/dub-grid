@@ -22,7 +22,7 @@ import {
 import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
 import { createNameMismatchResponseBody, hasCompleteName, namesMatch } from "@/lib/account-linking";
 import logger from "@/lib/logger";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { canGrantOrgRole, changedElsewhereMessage, getOrgRoleGrantRefusal } from "@dubgrid/domain";
 import { invitationAdminPermissions } from "@/features/organization/server/invitation-permissions";
 
 export const dynamic = "force-dynamic";
@@ -293,17 +293,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   }
 
   const orgRole = parsed.data.orgRole;
-  // The database refuses to accept such an invite too (043); saying so here
-  // stops an email going out that could never be used.
-  if (
-    orgRole === "super_admin" &&
-    !loaded.auth.permissions.isSuperAdmin &&
-    !loaded.auth.permissions.isGridmaster
-  ) {
-    return NextResponse.json(
-      { error: "Only a Super Admin can invite someone as a Super Admin." },
-      { status: 403 },
-    );
+  // The same ceiling as web's invite routes (F-238): an Admin invites Users.
+  if (!canGrantOrgRole(loaded.auth.permissions, orgRole)) {
+    return NextResponse.json({ error: getOrgRoleGrantRefusal(orgRole) }, { status: 403 });
   }
   const chosen = invitationAdminPermissions({
     role: orgRole,

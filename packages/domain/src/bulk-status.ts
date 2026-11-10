@@ -59,7 +59,7 @@ const BACK_TO_ACTIVE: Partial<Record<BulkStatusAction, { from: StatusChoiceKind;
 export interface BulkStatusOptions {
   /** True when the person is the manager making the change. */
   isSelf?: boolean;
-  /** False when the manager may not offboard or restore this person (51k). */
+  /** False when the manager may not change this person's access (`canOffboardAtTier`). */
   canOffboard?: boolean;
 }
 
@@ -78,7 +78,6 @@ export function bulkStatusSkipReason(
   if (kind === TARGET_KIND[action]) return `Already ${KIND_LABELS[kind]}.`;
   const backToActive = BACK_TO_ACTIVE[action];
   if (backToActive && kind !== backToActive.from) return backToActive.only;
-  if (backToActive && action !== "restore") return null;
   const option = statusChoices(person, { canOffboard }).find((choice) => choice.action === action);
   return option?.unavailableReason ?? null;
 }

@@ -3,13 +3,25 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
+import CustomSelect from "@/components/CustomSelect";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import { isValidCustomRange, MAX_CUSTOM_RANGE_DAYS, type PeriodRange } from "@/lib/period-presets";
-import { formatPersonPeriodLabel, isCurrentMonth, type PersonPeriod } from "@/lib/person-period";
+import {
+  formatPersonPeriodLabel,
+  isCurrentPeriod,
+  PERSON_PERIOD_SPAN_LABELS,
+  PERSON_PERIOD_SPAN_NOUNS,
+  personPeriodSpans,
+  type PersonPeriod,
+  type PersonPeriodSpan,
+} from "@/lib/person-period";
 
 interface PersonPeriodControlProps {
+  span: PersonPeriodSpan;
   period: PersonPeriod;
   today: string;
+  payPeriodStartDate?: string | null;
+  onSpanChange: (span: PersonPeriodSpan) => void;
   onStep: (step: -1 | 1) => void;
   onToday: () => void;
   onCustomRangeChange: (range: PeriodRange) => void;
@@ -17,18 +29,34 @@ interface PersonPeriodControlProps {
 
 const EMPTY_RANGE = { from: "", to: "" };
 
-/** The month the staff page's tabs follow, beside the tabs, with Dates for any other span. */
+/**
+ * The period a person's tabs follow, beside the tabs: what the arrows step by,
+ * the arrows themselves, and Dates for any other span.
+ */
 export function PersonPeriodControl({
+  span,
   period,
   today,
+  payPeriodStartDate,
+  onSpanChange,
   onStep,
   onToday,
   onCustomRangeChange,
 }: PersonPeriodControlProps) {
+  const noun = PERSON_PERIOD_SPAN_NOUNS[span];
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Period">
+      <CustomSelect<PersonPeriodSpan>
+        ariaLabel="Step by"
+        value={span}
+        options={personPeriodSpans(payPeriodStartDate).map((value) => ({
+          value,
+          label: PERSON_PERIOD_SPAN_LABELS[value],
+        }))}
+        onChange={onSpanChange}
+      />
       {/* Before the arrows, so appearing never moves them under the pointer. */}
-      {!isCurrentMonth(period, today) && (
+      {!isCurrentPeriod(period, today, payPeriodStartDate) && (
         <Button type="button" className="dg-btn dg-btn-secondary dg-btn-sm" onClick={onToday}>
           Today
         </Button>
@@ -37,7 +65,7 @@ export function PersonPeriodControl({
         <Button
           type="button"
           className="dg-btn dg-btn-secondary dg-btn-icon"
-          aria-label="Previous month"
+          aria-label={`Previous ${noun}`}
           onClick={() => onStep(-1)}
         >
           <ChevronLeft className="h-4 w-4" aria-hidden />
@@ -51,7 +79,7 @@ export function PersonPeriodControl({
         <Button
           type="button"
           className="dg-btn dg-btn-secondary dg-btn-icon"
-          aria-label="Next month"
+          aria-label={`Next ${noun}`}
           onClick={() => onStep(1)}
         >
           <ChevronRight className="h-4 w-4" aria-hidden />

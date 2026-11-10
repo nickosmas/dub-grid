@@ -32,6 +32,7 @@ import type { AssignableOrganizationRole } from "@/types";
 import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { getOrgRoleGrantRefusal } from "@dubgrid/domain";
 import logger from "@/lib/logger";
 import { INVITATION_LIFETIME_MS } from "@/lib/auth/invitation-capability";
 import {
@@ -254,7 +255,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }
 
-    // Regular admins with canManageEmployees can still invite admin/user.
+    // Admins who can manage staff invite Users; elevated tiers are a Super Admin's to give.
     if (!(await canAssignOrgRole(serviceClient, user.id, orgId, role))) {
       // No invitation exists to hang this on, so the refusal is recorded
       // against the organization with the address that was attempted.
@@ -274,7 +275,7 @@ export async function POST(req: NextRequest) {
         ipAddress: getRequestIp(req),
         userAgent: req.headers.get("user-agent"),
       });
-      return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
+      return NextResponse.json({ error: getOrgRoleGrantRefusal(role) }, { status: 403 });
     }
 
     const chosen = invitationAdminPermissions({

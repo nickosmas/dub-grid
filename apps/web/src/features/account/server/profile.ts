@@ -294,6 +294,51 @@ export async function fetchProfileOverviewScheduleCells(
   return (data ?? []) as DbScheduleCell[];
 }
 
+type ScheduleEntryLookups = Pick<
+  Parameters<typeof mapNormalizedScheduleCellRowToScheduleEntry>[1],
+  "assignmentLabelMap" | "assignmentIdByPair" | "absenceTypeMap"
+>;
+
+function scheduleEntryLookups({
+  assignments,
+  absenceTypeMap,
+}: Awaited<ReturnType<typeof fetchAssignmentContext>>): ScheduleEntryLookups {
+  return {
+    assignmentLabelMap: new Map(assignments.map((assignment) => [assignment.id, assignment.label])),
+    assignmentIdByPair: createAssignmentDefinitionIdByPairMap(assignments),
+    absenceTypeMap,
+  };
+}
+
+function toPublishedShiftMap(rows: DbScheduleCell[], lookups: ScheduleEntryLookups): ShiftMap {
+  const shifts: ShiftMap = {};
+  for (const row of rows) {
+    const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
+      isScheduler: false,
+      ...lookups,
+    });
+    if (entry) shifts[`${row.emp_id}_${row.date}`] = toPublishedOnlyProfileEntry(entry);
+  }
+  return shifts;
+}
+
+/** Your own published shifts over a period; none without a schedule record there. */
+export async function fetchSelfPeriodShifts(
+  userId: string,
+  orgId: string,
+  range: ProfileOverviewDateRange,
+): Promise<ShiftMap> {
+  // Membership first: an Offboarded person keeps the user id on their staff row.
+  if (!(await fetchOwnMembership(userId, orgId))) return {};
+  const employee = await fetchLinkedEmployeeByUserId(userId, orgId);
+  if (!employee) return {};
+  const [assignmentContext, rows] = await Promise.all([
+    fetchAssignmentContext(orgId),
+    fetchProfileOverviewScheduleCells(getServiceClient(), orgId, employee.id, range),
+  ]);
+  return toPublishedShiftMap(rows, scheduleEntryLookups(assignmentContext));
+}
+
 export async function fetchSelfWorkProfileSnapshot(
   userId: string,
   orgId: string | null,
@@ -351,11 +396,8 @@ export async function fetchSelfWorkProfileSnapshot(
     fetchAssignmentContext(orgId),
     fetchOrganizationTimeZone(orgId),
   ]);
-  const { assignments, shiftCategories, jobs, absenceTypeMap } = assignmentContext;
-  const assignmentLabelMap = new Map(
-    assignments.map((assignment) => [assignment.id, assignment.label]),
-  );
-  const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(assignments);
+  const { assignments, shiftCategories, jobs } = assignmentContext;
+  const lookups = scheduleEntryLookups(assignmentContext);
   const segmentCompatibility = createShiftJobCompatibilityMaps({
     assignments,
     shiftCategories,
@@ -379,30 +421,14 @@ export async function fetchSelfWorkProfileSnapshot(
 
   if (recurringResult.error) throw recurringResult.error;
 
-  const shifts: ShiftMap = {};
-
-  for (const row of scheduleCellsResult) {
-    const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
-      isScheduler: false,
-      assignmentLabelMap,
-      assignmentIdByPair,
-      absenceTypeMap,
-    });
-
-    if (!entry) {
-      continue;
-    }
-
-    shifts[`${row.emp_id}_${row.date}`] = toPublishedOnlyProfileEntry(entry);
-  }
-
+  const shifts = toPublishedShiftMap(scheduleCellsResult, lookups);
   const recurringShifts = ((recurringResult.data ?? []) as DbRecurringShift[]).map((row) =>
     rowToRecurringShift(
       row,
-      assignmentLabelMap,
-      absenceTypeMap,
+      lookups.assignmentLabelMap,
+      lookups.absenceTypeMap,
       segmentCompatibility,
-      assignmentIdByPair,
+      lookups.assignmentIdByPair,
     ),
   );
   return {

@@ -2344,7 +2344,7 @@ export default function PersonDetailScreen() {
         visible={showManagementAccess}
       />
       <PersonInviteSheet
-        canGrantSuperAdmin={bootstrapQuery.data?.effectiveRole === "super_admin"}
+        canGrantElevatedRoles={bootstrapQuery.data?.effectiveRole === "super_admin"}
         email={person.email}
         permissionLabels={{ focusAreaLabel, certificationLabel, roleLabel }}
         error={invitationError}

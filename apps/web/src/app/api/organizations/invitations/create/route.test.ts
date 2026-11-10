@@ -29,12 +29,10 @@ vi.mock("@/app/api/employees/shared", () => ({
   canManageEmployees: (...args: unknown[]) => canManageEmployees(...args),
   isGridmasterActor: (...args: unknown[]) => isGridmasterActor(...args),
   isOrgSuperAdminOrGridmaster: (...args: unknown[]) => isOrgSuperAdminOrGridmaster(...args),
-  // The route now asks the shared ceiling helper, which defers to the tier
-  // check these cases already drive.
-  canAssignOrgRole: (client: unknown, actorId: unknown, orgId: unknown, role: unknown) =>
-    role !== "super_admin"
-      ? Promise.resolve(true)
-      : Promise.resolve(isOrgSuperAdminOrGridmaster(client, actorId, orgId)),
+  // The shared ceiling helper, driven by the tier check these cases set
+  // (shared.test.ts covers the helper itself).
+  canAssignOrgRole: async (client: unknown, actorId: unknown, orgId: unknown, role: string) =>
+    role === "user" || (await isOrgSuperAdminOrGridmaster(client, actorId, orgId)),
 }));
 vi.mock("@/lib/rate-limit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
@@ -142,7 +140,7 @@ describe("a Gridmaster's invitation (41d4, F-59)", () => {
     getServiceClient.mockReturnValue({ rpc: invitationRpc() });
 
     const { POST } = await importRoute();
-    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
 
     expect(res.status).toBe(200);
     expect(requireSensitiveActionAuth).not.toHaveBeenCalled();
@@ -168,7 +166,7 @@ describe("POST /api/organizations/invitations/create", () => {
     forbidIfSandboxCookie.mockReturnValue(NextResponse.json({ error: "sandbox" }, { status: 403 }));
 
     const { POST } = await importRoute();
-    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
 
     expect(res.status).toBe(403);
     // Hard 403 before auth/service-client: no invitation is ever created.
@@ -201,7 +199,7 @@ describe("POST /api/organizations/invitations/create", () => {
     getServiceClient.mockReturnValue({ rpc });
 
     const { POST } = await importRoute();
-    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
 
     expect(res.status).toBe(200);
     // The token is emailed, never returned: the browser has no use for it.
@@ -226,6 +224,42 @@ describe("POST /api/organizations/invitations/create", () => {
     expect(rpc).toHaveBeenCalledWith(
       "send_invitation",
       expect.objectContaining({ p_invited_by: "actor-1" }),
+    );
+  });
+
+  it("lets an Admin who manages staff invite a User (F-238)", async () => {
+    const rpc = invitationRpc();
+    getServiceClient.mockReturnValue({ rpc });
+
+    const { POST } = await importRoute();
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
+
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith(
+      "send_invitation",
+      expect.objectContaining({ p_role: "user" }),
+    );
+  });
+
+  it("refuses an Admin inviting an Admin, records it, and sends nothing (F-238)", async () => {
+    const rpc = vi.fn();
+    const auditInsert = vi.fn(async () => ({ error: null }));
+    getServiceClient.mockReturnValue({ rpc, from: () => ({ insert: auditInsert }) });
+
+    const { POST } = await importRoute();
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toEqual({
+      error: "Only a Super Admin can invite someone as an Admin.",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(sendPendingInvitationEmail).not.toHaveBeenCalled();
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "invitation.access_denied",
+        details: expect.objectContaining({ requestedRole: "admin", reason: "policy_denied" }),
+      }),
     );
   });
 
@@ -283,8 +317,8 @@ describe("POST /api/organizations/invitations/create", () => {
     );
   });
 
-  // A pending row granting exactly what the "admin" requests below ask for.
-  const SAME_ACCESS_AS_ADMIN = { role_to_assign: "admin", department_ids: [], dept_admin_ids: [] };
+  // A pending row granting exactly what the "user" requests below ask for.
+  const SAME_ACCESS_AS_USER = { role_to_assign: "user", department_ids: [], dept_admin_ids: [] };
 
   // Chainable stub for the refreshPendingInvitation update: .update().eq().ilike()
   // .is().is().gte().select().maybeSingle()
@@ -312,7 +346,7 @@ describe("POST /api/organizations/invitations/create", () => {
 
     const res = await (
       await importRoute()
-    ).POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
+    ).POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
 
     expect(res.status).toBe(200);
     expect(from).toHaveBeenCalledWith("audit_log");
@@ -323,7 +357,7 @@ describe("POST /api/organizations/invitations/create", () => {
         action: "invitation.created",
         resource_type: "invitation",
         resource_id: "inv-9",
-        details: expect.objectContaining({ email: "new@test.com", role: "admin" }),
+        details: expect.objectContaining({ email: "new@test.com", role: "user" }),
       }),
     );
   });
@@ -341,7 +375,7 @@ describe("POST /api/organizations/invitations/create", () => {
 
     const res = await (
       await importRoute()
-    ).POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
+    ).POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "user" }));
 
     // The invitation exists by now, so losing its record must not turn a
     // successful create into a 500 the caller would retry.
@@ -363,7 +397,7 @@ describe("POST /api/organizations/invitations/create", () => {
               email: "orphan@test.com",
               token: "fresh-tok",
               expires_at: "2026-02-02T00:00:00Z",
-              ...SAME_ACCESS_AS_ADMIN,
+              ...SAME_ACCESS_AS_USER,
             },
             error: null,
           }),
@@ -371,7 +405,7 @@ describe("POST /api/organizations/invitations/create", () => {
     getServiceClient.mockReturnValue({ rpc, from });
 
     const { POST } = await importRoute();
-    const res = await POST(makeRequest({ orgId: ORG_ID, email: "orphan@test.com", role: "admin" }));
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "orphan@test.com", role: "user" }));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -421,7 +455,7 @@ describe("POST /api/organizations/invitations/create", () => {
         email: "John_Smith@test.com",
         token: "fresh-tok",
         expires_at: "2026-02-02T00:00:00Z",
-        ...SAME_ACCESS_AS_ADMIN,
+        ...SAME_ACCESS_AS_USER,
       },
       error: null,
     });
@@ -433,7 +467,7 @@ describe("POST /api/organizations/invitations/create", () => {
 
     const { POST } = await importRoute();
     const res = await POST(
-      makeRequest({ orgId: ORG_ID, email: "john_smith@test.com", role: "admin" }),
+      makeRequest({ orgId: ORG_ID, email: "john_smith@test.com", role: "user" }),
     );
 
     expect(res.status).toBe(200);
@@ -468,7 +502,7 @@ describe("POST /api/organizations/invitations/create", () => {
     getServiceClient.mockReturnValue({ rpc, from: vi.fn(() => chain) });
 
     const { POST } = await importRoute();
-    const res = await POST(makeRequest({ orgId: ORG_ID, email: "owner@test.com", role: "admin" }));
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "owner@test.com", role: "user" }));
 
     expect(res.status).toBe(409);
     await expect(res.json()).resolves.toEqual({
@@ -487,7 +521,7 @@ describe("POST /api/organizations/invitations/create", () => {
     getServiceClient.mockReturnValue({ rpc, from });
 
     const { POST } = await importRoute();
-    const res = await POST(makeRequest({ orgId: ORG_ID, email: "gone@test.com", role: "admin" }));
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "gone@test.com", role: "user" }));
 
     expect(res.status).toBe(409);
   });
@@ -542,7 +576,7 @@ describe("POST /api/organizations/invitations/create", () => {
           id: "inv-a",
           token: "fresh-tok",
           expires_at: "2026-02-02T00:00:00Z",
-          ...SAME_ACCESS_AS_ADMIN,
+          ...SAME_ACCESS_AS_USER,
         },
       }),
     );
@@ -556,7 +590,7 @@ describe("POST /api/organizations/invitations/create", () => {
       makeRequest({
         orgId: ORG_ID,
         email: "shared@test.com",
-        role: "admin",
+        role: "user",
         employeeId: EMPLOYEE_B,
       }),
     );
@@ -578,7 +612,7 @@ describe("POST /api/organizations/invitations/create", () => {
           id: "inv-a",
           token: "fresh-tok",
           expires_at: "2026-02-02T00:00:00Z",
-          ...SAME_ACCESS_AS_ADMIN,
+          ...SAME_ACCESS_AS_USER,
         },
       }),
     );
@@ -589,7 +623,7 @@ describe("POST /api/organizations/invitations/create", () => {
       makeRequest({
         orgId: ORG_ID,
         email: "shared@test.com",
-        role: "admin",
+        role: "user",
         employeeId: EMPLOYEE_A,
       }),
     );
@@ -621,7 +655,7 @@ describe("POST /api/organizations/invitations/create", () => {
       makeRequest({
         orgId: ORG_ID,
         email: "shared@test.com",
-        role: "admin",
+        role: "user",
         employeeId: EMPLOYEE_B,
       }),
     );
@@ -638,7 +672,7 @@ describe("POST /api/organizations/invitations/create", () => {
     getServiceClient.mockReturnValue({ rpc, from });
 
     const { POST } = await importRoute();
-    const res = await POST(makeRequest({ orgId: ORG_ID, email: "member@test.com", role: "admin" }));
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "member@test.com", role: "user" }));
 
     expect(res.status).toBe(409);
     expect(from).not.toHaveBeenCalled();

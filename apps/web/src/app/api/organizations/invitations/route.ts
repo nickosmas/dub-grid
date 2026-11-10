@@ -32,7 +32,7 @@ import {
   sendPendingInvitationEmail,
 } from "@/features/organization/server/invitation-delivery";
 import { INVITATION_LIFETIME_MS } from "@/lib/auth/invitation-capability";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, getOrgRoleGrantRefusal } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -315,10 +315,12 @@ export async function PATCH(req: NextRequest) {
         : undefined;
     const emailChanged = nextEmail !== undefined && nextEmail !== currentInvitation.email;
     const grantedRole = fields.roleToAssign ?? currentInvitation.roleToAssign;
+    const roleChanged = grantedRole !== currentInvitation.roleToAssign;
     // Redirecting a pending invitation grants its role to the new address, so
-    // the editor must be able to grant that role, as for a role change.
+    // the editor must be able to grant that role, as for a role change (F-218).
+    // Editors resend the unchanged role with other edits, which grants nothing.
     if (
-      (fields.roleToAssign !== undefined || emailChanged) &&
+      (roleChanged || emailChanged) &&
       !(await canAssignOrgRole(getServiceClient(), user.id, orgId, grantedRole))
     ) {
       await writeInvitationAuditEntry({
@@ -338,7 +340,7 @@ export async function PATCH(req: NextRequest) {
         ipAddress: getRequestIp(req),
         userAgent: req.headers.get("user-agent"),
       });
-      return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
+      return NextResponse.json({ error: getOrgRoleGrantRefusal(grantedRole) }, { status: 403 });
     }
 
     const nextInvitation: Partial<Invitation> = {
@@ -366,8 +368,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: true, invitation: currentInvitation });
     }
 
-    const roleChanged =
-      fields.roleToAssign !== undefined && fields.roleToAssign !== currentInvitation.roleToAssign;
     // Redirecting a pending invitation to another address grants its role to
     // that address, so both changes need a Gridmaster's fresh proof (F-59), as
     // does a change to the departments it grants (F-68).
@@ -741,7 +741,10 @@ export async function POST(req: NextRequest) {
           ipAddress: getRequestIp(req),
           userAgent: req.headers.get("user-agent"),
         });
-        return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
+        return NextResponse.json(
+          { error: getOrgRoleGrantRefusal(parsed.data.roleToAssign) },
+          { status: 403 },
+        );
       }
 
       const { data: replacementData, error: replacementError } = await serviceClient.rpc(
@@ -771,7 +774,7 @@ export async function POST(req: NextRequest) {
         }
         if (message.includes("invitation_tier_denied")) {
           return NextResponse.json(
-            { error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN },
+            { error: getOrgRoleGrantRefusal(parsed.data.roleToAssign) },
             { status: 403 },
           );
         }
