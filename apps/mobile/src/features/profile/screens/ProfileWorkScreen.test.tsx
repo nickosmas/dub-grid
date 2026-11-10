@@ -391,9 +391,9 @@ describe("ProfileWorkScreen", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Select at least one focus area.")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(updateMobilePerson).toHaveBeenCalledWith(
@@ -428,7 +428,7 @@ describe("ProfileWorkScreen", () => {
     render(<ProfileWorkScreen />);
 
     fireEvent.click(screen.getByRole("checkbox", { name: "ICU" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("Clear your upcoming shifts in ICU?")).toBeInTheDocument();
     expect(
@@ -456,7 +456,7 @@ describe("ProfileWorkScreen", () => {
 
     expect(screen.getByText("Select at least one focus area.")).toBeInTheDocument();
     expect(screen.queryByText(/Saving now removes you/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
   it("carries no organization block — that is the profile hub's job", () => {
@@ -474,7 +474,7 @@ describe("ProfileWorkScreen", () => {
 
     expect(screen.getByLabelText("First name")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     // Save is grayed rather than removed, so the bar doesn't reflow the moment
     // the first field changes. With nothing typed the back button leads the
     // bar; Discard takes its place once there is something to throw away.
@@ -482,9 +482,9 @@ describe("ProfileWorkScreen", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: "RN" }));
 
-    expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(screen.queryByRole("alert")).toBeNull();
 
     await waitFor(() => {
@@ -505,7 +505,7 @@ describe("ProfileWorkScreen", () => {
   it("explains an email-change request before submitting it", () => {
     render(<ProfileWorkScreen />);
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     const confirmation = screen.getByRole("alert");
     expect(confirmation).toHaveTextContent("Change your sign-in email to new@example.com?");
     expect(confirmation).toHaveTextContent("new@example.com");
@@ -519,7 +519,7 @@ describe("ProfileWorkScreen", () => {
   it("says a sign-in email change applies to every organization", () => {
     render(<ProfileWorkScreen />);
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Your email changes for every organization you belong to.",
     );
@@ -542,7 +542,7 @@ describe("ProfileWorkScreen", () => {
     render(<ProfileWorkScreen />);
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Mia" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     fireEvent.click(
       within(screen.getByRole("alert")).getByRole("button", { name: "Request changes" }),
     );
@@ -559,7 +559,7 @@ describe("ProfileWorkScreen", () => {
     render(<ProfileWorkScreen />);
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Mia" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     fireEvent.click(
       within(screen.getByRole("alert")).getByRole("button", { name: "Request changes" }),
     );
@@ -590,7 +590,7 @@ describe("ProfileWorkScreen", () => {
     // Discard must not navigate.
     expect(routerBack).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
   it("hides an incompatible new role while keeping the selected role removable", () => {
@@ -618,7 +618,7 @@ describe("ProfileWorkScreen", () => {
     expect(screen.queryByRole("checkbox", { name: "CL" })).not.toBeInTheDocument();
 
     fireEvent.click(selectedRole);
-    expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
   });
 
   it("goes back without asking while there is nothing to lose", () => {
@@ -667,6 +667,6 @@ describe("ProfileWorkScreen", () => {
 
     expect(navigatedActions).toHaveLength(0);
     expect(screen.queryByText("Discard unsaved changes?")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
   });
 });

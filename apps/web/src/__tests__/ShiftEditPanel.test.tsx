@@ -1064,7 +1064,7 @@ describe("ShiftEditPanel", () => {
           vi.fn(),
         ),
       );
-      expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
 
       rerender(
         panelElement(
@@ -1073,7 +1073,7 @@ describe("ShiftEditPanel", () => {
           vi.fn(),
         ),
       );
-      expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
     });
 
     it("Cancel turns mentored back off when the label did not change", async () => {
@@ -1911,7 +1911,7 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByText("Editing this and later days")).toBeInTheDocument();
       expect(screen.getByText(/Times and notes change one day at a time/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Custom time/ })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
   });
 
@@ -2239,7 +2239,7 @@ describe("ShiftEditPanel", () => {
           vi.fn(),
         ),
       );
-      expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
       expect(screen.queryByText("Before")).not.toBeInTheDocument();
     });
 
@@ -2362,10 +2362,10 @@ describe("ShiftEditPanel", () => {
       }
 
       const card = () => document.querySelector<HTMLElement>("[data-rest-of-day-absence-card]")!;
-      const save = () => screen.getByRole("button", { name: "Save changes" });
+      const save = () => screen.getByRole("button", { name: "Save" });
       // With no edit to save the footer is hidden; with one, Save waits.
       const expectSaveBlocked = () => {
-        const button = screen.queryByRole("button", { name: "Save changes" });
+        const button = screen.queryByRole("button", { name: "Save" });
         if (button) expect(button).toBeDisabled();
       };
 
@@ -3211,7 +3211,7 @@ describe("ShiftEditPanel", () => {
       expect(onConfirmDraft).not.toHaveBeenCalled();
 
       await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
-      await user.click(screen.getByRole("button", { name: "Save changes" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(onConfirmDraft).toHaveBeenCalledTimes(1);
       expect(onConfirmDraft).toHaveBeenCalledWith(undefined);
@@ -3230,7 +3230,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
 
       expect(onConfirmDraft).not.toHaveBeenCalled();
-      expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
     });
 
     it("shows a stale warning and disables confirm when the cell changed externally", async () => {
@@ -3246,7 +3246,7 @@ describe("ShiftEditPanel", () => {
           "This shift changed in another tab or by another editor. Close and reopen it before saving.",
         ),
       ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
   });
 

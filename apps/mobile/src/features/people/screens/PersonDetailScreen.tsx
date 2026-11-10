@@ -1567,7 +1567,7 @@ export default function PersonDetailScreen() {
           <Button
             compact
             disabled={updateMutation.isPending || !hasChanges || hasEditValidationErrors}
-            label="Save changes"
+            label="Save"
             loading={updateMutation.isPending}
             onPress={handleSave}
           />
@@ -1630,7 +1630,7 @@ export default function PersonDetailScreen() {
           }}
           save={{
             label: "Save",
-            accessibilityLabel: "Save changes",
+            accessibilityLabel: "Save",
             disabled: updateMutation.isPending || !hasChanges || hasEditValidationErrors,
             loading: updateMutation.isPending,
             onPress: handleSave,
@@ -2136,7 +2136,7 @@ export default function PersonDetailScreen() {
                     statusChoice || startsNow || offboardsNow || suspendsNow || restoresNow
                       ? (statusCopy?.label ?? "")
                       : detailsPicked || hasStatusTopFields
-                        ? "Save changes"
+                        ? "Save"
                         : "Change status"
                   }
                   loading={statusMutation.isPending}

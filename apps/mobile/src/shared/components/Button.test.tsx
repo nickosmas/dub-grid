@@ -35,9 +35,9 @@ beforeEach(() => {
 describe("Button", () => {
   it("renders its label and fires onPress", () => {
     const onPress = vi.fn();
-    render(<Button label="Save changes" onPress={onPress} />);
+    render(<Button label="Save" onPress={onPress} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
@@ -71,17 +71,17 @@ describe("Button", () => {
   });
 
   it("uses the pill radius by default", () => {
-    render(<Button label="Save changes" onPress={vi.fn()} />);
+    render(<Button label="Save" onPress={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: "Save changes" })).toHaveStyle({
+    expect(screen.getByRole("button", { name: "Save" })).toHaveStyle({
       borderRadius: mobileRadii.pill,
     });
   });
 
   it("uses the tighter squircle radius when explicitly asked for one", () => {
-    render(<Button label="Save changes" onPress={vi.fn()} shape="squircle" />);
+    render(<Button label="Save" onPress={vi.fn()} shape="squircle" />);
 
-    expect(screen.getByRole("button", { name: "Save changes" })).toHaveStyle({
+    expect(screen.getByRole("button", { name: "Save" })).toHaveStyle({
       borderRadius: mobileRadius.md,
     });
   });

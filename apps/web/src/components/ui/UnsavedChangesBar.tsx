@@ -70,7 +70,7 @@ export function UnsavedChangesBar({
   dirty,
   saveDisabled = false,
   saving = false,
-  saveLabel = "Save changes",
+  saveLabel = "Save",
   onDiscard,
   onSave,
 }: UnsavedChangesBarProps) {
