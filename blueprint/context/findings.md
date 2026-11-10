@@ -1004,13 +1004,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Confirm on the stack. If it holds, require `canEditShifts` or `canManageEmployees` in the SQL for acting on someone else, and never auto-approve a request that someone other than the requester filed.
 **Resolution:**
 
-### F-242 [P2] open - The Staff row says it sets access roles, and doesn't say it can create Admins
+### F-242 [P2] fixed - The Staff row says it sets access roles, and doesn't say it can create Admins
 
 **File:** `packages/authz/src/permission-modules.ts:100-104`; `docs/reference/admin-permissions.mdx:23`
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX)
 **Why it matters:** "With Edit, they can also ... set their access role" is wrong: changing a member's role is Super Admin only (`access/route.ts:90-94`). It also omits what Edit does allow: inviting people as Admin (F-237), suspending and offboarding. A Super Admin deciding who gets the strongest switch reads the wrong consequences.
 **Suggested fix:** Describe exactly what the server allows once F-237 and F-239 are settled, and show a one-line warning when Staff: Edit is turned on.
-**Resolution:**
+**Resolution:** Fixed on fix/admin-tier-boundary (2026-11-10): with F-237 and F-239 settled, the Staff row reads "With Edit, they can also add people, invite them as Users, and change their status." (`permission-modules.ts`), and the Admin permissions reference says Staff: Edit invites as Users and lists inviting Admins and changing a Super Admin's access among what only a Super Admin does. The one-line warning when Staff: Edit is turned on was not added; F-246 covers the editor's other notes.
 
 ### F-243 [P2] open - An Admin never configured shows no permissions, and can't be edited on mobile
 

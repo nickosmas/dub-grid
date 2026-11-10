@@ -118,7 +118,7 @@ count query first so we know how many Admins it fills.
        prototyped. Tests cover an Admin refused on each action for a Super Admin, and allowed for
        an Admin or User target.
        **Done when:** the tests pass on web and mobile, and fail against the old guard.
-5. [ ] **Copy.** Update the Staff row description, and `docs/reference/admin-permissions.mdx`
+5. [x] **Copy.** Update the Staff row description, and `docs/reference/admin-permissions.mdx`
        to match.
        **Done when:** `npm run docs:check` passes.
 
