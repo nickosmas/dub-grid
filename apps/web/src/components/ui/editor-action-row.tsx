@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useRef, type CSSProperties, type ReactNode } from "react";
 import { useFloatingFooter } from "@/components/ui/use-floating-footer";
 import { cn } from "@/lib/utils";
 
@@ -33,18 +33,6 @@ export function EditorActionRow({
   const rowRef = useRef<HTMLDivElement>(null);
   const lifted = useFloatingFooter(rowRef, floating);
 
-  useEffect(() => {
-    const row = rowRef.current;
-    if (!row || !floating) return;
-    // Floating, the row wears the fill of the box it closes.
-    let box = row.parentElement;
-    while (box && getComputedStyle(box).backgroundColor === "rgba(0, 0, 0, 0)") {
-      box = box.parentElement;
-    }
-    if (!box) return;
-    const style = getComputedStyle(box);
-    row.style.setProperty("--dg-floating-footer-bg", style.backgroundColor);
-  }, [floating]);
   const baseStyle: CSSProperties = {
     display: "flex",
     alignItems: "center",
