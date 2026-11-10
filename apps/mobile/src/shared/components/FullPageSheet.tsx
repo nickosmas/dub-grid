@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import {
   type LayoutChangeEvent,
   Modal,
@@ -11,7 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { registerModalPresentation } from "../lib/modal-presentation";
-import { IS_IOS_LIST, IS_NATIVE_LIST } from "../lib/native-list";
+import { IS_NATIVE_LIST } from "../lib/native-list";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileSpace, type MobileColors } from "../theme/tokens";
 import { AppText } from "./AppText";
@@ -23,6 +22,10 @@ import { liftSheetActions, type ButtonProps } from "./sheet-bar-actions";
 import { BarAction } from "./SheetBarAction";
 import { AppLockOverlay } from "./AppLockSurface";
 import { useAppLockSurface } from "../lib/app-lock";
+
+// iOS presents a page sheet below the status bar; Android's full-screen
+// modal covers it, so its bar pads past the inset.
+const SHEET_COVERS_STATUS_BAR = Platform.OS !== "ios";
 
 /**
  * A task that needs the whole page: the platform's card-style sheet.
@@ -122,7 +125,7 @@ export function FullPageSheet({
       animationType="slide"
       navigationBarTranslucent
       onRequestClose={handleDismiss}
-      presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
+      presentationStyle={SHEET_COVERS_STATUS_BAR ? "fullScreen" : "pageSheet"}
       statusBarTranslucent
       visible={visible}
     >
@@ -206,7 +209,7 @@ function NativeSheetBar({
   const mobileColors = useMobileColors();
   const { top: topInset } = useSafeAreaInsets();
   const [sideWidths, setSideWidths] = useState({ leading: 0, trailing: 0 });
-  const sideWidth = IS_IOS_LIST ? Math.max(sideWidths.leading, sideWidths.trailing) : 0;
+  const sideWidth = Math.max(sideWidths.leading, sideWidths.trailing);
   const measure = (side: "leading" | "trailing") => (event: LayoutChangeEvent) => {
     const width = Math.ceil(event.nativeEvent.layout.width);
     setSideWidths((current) => (current[side] === width ? current : { ...current, [side]: width }));
@@ -215,36 +218,29 @@ function NativeSheetBar({
   const closeColor = closeDisabled ? mobileColors.textSubtle : mobileColors.textPrimary;
 
   return (
-    <View style={[barStyles.bar, !IS_IOS_LIST && { paddingTop: topInset + mobileSpace.sm }]}>
+    <View
+      style={[barStyles.bar, SHEET_COVERS_STATUS_BAR && { paddingTop: topInset + mobileSpace.sm }]}
+    >
       <View style={[barStyles.side, { minWidth: sideWidth }]}>
         <View onLayout={measure("leading")} style={barStyles.sideContent}>
           <ChromeIconButton accessibilityLabel="Close" disabled={closeDisabled} onPress={onClose}>
-            {IS_IOS_LIST ? (
-              <Ionicons color={closeColor} name="close" size={22} />
-            ) : (
-              <MaterialIcons color={closeColor} name="close" size={24} />
-            )}
+            <Ionicons color={closeColor} name="close" size={22} />
           </ChromeIconButton>
           {back ? <BarAction action={back} kind="secondary" /> : null}
         </View>
       </View>
-      <View style={IS_IOS_LIST ? barStyles.iosTitles : barStyles.materialTitles}>
+      <View style={barStyles.iosTitles}>
         <AppText
           accessibilityRole="header"
-          align={IS_IOS_LIST ? "center" : undefined}
+          align="center"
           fit="fixed"
-          numberOfLines={IS_IOS_LIST ? 2 : 1}
-          variant={IS_IOS_LIST ? "cardTitle" : "title"}
+          numberOfLines={2}
+          variant="cardTitle"
         >
           {title}
         </AppText>
         {subtitle ? (
-          <AppText
-            align={IS_IOS_LIST ? "center" : undefined}
-            numberOfLines={2}
-            tone="secondary"
-            variant="meta"
-          >
+          <AppText align="center" numberOfLines={2} tone="secondary" variant="meta">
             {subtitle}
           </AppText>
         ) : null}
@@ -286,10 +282,6 @@ const barStyles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
   },
-  materialTitles: {
-    flex: 1,
-    gap: mobileSpace.xs,
-  },
 });
 
 const createStyles = (
@@ -310,7 +302,7 @@ const createStyles = (
       paddingHorizontal: mobileSpace.xl,
       // A pageSheet already sits below the status bar; on Android the modal
       // is its own window and needs the inset itself.
-      paddingTop: Platform.OS === "ios" ? mobileSpace["2xl"] : mobileSpace["2xl"] + topInset,
+      paddingTop: SHEET_COVERS_STATUS_BAR ? mobileSpace["2xl"] + topInset : mobileSpace["2xl"],
       paddingBottom: mobileSpace.md,
     },
     headerCopy: {

@@ -1,7 +1,7 @@
 import { forwardRef, useMemo, useState, type ReactNode } from "react";
 import { StyleSheet, TextInput, View, type TextInputProps } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
-import { IS_ANDROID_LIST, IS_IOS_LIST } from "../../../shared/lib/native-list";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
@@ -15,10 +15,9 @@ import {
 
 /**
  * The app's auth text field: a row that owns its own focus state, with
- * optional trailing content (a domain suffix, a visibility toggle). iOS draws
- * it as a grouped text field (a filled rounded row with no border) and
- * Android as Material 3's outlined field; the web build and the tests keep the
- * bordered row.
+ * optional trailing content (a domain suffix, a visibility toggle). The
+ * phones draw it as a grouped text field (a filled rounded row with no
+ * border); the web build and the tests keep the bordered row.
  *
  * Extracted from sign-in so forgot-password and reset-password get exactly the
  * same field rather than a near-copy that drifts.
@@ -55,11 +54,10 @@ export const AuthField = forwardRef<
     <View
       style={[
         styles.row,
-        IS_IOS_LIST && styles.rowIos,
-        IS_ANDROID_LIST && styles.rowAndroid,
+        IS_NATIVE_LIST && styles.rowNative,
         variant === "code" && styles.rowCode,
-        focused && !IS_IOS_LIST && (IS_ANDROID_LIST ? styles.rowFocusedAndroid : styles.rowFocused),
-        hasError && (IS_ANDROID_LIST ? styles.rowErrorAndroid : styles.rowError),
+        focused && !IS_NATIVE_LIST && styles.rowFocused,
+        hasError && styles.rowError,
       ]}
     >
       <TextInput
@@ -109,24 +107,8 @@ const createStyles = (mobileColors: MobileColors) =>
       borderColor: mobileColors.inputBorder,
       backgroundColor: mobileColors.surface,
     },
-    rowIos: {
+    rowNative: {
       borderWidth: 0,
-    },
-    // Material 3's outlined field: a 1dp outline at rest, 2dp in the primary
-    // colour when focused, on a 4dp corner.
-    rowAndroid: {
-      borderRadius: 4,
-      borderWidth: 1,
-      borderColor: mobileColors.border,
-      backgroundColor: "transparent",
-    },
-    rowFocusedAndroid: {
-      borderWidth: 2,
-      borderColor: mobileColors.brand,
-    },
-    rowErrorAndroid: {
-      borderWidth: 2,
-      borderColor: mobileColors.inputBorderError,
     },
     rowCode: {
       // The code's 32pt line plus its padding already clears the floor; this

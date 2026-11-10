@@ -3,7 +3,6 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { FitText } from "../../../shared/components/FitText";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { Text } from "../../../shared/components/Text";
-import { IS_ANDROID_LIST } from "../../../shared/lib/native-list";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileListRow,
@@ -40,7 +39,7 @@ export function RequestListSection({
         <Text
           accessibilityLabel={accessibilityLabel}
           accessibilityRole="header"
-          style={[styles.title, IS_ANDROID_LIST && styles.titleAndroid]}
+          style={styles.title}
         >
           {title}
         </Text>
@@ -101,10 +100,6 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.textPrimary,
     },
     // Material 3: a list subheader in the brand colour.
-    titleAndroid: {
-      ...mobileTextWeighted("body", "semibold"),
-      color: mobileColors.brand,
-    },
     count: {
       ...mobileText.body,
       color: mobileColors.textSecondary,

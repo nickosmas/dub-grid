@@ -5,8 +5,6 @@ export type ToneSymbolProps = {
   /** The offline notice's own symbol in place of the tone's shape. */
   offline?: boolean;
   size: number;
-  /** The filled shape. */
+  /** The filled shape; its mark is cut out to whatever is behind. */
   color: string;
-  /** The mark on the shape (iOS); Android's glyphs cut it out to whatever is behind. */
-  markColor: string;
 };

@@ -15,7 +15,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
 import { SelectionCheck } from "../../../shared/components/SelectionCheck";
-import { IS_ANDROID_LIST, IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
@@ -766,9 +766,7 @@ function OrganizationOptionRow({
       </View>
       {/* The row's own accessibilityLabel already says "current organization",
           so the mark is decorative here. */}
-      {membership.isCurrent || IS_ANDROID_LIST ? (
-        <SelectionCheck selected={membership.isCurrent} />
-      ) : null}
+      {membership.isCurrent ? <SelectionCheck selected={membership.isCurrent} /> : null}
     </>
   );
 

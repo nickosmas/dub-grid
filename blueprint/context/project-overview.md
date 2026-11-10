@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Items 1 through 39 and 41 through 54 are
-shipped, and so is item 55. Items 40 and 56 are in progress.
+shipped, and so are items 55 and 56. Item 40 is in progress.
 
 | Item | Status      | Outcome                                                                                                                         |
 | ---- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -90,7 +90,7 @@ shipped, and so is item 55. Items 40 and 56 are in progress.
 | 53   | Shipped     | Past days are finished: a past cell opens Correct this day, which fixes the published day with a reason.                        |
 | 54   | Shipped     | People away or absent all period sit last in their section, under a group row that folds.                                       |
 | 55   | Shipped     | One staff page holds everything stored about a person, in tabs that follow one chosen period.                                   |
-| 56   | In progress | The app feels built for each phone: Liquid Glass on iOS, Material 3 on Android, and a My schedule \| Team switch on admin Home. |
+| 56   | Shipped     | The app feels built for each phone: native navigation, sheets and alerts, one DubGrid design, and a My schedule \| Team switch. |
 
 Item 40 is split:
 
@@ -597,9 +597,19 @@ Item 56, native iOS and Android, is split (owner decisions, 2026-10-31):
   star alone, sections open from their title, section tags are Liquid Glass
   capsules or Material filter chips, and lists and cards are the platforms'
   grouped lists on a grouped gray page.
-- **56d - Polish pass:** planned; every screen on both platforms.
+- **56d - Platform consolidation:** shipped; one DubGrid design on both
+  phones and native only where iOS, Android or the navigation library supply
+  it (navigation bar, tab bar, search, system alerts, sheets, date picker,
+  share, haptics). The segmented switch, toasts (at the top), tab strip,
+  selection marks, status symbols, round header button, text fields and lists
+  are one control each, keeping Liquid Glass and ripples as materials; search
+  is the system's on both phones; a sheet's discard asks in the system alert;
+  the tab list is written once; and a lint rule keeps platform checks out of
+  screens. Replaces the polish pass.
 
-Android keeps DubGrid's brand colors rather than wallpaper colors.
+Android keeps DubGrid's brand colors rather than wallpaper colors. The app
+follows the industry standard for cross-platform apps rather than drawing each
+control per platform (owner, 2026-11-09).
 
 Public documentation covers customer behavior only. Gridmaster tooling, Test
 Sandbox, feature flags, migrations, environment variables, and internal HTTP

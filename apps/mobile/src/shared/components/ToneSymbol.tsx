@@ -16,7 +16,7 @@ const TONE_ICON: Record<ToneSymbolProps["tone"], MaterialIconName> = {
 /**
  * A tone's filled Material icon: a circle with a check, a triangle with !, a
  * circle with i, an octagon with !. Its mark is a hole in the shape, so it
- * shows whatever is behind. iOS draws SF Symbols (`.ios.tsx`).
+ * shows whatever is behind. The same on both phones.
  */
 export function ToneSymbol({ tone, offline = false, size, color }: ToneSymbolProps) {
   return (

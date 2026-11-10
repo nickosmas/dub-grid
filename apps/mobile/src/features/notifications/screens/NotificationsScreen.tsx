@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Platform, StyleSheet, View } from "react-native";
-import { Stack } from "expo-router";
+import { StyleSheet, View } from "react-native";
 import { HeaderLeadingTitle } from "../../../shared/navigation/HeaderLeadingTitle";
 import { useLargeTitleCollapse } from "../../../shared/navigation/useLargeTitleCollapse";
-import { useToolbarIcon } from "../../../shared/navigation/useToolbarIcon";
+import { HeaderBarAction } from "../../../shared/navigation/HeaderBarAction";
 import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ScreenSearch } from "../../../shared/components/ScreenSearch";
+import { ALERTS_SEARCH_PLACEHOLDER, ScreenSearch } from "../../../shared/components/ScreenSearch";
 import { Screen } from "../../../shared/components/Screen";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
 import {
@@ -383,7 +382,7 @@ export default function NotificationsScreen() {
       }}
     >
       <View style={styles.headerArea}>
-        <ScreenSearch placeholder="Search title or message" onSearchChange={setSearchInput} />
+        <ScreenSearch placeholder={ALERTS_SEARCH_PLACEHOLDER} onSearchChange={setSearchInput} />
 
         {/* Held back until the facets land: every tab carries a count, and
             painting the strip first made each badge pop in afterwards and shove
@@ -410,7 +409,14 @@ export default function NotificationsScreen() {
         {/* Mark all read is a bar action, as in Mail; how many are unread is
             already on the Unread filter. */}
         {unreadCount > 0 ? (
-          <MarkAllReadBarAction disabled={busy} onPress={() => setConfirmingMarkAllRead(true)} />
+          <HeaderBarAction
+            disabled={busy}
+            label="Mark all read"
+            materialIcon="done-all"
+            placement="right"
+            sfSymbol="checkmark.circle"
+            onPress={() => setConfirmingMarkAllRead(true)}
+          />
         ) : null}
         {/* Inside the header block so the placeholder rows sit the same
             compact gap below the unread row that the real rows do. */}
@@ -494,31 +500,3 @@ const createStyles = (mobileColors: MobileColors) =>
       marginHorizontal: getScreenGutter(),
     },
   });
-
-/** Mark all read in the navigation bar: the words on iOS, Material's done-all icon on Android. */
-function MarkAllReadBarAction({ disabled, onPress }: { disabled: boolean; onPress: () => void }) {
-  const androidIcon = useToolbarIcon("checkmark.circle", "done-all");
-
-  return (
-    <Stack.Toolbar placement="right">
-      {Platform.OS === "android" ? (
-        androidIcon ? (
-          <Stack.Toolbar.Button
-            accessibilityLabel="Mark all read"
-            disabled={disabled}
-            icon={androidIcon}
-            onPress={onPress}
-          />
-        ) : null
-      ) : (
-        <Stack.Toolbar.Button
-          accessibilityLabel="Mark all read"
-          disabled={disabled}
-          onPress={onPress}
-        >
-          Mark all read
-        </Stack.Toolbar.Button>
-      )}
-    </Stack.Toolbar>
-  );
-}
