@@ -558,7 +558,7 @@ describe("settings dirty save controls", () => {
       <Indicators indicatorTypes={[]} orgId="org-1" onChange={vi.fn()} canManageIndicatorTypes />,
     );
 
-    await user.click(screen.getByRole("button", { name: /\+ add schedule note/i }));
+    await user.click(screen.getByRole("button", { name: /^add schedule note/i }));
 
     expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
@@ -1571,7 +1571,7 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /^edit$/i }));
 
     expect(screen.getByText(/No wings yet/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "+ Add Wing" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Wing" })).toBeInTheDocument();
   });
 
   it("reorders departments from their keyboard handles", async () => {
@@ -1923,7 +1923,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /\+ add shift/i }));
+    await user.click(screen.getByRole("button", { name: /^add shift/i }));
 
     expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
@@ -1962,7 +1962,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /\+ add shift/i }));
+    await user.click(screen.getByRole("button", { name: /^add shift/i }));
     await user.type(screen.getByPlaceholderText("e.g. Day Shift"), "Day Shift");
 
     expect(screen.getByDisplayValue("D")).toBeInTheDocument();
@@ -3197,7 +3197,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /\+ add absence type/i }));
+    await user.click(screen.getByRole("button", { name: /^add absence type/i }));
 
     expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();

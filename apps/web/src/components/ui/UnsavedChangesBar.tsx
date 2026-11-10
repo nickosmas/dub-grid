@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { footerSection, useFloatingFooter } from "@/components/ui/use-floating-footer";
 import { cn } from "@/lib/utils";
 
 /** Cards a docked bar can close off; SectionCard and other styled cards opt in. */
@@ -32,10 +33,9 @@ interface UnsavedChangesScopeProps {
 }
 
 /**
- * Wraps the section an Unsaved changes bar saves. The bar floats at the
- * bottom of the screen while the section is in view, rests under it at its
- * end, and scrolls away with it. A bar rendered anywhere inside, even inside a
- * card that clips its overflow, is moved to the scope's end.
+ * Wraps the section an Unsaved changes bar saves, so the bar sticks within the
+ * whole section and scrolls away with it. A bar rendered anywhere inside, even
+ * inside a card that clips its overflow, is moved to the scope's end.
  */
 export function UnsavedChangesScope({ children, className, style }: UnsavedChangesScopeProps) {
   const [slot, setSlot] = useState<HTMLElement | null>(null);
@@ -51,6 +51,8 @@ export function UnsavedChangesScope({ children, className, style }: UnsavedChang
 }
 
 interface UnsavedChangesBarProps {
+  /** Something differs from what is saved. Until then Save is off and the bar stays put. */
+  dirty: boolean;
   saveDisabled?: boolean;
   saving?: boolean;
   saveLabel?: string;
@@ -59,8 +61,13 @@ interface UnsavedChangesBarProps {
   onSave: () => void;
 }
 
-/** Shown once a section that edits in place has something to save. */
+/**
+ * The footer of a section that edits in place, always shown. While one of its
+ * buttons can be pressed it floats at the bottom of the screen as the section
+ * scrolls; otherwise, and at the section's end, it is the last card's footer.
+ */
 export function UnsavedChangesBar({
+  dirty,
   saveDisabled = false,
   saving = false,
   saveLabel = "Save changes",
@@ -69,87 +76,49 @@ export function UnsavedChangesBar({
 }: UnsavedChangesBarProps) {
   const slot = useContext(UnsavedChangesSlotContext);
   const barRef = useRef<HTMLDivElement>(null);
-  const [placement, setPlacement] = useState<"floating" | "docked" | "resting">("resting");
-  // Only shown while a button can be pressed, or while a save is underway.
-  const actionable = saving || !saveDisabled || Boolean(onDiscard);
-  const shown = slot !== null && actionable;
+  const showDiscard = dirty && Boolean(onDiscard);
+  const canSave = dirty && !saveDisabled;
+  // It floats only while something can be pressed, or while a save is underway.
+  const sticky = saving || canSave || showDiscard;
+  const floating = useFloatingFooter(barRef, sticky && slot !== null);
+  const [docked, setDocked] = useState(false);
 
   useEffect(() => {
     const bar = barRef.current;
-    let section = bar?.parentElement ?? null;
-    while (section && getComputedStyle(section).display === "contents") {
-      section = section.parentElement;
+    const section = bar ? footerSection(bar) : null;
+    if (!bar || !section || slot === null) return;
+    // The card the bar closes off: the last one in the section.
+    const host =
+      Array.from(section.querySelectorAll<HTMLElement>(HOST_SELECTOR))
+        .filter((card) => !bar.contains(card) && !card.parentElement?.closest(HOST_SELECTOR))
+        .at(-1) ?? null;
+    if (!host) {
+      setDocked(false);
+      return;
     }
-    if (!shown || !bar || !section) return;
-    const scope = section;
-    let host: HTMLElement | null = null;
-    // The card the bar closes off when it docks: the last one in the section.
-    const findHost = () => {
-      const cards = Array.from(scope.querySelectorAll<HTMLElement>(HOST_SELECTOR)).filter(
-        (card) => !bar.contains(card) && !card.parentElement?.closest(HOST_SELECTOR),
-      );
-      const next = cards.at(-1) ?? null;
-      if (next !== host) {
-        host?.removeAttribute(DOCKED_HOST_ATTRIBUTE);
-        host = next;
-        if (host) {
-          const style = getComputedStyle(host);
-          bar.style.setProperty("--dg-unsaved-bar-host-radius", style.borderBottomLeftRadius);
-          bar.style.setProperty("--dg-unsaved-bar-host-shadow", style.boxShadow);
-          const paddingX = style.getPropertyValue("--dg-card-padding-x").trim();
-          bar.style.setProperty("--dg-unsaved-bar-host-px", paddingX || "20px");
-        }
-      }
-    };
-    // At rest the bar is the last thing in its section, so the two share a
-    // bottom edge; floating, sticky lifts the bar above it.
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      if (!host?.isConnected) findHost();
-      const floating =
-        scope.getBoundingClientRect().bottom - bar.getBoundingClientRect().bottom > 1;
-      host?.toggleAttribute(DOCKED_HOST_ATTRIBUTE, !floating);
-      setPlacement(floating ? "floating" : host ? "docked" : "resting");
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(measure);
-    };
-    findHost();
-    measure();
-    document.addEventListener("scroll", schedule, { capture: true, passive: true });
-    window.addEventListener("resize", schedule);
-    bar.addEventListener("animationend", schedule);
-    const resizeObserver =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(() => {
-            findHost();
-            schedule();
-          });
-    resizeObserver?.observe(scope);
-    return () => {
-      cancelAnimationFrame(frame);
-      document.removeEventListener("scroll", schedule, { capture: true });
-      window.removeEventListener("resize", schedule);
-      bar.removeEventListener("animationend", schedule);
-      resizeObserver?.disconnect();
-      host?.removeAttribute(DOCKED_HOST_ATTRIBUTE);
-    };
-  }, [slot, shown]);
+    const style = getComputedStyle(host);
+    bar.style.setProperty("--dg-unsaved-bar-host-radius", style.borderBottomLeftRadius);
+    bar.style.setProperty("--dg-unsaved-bar-host-shadow", style.boxShadow);
+    const paddingX = style.getPropertyValue("--dg-card-padding-x").trim();
+    bar.style.setProperty("--dg-unsaved-bar-host-px", paddingX || "20px");
+    host.toggleAttribute(DOCKED_HOST_ATTRIBUTE, !floating);
+    setDocked(!floating);
+    return () => host.removeAttribute(DOCKED_HOST_ATTRIBUTE);
+  }, [slot, floating]);
 
-  if (!shown) return null;
+  if (slot === null) return null;
 
   const bar = (
     <div
       ref={barRef}
-      role="region"
-      aria-label="Unsaved changes"
-      data-placement={placement}
+      role={dirty ? "region" : undefined}
+      aria-label={dirty ? "Unsaved changes" : undefined}
+      data-sticky={sticky ? "" : undefined}
+      data-placement={floating ? "floating" : docked ? "docked" : "resting"}
       className="dg-unsaved-bar"
     >
       <div className="dg-unsaved-bar__actions">
-        {onDiscard ? (
+        {showDiscard ? (
           <Button
             type="button"
             className="dg-btn dg-btn-secondary"
@@ -162,7 +131,7 @@ export function UnsavedChangesBar({
         <Button
           type="button"
           className="dg-btn dg-btn-primary"
-          disabled={saveDisabled || saving}
+          disabled={!canSave || saving}
           onClick={onSave}
         >
           <ButtonLoading

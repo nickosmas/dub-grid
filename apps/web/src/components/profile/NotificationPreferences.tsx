@@ -342,9 +342,12 @@ export function NotificationPreferences({
           ))}
       </div>
 
-      {hasChanges ? (
-        <UnsavedChangesBar saving={saving} onDiscard={discard} onSave={() => void save()} />
-      ) : null}
+      <UnsavedChangesBar
+        dirty={hasChanges}
+        saving={saving}
+        onDiscard={discard}
+        onSave={() => void save()}
+      />
     </div>
   );
 }
