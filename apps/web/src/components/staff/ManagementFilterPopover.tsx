@@ -1,12 +1,12 @@
 "use client";
 
 import { ORG_ROLE_LABELS } from "@dubgrid/domain";
-import { SpanTabs, type SpanTabItem } from "@/components/ui/span-tabs";
+import { CapsuleChoices, type CapsuleChoice } from "@/components/ui/capsule-choices";
 import { FilterField, FilterPanelShell } from "./FilterPanelShell";
 import { MANAGEMENT_ROLE_FILTERS } from "./useManagementFilters";
 import type { ManagementInvitationFilter, ManagementRoleFilter } from "./useManagementFilters";
 
-const ACCESS_ROLE_ITEMS: SpanTabItem<ManagementRoleFilter>[] = [
+const ACCESS_ROLE_ITEMS: CapsuleChoice<ManagementRoleFilter>[] = [
   { value: "all", label: "All" },
   ...MANAGEMENT_ROLE_FILTERS.map((role) => ({ value: role, label: ORG_ROLE_LABELS[role] })),
 ];
@@ -40,7 +40,7 @@ export function ManagementFilterPopover({
   onClearAll: () => void;
   hasActiveFilters: boolean;
 }) {
-  const invitationItems: SpanTabItem<ManagementInvitationFilter>[] = [
+  const invitationItems: CapsuleChoice<ManagementInvitationFilter>[] = [
     { value: "all", label: "All" },
     { value: "has_access", label: "Has access" },
     {
@@ -60,7 +60,7 @@ export function ManagementFilterPopover({
       onClose={onClose}
     >
       <FilterField label="Access role">
-        <SpanTabs
+        <CapsuleChoices
           aria-label="Access role"
           items={ACCESS_ROLE_ITEMS}
           value={filterRole}
@@ -68,7 +68,7 @@ export function ManagementFilterPopover({
         />
       </FilterField>
       <FilterField label="Invitation">
-        <SpanTabs
+        <CapsuleChoices
           aria-label="Invitation"
           items={invitationItems}
           value={filterInvitation}

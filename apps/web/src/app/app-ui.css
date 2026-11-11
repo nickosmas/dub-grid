@@ -4456,6 +4456,55 @@ button.dg-cc-sg-main {
   border-bottom: none;
 }
 
+/* Capsules: a filter's choices, one chosen, wrapping onto a second line
+   rather than scrolling. The chosen one is tinted, never filled with brand
+   blue, which is reserved for the action we want completed. */
+.dg-capsules {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.dg-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: 999px;
+  background: var(--dg-color-surface);
+  color: var(--dg-color-text-secondary);
+  font-family: inherit;
+  font-size: var(--dg-type-control-size);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease;
+}
+.dg-capsule:hover:not(.active) {
+  background: var(--dg-color-surface-hover);
+}
+.dg-capsule:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+.dg-capsule.active {
+  background: var(--dg-color-brand-bg);
+  border-color: var(--dg-color-brand-border);
+  color: var(--dg-color-brand);
+}
+.dg-capsule-count {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
 /* People filter panel: a popover on desktop, a bottom sheet on a phone. */
 .dg-filter-panel {
   display: flex;
@@ -4526,8 +4575,7 @@ button.dg-cc-sg-main {
   flex: 1 1 auto;
   min-width: 0;
 }
-/* A dropdown fills the row; a segmented control keeps its own width. */
-.dg-filter-field-control > :not(.dg-span-tabs) {
+.dg-filter-field-control > * {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -4548,11 +4596,4 @@ button.dg-cc-sg-main {
 }
 .dg-filter-panel--sheet .dg-filter-field-label {
   flex: none;
-}
-.dg-filter-panel--sheet .dg-filter-field-control > .dg-span-tabs {
-  flex: 1 1 auto;
-}
-.dg-filter-panel--sheet .dg-filter-field-control .dg-span-tab {
-  flex: 1 1 auto;
-  justify-content: center;
 }
