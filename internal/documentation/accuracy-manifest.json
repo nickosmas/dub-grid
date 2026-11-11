@@ -1322,7 +1322,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:df45c24c6045ef1c71404dfbb050e352e8bba5cfa085eefcb37098199ef2c19c"
+      "evidenceFingerprint": "sha256:13a3a936b9860216bf28a993a22de087cb6cfeface1ca6f215f403f28dc74a83"
     },
     {
       "id": "alerts",
@@ -1518,7 +1518,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:6c76085292a6c4adc7c41829c4314cbf1bb61f5ae59fb8dda7d7a8659db0b5f6"
+      "evidenceFingerprint": "sha256:1b4c79ee5382e680ad728c5fcd10962f819f4f21423f0b535bcc39099b2ad8bd"
     },
     {
       "id": "security-sessions",
@@ -1597,7 +1597,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:745cc3a4da33c34376562edbd390e8de4ff16be6010e2c421418b8fec89feb46"
+      "evidenceFingerprint": "sha256:cf1490f11ca28e49c8d28a096bc1f05087457b0a337e98ab54005d1ea4ad74cc"
     },
     {
       "id": "privacy-controls",
