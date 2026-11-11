@@ -15,6 +15,7 @@ import {
   type StatusActionCopy,
   DEFAULT_ORGANIZATION_LABELS,
   ADMINISTRATIVE_TEAM_LABELS,
+  canOfferMoveToNewEmail,
 } from "@dubgrid/domain";
 import {
   Linking,
@@ -41,6 +42,7 @@ import {
   getStaffNotesError,
   getOptionalUsPhoneError,
   normalizeOptionalStaffEmail,
+  normalizeRequiredStaffEmail,
   normalizeOptionalUsPhone,
   normalizeStaffName,
   normalizeStaffNotes,
@@ -72,6 +74,7 @@ import {
   checkMobilePersonContact,
   createMobilePersonInvitation,
   getMobilePerson,
+  moveMobilePersonToNewEmail,
   parseMobileAccountLinkChallenge,
   parseMobileContactConflict,
   parseMobileStaffFieldErrors,
@@ -138,6 +141,8 @@ import {
 } from "../components/StatusMark";
 import { ManagementAccessSheet } from "../components/ManagementAccessSheet";
 import { PersonInviteSheet } from "../components/PersonInviteSheet";
+import { MoveEmailSheet } from "../components/MoveEmailSheet";
+import { useMobileStepUpAction } from "../../profile/hooks/useMobileStepUpAction";
 import { PermissionsSheet } from "../components/PermissionsSheet";
 import {
   makePersonDraft as makeDraft,
@@ -324,6 +329,9 @@ export default function PersonDetailScreen() {
     Partial<Record<MobileStaffField, string>>
   >({});
   const [isCompactTitleVisible, setIsCompactTitleVisible] = useState(false);
+  const [showMoveEmail, setShowMoveEmail] = useState(false);
+  const [moveEmailError, setMoveEmailError] = useState<string | null>(null);
+  const stepUp = useMobileStepUpAction();
 
   const personQuery = useQuery({
     queryKey: mobileQueryKeys.person(accessToken, personId),
@@ -692,6 +700,53 @@ export default function PersonDetailScreen() {
     },
   });
 
+  const moveEmailMutation = useMutation({
+    mutationFn: async (input: { accessToken: string; email: string }) => {
+      if (!person) throw new Error("Person unavailable");
+      return moveMobilePersonToNewEmail(input.accessToken, person.id, {
+        email: normalizeRequiredStaffEmail(input.email),
+        expectedVersion: person.version,
+      });
+    },
+    onSuccess: async (result) => {
+      updateCachedPerson(result.person);
+      // The edit stays open on the record's new address, which is no longer
+      // anyone's sign-in, so the field becomes editable like any other.
+      setDraft((current) => (current ? { ...current, email: result.person.email } : current));
+      setShowMoveEmail(false);
+      pushToast(
+        result.invited
+          ? {
+              tone: "success",
+              title: "Moved to a new email",
+              message: `Invite sent to ${result.person.email}.`,
+            }
+          : {
+              tone: "warning",
+              title: "Moved to a new email",
+              message: "They were moved, but the invite didn't send. Send it from their page.",
+            },
+      );
+      await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
+    },
+  });
+
+  async function moveToNewEmail(email: string) {
+    setMoveEmailError(null);
+    try {
+      await stepUp.run((actionAccessToken) =>
+        moveEmailMutation.mutateAsync({ accessToken: actionAccessToken, email }),
+      );
+    } catch (error) {
+      setMoveEmailError(
+        parseMobileContactConflict(error)?.message ??
+          parseMobileStaffFieldErrors(error)?.email ??
+          getClientFriendlyErrorMessage(error, "We couldn't move them to that email. Try again."),
+      );
+      void personQuery.refetch();
+    }
+  }
+
   const hasChanges = Boolean(draft && person && personDraftHasChanges(draft, person));
   // `editing && hasChanges`, not just `editing`: on iOS the whole screen is a
   // back-swipe target, so a guard that fired for an untouched open panel would
@@ -974,6 +1029,14 @@ export default function PersonDetailScreen() {
   // role until it is accepted, and reading `orgRole` alone showed a pending
   // Admin as "User".
   const orgRole = getPersonOrgRole(person);
+  const canMoveToNewEmail =
+    canEdit &&
+    canOfferMoveToNewEmail({
+      employee: person,
+      orgRole,
+      currentUserId,
+      canGrantElevatedRoles: bootstrapQuery.data?.effectiveRole === "super_admin",
+    });
   // Only a Super Admin offboards or restores a Super Admin (51k); the server enforces it too.
   const reach = {
     canOffboard: canOffboardAtTier(
@@ -1715,6 +1778,14 @@ export default function PersonDetailScreen() {
             hasManagementAccess={person.managementDepartmentIds.length > 0}
             hasAccount={Boolean(person.userId)}
             initialFocusField={editFocusField}
+            onMoveToNewEmail={
+              canMoveToNewEmail
+                ? () => {
+                    setMoveEmailError(null);
+                    setShowMoveEmail(true);
+                  }
+                : undefined
+            }
             serverFieldErrors={serverFieldErrors}
             onChange={(next) => {
               // A server verdict only holds for the value it was given. Editing
@@ -2364,6 +2435,19 @@ export default function PersonDetailScreen() {
         personName={fullName}
         visible={showInviteSheet}
       />
+      <MoveEmailSheet
+        error={moveEmailError}
+        hidden={stepUp.active}
+        isPending={moveEmailMutation.isPending}
+        onDismiss={() => {
+          setMoveEmailError(null);
+          setShowMoveEmail(false);
+        }}
+        onMove={moveToNewEmail}
+        personName={fullName}
+        visible={showMoveEmail}
+      />
+      {stepUp.sheet}
       <PermissionsSheet
         error={permissionsError}
         isPending={permissionsMutation.isPending}
@@ -2611,6 +2695,7 @@ function EditPanel({
   initialFocusField,
   serverFieldErrors,
   onChange,
+  onMoveToNewEmail,
 }: {
   draft: EditDraft;
   saving: boolean;
@@ -2627,6 +2712,8 @@ function EditPanel({
   useCompactRoleCertificationLabels: boolean;
   serverFieldErrors: Partial<Record<MobileStaffField, string>>;
   onChange: (draft: EditDraft) => void;
+  /** Offered under a joined person's locked email, when this viewer may move them. */
+  onMoveToNewEmail?: () => void;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -2729,8 +2816,20 @@ function EditPanel({
           />
           {hasAccount ? (
             <Text style={styles.statusMessage}>
-              This is their sign-in email, so they change it on their own profile.
+              They sign in with this email, so they&apos;ll need to change it from their profile.
             </Text>
+          ) : null}
+          {hasAccount && onMoveToNewEmail ? (
+            <View style={styles.moveEmailRow}>
+              <Text style={styles.statusMessage}>Lost access to this email?</Text>
+              <Button
+                fullWidth={false}
+                label="Move them to a new one"
+                onPress={onMoveToNewEmail}
+                size="sm"
+                tone="link"
+              />
+            </View>
           ) : null}
         </ProfilePanel>
       </ProfileSection>
@@ -2839,6 +2938,12 @@ const createStyles = (mobileColors: MobileColors) =>
     statusMessage: {
       ...mobileText.body,
       color: mobileColors.textSecondary,
+    },
+    moveEmailRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      columnGap: mobileSpace.xs,
     },
     noteText: {
       ...mobileText.body,
