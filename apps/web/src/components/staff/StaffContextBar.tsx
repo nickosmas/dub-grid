@@ -21,6 +21,7 @@ import type {
   AccountStateFilter,
   CertificationFilter,
   EmploymentTypeFilter,
+  IdFilter,
   OrgRoleFilter,
   PhonePresenceFilter,
 } from "./useStaffFilters";
@@ -28,10 +29,10 @@ import type {
 interface StaffContextBarProps {
   // Filter state
   filterEmploymentType: EmploymentTypeFilter;
-  filterDepartment: number | null;
-  filterFocusArea: number | null;
+  filterDepartment: IdFilter;
+  filterFocusArea: IdFilter;
   filterCertification: CertificationFilter;
-  filterRole: number | null;
+  filterRole: IdFilter;
   filterAccount: AccountStateFilter;
   filterOrgRole: OrgRoleFilter;
   filterPhonePresence: PhonePresenceFilter;
@@ -132,37 +133,29 @@ export function StaffContextBar({
   const showReorder = isReordering;
   const isVisible = showFilters || showBulk || showReorder;
 
-  // Filter pill labels
-  const employmentTypeLabel =
-    filterEmploymentType === "full_time"
-      ? "Full-time"
-      : filterEmploymentType === "part_time"
-        ? "Part-time"
-        : null;
-  const departmentName = filterDepartment
-    ? departments.find((department) => department.id === filterDepartment)?.name
-    : null;
-  const focusAreaName = filterFocusArea
-    ? focusAreas.find((fa) => fa.id === filterFocusArea)?.name
-    : null;
-  const certificationName =
-    filterCertification === null
-      ? null
-      : filterCertification === "any"
+  // Filter pill labels: one pill per filter, naming every choice ticked in it.
+  const namesOf = (ids: readonly number[], items: readonly { id: number; name: string }[]) =>
+    joinNames(ids.map((id) => items.find((item) => item.id === id)?.name));
+  const employmentTypeLabel = joinNames(
+    filterEmploymentType.map((type) => (type === "part_time" ? "Part-time" : "Full-time")),
+  );
+  const departmentName = namesOf(filterDepartment, departments);
+  const focusAreaName = namesOf(filterFocusArea, focusAreas);
+  const certificationName = joinNames(
+    filterCertification.map((choice) =>
+      choice === "any"
         ? "Certified staff"
-        : filterCertification === "none"
+        : choice === "none"
           ? "Not certified"
-          : (certifications.find((certification) => certification.id === filterCertification)
-              ?.name ?? null);
-  const roleName = filterRole ? roles.find((r) => r.id === filterRole)?.name : null;
-  const accountLabel = filterAccount === "all" ? null : STAFF_ACCOUNT_STATE_LABELS[filterAccount];
-  const orgRoleLabel = filterOrgRole === "all" ? null : ORG_ROLE_LABELS[filterOrgRole];
-  const phonePresenceLabel =
-    filterPhonePresence === "present"
-      ? "Has phone"
-      : filterPhonePresence === "missing"
-        ? "Missing phone"
-        : null;
+          : certifications.find((certification) => certification.id === choice)?.name,
+    ),
+  );
+  const roleName = namesOf(filterRole, roles);
+  const accountLabel = joinNames(filterAccount.map((state) => STAFF_ACCOUNT_STATE_LABELS[state]));
+  const orgRoleLabel = joinNames(filterOrgRole.map((role) => ORG_ROLE_LABELS[role]));
+  const phonePresenceLabel = joinNames(
+    filterPhonePresence.map((presence) => (presence === "present" ? "Has phone" : "Missing phone")),
+  );
   const activeFilterCount = [
     employmentTypeLabel,
     departmentName,
@@ -221,11 +214,7 @@ export function StaffContextBar({
           )}
           {certificationName && (
             <FilterPill
-              label={
-                filterCertification === "any" || filterCertification === "none"
-                  ? certificationName
-                  : `${certificationLabel}: ${certificationName}`
-              }
+              label={`${certificationLabel}: ${certificationName}`}
               onClear={onClearCertification}
             />
           )}
@@ -313,6 +302,12 @@ export function StaffContextBar({
       )}
     </div>
   );
+}
+
+/** The names a filter has ticked, or null when it has none (or none still exist). */
+function joinNames(names: readonly (string | undefined)[]): string | null {
+  const known = names.filter((name): name is string => Boolean(name));
+  return known.length > 0 ? known.join(", ") : null;
 }
 
 // Applied-filter chip: matches <StatusPill>'s neutral tone + adds a close affordance.

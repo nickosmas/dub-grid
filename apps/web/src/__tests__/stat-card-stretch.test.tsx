@@ -50,7 +50,7 @@ describe("stat card stretch", () => {
         certificationLabel="Certification"
         certifiedCount={4}
         uncertifiedCount={2}
-        selectedCertification={null}
+        selectedCertification={[]}
         onSelectCertification={() => {}}
       />,
     );
