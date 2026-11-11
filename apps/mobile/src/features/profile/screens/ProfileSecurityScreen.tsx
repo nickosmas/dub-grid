@@ -20,6 +20,7 @@ import {
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
+import { clearSavedStepUpPassword } from "../../../shared/lib/biometric-step-up";
 import { useAppLockEnabled } from "../../../shared/providers/AppLockProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -130,6 +131,7 @@ export default function ProfileSecurityScreen() {
         if (check === "failed") return;
       }
       await setAppLockEnabled(next);
+      if (!next) await clearSavedStepUpPassword();
     } finally {
       setAppLockToggling(false);
     }

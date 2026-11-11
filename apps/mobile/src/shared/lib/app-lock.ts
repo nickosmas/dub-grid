@@ -80,6 +80,16 @@ export function isSettingsDeviceCheckOpen(): boolean {
   return settingsChecksOpen > 0;
 }
 
+/** Runs a system biometric prompt the app asked for, without the lock's cover. */
+export async function withDeviceCheckOpen<T>(check: () => Promise<T>): Promise<T> {
+  settingsChecksOpen += 1;
+  try {
+    return await check();
+  } finally {
+    settingsChecksOpen -= 1;
+  }
+}
+
 export type DeviceCheckResult = "passed" | "failed" | "unavailable";
 
 /** Asks the device owner to confirm with biometrics or the passcode. */
@@ -90,14 +100,13 @@ export async function confirmDeviceOwner(promptMessage: string): Promise<DeviceC
   ]);
   if (!hasHardware || !isEnrolled) return "unavailable";
 
-  settingsChecksOpen += 1;
   try {
-    const result = await LocalAuthentication.authenticateAsync({ promptMessage });
+    const result = await withDeviceCheckOpen(() =>
+      LocalAuthentication.authenticateAsync({ promptMessage }),
+    );
     return result.success ? "passed" : "failed";
   } catch {
     return "failed";
-  } finally {
-    settingsChecksOpen -= 1;
   }
 }
 

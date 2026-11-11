@@ -100,6 +100,8 @@ interface StaffDetailPanelProps {
   onManageManagementAccess?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onResend?: (invitationId: string) => Promise<boolean> | boolean | void;
+  /** Opens Move to a new email; left out when the viewer can't move this person. */
+  onMoveToNewEmail?: () => void;
 }
 
 export function StaffDetailPanel({
@@ -141,6 +143,7 @@ export function StaffDetailPanel({
   onManageManagementAccess,
   onRevoke,
   onResend,
+  onMoveToNewEmail,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
   const { resolvedTheme } = useTheme();
@@ -407,6 +410,9 @@ export function StaffDetailPanel({
                 <InvitationCard
                   state={invitationState}
                   onInvite={showSendInviteAction && onInvite ? () => onInvite(employee) : undefined}
+                  onEditDetails={
+                    canEditEmployee ? () => editorRef.current?.focusEmail() : undefined
+                  }
                   onResend={onResend}
                   onRevoke={onRevoke}
                   disabledReason={
@@ -438,6 +444,8 @@ export function StaffDetailPanel({
             pendingInvitation={pendingInvitation}
             inviteOnSave={inviteOnSave}
             onSaveLabelChange={setSaveLabel}
+            onMoveToNewEmail={onMoveToNewEmail}
+            isOwnRecord={isSelf}
           />
         </div>
 
