@@ -113,12 +113,14 @@
   under the row, the chosen label dark with a brand underline. Switching a
   view of the same content, filtering one list, or answering a question in a
   form is the segmented control (`SpanTabs`, `.dg-span-tabs`, `.dg-segment`):
-  a gray track with the chosen segment raised in the surface color. A filter
-  in a filter panel is never tabs (owner, 2026-11-11): its few choices are
-  capsules (`CapsuleChoices`, `.dg-capsule`), outlined pills that wrap, the
-  chosen one tinted brand; a long list is a dropdown. None fills a choice
-  with brand blue, which is reserved for the action we want completed.
-  Counts inside any of them use the shared quiet count, never a blue badge.
+  a gray track with the chosen segment raised in the surface color. Neither
+  fills a choice with brand blue, which is reserved for the action we want
+  completed. A filter in a filter panel is never tabs or a dropdown (owner,
+  2026-11-11): every choice is a checkbox on its own row under the filter's
+  name (`CheckboxChoices`), any number can be ticked, and none ticked turns
+  the filter off. A person matches a filter when they match any choice
+  ticked in it, and must match every filter that has one. Counts inside any
+  of them use the shared quiet count, never a blue badge.
 - Dropdowns are never wider than they need to be (owner, 2026-11-07). A
   trigger (`CustomSelect`, `StaffMultiSelect`, `DateRangePicker`) sizes to
   its label and truncates in a narrow row; in a toolbar with a search field

@@ -6,10 +6,12 @@ import {
 } from "@dubgrid/domain";
 import type { DirectoryPerson, OrganizationRole } from "@/types";
 
-/** Everyone, or one access tier. */
-export type ManagementRoleFilter = "all" | OrganizationRole;
+/** Access tiers to keep; none ticked keeps everyone. */
+export type ManagementRoleFilter = readonly OrganizationRole[];
 /** Whether the invitation behind a roster row has been accepted yet. */
-export type ManagementInvitationFilter = "all" | "has_access" | "pending";
+export type ManagementInvitationState = "has_access" | "pending";
+/** Invitation states to keep; none ticked keeps everyone. */
+export type ManagementInvitationFilter = readonly ManagementInvitationState[];
 export type ManagementSortKey = "name" | "access";
 
 /** What the roster's toolbar sort dropdown offers, matching the staff half's. */
@@ -52,21 +54,21 @@ export function useManagementFilters({
   searchEnabled: boolean;
 }) {
   const [deptFilterId, setDeptFilterId] = useState<number | null>(null);
-  const [filterRole, setFilterRole] = useState<ManagementRoleFilter>("all");
-  const [filterInvitation, setFilterInvitation] = useState<ManagementInvitationFilter>("all");
+  const [filterRole, setFilterRole] = useState<ManagementRoleFilter>([]);
+  const [filterInvitation, setFilterInvitation] = useState<ManagementInvitationFilter>([]);
   const [sortKey, setSortKey] = useState<ManagementSortKey>("name");
 
   const activeFilterCount = [
     deptFilterId !== null,
-    filterRole !== "all",
-    filterInvitation !== "all",
+    filterRole.length > 0,
+    filterInvitation.length > 0,
   ].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
 
   function clearFilters() {
     setDeptFilterId(null);
-    setFilterRole("all");
-    setFilterInvitation("all");
+    setFilterRole([]);
+    setFilterInvitation([]);
   }
 
   const filteredUsers = useMemo(() => {
@@ -82,13 +84,14 @@ export function useManagementFilters({
 
         // A roster row with no role set counts as a User, the same rule the
         // staff half applies, so the two halves cannot disagree on a tier.
-        if (filterRole !== "all" && getEffectiveOrgRole(person.orgRole) !== filterRole)
+        if (filterRole.length > 0 && !filterRole.includes(getEffectiveOrgRole(person.orgRole)))
           return false;
 
-        if (filterInvitation !== "all") {
-          const pending = isPendingManagementInvite(person);
-          if (filterInvitation === "pending" ? !pending : pending) return false;
-        }
+        if (
+          filterInvitation.length > 0 &&
+          !filterInvitation.includes(isPendingManagementInvite(person) ? "pending" : "has_access")
+        )
+          return false;
 
         if (!query) return true;
         return (

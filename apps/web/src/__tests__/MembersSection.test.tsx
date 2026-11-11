@@ -959,7 +959,7 @@ describe("MembersSection — management roster filters", () => {
 
     await showManagementView(user);
     await user.click(screen.getByRole("button", { name: "Filter" }));
-    await user.click(screen.getByRole("button", { name: "Super Admin" }));
+    await user.click(screen.getByRole("checkbox", { name: "Super Admin" }));
 
     expect(screen.getByText("Sam Lee")).toBeInTheDocument();
     expect(screen.queryByText("Jamie Rivera")).not.toBeInTheDocument();
@@ -984,7 +984,7 @@ describe("MembersSection — management roster filters", () => {
 
     await showManagementView(user);
     await user.click(screen.getByRole("button", { name: "Filter" }));
-    await user.click(screen.getByRole("button", { name: /Invitation pending/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Invitation pending/ }));
 
     expect(screen.getByText("Sam Lee")).toBeInTheDocument();
     expect(screen.queryByText("Jamie Rivera")).not.toBeInTheDocument();
@@ -1129,8 +1129,11 @@ describe("MembersSection — certified staff count", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Filter" }));
-    await user.click(screen.getByRole("button", { name: "Certifications" }));
-    await user.click(screen.getByRole("option", { name: "Not certified" }));
+    await user.click(
+      within(screen.getByRole("group", { name: "Certifications" })).getByRole("checkbox", {
+        name: "Not certified",
+      }),
+    );
 
     expect(screen.getByText(/Robin/)).toBeInTheDocument();
     expect(screen.queryByText(/Casey/)).not.toBeInTheDocument();
@@ -1150,8 +1153,11 @@ describe("MembersSection — certified staff count", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Filter" }));
-    await user.click(screen.getByRole("button", { name: "Certifications" }));
-    await user.click(screen.getByRole("option", { name: "Certified staff" }));
+    await user.click(
+      within(screen.getByRole("group", { name: "Certifications" })).getByRole("checkbox", {
+        name: "Certified staff",
+      }),
+    );
 
     expect(screen.getByText(/Casey/)).toBeInTheDocument();
     expect(screen.queryByText(/Robin/)).not.toBeInTheDocument();
@@ -1316,7 +1322,7 @@ describe("MembersSection - bulk status changes (51h)", () => {
     });
     await settleInvitations();
     // The header checkbox selects every row on the page (the rows' own are unlabeled).
-    await user.click(screen.getAllByRole("checkbox")[0]);
+    await user.click(within(screen.getByRole("table")).getAllByRole("checkbox")[0]);
     return { user, view };
   }
 
