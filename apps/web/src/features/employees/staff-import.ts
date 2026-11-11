@@ -305,24 +305,27 @@ export function buildStaffImportTemplate(
   references: StaffImportReferences,
 ): string {
   const headers = staffCsvHeaders(labels);
-  const area = (index: number) =>
-    references.focusAreas[index % Math.max(references.focusAreas.length, 1)]?.name ?? "";
-  const certification = references.certifications[0]?.name ?? "";
-  const role = references.roles[0]?.name ?? "";
+  // The first person lists two of each so the template shows how a list is written.
+  const firstTwo = (items: readonly NamedRef[]) =>
+    items
+      .slice(0, 2)
+      .map((item) => item.name)
+      .join("; ");
+  const lastArea = references.focusAreas[references.focusAreas.length - 1]?.name ?? "";
   const rows = [
     [
       "Jordan",
       "Lee",
       "jordan.lee@example.com",
       "(555) 201-0100",
-      area(0),
-      certification,
-      role,
+      firstTwo(references.focusAreas),
+      references.certifications[0]?.name ?? "",
+      firstTwo(references.roles),
       "Full-time",
       "",
       "",
     ],
-    ["Sam", "Rivera", "", "", area(1), "", "", "Part-time", "", ""],
+    ["Sam", "Rivera", "", "", lastArea, "", "", "Part-time", "", ""],
   ];
   return toStaffCsv([headers, ...rows]);
 }
