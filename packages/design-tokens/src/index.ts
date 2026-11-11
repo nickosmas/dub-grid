@@ -1,3 +1,9 @@
+export {
+  ACCESS_INSIGNIA_BEVEL,
+  ACCESS_INSIGNIA_STAR_BOX,
+  ACCESS_INSIGNIA_STAR_POINTS,
+  ACCESS_INSIGNIA_STAR_STROKE,
+} from "./access-insignia";
 export { BRAND_ANIMATED_LOGO_SIZE } from "./animated-logo";
 
 export {
@@ -137,10 +143,9 @@ export const lightColorTokens = {
   warningText: "#92400E",
   warningSoft: "#FFFBEB",
   warningBorder: "#FDE68A",
-  // The Super Admin star. A step deeper than `warning`, which is too light to
-  // carry the white star. Theme-stable: the insignia is a solid chip ringed in
-  // the surface behind it, so only the ring tracks the theme.
-  insigniaGold: "#D97706",
+  // The Super Admin star: gold rather than amber, deep enough to carry the
+  // white star. The same in both themes, since the badge is a solid chip.
+  insigniaGold: "#C9920A",
   danger: "#EF4444",
   dangerText: "#B91C1C",
   dangerSoft: "#FEF2F2",
@@ -208,7 +213,7 @@ export const darkColorTokens: ColorTokens = {
   warningText: "#FBBF24",
   warningSoft: "#241C0B",
   warningBorder: "#3F2F10",
-  insigniaGold: "#D97706",
+  insigniaGold: "#C9920A",
   danger: "#EF4444",
   dangerText: "#FF5C5C",
   dangerSoft: "#2A1414",

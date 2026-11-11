@@ -1,5 +1,11 @@
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { View } from "react-native";
+import Svg, { Circle, Defs, G, LinearGradient, Polygon, Stop } from "react-native-svg";
+import {
+  ACCESS_INSIGNIA_BEVEL,
+  ACCESS_INSIGNIA_STAR_BOX,
+  ACCESS_INSIGNIA_STAR_POINTS,
+  ACCESS_INSIGNIA_STAR_STROKE,
+} from "@dubgrid/design-tokens";
 import { ORG_ROLE_LABELS, getHighlightedOrgRole, getOrgRoleInsignia } from "@dubgrid/domain";
 
 import { useMobileColors } from "../providers/ThemeModeProvider";
@@ -8,21 +14,24 @@ type InsigniaSize = "sm" | "lg";
 
 // Sized to the cap height of the title it follows (22pt beside a screen title,
 // 28pt beside a display title), so the mark reads as part of the name rather
-// than as a chip the same height as the text. The star spans about two thirds
-// of the circle, matching web: the glyph's outline is ~83% of its font size.
+// than as a chip the same height as the text.
 //
 // `pull` closes most of the row's own gap. The mark belongs to the name, so it
 // should read as attached to it, while the pill that follows keeps the row's
 // normal rhythm — which a smaller container gap would have tightened too.
-const SIZES: Record<InsigniaSize, { badge: number; glyph: number; pull: number }> = {
-  sm: { badge: 16, glyph: 13, pull: -5 },
-  lg: { badge: 20, glyph: 16, pull: -5 },
+const SIZES: Record<InsigniaSize, { badge: number; pull: number }> = {
+  sm: { badge: 16, pull: -5 },
+  lg: { badge: 20, pull: -5 },
 };
+
+const EDGE = ACCESS_INSIGNIA_BEVEL.width;
+const BEVEL_GRADIENT_ID = "access-insignia-bevel";
 
 /**
  * The star marking an elevated member, sitting just after their name: gold for
  * a Super Admin, blue for an Admin. Plain users get nothing, so the mark keeps
- * meaning something.
+ * meaning something. Drawn like web's: a 1px ring lit along the top and shaded
+ * along the bottom, and the shared star sized to the face inside it.
  */
 export function AccessInsignia({
   orgRole,
@@ -39,25 +48,50 @@ export function AccessInsignia({
     return null;
   }
 
-  const { badge, glyph, pull } = SIZES[size];
+  const { badge, pull } = SIZES[size];
+  const radius = badge / 2;
+  const starScale = (badge - 2 * EDGE) / ACCESS_INSIGNIA_STAR_BOX;
 
   return (
     <View
       accessibilityLabel={ORG_ROLE_LABELS[highlightedRole]}
       accessibilityRole="image"
-      style={{
-        alignItems: "center",
-        backgroundColor: insignia === "gold" ? mobileColors.insigniaGold : mobileColors.brand,
-        borderRadius: badge / 2,
-        // A long name shrinks the title beside it, never this.
-        flexShrink: 0,
-        height: badge,
-        justifyContent: "center",
-        marginLeft: pull,
-        width: badge,
-      }}
+      // A long name shrinks the title beside it, never this.
+      style={{ flexShrink: 0, height: badge, marginLeft: pull, width: badge }}
     >
-      <MaterialCommunityIcons color={mobileColors.textInverse} name="star" size={glyph} />
+      <Svg width={badge} height={badge}>
+        <Defs>
+          <LinearGradient id={BEVEL_GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={ACCESS_INSIGNIA_BEVEL.light} />
+            <Stop offset="0.5" stopColor="#ffffff" stopOpacity={0} />
+            <Stop offset="0.5" stopColor="#000000" stopOpacity={0} />
+            <Stop offset="1" stopColor={ACCESS_INSIGNIA_BEVEL.shade} />
+          </LinearGradient>
+        </Defs>
+        <Circle
+          cx={radius}
+          cy={radius}
+          r={radius}
+          fill={insignia === "gold" ? mobileColors.insigniaGold : mobileColors.brand}
+        />
+        <Circle
+          cx={radius}
+          cy={radius}
+          r={radius - EDGE / 2}
+          fill="none"
+          stroke={`url(#${BEVEL_GRADIENT_ID})`}
+          strokeWidth={EDGE}
+        />
+        <G transform={`translate(${EDGE} ${EDGE}) scale(${starScale})`}>
+          <Polygon
+            points={ACCESS_INSIGNIA_STAR_POINTS}
+            fill={mobileColors.textInverse}
+            stroke={mobileColors.textInverse}
+            strokeWidth={ACCESS_INSIGNIA_STAR_STROKE}
+            strokeLinejoin="round"
+          />
+        </G>
+      </Svg>
     </View>
   );
 }
