@@ -80,7 +80,7 @@ describe("MemberAccessControls: a cancelled step-up (F-69)", () => {
     expect(onPermissionsChange).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
     expect(
-      screen.getByRole("dialog", { name: "Edit permissions", hidden: true }),
+      screen.getByRole("dialog", { name: /^Edit permissions/, hidden: true }),
     ).toBeInTheDocument();
   });
 });
