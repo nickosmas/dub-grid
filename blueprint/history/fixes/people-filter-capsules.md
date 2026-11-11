@@ -26,6 +26,14 @@ segmented control, which reads as tabs.
   segment stretching is gone, since capsules wrap.
 - `coding-standards.md`: a filter in a filter panel is never tabs; its few
   choices are capsules, a long list a dropdown.
+- Spacing (owner, "Fix spacing and styling"): capsules use the dropdowns'
+  text color and weight. On desktop every control sits on a 34px line with
+  6px between rows, so each label centers on its control and the panel fits
+  under the toolbar at 1280x900 with no scroll and no scroll cue (before, it
+  scrolled and the cue sat over the Access role capsules). The panel is 500px
+  wide so Access role stays on one line, and the divider is visible. On the
+  phone sheet each label sits 8px above its control, groups are 18px apart,
+  and capsules are 36px tall for touch.
 
 ## Result
 
@@ -36,6 +44,9 @@ segmented control, which reads as tabs.
   list, the Filter button counts 1 and the bar shows "Access role: Admin". At
   390x844 the sheet stacks each label over its capsules, nothing scrolls
   sideways, and Done stays in view.
+- After the spacing pass, Playwright captures at 1280x900 (light and dark)
+  measured every label's center equal to its control's, and the panel body
+  at 357 of 357px (no overflow).
 
 ## Not done
 
