@@ -467,16 +467,17 @@ function personName(employee: ExistingEmployeeLite): string {
 }
 
 function duplicateIssue(match: DuplicateMatch, earlierRow: number | null): StaffImportIssue {
-  const name = personName(match.employee);
+  const field = match.reason === "email" ? "email" : match.reason === "phone" ? "phone" : "name";
   if (earlierRow !== null) {
     return {
       title: `Same person as row ${earlierRow}`,
-      detail: `Same person as row ${earlierRow}.`,
+      detail: `Row ${earlierRow} has the same ${field}.`,
     };
   }
-  const what =
-    match.reason === "email" ? "this email" : match.reason === "phone" ? "this phone" : "this name";
-  return { title: "Already on staff", detail: `Already on staff: ${name} has ${what}.` };
+  return {
+    title: "Already on staff",
+    detail: `Already on staff: ${personName(match.employee)} has this ${field}.`,
+  };
 }
 
 /**

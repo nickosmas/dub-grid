@@ -132,13 +132,13 @@ Must not break:
       missing area, bad first day, contact conflict), one audit row and event per
       person, and a Gridmaster without an impersonation refused; the export's
       test covers its columns, statuses and formula guard.
-- [ ] **3. The dialog.** Rebuild `BulkImportModal` on `Modal` per the canvas.
+- [x] **3. The dialog.** Rebuild `BulkImportModal` on `Modal` per the canvas.
       Move `inviteAddedPeople` out of `PeoplePageContent` so Add staff and import
       share it. Remove the old inline styles and tinted rows.
       **Done when:** `MembersSection.test.tsx` passes, and the browser shows each
       step matching the canvas in light and dark, with a real file of 30 rows
       adding and inviting people on the local stack.
-- [ ] **4. Docs and checks.** Update "Importing a list" in
+- [x] **4. Docs and checks.** Update "Importing a list" in
       `docs/staff/roster.mdx` (columns, required schedule area, first day,
       invites, template) and refresh its fingerprint. Run `npm run type-check`,
       `npm run lint`, `npm run test:web` and `npm run build`.

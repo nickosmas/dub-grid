@@ -4397,7 +4397,7 @@ button.dg-cc-sg-main {
 }
 .dg-import-table {
   width: 100%;
-  min-width: 960px;
+  min-width: 1000px;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 13px;
