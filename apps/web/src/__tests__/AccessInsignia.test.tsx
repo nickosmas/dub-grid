@@ -38,11 +38,11 @@ describe("AccessInsignia", () => {
     expect(screen.getByRole("img", { name: "Admin" })).toHaveStyle({ width: "20px" });
   });
 
-  it("lights the top edge and shades the bottom with a 1px bevel", () => {
+  it("keeps the outer edge in the badge color, lights the pixel inside it and shades the bottom", () => {
     render(<AccessInsignia orgRole="super_admin" />);
 
     expect(screen.getByRole("img", { name: "Super Admin" }).style.boxShadow).toBe(
-      "inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.16)",
+      "inset 0 1px 0 var(--dg-color-insignia-gold), inset 0 2px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.16)",
     );
   });
 

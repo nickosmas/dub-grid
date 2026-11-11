@@ -16,16 +16,26 @@ type InsigniaSize = "sm" | "lg";
 // 28pt beside a display title), so the mark reads as part of the name rather
 // than as a chip the same height as the text.
 //
-// `pull` closes most of the row's own gap. The mark belongs to the name, so it
-// should read as attached to it, while the pill that follows keeps the row's
-// normal rhythm — which a smaller container gap would have tightened too.
+// `pull` trims the row's own 8pt gap so the mark sits a clear 6 to 7pt after
+// the name, while the pill that follows keeps the row's normal rhythm.
 const SIZES: Record<InsigniaSize, { badge: number; pull: number }> = {
-  sm: { badge: 16, pull: -5 },
-  lg: { badge: 20, pull: -5 },
+  sm: { badge: 16, pull: -2 },
+  lg: { badge: 20, pull: -1 },
 };
 
 const EDGE = ACCESS_INSIGNIA_BEVEL.width;
-const BEVEL_GRADIENT_ID = "access-insignia-bevel";
+const LIGHT_GRADIENT_ID = "access-insignia-light";
+const SHADE_GRADIENT_ID = "access-insignia-shade";
+
+// Web's inset shadows touch only the very top and bottom of the circle, but
+// these rings run all the way round, so a shade fading in from the middle read
+// as a dark rim along the whole lower half. Light and shade are kept to the
+// top and bottom, and the shade is lighter than web's. The light ring sits one
+// point inside the edge, as on web: on the outer edge it blended into a light
+// page and the circle looked flattened on top.
+const BEVEL_LIGHT_END = "0.35";
+const BEVEL_SHADE_START = "0.8";
+const BEVEL_SHADE_OPACITY = 0.08;
 
 /**
  * The star marking an elevated member, sitting just after their name: gold for
@@ -61,11 +71,13 @@ export function AccessInsignia({
     >
       <Svg width={badge} height={badge}>
         <Defs>
-          <LinearGradient id={BEVEL_GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
+          <LinearGradient id={LIGHT_GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={ACCESS_INSIGNIA_BEVEL.light} />
-            <Stop offset="0.5" stopColor="#ffffff" stopOpacity={0} />
-            <Stop offset="0.5" stopColor="#000000" stopOpacity={0} />
-            <Stop offset="1" stopColor={ACCESS_INSIGNIA_BEVEL.shade} />
+            <Stop offset={BEVEL_LIGHT_END} stopColor="#ffffff" stopOpacity={0} />
+          </LinearGradient>
+          <LinearGradient id={SHADE_GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset={BEVEL_SHADE_START} stopColor="#000000" stopOpacity={0} />
+            <Stop offset="1" stopColor="#000000" stopOpacity={BEVEL_SHADE_OPACITY} />
           </LinearGradient>
         </Defs>
         <Circle
@@ -79,7 +91,15 @@ export function AccessInsignia({
           cy={radius}
           r={radius - EDGE / 2}
           fill="none"
-          stroke={`url(#${BEVEL_GRADIENT_ID})`}
+          stroke={`url(#${SHADE_GRADIENT_ID})`}
+          strokeWidth={EDGE}
+        />
+        <Circle
+          cx={radius}
+          cy={radius}
+          r={radius - 1.5 * EDGE}
+          fill="none"
+          stroke={`url(#${LIGHT_GRADIENT_ID})`}
           strokeWidth={EDGE}
         />
         <G transform={`translate(${EDGE} ${EDGE}) scale(${starScale})`}>
