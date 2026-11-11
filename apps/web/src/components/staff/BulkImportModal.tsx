@@ -413,13 +413,13 @@ export function BulkImportModal({
           <table className="dg-import-table">
             <thead>
               <tr>
-                <th className="w-[48px]">Row</th>
-                <th className="w-[180px]">Person</th>
-                <th className="w-[140px]">{focusAreaLabel}</th>
-                <th className="w-[100px]">{certificationColumn}</th>
-                <th className="w-[100px]">{roleLabel}</th>
-                <th className="w-[92px]">Employment</th>
-                <th className="w-[100px]">First day</th>
+                <th className="w-[4%]">Row</th>
+                <th className="w-[17%]">Person</th>
+                <th className="w-[15%]">{focusAreaLabel}</th>
+                <th className="w-[14%]">{certificationColumn}</th>
+                <th className="w-[15%]">{roleLabel}</th>
+                <th className="w-[9%]">Employment</th>
+                <th className="w-[9%]">First day</th>
                 <th>Status</th>
               </tr>
             </thead>

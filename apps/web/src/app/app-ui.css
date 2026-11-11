@@ -4358,8 +4358,8 @@ button.dg-cc-sg-main {
   max-width: 720px;
 }
 .dg-modal.dg-modal--import-check {
-  width: min(1080px, calc(100vw - 48px));
-  max-width: 1080px;
+  width: calc(100vw - 48px);
+  max-width: none;
 }
 .dg-import-drop {
   display: flex;
