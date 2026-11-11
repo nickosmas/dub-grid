@@ -26,7 +26,7 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const editorHarness = vi.hoisted(() => ({ saveResult: true }));
+const editorHarness = vi.hoisted(() => ({ saveResult: true, focusEmail: vi.fn() }));
 
 vi.mock("@/components/EditEmployeePanel", async () => {
   const React = await import("react");
@@ -36,8 +36,13 @@ vi.mock("@/components/EditEmployeePanel", async () => {
         props: {
           onDirtyChange?: (dirty: boolean) => void;
           onSaveCompleted?: () => void;
+          onMoveToNewEmail?: () => void;
         },
-        ref: React.ForwardedRef<{ save: () => Promise<boolean>; requestDismiss: () => void }>,
+        ref: React.ForwardedRef<{
+          save: () => Promise<boolean>;
+          requestDismiss: () => void;
+          focusEmail: () => void;
+        }>,
       ) => {
         React.useImperativeHandle(ref, () => ({
           save: async () => {
@@ -45,10 +50,14 @@ vi.mock("@/components/EditEmployeePanel", async () => {
             return editorHarness.saveResult;
           },
           requestDismiss: () => undefined,
+          focusEmail: editorHarness.focusEmail,
         }));
         return (
           <div data-testid="edit-employee-panel">
             <button onClick={() => props.onDirtyChange?.(true)}>Modify employee</button>
+            {props.onMoveToNewEmail ? (
+              <button onClick={props.onMoveToNewEmail}>Move them to a new one</button>
+            ) : null}
           </div>
         );
       },
@@ -375,5 +384,40 @@ describe("StaffDetailPanel access controls", () => {
     renderPanel({ orgRole: "user", onPermissionsChange: vi.fn() });
 
     expect(screen.queryByRole("button", { name: "Edit admin access" })).not.toBeInTheDocument();
+  });
+});
+
+describe("StaffDetailPanel move to a new email", () => {
+  it("offers the move in the editor when the list allows it", async () => {
+    const user = userEvent.setup();
+    const onMoveToNewEmail = vi.fn();
+    renderPanel({ onMoveToNewEmail });
+
+    await user.click(screen.getByRole("button", { name: "Move them to a new one" }));
+    expect(onMoveToNewEmail).toHaveBeenCalledOnce();
+    cleanup();
+  });
+
+  it("leaves the move out when the list doesn't allow it", () => {
+    renderPanel();
+    expect(screen.queryByRole("button", { name: "Move them to a new one" })).toBeNull();
+    cleanup();
+  });
+});
+
+describe("StaffDetailPanel invitation card", () => {
+  it("takes someone with no email on file to the email field", async () => {
+    const user = userEvent.setup();
+    editorHarness.focusEmail.mockClear();
+    renderPanel({
+      orgRole: null,
+      employee: { ...employee, userId: null, email: "" },
+      accountState: { kind: "no-email" },
+    });
+
+    const card = screen.getByRole("region", { name: "Invitation" });
+    await user.click(within(card).getByRole("button", { name: "Edit details" }));
+    expect(editorHarness.focusEmail).toHaveBeenCalledOnce();
+    cleanup();
   });
 });

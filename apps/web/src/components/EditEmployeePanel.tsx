@@ -1063,7 +1063,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                               marginTop: 4,
                             }}
                           >
-                            This is their sign-in email, so they change it on their own profile.
+                            They sign in with this email, so they&apos;ll need to change it from
+                            their profile.
                             {onMoveToNewEmail ? (
                               <span className="block">
                                 Lost access to this email?{" "}

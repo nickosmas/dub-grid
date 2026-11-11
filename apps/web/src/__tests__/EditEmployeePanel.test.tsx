@@ -929,7 +929,9 @@ describe("EditEmployeePanel", () => {
 
       expect(screen.getByLabelText("Email")).toHaveAttribute("readonly");
       expect(
-        screen.getByText("This is their sign-in email, so they change it on their own profile."),
+        screen.getByText(
+          "They sign in with this email, so they'll need to change it from their profile.",
+        ),
       ).toBeInTheDocument();
     });
 
