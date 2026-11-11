@@ -10,7 +10,7 @@ import ProgressBar from "@/components/ProgressBar";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { PersonPageSkeleton } from "@/components/LoadingSkeletons";
 import { DeleteStaffAccountCard } from "@/components/staff-detail/DeleteStaffAccountCard";
-import { MoveEmailDialog } from "@/components/staff-detail/MoveEmailDialog";
+import { MoveEmailDialog, canOfferMoveToNewEmail } from "@/components/staff-detail/MoveEmailDialog";
 import { useSkeletonGate } from "@/hooks/useSkeletonGate";
 import { Button } from "@/components/Button";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
@@ -1066,16 +1066,14 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   // Matches the directory table's Access column: the membership's role, or the
   // role a pending invitation will grant once it is accepted.
   const effectiveOrgRole = directoryPerson?.orgRole ?? pendingInvite?.roleToAssign ?? null;
-  // The server applies the same limits: an Admin can't choose who holds another
-  // Admin's access, and a person changes their own email on their profile.
   const canMoveToNewEmail =
-    Boolean(employee?.userId) &&
-    employee?.status !== "removed" &&
-    !isSelfAction(currentUser?.id, employee?.userId) &&
-    (effectiveOrgRole === "user" ||
-      effectiveOrgRole === null ||
-      Boolean(perms.isSuperAdmin) ||
-      Boolean(perms.isGridmaster));
+    !!employee &&
+    canOfferMoveToNewEmail({
+      employee,
+      orgRole: effectiveOrgRole,
+      currentUserId: currentUser?.id,
+      canGrantElevatedRoles: Boolean(perms.isSuperAdmin) || Boolean(perms.isGridmaster),
+    });
   const hasPendingManagementInvite =
     !!directoryPerson &&
     directoryPerson.managementDepartmentIds.length > 0 &&

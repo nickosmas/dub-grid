@@ -64,6 +64,10 @@ import {
   EMAIL_BELONGS_TO_SOMEONE_ELSE,
   PHONE_BELONGS_TO_SOMEONE_ELSE,
 } from "@/lib/employee-contact-conflicts";
+import { toast } from "sonner";
+import { EMAIL_TAKEN_MESSAGE } from "@dubgrid/client-errors";
+import { requireCredentialAssurance, updateBrowserUserEmail } from "@/features/account/client";
+import { extractErrorMessage } from "@/lib/error-handling";
 
 export interface EditEmployeePanelProps {
   employee: Employee;
@@ -108,6 +112,8 @@ export interface EditEmployeePanelProps {
   pendingInvitation?: Invitation;
   /** Offered beside a joined person's locked email, when this viewer may move them. */
   onMoveToNewEmail?: () => void;
+  /** The viewer is editing their own record, so the locked email points them to their profile. */
+  isOwnRecord?: boolean;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onResend?: (invitationId: string) => Promise<boolean> | boolean | void;
   /** Offers an invite beside the email (the staff page and the People
@@ -225,6 +231,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onInvite,
       pendingInvitation,
       onMoveToNewEmail,
+      isOwnRecord = false,
       onRevoke,
       onResend,
       inviteOnSave,
@@ -238,6 +245,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
   ) {
     const isMobile = useMediaQuery(MOBILE);
     const isInSandbox = useIsInSandbox();
+    // Your own sign-in email is yours to change here; anyone else's is locked.
+    const emailLocked = Boolean(employee.userId) && !isOwnRecord;
     const stepUp = useStepUpAction();
     const stepUpRef = useLatestRef(stepUp);
     const identityFieldIdPrefix = useId();
@@ -527,6 +536,52 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       [inviteOnSave, onSave, stepUpRef],
     );
 
+    // Your own sign-in email changes the way your profile changes it: after you
+    // confirm it's you, both addresses get a link, and it changes once both
+    // confirm. The staff record keeps the current email until then.
+    const saveOwnLoginEmailChange = useCallback(
+      async (nextEmployee: Employee, nextEmail: string): Promise<boolean> => {
+        const current = buildEditForm(employee);
+        const otherFieldsChanged = ALL_FIELDS.some(
+          (field) => field !== "email" && !sameFieldValue(form[field], current[field]),
+        );
+        let otherFieldsSaved = false;
+        let finished = false;
+        const completed = await stepUpRef.current.run(async (accessToken) => {
+          await requireCredentialAssurance(accessToken);
+          if (otherFieldsChanged) {
+            const saved = await submitEmployee(
+              { ...nextEmployee, email: employee.email },
+              null,
+              ALL_FIELDS,
+            );
+            if (!saved) return;
+            otherFieldsSaved = true;
+          }
+          try {
+            await updateBrowserUserEmail(nextEmail);
+          } catch (err) {
+            toast.error(
+              otherFieldsSaved
+                ? extractErrorMessage(err, "") === EMAIL_TAKEN_MESSAGE
+                  ? "That email belongs to someone else, so your email stayed the same. Your other changes were saved."
+                  : "Your other changes were saved, but we couldn't start the email change. Try the email again."
+                : extractErrorMessage(err, "We couldn't update your email. Try again."),
+            );
+            return;
+          }
+          finished = true;
+        });
+        if (!completed || !finished) return false;
+        toast.success(
+          "We emailed a link to your current address and your new one. Your email changes once you confirm both.",
+        );
+        onSaveCompleted?.();
+        return true;
+      },
+      [employee, form, stepUpRef, submitEmployee, onSaveCompleted],
+    );
+
     const handleSave = useCallback(async (): Promise<boolean> => {
       if (
         !form.firstName.trim() ||
@@ -576,6 +631,15 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
         firstDay: form.firstDay || null,
       };
 
+      const nextLoginEmail = nextEmployee.email ?? "";
+      if (
+        isOwnRecord &&
+        employee.userId &&
+        nextLoginEmail.toLowerCase() !== (employee.email ?? "").trim().toLowerCase()
+      ) {
+        return saveOwnLoginEmailChange(nextEmployee, nextLoginEmail);
+      }
+
       const invite = buildInvite();
 
       const saved = await submitEmployee(nextEmployee, invite, ALL_FIELDS);
@@ -585,6 +649,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     }, [
       form,
       employee,
+      isOwnRecord,
+      saveOwnLoginEmailChange,
       onSaveCompleted,
       validateStaffEmail,
       isManagementUser,
@@ -1045,17 +1111,17 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                           onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                           onBlur={() => markTouched("email")}
                           placeholder="name@example.com"
-                          readOnly={readOnly || Boolean(employee.userId)}
+                          readOnly={readOnly || emailLocked}
                           style={{
                             ...(fieldErrors.email
                               ? { borderColor: "var(--dg-color-danger)" }
                               : undefined),
-                            ...(employee.userId
+                            ...(emailLocked
                               ? { color: "var(--dg-color-text-muted)", cursor: "default" }
                               : undefined),
                           }}
                         />
-                        {employee.userId && !fieldErrors.email && (
+                        {emailLocked && !fieldErrors.email && (
                           <div
                             style={{
                               fontSize: "var(--dg-fs-footnote)",
@@ -1063,7 +1129,8 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                               marginTop: 4,
                             }}
                           >
-                            This is their sign-in email, so they change it on their own profile.
+                            They sign in with this email, so they&apos;ll need to change it from
+                            their profile.
                             {onMoveToNewEmail ? (
                               <span className="block">
                                 Lost access to this email?{" "}
