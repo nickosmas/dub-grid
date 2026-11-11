@@ -87,18 +87,7 @@ export default function ExpandedStaffHours({
     <Modal title="Overtime watch" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Controls row */}
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            flexWrap: "wrap",
-            alignItems: "center",
-            padding: 16,
-            borderRadius: "var(--dg-radius-md)",
-            background: "var(--dg-color-bg)",
-            border: "1px solid var(--dg-color-border)",
-          }}
-        >
+        <div className="dg-dialog-toolbar">
           {/* Sort buttons */}
           <div style={{ display: "flex", gap: 4 }}>
             {(
@@ -142,13 +131,7 @@ export default function ExpandedStaffHours({
             fontSize="var(--dg-fs-label)"
           />
 
-          <span
-            style={{
-              fontSize: "var(--dg-type-metadata-size)",
-              color: "var(--dg-color-text-subtle)",
-              marginLeft: "auto",
-            }}
-          >
+          <span className="dg-dialog-toolbar-meta">
             {sorted.length} staff &middot; {otCount} OT &middot; {otThreshold}h limit
           </span>
         </div>

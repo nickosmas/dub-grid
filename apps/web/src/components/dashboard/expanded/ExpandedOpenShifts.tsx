@@ -109,19 +109,7 @@ export default function ExpandedOpenShifts({
               </div>
             )}
             {/* Filters */}
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-                alignItems: "center",
-                padding: 16,
-                borderRadius: "var(--dg-radius-md)",
-                background: "var(--dg-color-bg)",
-                border: "1px solid var(--dg-color-border)",
-              }}
-            >
-              <span style={filterLabelStyle}>Filter:</span>
+            <div className="dg-dialog-toolbar">
               <CustomSelect
                 value={urgencyFilter}
                 options={URGENCY_OPTIONS}
@@ -140,13 +128,7 @@ export default function ExpandedOpenShifts({
                 onChange={setFocusAreaFilter}
                 fontSize="var(--dg-fs-label)"
               />
-              <span
-                style={{
-                  fontSize: "var(--dg-type-metadata-size)",
-                  color: "var(--dg-color-text-subtle)",
-                  marginLeft: "auto",
-                }}
-              >
+              <span className="dg-dialog-toolbar-meta">
                 {filteredSlotCount} open slot{filteredSlotCount === 1 ? "" : "s"}
               </span>
             </div>
@@ -285,14 +267,6 @@ export default function ExpandedOpenShifts({
 }
 
 const modalStyle = { maxWidth: 700, width: "90vw" };
-
-const filterLabelStyle = {
-  fontSize: "var(--dg-type-field-title-size)",
-  fontWeight: 500 as const,
-  color: "var(--dg-color-text-subtle)",
-  textTransform: "none" as const,
-  letterSpacing: "0.04em",
-};
 
 const itemStyle = {
   display: "flex" as const,

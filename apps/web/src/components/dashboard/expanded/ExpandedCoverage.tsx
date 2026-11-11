@@ -84,18 +84,7 @@ export default function ExpandedCoverage({
               </div>
             )}
             {/* Summary + filter row */}
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                flexWrap: "wrap",
-                alignItems: "center",
-                padding: 16,
-                borderRadius: "var(--dg-radius-md)",
-                background: "var(--dg-color-bg)",
-                border: "1px solid var(--dg-color-border)",
-              }}
-            >
+            <div className="dg-dialog-toolbar">
               <div style={summaryBadgeStyle}>
                 <span
                   style={{
