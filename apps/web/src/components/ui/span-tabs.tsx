@@ -8,6 +8,8 @@ export interface SpanTabItem<T extends string> {
   label: string;
   /** Something waiting there, shown as a count after the label. */
   count?: number;
+  /** What the count means to a screen reader; "N waiting" by default. */
+  countLabel?: string;
 }
 
 /**
@@ -48,7 +50,7 @@ export function SpanTabs<T extends string>({
               <NumericBadge
                 count={item.count}
                 tone="label"
-                label={`${item.count} waiting`}
+                label={item.countLabel ?? `${item.count} waiting`}
                 className="dg-span-tab-count"
               />
             ) : null}

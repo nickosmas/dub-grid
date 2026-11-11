@@ -11,7 +11,20 @@ import { z } from "zod";
 import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
 import { orderFocusAreasByDepartment } from "@dubgrid/domain";
 import { withoutHiddenStaff } from "@dubgrid/data-access";
-import { capitalizeFirst, DEFAULT_ORGANIZATION_LABELS, pluralLabelNoun } from "@dubgrid/domain";
+import {
+  capitalizeFirst,
+  DEFAULT_ORGANIZATION_LABELS,
+  describeEmploymentStatus,
+  pluralLabelNoun,
+  resolveOrganizationLabel,
+  upcomingFirstDay,
+} from "@dubgrid/domain";
+import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
+import {
+  EMPLOYMENT_CSV_LABELS,
+  staffCsvHeaders,
+  toStaffCsv,
+} from "@/features/employees/staff-import";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -50,7 +63,7 @@ async function exportStaff(
     supabase
       .from("employees")
       .select(
-        "id, first_name, last_name, email, phone, status, status_note, seniority, focus_area_ids, certification_id, role_ids, contact_notes, archived_at",
+        "id, first_name, last_name, email, phone, status, away_until, suspended_at, suspended_until, employment_type, first_day, seniority, focus_area_ids, certification_id, role_ids, contact_notes",
       )
       .eq("org_id", orgId)
       .is("archived_at", null),
@@ -62,30 +75,36 @@ async function exportStaff(
   if (error) throw error;
 
   // Fetch focus areas and certifications for name resolution
-  const [{ data: focusAreas }, { data: departments }, { data: certs }, { data: roles }] =
-    await Promise.all([
-      supabase
-        .from("focus_areas")
-        .select("id, name, department_id, sort_order")
-        .eq("org_id", orgId)
-        .is("archived_at", null),
-      supabase
-        .from("departments")
-        .select("id, type, sort_order")
-        .eq("org_id", orgId)
-        .is("archived_at", null),
-      supabase
-        .from("certifications")
-        .select("id, name")
-        .eq("org_id", orgId)
-        .is("archived_at", null),
-      supabase
-        .from("organization_roles")
-        .select("id, name")
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .order("sort_order"),
-    ]);
+  const [
+    { data: focusAreas },
+    { data: departments },
+    { data: certs },
+    { data: roles },
+    { data: org },
+  ] = await Promise.all([
+    supabase
+      .from("focus_areas")
+      .select("id, name, department_id, sort_order")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    supabase
+      .from("departments")
+      .select("id, type, sort_order")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    supabase.from("certifications").select("id, name").eq("org_id", orgId).is("archived_at", null),
+    supabase
+      .from("organization_roles")
+      .select("id, name")
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .order("sort_order"),
+    supabase
+      .from("organizations")
+      .select("focus_area_label, certification_label, role_label, timezone")
+      .eq("id", orgId)
+      .maybeSingle(),
+  ]);
 
   const orderedFocusAreas = orderFocusAreasByDepartment(
     (
@@ -120,32 +139,42 @@ async function exportStaff(
     (roles ?? []).map((r: Record<string, unknown>) => [r.id as number, r.name as string]),
   );
 
-  const headers = [
-    "First Name",
-    "Last Name",
-    "Email",
-    "Phone",
-    "Status",
-    "Seniority",
-    "Focus Areas",
-    "Certification",
-    "Roles",
-    "Notes",
-  ];
-  const rows = (employees ?? []).map((emp: Record<string, unknown>) => [
+  const orgRow = (org ?? {}) as {
+    focus_area_label?: string | null;
+    certification_label?: string | null;
+    role_label?: string | null;
+    timezone?: string | null;
+  };
+  const labels = {
+    focusArea: resolveOrganizationLabel("focusArea", orgRow.focus_area_label),
+    certification: resolveOrganizationLabel("certification", orgRow.certification_label),
+    role: resolveOrganizationLabel("role", orgRow.role_label),
+  };
+  const today = getIsoDateInTimeZone(new Date(), orgRow.timezone ?? null);
+
+  // The import's columns first, so this file imports again; status and seniority after.
+  const headers = [...staffCsvHeaders(labels), "Status", "Seniority"];
+  const rows = ((employees ?? []) as Record<string, unknown>[]).map((emp) => [
     emp.first_name as string,
     emp.last_name as string,
     emp.email as string,
     emp.phone as string,
-    emp.status as string,
-    emp.seniority as number,
     namesInOrder((emp.focus_area_ids as number[]) ?? [], faMap).join("; "),
     emp.certification_id ? (certMap.get(emp.certification_id as number) ?? "") : "",
     namesInOrder((emp.role_ids as number[]) ?? [], roleMap).join("; "),
+    EMPLOYMENT_CSV_LABELS[emp.employment_type === "part_time" ? "part_time" : "full_time"],
+    upcomingFirstDay({ firstDay: (emp.first_day as string | null) ?? null }, today) ?? "",
     emp.contact_notes as string,
+    describeEmploymentStatus(
+      emp.status as string,
+      emp.away_until as string | null,
+      emp.suspended_at as string | null,
+      emp.suspended_until as string | null,
+    ),
+    emp.seniority as number,
   ]);
 
-  return buildCsv(headers, rows);
+  return toStaffCsv([headers, ...rows]);
 }
 
 async function exportSchedule(

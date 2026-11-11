@@ -39,9 +39,17 @@ Select **Add**. If you can add both kinds of people, choose **Scheduled staff** 
 
 ### Importing a list
 
-On a desktop-sized screen, **Import** adds people from a `.csv` file of up to 500 rows. The file's columns are `first_name`, `last_name`, `email`, `phone`, `focus_areas`, `certification`, `roles`, and `notes`; only the names are required, and several schedule areas are separated with semicolons.
+On a desktop-sized screen, **Import** adds people from a `.csv` file of up to 500 rows. **Download template** gives a file with every column and two example rows that use your own schedule areas, certifications, and roles. A file exported from **People > Export** imports too.
 
-Before importing, DubGrid checks for duplicates. A row that matches someone already on your roster by name, email, or phone, or another row in the file, is skipped. A row with a similar name but different contact details is flagged so you can double-check it. Importing may not be available in every organization.
+Each person needs a first name, a last name, and at least one schedule area. The other columns are optional: email, phone, certification, roles, employment (full-time or part-time; full-time when blank), first day (from today up to a year ahead), and notes. Names must match your settings, and several schedule areas or roles are separated with a semicolon.
+
+Before anyone is added, **Check before adding** lists every row and says whether it's ready or why it won't be added:
+
+- A row that matches someone already on your roster by name, email, or phone is left out, and so is a later row for the same person in the file.
+- A row with an unknown schedule area, certification, or role, no schedule area, or a first day outside today to a year ahead is left out.
+- A row with a name similar to someone on staff but different contact details is added, and marked so you can check it isn't the same person.
+
+**All**, **Ready**, and **Won't be added** filter the list. **Invite everyone with an email** invites the people added, as in **Add staff members**, and the button says how many it adds and invites. When it's done, you see how many people were added and invited, and every row that wasn't added with its reason, so you can fix your file and import it again; people already added are skipped as duplicates. Importing may not be available in every organization.
 
 ## Taking someone off a schedule area
 
