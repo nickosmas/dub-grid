@@ -13,3 +13,7 @@ export const Rect = stub("Rect");
 export const Circle = stub("Circle");
 export const Path = stub("Path");
 export const Text = stub("Text");
+export const Polygon = stub("Polygon");
+export const Defs = stub("Defs");
+export const LinearGradient = stub("LinearGradient");
+export const Stop = stub("Stop");
