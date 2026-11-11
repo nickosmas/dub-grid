@@ -37,4 +37,24 @@ describe("AccessInsignia", () => {
     rerender(<AccessInsignia orgRole="admin" size="lg" />);
     expect(screen.getByRole("img", { name: "Admin" })).toHaveStyle({ width: "20px" });
   });
+
+  it("lights the top edge and shades the bottom with a 1px bevel", () => {
+    render(<AccessInsignia orgRole="super_admin" />);
+
+    expect(screen.getByRole("img", { name: "Super Admin" }).style.boxShadow).toBe(
+      "inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.16)",
+    );
+  });
+
+  it("sizes the star to the face inside the bevel at every size", () => {
+    const { rerender } = render(<AccessInsignia orgRole="admin" />);
+    const star = () => screen.getByRole("img", { name: "Admin" }).querySelector("svg");
+    expect(star()).toHaveAttribute("width", "12");
+
+    rerender(<AccessInsignia orgRole="admin" size="md" />);
+    expect(star()).toHaveAttribute("width", "14");
+
+    rerender(<AccessInsignia orgRole="admin" size="lg" />);
+    expect(star()).toHaveAttribute("width", "18");
+  });
 });

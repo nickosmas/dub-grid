@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  ACCESS_INSIGNIA_BEVEL,
+  ACCESS_INSIGNIA_STAR_BOX,
+  ACCESS_INSIGNIA_STAR_POINTS,
+  ACCESS_INSIGNIA_STAR_STROKE,
+} from "@dubgrid/design-tokens";
 import { ORG_ROLE_LABELS, getHighlightedOrgRole, getOrgRoleInsignia } from "@dubgrid/domain";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
@@ -20,19 +26,9 @@ const SIZES: Record<InsigniaSize, { badge: number; pull: number }> = {
   lg: { badge: 20, pull: -7 },
 };
 
-// A regular five-point star drawn about the viewBox center, spanning about two
-// thirds of it. A regular star's centroid is its circumcircle's center, so this
-// lands the star's visual weight on the circle's center; lucide's Star is drawn
-// off-center in its viewBox and sat visibly low and to the right. The svg is
-// the full chip rather than a smaller glyph centered in it, so it never lands
-// on a half pixel. The round stroke softens the points the way lucide's does.
-const STAR_OUTER_RADIUS = 7.6;
-const STAR_INNER_RADIUS = 3.4;
-const STAR_POINTS = Array.from({ length: 10 }, (_, i) => {
-  const radius = i % 2 === 0 ? STAR_OUTER_RADIUS : STAR_INNER_RADIUS;
-  const angle = -Math.PI / 2 + (i * Math.PI) / 5;
-  return `${(12 + radius * Math.cos(angle)).toFixed(2)},${(12 + radius * Math.sin(angle)).toFixed(2)}`;
-}).join(" ");
+const EDGE = ACCESS_INSIGNIA_BEVEL.width;
+const BEVEL_SHADOW = `inset 0 ${EDGE}px 0 ${ACCESS_INSIGNIA_BEVEL.light}, inset 0 -${EDGE}px 0 ${ACCESS_INSIGNIA_BEVEL.shade}`;
+const STAR_VIEW_BOX = `0 0 ${ACCESS_INSIGNIA_STAR_BOX} ${ACCESS_INSIGNIA_STAR_BOX}`;
 
 interface AccessInsigniaProps {
   orgRole: OrganizationRole | string | null | undefined;
@@ -43,7 +39,8 @@ interface AccessInsigniaProps {
 /**
  * The star marking an elevated member, sitting just after their name: gold for
  * a Super Admin, blue for an Admin. Plain users get nothing, so the mark keeps
- * meaning something.
+ * meaning something. A 1px bevel lights the top edge and shades the bottom; the
+ * star fills the face inside it, so a 14px badge is a true copy of a 20px one.
  */
 export function AccessInsignia({ orgRole, size = "sm" }: AccessInsigniaProps) {
   const insignia = getOrgRoleInsignia(orgRole);
@@ -68,19 +65,20 @@ export function AccessInsignia({ orgRole, size = "sm" }: AccessInsigniaProps) {
           background:
             insignia === "gold" ? "var(--dg-color-insignia-gold)" : "var(--dg-color-brand)",
           color: "var(--dg-color-text-inverse)",
+          boxShadow: BEVEL_SHADOW,
         }}
       >
         <svg
           aria-hidden
-          viewBox="0 0 24 24"
-          width={badge}
-          height={badge}
+          viewBox={STAR_VIEW_BOX}
+          width={badge - 2 * EDGE}
+          height={badge - 2 * EDGE}
           fill="currentColor"
           stroke="currentColor"
-          strokeWidth={2}
+          strokeWidth={ACCESS_INSIGNIA_STAR_STROKE}
           strokeLinejoin="round"
         >
-          <polygon points={STAR_POINTS} />
+          <polygon points={ACCESS_INSIGNIA_STAR_POINTS} />
         </svg>
       </span>
     </Hint>
