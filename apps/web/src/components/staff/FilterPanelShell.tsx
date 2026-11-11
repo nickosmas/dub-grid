@@ -113,12 +113,32 @@ export function FilterPanelShell({
   );
 }
 
-/** One filter: its name, then the control that answers it. */
-export function FilterField({ label, children }: { label: string; children: ReactNode }) {
+/** One filter: its name, a Clear while something in it is set, then its choices. */
+export function FilterField({
+  label,
+  onClear,
+  children,
+}: {
+  label: string;
+  onClear?: () => void;
+  children: ReactNode;
+}) {
   return (
     <div className="dg-filter-field">
-      <span className="dg-filter-field-label">{label}</span>
-      <div className="dg-filter-field-control">{children}</div>
+      <div className="dg-filter-field-head">
+        <span className="dg-filter-field-label">{label}</span>
+        {onClear && (
+          <Button
+            type="button"
+            className="dg-btn dg-btn-ghost dg-btn-sm dg-filter-field-clear"
+            aria-label={`Clear ${label}`}
+            onClick={onClear}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+      {children}
     </div>
   );
 }

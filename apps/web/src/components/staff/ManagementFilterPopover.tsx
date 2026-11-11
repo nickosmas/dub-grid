@@ -1,15 +1,19 @@
 "use client";
 
 import { ORG_ROLE_LABELS } from "@dubgrid/domain";
-import { CapsuleChoices, type CapsuleChoice } from "@/components/ui/capsule-choices";
+import { CheckboxChoices, type CheckboxChoice } from "@/components/ui/checkbox-choices";
+import type { OrganizationRole } from "@/types";
 import { FilterField, FilterPanelShell } from "./FilterPanelShell";
 import { MANAGEMENT_ROLE_FILTERS } from "./useManagementFilters";
-import type { ManagementInvitationFilter, ManagementRoleFilter } from "./useManagementFilters";
+import type {
+  ManagementInvitationFilter,
+  ManagementInvitationState,
+  ManagementRoleFilter,
+} from "./useManagementFilters";
 
-const ACCESS_ROLE_ITEMS: CapsuleChoice<ManagementRoleFilter>[] = [
-  { value: "all", label: "All" },
-  ...MANAGEMENT_ROLE_FILTERS.map((role) => ({ value: role, label: ORG_ROLE_LABELS[role] })),
-];
+const ACCESS_ROLE_ITEMS: CheckboxChoice<OrganizationRole>[] = MANAGEMENT_ROLE_FILTERS.map(
+  (role) => ({ value: role, label: ORG_ROLE_LABELS[role] }),
+);
 
 /**
  * The management roster's filters. Deliberately not the staff panel: focus
@@ -33,15 +37,14 @@ export function ManagementFilterPopover({
   onClose: () => void;
   anchorRef: HTMLElement | null;
   filterRole: ManagementRoleFilter;
-  onFilterRoleChange: (value: ManagementRoleFilter) => void;
+  onFilterRoleChange: (value: OrganizationRole[]) => void;
   filterInvitation: ManagementInvitationFilter;
-  onFilterInvitationChange: (value: ManagementInvitationFilter) => void;
+  onFilterInvitationChange: (value: ManagementInvitationState[]) => void;
   pendingCount: number;
   onClearAll: () => void;
   hasActiveFilters: boolean;
 }) {
-  const invitationItems: CapsuleChoice<ManagementInvitationFilter>[] = [
-    { value: "all", label: "All" },
+  const invitationItems: CheckboxChoice<ManagementInvitationState>[] = [
     { value: "has_access", label: "Has access" },
     {
       value: "pending",
@@ -59,16 +62,22 @@ export function ManagementFilterPopover({
       onClearAll={onClearAll}
       onClose={onClose}
     >
-      <FilterField label="Access role">
-        <CapsuleChoices
+      <FilterField
+        label="Access role"
+        onClear={filterRole.length > 0 ? () => onFilterRoleChange([]) : undefined}
+      >
+        <CheckboxChoices
           aria-label="Access role"
           items={ACCESS_ROLE_ITEMS}
           value={filterRole}
           onChange={onFilterRoleChange}
         />
       </FilterField>
-      <FilterField label="Invitation">
-        <CapsuleChoices
+      <FilterField
+        label="Invitation"
+        onClear={filterInvitation.length > 0 ? () => onFilterInvitationChange([]) : undefined}
+      >
+        <CheckboxChoices
           aria-label="Invitation"
           items={invitationItems}
           value={filterInvitation}

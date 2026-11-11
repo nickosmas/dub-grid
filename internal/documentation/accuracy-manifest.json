@@ -764,7 +764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cc2faa84054cb52157421a43a7f9a82a193e0f4b668158cd82b848b511a45ef0"
+      "evidenceFingerprint": "sha256:9d006f194c4aa3edb84512cc070540229574b55b89fd7a6c7fbdf7bd8da0692a"
     },
     {
       "id": "person-detail",
@@ -909,7 +909,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:76fc760d8787aa3929f0b5bf84cea1e1f2b92aadefb7f283be997d6a2c788d3f"
+      "evidenceFingerprint": "sha256:d9f4cd97f0c1d8b81dd2220324c8345f5b5ad2f25b0405b35c751d42458a4b8b"
     },
     {
       "id": "organization",
@@ -2152,7 +2152,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:bb90d60cfff7808f6fb9583f06ba8028bb726e5e6a3ab19595a095cb6b16f40c"
+      "evidenceFingerprint": "sha256:c22c3ea20232e01da06928969a0b6fee6b4b969782e9b7138809592c9d91fb2d"
     }
   ],
   "surfaceExclusions": [

@@ -53,10 +53,19 @@ function renderStaffFilters(options: { regularUserMode?: boolean } = {}) {
 }
 
 describe("useStaffFilters access tier", () => {
+  it("keeps anyone in any of the ticked tiers", () => {
+    const { result } = renderStaffFilters();
+
+    act(() => result.current.setFilterOrgRole(["super_admin", "admin"]));
+
+    expect(result.current.sorted.map((employee) => employee.id).sort()).toEqual(["ad", "sa"]);
+    expect(result.current.activeFilterCount).toBe(1);
+  });
+
   it("narrows the directory to one access tier", () => {
     const { result } = renderStaffFilters();
 
-    act(() => result.current.setFilterOrgRole("admin"));
+    act(() => result.current.setFilterOrgRole(["admin"]));
 
     expect(result.current.sorted.map((employee) => employee.id)).toEqual(["ad"]);
   });
@@ -65,7 +74,7 @@ describe("useStaffFilters access tier", () => {
   it("counts staff with no account as users rather than a fourth bucket", () => {
     const { result } = renderStaffFilters();
 
-    act(() => result.current.setFilterOrgRole("user"));
+    act(() => result.current.setFilterOrgRole(["user"]));
 
     expect(result.current.sorted.map((employee) => employee.id).sort()).toEqual(["nl", "us"]);
   });
@@ -73,7 +82,7 @@ describe("useStaffFilters access tier", () => {
   it("filters admins out when the tier is set to plain users", () => {
     const { result } = renderStaffFilters();
 
-    act(() => result.current.setFilterOrgRole("user"));
+    act(() => result.current.setFilterOrgRole(["user"]));
 
     expect(result.current.sorted.some((employee) => employee.id === "ad")).toBe(false);
     expect(result.current.sorted.some((employee) => employee.id === "sa")).toBe(false);
@@ -82,11 +91,11 @@ describe("useStaffFilters access tier", () => {
   it("counts the tier as an active filter and clears with the rest", () => {
     const { result } = renderStaffFilters();
 
-    act(() => result.current.setFilterOrgRole("admin"));
+    act(() => result.current.setFilterOrgRole(["admin"]));
     expect(result.current.activeFilterCount).toBe(1);
 
     act(() => result.current.clearFilters());
-    expect(result.current.filterOrgRole).toBe("all");
+    expect(result.current.filterOrgRole).toEqual([]);
     expect(result.current.sorted).toHaveLength(4);
   });
 
@@ -95,7 +104,7 @@ describe("useStaffFilters access tier", () => {
   it("ignores the tier for regular users", () => {
     const { result } = renderStaffFilters({ regularUserMode: true });
 
-    act(() => result.current.setFilterOrgRole("admin"));
+    act(() => result.current.setFilterOrgRole(["admin"]));
 
     expect(result.current.sorted).toHaveLength(4);
     expect(result.current.activeFilterCount).toBe(0);
@@ -226,7 +235,7 @@ describe("useStaffFilters account state", () => {
   ] as const)("keeps only %s people, as the Account column reads them", (state, id) => {
     const { result } = renderAccountFilters();
 
-    act(() => result.current.setFilterAccount(state));
+    act(() => result.current.setFilterAccount([state]));
 
     expect(result.current.sorted.map((employee) => employee.id)).toEqual([id]);
     expect(result.current.activeFilterCount).toBe(1);
@@ -237,11 +246,72 @@ describe("useStaffFilters account state", () => {
 
     act(() => {
       result.current.setSearchQuery("ni@");
-      result.current.setFilterAccount("not_invited");
+      result.current.setFilterAccount(["not_invited"]);
     });
     act(() => result.current.clearFilters());
 
-    expect(result.current.filterAccount).toBe("all");
+    expect(result.current.filterAccount).toEqual([]);
     expect(result.current.searchQuery).toBe("ni@");
+  });
+});
+
+describe("useStaffFilters several choices", () => {
+  const FULL_PHONE = buildEmployee({ id: "fp", phone: "555-0100", focusAreaIds: [1] });
+  const PART_PHONE = buildEmployee({
+    id: "pp",
+    employmentType: "part_time",
+    phone: "555-0101",
+    focusAreaIds: [2],
+  });
+  const FULL_NO_PHONE = buildEmployee({ id: "fn", focusAreaIds: [3] });
+  const CERTIFIED = buildEmployee({ id: "ce", certificationId: 7, focusAreaIds: [3] });
+
+  function renderSeveral() {
+    return renderHook(() =>
+      useStaffFilters({
+        employees: [FULL_PHONE, PART_PHONE, FULL_NO_PHONE, CERTIFIED],
+        focusAreas: [],
+        certifications: [],
+        roles: [],
+      }),
+    );
+  }
+
+  it("keeps anyone matching any choice ticked in one filter", () => {
+    const { result } = renderSeveral();
+
+    act(() => result.current.setFilterFocusArea([1, 2]));
+
+    expect(result.current.sorted.map((employee) => employee.id).sort()).toEqual(["fp", "pp"]);
+  });
+
+  it("needs a match in every filter that has a choice ticked", () => {
+    const { result } = renderSeveral();
+
+    act(() => {
+      result.current.setFilterEmploymentType(["full_time"]);
+      result.current.setFilterPhonePresence(["present"]);
+    });
+
+    expect(result.current.sorted.map((employee) => employee.id)).toEqual(["fp"]);
+    expect(result.current.activeFilterCount).toBe(2);
+  });
+
+  it("mixes a certification with the not-certified case", () => {
+    const { result } = renderSeveral();
+
+    act(() => result.current.setFilterCertification([7]));
+    expect(result.current.sorted.map((employee) => employee.id)).toEqual(["ce"]);
+
+    act(() => result.current.setFilterCertification([7, "none"]));
+    expect(result.current.sorted).toHaveLength(4);
+  });
+
+  it("keeps both phone states when both are ticked", () => {
+    const { result } = renderSeveral();
+
+    act(() => result.current.setFilterPhonePresence(["present", "missing"]));
+
+    expect(result.current.sorted).toHaveLength(4);
   });
 });

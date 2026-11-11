@@ -4456,54 +4456,6 @@ button.dg-cc-sg-main {
   border-bottom: none;
 }
 
-/* Capsules: a filter's choices, one chosen, wrapping onto a second line
-   rather than scrolling. The chosen one is tinted, never filled with brand
-   blue, which is reserved for the action we want completed. */
-.dg-capsules {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.dg-capsule {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--dg-color-border);
-  border-radius: 999px;
-  background: var(--dg-color-surface);
-  color: var(--dg-type-control-color);
-  font-family: inherit;
-  font-size: var(--dg-type-control-size);
-  font-weight: var(--dg-type-control-weight);
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    color 150ms ease,
-    background 150ms ease,
-    border-color 150ms ease;
-}
-.dg-capsule:hover:not(.active) {
-  background: var(--dg-color-surface-hover);
-}
-.dg-capsule:focus-visible {
-  outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: 2px;
-}
-.dg-capsule.active {
-  background: var(--dg-color-brand-bg);
-  border-color: var(--dg-color-brand-border);
-  color: var(--dg-color-brand);
-}
-.dg-capsule-count {
-  background: color-mix(in srgb, currentColor 12%, transparent);
-  color: inherit;
-  font-weight: inherit;
-}
-
 /* People filter panel: a popover on desktop, a bottom sheet on a phone. */
 .dg-filter-panel {
   display: flex;
@@ -4543,8 +4495,8 @@ button.dg-cc-sg-main {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 14px 20px;
+  gap: 14px;
+  padding: 14px 20px 16px;
 }
 .dg-filter-panel-footer {
   display: grid;
@@ -4554,39 +4506,50 @@ button.dg-cc-sg-main {
 .dg-filter-panel--sheet .dg-filter-panel-footer {
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
 }
-/* Rows are compact so the whole panel fits under the toolbar on a laptop.
-   Every control sits on a 34px line: a label beside wrapped capsules lines
-   up with their first row. */
+/* Each filter is its name, then its choices, one checkbox to a row. */
 .dg-filter-field {
-  --dg-filter-line: 34px;
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  flex-direction: column;
+}
+.dg-filter-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
 }
 .dg-filter-field-label {
-  flex: 0 0 112px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: var(--dg-filter-line);
   font-size: var(--dg-type-control-size);
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--dg-color-text-primary);
+}
+.dg-filter-field-clear {
+  flex: none;
   color: var(--dg-color-text-muted);
 }
-.dg-filter-field-control {
+.dg-checkbox-choices {
   display: flex;
-  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.dg-checkbox-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  max-width: 100%;
+  font-size: var(--dg-type-control-size);
+  color: var(--dg-color-text-primary);
+  cursor: pointer;
+}
+.dg-checkbox-choice-label {
   min-width: 0;
-}
-.dg-filter-field-control > * {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.dg-filter-field-control > :not(.dg-capsules) {
-  height: var(--dg-filter-line);
-}
-.dg-filter-field-control > .dg-capsules {
-  padding: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dg-filter-divider {
   flex: none;
@@ -4598,20 +4561,12 @@ button.dg-cc-sg-main {
   gap: 18px;
   padding: 16px 20px 20px;
 }
-.dg-filter-panel--sheet .dg-filter-field {
-  --dg-filter-line: var(--dg-toolbar-h);
-  flex-direction: column;
+.dg-filter-panel--sheet .dg-filter-field-head {
+  min-height: var(--dg-toolbar-h);
+}
+.dg-filter-panel--sheet .dg-checkbox-choices {
   align-items: stretch;
-  gap: 8px;
 }
-.dg-filter-panel--sheet .dg-filter-field-label {
-  flex: none;
-  line-height: 1.3;
-}
-.dg-filter-panel--sheet .dg-filter-field-control > .dg-capsules {
-  padding: 0;
-}
-.dg-filter-panel--sheet .dg-capsule {
-  height: 36px;
-  padding: 0 14px;
+.dg-filter-panel--sheet .dg-checkbox-choice {
+  min-height: 44px;
 }

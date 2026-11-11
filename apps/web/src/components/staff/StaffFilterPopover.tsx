@@ -1,76 +1,74 @@
 "use client";
 
 import { ORG_ROLE_LABELS, ORG_ROLE_PRIVILEGE_ORDER } from "@dubgrid/domain";
-import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
-import { CapsuleChoices, type CapsuleChoice } from "@/components/ui/capsule-choices";
-import type { Department, FocusArea, NamedItem } from "@/types";
+import { CheckboxChoices, type CheckboxChoice } from "@/components/ui/checkbox-choices";
+import type { Department, FocusArea, NamedItem, OrganizationRole } from "@/types";
 import { FilterDivider, FilterField, FilterPanelShell } from "./FilterPanelShell";
-import { STAFF_ACCOUNT_STATES, STAFF_ACCOUNT_STATE_LABELS } from "./staff-account-state";
+import {
+  STAFF_ACCOUNT_STATES,
+  STAFF_ACCOUNT_STATE_LABELS,
+  type StaffAccountState,
+} from "./staff-account-state";
 import type {
   AccountStateFilter,
+  CertificationChoice,
   CertificationFilter,
+  EmploymentType,
   EmploymentTypeFilter,
+  IdFilter,
   OrgRoleFilter,
+  PhonePresence,
   PhonePresenceFilter,
 } from "./useStaffFilters";
 
-const EMPLOYMENT_ITEMS: CapsuleChoice<EmploymentTypeFilter>[] = [
-  { value: "all", label: "All" },
+const EMPLOYMENT_ITEMS: CheckboxChoice<EmploymentType>[] = [
   { value: "full_time", label: "Full-time" },
   { value: "part_time", label: "Part-time" },
 ];
 
-const ACCESS_ROLE_ITEMS: CapsuleChoice<OrgRoleFilter>[] = [
-  { value: "all", label: "All" },
-  ...ORG_ROLE_PRIVILEGE_ORDER.map((role) => ({ value: role, label: ORG_ROLE_LABELS[role] })),
-];
+const ACCESS_ROLE_ITEMS: CheckboxChoice<OrganizationRole>[] = ORG_ROLE_PRIVILEGE_ORDER.map(
+  (role) => ({ value: role, label: ORG_ROLE_LABELS[role] }),
+);
 
-const PHONE_ITEMS: CapsuleChoice<PhonePresenceFilter>[] = [
-  { value: "all", label: "All" },
+const PHONE_ITEMS: CheckboxChoice<PhonePresence>[] = [
   { value: "present", label: "Has phone" },
   { value: "missing", label: "Missing phone" },
 ];
 
-const ACCOUNT_OPTIONS: SelectOption<AccountStateFilter>[] = [
-  { value: "all", label: "All" },
-  ...STAFF_ACCOUNT_STATES.map((state) => ({
-    value: state,
-    label: STAFF_ACCOUNT_STATE_LABELS[state],
-  })),
-];
+const ACCOUNT_ITEMS: CheckboxChoice<StaffAccountState>[] = STAFF_ACCOUNT_STATES.map((state) => ({
+  value: state,
+  label: STAFF_ACCOUNT_STATE_LABELS[state],
+}));
 
-type IdFilter = number | "all";
-
-function idOptions(items: readonly { id: number; name: string }[]): SelectOption<IdFilter>[] {
-  return [
-    { value: "all", label: "All" },
-    ...items.map((item) => ({ value: item.id, label: item.name })),
-  ];
+function idItems(items: readonly { id: number; name: string }[]): CheckboxChoice<number>[] {
+  return items.map((item) => ({ value: item.id, label: item.name }));
 }
 
-const toIdFilter = (id: number | null): IdFilter => id ?? "all";
-const fromIdFilter = (value: IdFilter): number | null => (value === "all" ? null : value);
+/** A filter's Clear, offered only once something in it is ticked. */
+function clearIfSet<T>(value: readonly T[], onChange: (value: T[]) => void) {
+  return value.length > 0 ? () => onChange([]) : undefined;
+}
 
 interface StaffFilterPopoverProps {
   open: boolean;
   onClose: () => void;
   anchorRef: HTMLElement | null;
   filterEmploymentType: EmploymentTypeFilter;
-  onFilterEmploymentTypeChange: (value: EmploymentTypeFilter) => void;
-  filterDepartment: number | null;
-  onFilterDepartmentChange: (id: number | null) => void;
-  filterFocusArea: number | null;
-  onFilterFocusAreaChange: (id: number | null) => void;
+  onFilterEmploymentTypeChange: (value: EmploymentType[]) => void;
+  filterDepartment: IdFilter;
+  onFilterDepartmentChange: (ids: number[]) => void;
+  filterFocusArea: IdFilter;
+  onFilterFocusAreaChange: (ids: number[]) => void;
   filterCertification: CertificationFilter;
-  onFilterCertificationChange: (value: CertificationFilter) => void;
-  filterRole: number | null;
-  onFilterRoleChange: (id: number | null) => void;
+  onFilterCertificationChange: (value: CertificationChoice[]) => void;
+  filterRole: IdFilter;
+  onFilterRoleChange: (ids: number[]) => void;
   filterAccount: AccountStateFilter;
-  onFilterAccountChange: (value: AccountStateFilter) => void;
+  onFilterAccountChange: (value: StaffAccountState[]) => void;
   filterPhonePresence: PhonePresenceFilter;
-  onFilterPhonePresenceChange: (value: PhonePresenceFilter) => void;
+  onFilterPhonePresenceChange: (value: PhonePresence[]) => void;
   filterOrgRole: OrgRoleFilter;
-  onFilterOrgRoleChange: (value: OrgRoleFilter) => void;
+  onFilterOrgRoleChange: (value: OrganizationRole[]) => void;
   /**
    * Access is admin-only information, and the tier map behind it is only
    * loaded for viewers who can read the directory. Off, the filter would be
@@ -125,8 +123,7 @@ export function StaffFilterPopover({
 }: StaffFilterPopoverProps) {
   // The two presence cases match the People page's certified and not
   // certified counts.
-  const certificationOptions: SelectOption<Exclude<CertificationFilter, null> | "all">[] = [
-    { value: "all", label: "All" },
+  const certificationItems: CheckboxChoice<CertificationChoice>[] = [
     { value: "any", label: "Certified staff" },
     { value: "none", label: "Not certified" },
     ...certifications.map((certification) => ({
@@ -145,8 +142,11 @@ export function StaffFilterPopover({
       onClose={onClose}
     >
       {showAdministrativeFilters && (
-        <FilterField label="Employment">
-          <CapsuleChoices
+        <FilterField
+          label="Employment"
+          onClear={clearIfSet(filterEmploymentType, onFilterEmploymentTypeChange)}
+        >
+          <CheckboxChoices
             aria-label="Employment"
             items={EMPLOYMENT_ITEMS}
             value={filterEmploymentType}
@@ -156,45 +156,54 @@ export function StaffFilterPopover({
       )}
 
       {showAdministrativeFilters && departments.length > 0 && (
-        <FilterField label={departmentLabel}>
-          <CustomSelect
-            ariaLabel={departmentLabel}
-            value={toIdFilter(filterDepartment)}
-            options={idOptions(departments)}
-            onChange={(value) => onFilterDepartmentChange(fromIdFilter(value))}
+        <FilterField
+          label={departmentLabel}
+          onClear={clearIfSet(filterDepartment, onFilterDepartmentChange)}
+        >
+          <CheckboxChoices
+            aria-label={departmentLabel}
+            items={idItems(departments)}
+            value={filterDepartment}
+            onChange={onFilterDepartmentChange}
           />
         </FilterField>
       )}
 
       {focusAreas.length > 0 && (
-        <FilterField label={focusAreaLabel}>
-          <CustomSelect
-            ariaLabel={focusAreaLabel}
-            value={toIdFilter(filterFocusArea)}
-            options={idOptions(focusAreas)}
-            onChange={(value) => onFilterFocusAreaChange(fromIdFilter(value))}
+        <FilterField
+          label={focusAreaLabel}
+          onClear={clearIfSet(filterFocusArea, onFilterFocusAreaChange)}
+        >
+          <CheckboxChoices
+            aria-label={focusAreaLabel}
+            items={idItems(focusAreas)}
+            value={filterFocusArea}
+            onChange={onFilterFocusAreaChange}
           />
         </FilterField>
       )}
 
       {certifications.length > 0 && (
-        <FilterField label={certificationLabel}>
-          <CustomSelect
-            ariaLabel={certificationLabel}
-            value={filterCertification ?? "all"}
-            options={certificationOptions}
-            onChange={(value) => onFilterCertificationChange(value === "all" ? null : value)}
+        <FilterField
+          label={certificationLabel}
+          onClear={clearIfSet(filterCertification, onFilterCertificationChange)}
+        >
+          <CheckboxChoices
+            aria-label={certificationLabel}
+            items={certificationItems}
+            value={filterCertification}
+            onChange={onFilterCertificationChange}
           />
         </FilterField>
       )}
 
       {roles.length > 0 && (
-        <FilterField label={roleLabel}>
-          <CustomSelect
-            ariaLabel={roleLabel}
-            value={toIdFilter(filterRole)}
-            options={idOptions(roles)}
-            onChange={(value) => onFilterRoleChange(fromIdFilter(value))}
+        <FilterField label={roleLabel} onClear={clearIfSet(filterRole, onFilterRoleChange)}>
+          <CheckboxChoices
+            aria-label={roleLabel}
+            items={idItems(roles)}
+            value={filterRole}
+            onChange={onFilterRoleChange}
           />
         </FilterField>
       )}
@@ -202,19 +211,19 @@ export function StaffFilterPopover({
       {showAccountGroup && <FilterDivider />}
 
       {showAdministrativeFilters && (
-        <FilterField label="Account">
-          <CustomSelect
-            ariaLabel="Account"
+        <FilterField label="Account" onClear={clearIfSet(filterAccount, onFilterAccountChange)}>
+          <CheckboxChoices
+            aria-label="Account"
+            items={ACCOUNT_ITEMS}
             value={filterAccount}
-            options={ACCOUNT_OPTIONS}
             onChange={onFilterAccountChange}
           />
         </FilterField>
       )}
 
       {showAccessControls && (
-        <FilterField label="Access role">
-          <CapsuleChoices
+        <FilterField label="Access role" onClear={clearIfSet(filterOrgRole, onFilterOrgRoleChange)}>
+          <CheckboxChoices
             aria-label="Access role"
             items={ACCESS_ROLE_ITEMS}
             value={filterOrgRole}
@@ -224,8 +233,11 @@ export function StaffFilterPopover({
       )}
 
       {showAdministrativeFilters && (
-        <FilterField label="Phone">
-          <CapsuleChoices
+        <FilterField
+          label="Phone"
+          onClear={clearIfSet(filterPhonePresence, onFilterPhonePresenceChange)}
+        >
+          <CheckboxChoices
             aria-label="Phone"
             items={PHONE_ITEMS}
             value={filterPhonePresence}

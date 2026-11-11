@@ -13,16 +13,25 @@ export const STAFF_SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "name", label: "Sort: Name" },
   { value: "access", label: "Sort: Access role" },
 ];
-export type EmploymentTypeFilter = "all" | Employee["employmentType"];
-export type AccountStateFilter = "all" | StaffAccountState;
-export type PhonePresenceFilter = "all" | "present" | "missing";
-/** Everyone, or one access tier, matching the roster half's own role filter. */
-export type OrgRoleFilter = "all" | OrganizationRole;
+export type EmploymentType = Employee["employmentType"];
+export type PhonePresence = "present" | "missing";
 /**
  * A specific certification id, or the two presence cases. "any" is the People
  * page's certified-staff count; "none" is its support-staff complement.
  */
-export type CertificationFilter = number | "any" | "none" | null;
+export type CertificationChoice = number | "any" | "none";
+/*
+ * Each filter holds the choices ticked in it. A person matches a filter when
+ * they match any one of its choices, and must match every filter that has
+ * one. Nothing ticked turns the filter off.
+ */
+export type EmploymentTypeFilter = readonly EmploymentType[];
+export type AccountStateFilter = readonly StaffAccountState[];
+export type PhonePresenceFilter = readonly PhonePresence[];
+/** Access tiers, matching the roster half's own role filter. */
+export type OrgRoleFilter = readonly OrganizationRole[];
+export type CertificationFilter = readonly CertificationChoice[];
+export type IdFilter = readonly number[];
 export interface SortConfig {
   key: SortKey;
   dir: "asc" | "desc";
@@ -62,38 +71,38 @@ export function useStaffFilters({
   const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "seniority", dir: "asc" });
-  const [filterEmploymentType, setFilterEmploymentType] = useState<EmploymentTypeFilter>("all");
-  const [filterDepartment, setFilterDepartment] = useState<number | null>(null);
-  const [filterFocusArea, setFilterFocusArea] = useState<number | null>(null);
-  const [filterCertification, setFilterCertification] = useState<CertificationFilter>(null);
-  const [filterRole, setFilterRole] = useState<number | null>(null);
-  const [filterAccount, setFilterAccount] = useState<AccountStateFilter>("all");
-  const [filterOrgRole, setFilterOrgRole] = useState<OrgRoleFilter>("all");
-  const [filterPhonePresence, setFilterPhonePresence] = useState<PhonePresenceFilter>("all");
+  const [filterEmploymentType, setFilterEmploymentType] = useState<EmploymentTypeFilter>([]);
+  const [filterDepartment, setFilterDepartment] = useState<IdFilter>([]);
+  const [filterFocusArea, setFilterFocusArea] = useState<IdFilter>([]);
+  const [filterCertification, setFilterCertification] = useState<CertificationFilter>([]);
+  const [filterRole, setFilterRole] = useState<IdFilter>([]);
+  const [filterAccount, setFilterAccount] = useState<AccountStateFilter>([]);
+  const [filterOrgRole, setFilterOrgRole] = useState<OrgRoleFilter>([]);
+  const [filterPhonePresence, setFilterPhonePresence] = useState<PhonePresenceFilter>([]);
   const [page, setPage] = useState(1);
 
   const activeFilterCount = [
-    !regularUserMode && filterEmploymentType !== "all",
-    !regularUserMode && filterDepartment !== null,
-    filterFocusArea !== null,
-    filterCertification !== null,
-    filterRole !== null,
-    !regularUserMode && filterAccount !== "all",
-    !regularUserMode && filterOrgRole !== "all",
-    !regularUserMode && filterPhonePresence !== "all",
+    !regularUserMode && filterEmploymentType.length > 0,
+    !regularUserMode && filterDepartment.length > 0,
+    filterFocusArea.length > 0,
+    filterCertification.length > 0,
+    filterRole.length > 0,
+    !regularUserMode && filterAccount.length > 0,
+    !regularUserMode && filterOrgRole.length > 0,
+    !regularUserMode && filterPhonePresence.length > 0,
   ].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
 
   // Search has its own clear button, so clearing filters leaves it alone.
   function clearFilters() {
-    setFilterEmploymentType("all");
-    setFilterDepartment(null);
-    setFilterFocusArea(null);
-    setFilterCertification(null);
-    setFilterRole(null);
-    setFilterAccount("all");
-    setFilterOrgRole("all");
-    setFilterPhonePresence("all");
+    setFilterEmploymentType([]);
+    setFilterDepartment([]);
+    setFilterFocusArea([]);
+    setFilterCertification([]);
+    setFilterRole([]);
+    setFilterAccount([]);
+    setFilterOrgRole([]);
+    setFilterPhonePresence([]);
   }
 
   const handleSort = useCallback((key: SortKey) => {
@@ -208,36 +217,45 @@ export function useStaffFilters({
 
       const matchesEmploymentType =
         regularUserMode ||
-        filterEmploymentType === "all" ||
-        emp.employmentType === filterEmploymentType;
+        filterEmploymentType.length === 0 ||
+        filterEmploymentType.includes(emp.employmentType);
       const matchesDepartment =
         regularUserMode ||
-        !filterDepartment ||
-        emp.focusAreaIds.some((id) => focusAreaDepartmentById.get(id) === filterDepartment);
-      const matchesFocusArea = !filterFocusArea || emp.focusAreaIds.includes(filterFocusArea);
+        filterDepartment.length === 0 ||
+        emp.focusAreaIds.some((id) => {
+          const departmentId = focusAreaDepartmentById.get(id);
+          return departmentId !== undefined && filterDepartment.includes(departmentId);
+        });
+      const matchesFocusArea =
+        filterFocusArea.length === 0 || emp.focusAreaIds.some((id) => filterFocusArea.includes(id));
       const matchesCertification =
-        filterCertification === null ||
-        (filterCertification === "any"
-          ? emp.certificationId != null
-          : filterCertification === "none"
-            ? emp.certificationId == null
-            : emp.certificationId === filterCertification);
-      const matchesRole = !filterRole || emp.roleIds.includes(filterRole);
+        filterCertification.length === 0 ||
+        filterCertification.some((choice) =>
+          choice === "any"
+            ? emp.certificationId != null
+            : choice === "none"
+              ? emp.certificationId == null
+              : emp.certificationId === choice,
+        );
+      const matchesRole =
+        filterRole.length === 0 || emp.roleIds.some((id) => filterRole.includes(id));
       const matchesAccount =
         regularUserMode ||
-        filterAccount === "all" ||
-        getStaffAccountState(emp, Boolean(pendingInviteEmployeeIds?.has(emp.id))) === filterAccount;
+        filterAccount.length === 0 ||
+        filterAccount.includes(
+          getStaffAccountState(emp, Boolean(pendingInviteEmployeeIds?.has(emp.id))),
+        );
       // Access is an admin-only column, and an admin-only filter with it:
       // nobody else is shown the tier it narrows on. Staff with no account
       // count as Users, so picking that tier returns everyone but the admins.
       const matchesOrgRole =
         regularUserMode ||
-        filterOrgRole === "all" ||
-        getEffectiveOrgRole(orgRoleByEmployeeId?.get(emp.id)) === filterOrgRole;
+        filterOrgRole.length === 0 ||
+        filterOrgRole.includes(getEffectiveOrgRole(orgRoleByEmployeeId?.get(emp.id)));
       const matchesPhonePresence =
         regularUserMode ||
-        filterPhonePresence === "all" ||
-        (filterPhonePresence === "present" ? Boolean(emp.phone) : !emp.phone);
+        filterPhonePresence.length === 0 ||
+        filterPhonePresence.includes(emp.phone ? "present" : "missing");
 
       return (
         matchesSearch &&
