@@ -53,6 +53,7 @@ import {
 } from "../../../shared/lib/api";
 import { getAvatarTone, resolveAvatarSeed } from "../../../shared/lib/avatar-tone";
 import { getDepartmentNames } from "../../../shared/lib/departments";
+import { matchesAnyChoice, toggleFilterChoice } from "../../../shared/lib/filter-choices";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import {
   getClientFriendlyErrorMessage,
@@ -110,47 +111,80 @@ type ManagementSortMode = "alphabetical" | "access";
  * Neither set says anything about the other list, so the sheet swaps with the
  * tab rather than offering filters the visible roster can't answer.
  */
+type EmploymentType = MobilePerson["employmentType"];
+type OrgRole = NonNullable<MobileOrgRole>;
+type InvitationState = MobileManagementUser["source"];
+
+/**
+ * Every filter takes several choices and is off while none is ticked; a person
+ * matches a filter when they match any choice ticked in it. Status and sort
+ * pick one: status switches which list you're looking at.
+ */
 type StaffFilters = {
-  focusAreaId: number | "all";
-  certificationId: number | "all";
-  roleId: number | "all";
-  employmentType: "all" | MobilePerson["employmentType"];
-  appAccess: "all" | PersonAppAccess;
-  orgRole: "all" | NonNullable<MobileOrgRole>;
+  focusAreaIds: readonly number[];
+  certificationIds: readonly number[];
+  roleIds: readonly number[];
+  employmentTypes: readonly EmploymentType[];
+  appAccess: readonly PersonAppAccess[];
+  orgRoles: readonly OrgRole[];
   status: StatusFilter;
   sort: SortMode;
 };
 
 type ManagementFilters = {
-  departmentId: number | "all";
-  orgRole: "all" | NonNullable<MobileOrgRole>;
-  invitation: "all" | MobileManagementUser["source"];
+  departmentIds: readonly number[];
+  orgRoles: readonly OrgRole[];
+  invitations: readonly InvitationState[];
   sort: ManagementSortMode;
 };
 
+type StaffChoiceKey = Exclude<keyof StaffFilters, "status" | "sort">;
+type ManagementChoiceKey = Exclude<keyof ManagementFilters, "sort">;
+
 const STAFF_FILTER_DEFAULTS: StaffFilters = {
-  focusAreaId: "all",
-  certificationId: "all",
-  roleId: "all",
-  employmentType: "all",
-  appAccess: "all",
-  orgRole: "all",
+  focusAreaIds: [],
+  certificationIds: [],
+  roleIds: [],
+  employmentTypes: [],
+  appAccess: [],
+  orgRoles: [],
   status: "active",
   sort: "seniority",
 };
 
 const MANAGEMENT_FILTER_DEFAULTS: ManagementFilters = {
-  departmentId: "all",
-  orgRole: "all",
-  invitation: "all",
+  departmentIds: [],
+  orgRoles: [],
+  invitations: [],
   sort: "alphabetical",
 };
 
-/** How many of a tab's filters sit away from their default, for the badge. */
+const EMPLOYMENT_TYPE_CHOICES: readonly { value: EmploymentType; label: string }[] = [
+  { value: "full_time", label: "Full-time" },
+  { value: "part_time", label: "Part-time" },
+];
+const APP_ACCESS_CHOICES: readonly { value: PersonAppAccess; label: string }[] = [
+  { value: "has_access", label: "Has app access" },
+  { value: "invited", label: "Invitation pending" },
+  { value: "none", label: "Not invited yet" },
+];
+const INVITATION_CHOICES: readonly { value: InvitationState; label: string }[] = [
+  { value: "member", label: "Has access" },
+  { value: "pending_invite", label: "Invitation pending" },
+];
+const EMPLOYMENT_TYPE_ORDER = EMPLOYMENT_TYPE_CHOICES.map((choice) => choice.value);
+const APP_ACCESS_ORDER = APP_ACCESS_CHOICES.map((choice) => choice.value);
+const INVITATION_ORDER = INVITATION_CHOICES.map((choice) => choice.value);
+
+/**
+ * How many of a tab's filters are on, for the badge: a list with anything
+ * ticked, or a single choice away from its default.
+ */
 function countActiveFilters<Filters extends object>(filters: Filters, defaults: Filters): number {
-  return (Object.keys(defaults) as (keyof Filters)[]).filter(
-    (key) => filters[key] !== defaults[key],
-  ).length;
+  return (Object.keys(defaults) as (keyof Filters)[]).filter((key) => {
+    const value = filters[key];
+    return Array.isArray(value) ? value.length > 0 : value !== defaults[key];
+  }).length;
 }
 type ProfileRequestConfirmation = {
   request: MobileProfileChangeRequest;
@@ -319,6 +353,28 @@ export default function PeopleScreen() {
     setStaffFilters((current) => ({ ...current, [key]: value }));
   }
 
+  function toggleStaffChoice<Key extends StaffChoiceKey>(
+    key: Key,
+    choice: StaffFilters[Key][number],
+    order: readonly StaffFilters[Key][number][],
+  ) {
+    setStaffFilters((current) => ({
+      ...current,
+      [key]: toggleFilterChoice<StaffFilters[Key][number]>(current[key], choice, order),
+    }));
+  }
+
+  function toggleManagementChoice<Key extends ManagementChoiceKey>(
+    key: Key,
+    choice: ManagementFilters[Key][number],
+    order: readonly ManagementFilters[Key][number][],
+  ) {
+    setManagementFilters((current) => ({
+      ...current,
+      [key]: toggleFilterChoice<ManagementFilters[Key][number]>(current[key], choice, order),
+    }));
+  }
+
   function setManagementFilter<Key extends keyof ManagementFilters>(
     key: Key,
     value: ManagementFilters[Key],
@@ -385,6 +441,11 @@ export default function PeopleScreen() {
       ),
     [bootstrapQuery.data?.departments],
   );
+  // The order each filter lists its choices in, which ticked choices keep.
+  const focusAreaIds = focusAreas.map((focusArea) => focusArea.id);
+  const certificationIds = certifications.map((certification) => certification.id);
+  const roleIds = roles.map((role) => role.id);
+  const managementDepartmentIds = managementDepartments.map((department) => department.id);
   // The toggle only appears where there is a second half to switch to: web
   // hides it for orgs with no management departments for the same reason.
   const canSeeManagementRoster =
@@ -444,34 +505,27 @@ export default function PeopleScreen() {
 
         const matchesStatus = !canManageEmployees ? true : person.status === staffFilters.status;
 
-        const matchesFocus =
-          staffFilters.focusAreaId === "all"
-            ? true
-            : person.focusAreaIds.includes(staffFilters.focusAreaId);
-        const matchesCertification =
-          staffFilters.certificationId === "all"
-            ? true
-            : person.certificationId === staffFilters.certificationId;
-        const matchesRole =
-          staffFilters.roleId === "all" ? true : person.roleIds.includes(staffFilters.roleId);
+        const matchesFocus = matchesAnyChoice(staffFilters.focusAreaIds, person.focusAreaIds);
+        const matchesCertification = matchesAnyChoice(
+          staffFilters.certificationIds,
+          person.certificationId == null ? [] : [person.certificationId],
+        );
+        const matchesRole = matchesAnyChoice(staffFilters.roleIds, person.roleIds);
         const matchesEmploymentType =
-          regularUserMode || staffFilters.employmentType === "all"
-            ? true
-            : person.employmentType === staffFilters.employmentType;
+          regularUserMode ||
+          matchesAnyChoice(staffFilters.employmentTypes, [person.employmentType]);
         // App access is an admin-only column on the row, and an admin-only
         // filter with it: nobody else is shown the hint it filters on.
         const matchesAppAccess =
-          !canManageEmployees || staffFilters.appAccess === "all"
-            ? true
-            : getPersonAppAccess(person) === staffFilters.appAccess;
+          !canManageEmployees ||
+          matchesAnyChoice(staffFilters.appAccess, [getPersonAppAccess(person)]);
         // Access role is admin-only for the same reason as app access above:
         // the tier it narrows on is never printed on a regular user's rows.
-        // Staff with no account count as Users, so picking that tier returns
+        // Staff with no account count as Users, so ticking that tier returns
         // everyone but the admins.
         const matchesOrgRole =
-          !canManageEmployees || staffFilters.orgRole === "all"
-            ? true
-            : getEffectiveOrgRole(person.orgRole) === staffFilters.orgRole;
+          !canManageEmployees ||
+          matchesAnyChoice(staffFilters.orgRoles, [getEffectiveOrgRole(person.orgRole)]);
 
         return (
           matchesSearch &&
@@ -529,18 +583,16 @@ export default function PeopleScreen() {
           fullName.includes(normalizedSearch) ||
           managementUser.email.toLowerCase().includes(normalizedSearch) ||
           managementUser.phone.toLowerCase().includes(normalizedSearch);
-        const matchesDepartment =
-          managementFilters.departmentId === "all"
-            ? true
-            : managementUser.managementDepartmentIds.includes(managementFilters.departmentId);
-        const matchesOrgRole =
-          managementFilters.orgRole === "all"
-            ? true
-            : getEffectiveOrgRole(managementUser.orgRole) === managementFilters.orgRole;
-        const matchesInvitation =
-          managementFilters.invitation === "all"
-            ? true
-            : managementUser.source === managementFilters.invitation;
+        const matchesDepartment = matchesAnyChoice(
+          managementFilters.departmentIds,
+          managementUser.managementDepartmentIds,
+        );
+        const matchesOrgRole = matchesAnyChoice(managementFilters.orgRoles, [
+          getEffectiveOrgRole(managementUser.orgRole),
+        ]);
+        const matchesInvitation = matchesAnyChoice(managementFilters.invitations, [
+          managementUser.source,
+        ]);
         return matchesSearch && matchesDepartment && matchesOrgRole && matchesInvitation;
       })
       .sort((left, right) => {
@@ -561,9 +613,9 @@ export default function PeopleScreen() {
     ? countActiveFilters(managementFilters, MANAGEMENT_FILTER_DEFAULTS)
     : regularUserMode
       ? [
-          staffFilters.focusAreaId !== "all",
-          staffFilters.certificationId !== "all",
-          staffFilters.roleId !== "all",
+          staffFilters.focusAreaIds.length > 0,
+          staffFilters.certificationIds.length > 0,
+          staffFilters.roleIds.length > 0,
           staffFilters.sort !== STAFF_FILTER_DEFAULTS.sort,
         ].filter(Boolean).length
       : countActiveFilters(staffFilters, STAFF_FILTER_DEFAULTS);
@@ -730,55 +782,45 @@ export default function PeopleScreen() {
         {isManagementTab ? (
           <>
             <SelectionSection label="Administrative team">
-              <SelectionRow
-                label="All administrative teams"
-                onPress={() => setManagementFilter("departmentId", "all")}
-                selected={managementFilters.departmentId === "all"}
-              />
               {managementDepartments.map((department) => (
                 <SelectionRow
                   key={department.id}
                   detail={`${countManagementUsersInDepartment(managementUsers, department.id)} people`}
                   label={department.name}
-                  onPress={() => setManagementFilter("departmentId", department.id)}
-                  selected={managementFilters.departmentId === department.id}
+                  multiple
+                  onPress={() =>
+                    toggleManagementChoice("departmentIds", department.id, managementDepartmentIds)
+                  }
+                  selected={managementFilters.departmentIds.includes(department.id)}
                 />
               ))}
             </SelectionSection>
 
             <SelectionSection label="Access role">
-              <SelectionRow
-                label="All access roles"
-                onPress={() => setManagementFilter("orgRole", "all")}
-                selected={managementFilters.orgRole === "all"}
-              />
               {ORG_ROLE_PRIVILEGE_ORDER.map((role) => (
                 <SelectionRow
                   key={role}
                   detail={`${countManagementUsersWithRole(managementUsers, role)} people`}
                   label={ORG_ROLE_LABELS[role]}
-                  onPress={() => setManagementFilter("orgRole", role)}
-                  selected={managementFilters.orgRole === role}
+                  multiple
+                  onPress={() => toggleManagementChoice("orgRoles", role, ORG_ROLE_PRIVILEGE_ORDER)}
+                  selected={managementFilters.orgRoles.includes(role)}
                 />
               ))}
             </SelectionSection>
 
             <SelectionSection label="Invitation">
-              <SelectionRow
-                label="Everyone"
-                onPress={() => setManagementFilter("invitation", "all")}
-                selected={managementFilters.invitation === "all"}
-              />
-              <SelectionRow
-                label="Has access"
-                onPress={() => setManagementFilter("invitation", "member")}
-                selected={managementFilters.invitation === "member"}
-              />
-              <SelectionRow
-                label="Invitation pending"
-                onPress={() => setManagementFilter("invitation", "pending_invite")}
-                selected={managementFilters.invitation === "pending_invite"}
-              />
+              {INVITATION_CHOICES.map((choice) => (
+                <SelectionRow
+                  key={choice.value}
+                  label={choice.label}
+                  multiple
+                  onPress={() =>
+                    toggleManagementChoice("invitations", choice.value, INVITATION_ORDER)
+                  }
+                  selected={managementFilters.invitations.includes(choice.value)}
+                />
+              ))}
             </SelectionSection>
 
             <SelectionSection label="Sort by">
@@ -797,28 +839,19 @@ export default function PeopleScreen() {
         ) : (
           <>
             <SelectionSection label={capitalizeFirst(singularLabelNoun(focusAreaLabel))}>
-              <SelectionRow
-                label={`All ${pluralLabelNoun(focusAreaLabel)}`}
-                onPress={() => setStaffFilter("focusAreaId", "all")}
-                selected={staffFilters.focusAreaId === "all"}
-              />
               {focusAreas.map((focusArea) => (
                 <SelectionRow
                   key={focusArea.id}
                   label={focusArea.name}
-                  onPress={() => setStaffFilter("focusAreaId", focusArea.id)}
-                  selected={staffFilters.focusAreaId === focusArea.id}
+                  multiple
+                  onPress={() => toggleStaffChoice("focusAreaIds", focusArea.id, focusAreaIds)}
+                  selected={staffFilters.focusAreaIds.includes(focusArea.id)}
                 />
               ))}
             </SelectionSection>
 
             {certifications.length > 0 ? (
               <SelectionSection label={certificationLabel}>
-                <SelectionRow
-                  label={`All ${pluralLabelNoun(certificationLabel)}`}
-                  onPress={() => setStaffFilter("certificationId", "all")}
-                  selected={staffFilters.certificationId === "all"}
-                />
                 {certifications.map((certification) => (
                   <SelectionRow
                     key={certification.id}
@@ -827,8 +860,11 @@ export default function PeopleScreen() {
                         ? certification.abbr || certification.name
                         : certification.name
                     }
-                    onPress={() => setStaffFilter("certificationId", certification.id)}
-                    selected={staffFilters.certificationId === certification.id}
+                    multiple
+                    onPress={() =>
+                      toggleStaffChoice("certificationIds", certification.id, certificationIds)
+                    }
+                    selected={staffFilters.certificationIds.includes(certification.id)}
                   />
                 ))}
               </SelectionSection>
@@ -836,17 +872,13 @@ export default function PeopleScreen() {
 
             {roles.length > 0 ? (
               <SelectionSection label={roleLabel}>
-                <SelectionRow
-                  label={`All ${pluralLabelNoun(roleLabel)}`}
-                  onPress={() => setStaffFilter("roleId", "all")}
-                  selected={staffFilters.roleId === "all"}
-                />
                 {roles.map((role) => (
                   <SelectionRow
                     key={role.id}
                     label={useCompactRoleCertificationLabels ? role.abbr || role.name : role.name}
-                    onPress={() => setStaffFilter("roleId", role.id)}
-                    selected={staffFilters.roleId === role.id}
+                    multiple
+                    onPress={() => toggleStaffChoice("roleIds", role.id, roleIds)}
+                    selected={staffFilters.roleIds.includes(role.id)}
                   />
                 ))}
               </SelectionSection>
@@ -854,63 +886,44 @@ export default function PeopleScreen() {
 
             {canManageEmployees ? (
               <SelectionSection label="Employment type">
-                <SelectionRow
-                  label="All employment types"
-                  onPress={() => setStaffFilter("employmentType", "all")}
-                  selected={staffFilters.employmentType === "all"}
-                />
-                <SelectionRow
-                  label="Full-time"
-                  onPress={() => setStaffFilter("employmentType", "full_time")}
-                  selected={staffFilters.employmentType === "full_time"}
-                />
-                <SelectionRow
-                  label="Part-time"
-                  onPress={() => setStaffFilter("employmentType", "part_time")}
-                  selected={staffFilters.employmentType === "part_time"}
-                />
+                {EMPLOYMENT_TYPE_CHOICES.map((choice) => (
+                  <SelectionRow
+                    key={choice.value}
+                    label={choice.label}
+                    multiple
+                    onPress={() =>
+                      toggleStaffChoice("employmentTypes", choice.value, EMPLOYMENT_TYPE_ORDER)
+                    }
+                    selected={staffFilters.employmentTypes.includes(choice.value)}
+                  />
+                ))}
               </SelectionSection>
             ) : null}
 
             {canManageEmployees ? (
               <SelectionSection label="App access">
-                <SelectionRow
-                  label="All access"
-                  onPress={() => setStaffFilter("appAccess", "all")}
-                  selected={staffFilters.appAccess === "all"}
-                />
-                <SelectionRow
-                  label="Has app access"
-                  onPress={() => setStaffFilter("appAccess", "has_access")}
-                  selected={staffFilters.appAccess === "has_access"}
-                />
-                <SelectionRow
-                  label="Invitation pending"
-                  onPress={() => setStaffFilter("appAccess", "invited")}
-                  selected={staffFilters.appAccess === "invited"}
-                />
-                <SelectionRow
-                  label="Not invited yet"
-                  onPress={() => setStaffFilter("appAccess", "none")}
-                  selected={staffFilters.appAccess === "none"}
-                />
+                {APP_ACCESS_CHOICES.map((choice) => (
+                  <SelectionRow
+                    key={choice.value}
+                    label={choice.label}
+                    multiple
+                    onPress={() => toggleStaffChoice("appAccess", choice.value, APP_ACCESS_ORDER)}
+                    selected={staffFilters.appAccess.includes(choice.value)}
+                  />
+                ))}
               </SelectionSection>
             ) : null}
 
             {canManageEmployees ? (
               <SelectionSection label="Access role">
-                <SelectionRow
-                  label="All access roles"
-                  onPress={() => setStaffFilter("orgRole", "all")}
-                  selected={staffFilters.orgRole === "all"}
-                />
                 {ORG_ROLE_PRIVILEGE_ORDER.map((role) => (
                   <SelectionRow
                     key={role}
                     detail={`${countPeopleWithRole(visiblePeople, role)} people`}
                     label={ORG_ROLE_LABELS[role]}
-                    onPress={() => setStaffFilter("orgRole", role)}
-                    selected={staffFilters.orgRole === role}
+                    multiple
+                    onPress={() => toggleStaffChoice("orgRoles", role, ORG_ROLE_PRIVILEGE_ORDER)}
+                    selected={staffFilters.orgRoles.includes(role)}
                   />
                 ))}
               </SelectionSection>
