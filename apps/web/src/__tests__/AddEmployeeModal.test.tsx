@@ -312,14 +312,40 @@ describe("AddEmployeeModal", () => {
       ]);
     });
 
+    it("shows the bulk invite controls only once they reach two people", async () => {
+      renderModal({ canGrantElevatedRoles: true });
+      const everyoneControls = () => [
+        screen.queryByRole("checkbox", { name: "Invite everyone with an email" }),
+        screen.queryByRole("button", { name: "Set everyone's access role" }),
+      ];
+      expect(everyoneControls()).toEqual([null, null]);
+
+      await userEvent.type(getEmailInputs()[0]!, "jane@calmhaven.org");
+      expect(everyoneControls()).toEqual([null, null]);
+
+      await userEvent.type(getEmailInputs()[1]!, "omar@calmhaven.org");
+      expect(everyoneControls().every(Boolean)).toBe(true);
+
+      await userEvent.click(screen.getAllByRole("checkbox", { name: "Invite to the app" })[1]!);
+      expect(
+        screen.queryByRole("button", { name: "Set everyone's access role" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: "Invite everyone with an email" }),
+      ).toBeInTheDocument();
+    });
+
     it("ticks and clears everyone with an email at once", async () => {
       renderModal();
       await userEvent.type(getEmailInputs()[0]!, "jane@calmhaven.org");
+      await userEvent.type(getEmailInputs()[1]!, "omar@calmhaven.org");
       const all = screen.getByRole("checkbox", { name: "Invite everyone with an email" });
       expect(all).toBeChecked();
 
       await userEvent.click(all);
-      expect(screen.getByRole("checkbox", { name: "Invite to the app" })).not.toBeChecked();
+      for (const row of screen.getAllByRole("checkbox", { name: "Invite to the app" })) {
+        expect(row).not.toBeChecked();
+      }
       expect(all).not.toBeChecked();
     });
   });

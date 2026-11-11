@@ -183,6 +183,8 @@ export default function AddEmployeeModal({
   const inviteAll = invitableRows.length > 0 && invitableRows.every((row) => row.invite);
   const invitedRows = validRows.filter((row) => row.invite && row.email.trim().length > 0);
   const invitingRows = invitableRows.filter((row) => row.invite);
+  const showInviteAll = invitableRows.length > 1;
+  const showBulkRole = roleOptions.length > 1 && invitingRows.length > 1;
   const bulkRole: AssignableOrganizationRole | "mixed" =
     invitingRows.length > 0 && invitingRows.every((row) => row.role === invitingRows[0].role)
       ? invitingRows[0].role
@@ -385,46 +387,48 @@ export default function AddEmployeeModal({
                 {" · "}
                 {validRows.length} ready to add
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                <label style={checkboxLabelStyle}>
-                  <input
-                    type="checkbox"
-                    className="dg-checkbox"
-                    checked={inviteAll}
-                    disabled={invitableRows.length === 0}
-                    onChange={() =>
-                      setRows((prev) =>
-                        prev.map((r, index) =>
-                          canInviteRow(r, index) ? { ...r, invite: !inviteAll } : r,
-                        ),
-                      )
-                    }
-                  />
-                  Invite everyone with an email
-                </label>
-                {roleOptions.length > 1 ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ ...fieldLabelStyle, whiteSpace: "nowrap" }}>
-                      Set everyone to
-                    </span>
-                    <CustomSelect<AssignableOrganizationRole | "mixed">
-                      ariaLabel="Set everyone's access role"
-                      value={bulkRole}
-                      options={roleOptions}
-                      placeholder={invitingRows.length === 0 ? "No one invited" : "Mixed"}
-                      disabled={invitingRows.length === 0}
-                      onChange={(role) => {
-                        if (role === "mixed") return;
-                        setRows((prev) =>
-                          prev.map((r, index) =>
-                            canInviteRow(r, index) && r.invite ? { ...r, role } : r,
-                          ),
-                        );
-                      }}
-                    />
-                  </div>
-                ) : null}
-              </div>
+              {showInviteAll || showBulkRole ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                  {showInviteAll ? (
+                    <label style={checkboxLabelStyle}>
+                      <input
+                        type="checkbox"
+                        className="dg-checkbox"
+                        checked={inviteAll}
+                        onChange={() =>
+                          setRows((prev) =>
+                            prev.map((r, index) =>
+                              canInviteRow(r, index) ? { ...r, invite: !inviteAll } : r,
+                            ),
+                          )
+                        }
+                      />
+                      Invite everyone with an email
+                    </label>
+                  ) : null}
+                  {showBulkRole ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ ...fieldLabelStyle, whiteSpace: "nowrap" }}>
+                        Set everyone to
+                      </span>
+                      <CustomSelect<AssignableOrganizationRole | "mixed">
+                        ariaLabel="Set everyone's access role"
+                        value={bulkRole}
+                        options={roleOptions}
+                        placeholder="Mixed"
+                        onChange={(role) => {
+                          if (role === "mixed") return;
+                          setRows((prev) =>
+                            prev.map((r, index) =>
+                              canInviteRow(r, index) && r.invite ? { ...r, role } : r,
+                            ),
+                          );
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div
               style={{
@@ -700,8 +704,7 @@ export default function AddEmployeeModal({
                       <div
                         style={{
                           display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
+                          alignItems: "baseline",
                           gap: 8,
                           flexWrap: "wrap",
                         }}
