@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { replaceAuthSession } from "../providers/AuthSessionProvider";
 import { disablePushToken, signOutMobileSessions } from "./api";
+import { clearSavedStepUpPassword } from "./biometric-step-up";
 import { clearQueryCache } from "./query-persistence";
 import { loadStoredPushDevice, saveStoredPushRegistration } from "./session";
 import { getSupabaseClient } from "./supabase";
@@ -110,6 +111,8 @@ export async function handleExpiredMobileSession(options?: {
     }
 
     clearQueryCache();
+    // Every way out ends here, a password change included.
+    await settleWithin(clearSavedStepUpPassword());
 
     if (!options?.skipSignOut) {
       try {

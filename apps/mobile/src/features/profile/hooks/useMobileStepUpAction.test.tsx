@@ -6,6 +6,17 @@ const confirmMobileStepUp = vi.hoisted(() => vi.fn());
 const getMobileStepUpMethod = vi.hoisted(() => vi.fn());
 const getMobileStepUpContextKey = vi.hoisted(() => vi.fn());
 const useSessionState = vi.hoisted(() => vi.fn());
+const biometric = vi.hoisted(() => ({
+  readSavedStepUpPassword: vi.fn(),
+  saveStepUpPassword: vi.fn(),
+  clearSavedStepUpPassword: vi.fn(),
+  isRefusedSavedPassword: vi.fn(),
+}));
+
+vi.mock("../../../shared/lib/biometric-step-up", () => biometric);
+vi.mock("../../../shared/lib/access-token", () => ({
+  getUserIdFromAccessToken: (token: string) => `user-of-${token}`,
+}));
 
 vi.mock("../../../shared/providers/AuthSessionProvider", () => ({ useSessionState }));
 vi.mock("../lib/step-up", () => ({
@@ -58,6 +69,12 @@ beforeEach(() => {
   readMobileStepUpContext.mockResolvedValue({ key: "user-1:org-1", accessToken: "old-token" });
   getMobileStepUpContextKey.mockReturnValue("user-1:org-1");
   getMobileStepUpMethod.mockImplementation((error: { method?: string }) => error?.method ?? null);
+  biometric.readSavedStepUpPassword.mockResolvedValue(null);
+  biometric.saveStepUpPassword.mockResolvedValue(undefined);
+  biometric.clearSavedStepUpPassword.mockResolvedValue(undefined);
+  biometric.isRefusedSavedPassword.mockImplementation(
+    (error: { refused?: boolean }) => error?.refused === true,
+  );
 });
 
 describe("useMobileStepUpAction", () => {
@@ -118,5 +135,123 @@ describe("useMobileStepUpAction", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(action).toHaveBeenCalledTimes(1);
+  });
+
+  describe("with a password saved behind biometrics", () => {
+    it("completes the action after biometrics, with no sheet", async () => {
+      action.mockRejectedValueOnce({ method: "password" }).mockResolvedValueOnce(undefined);
+      biometric.readSavedStepUpPassword.mockResolvedValue("saved-secret");
+      confirmMobileStepUp.mockResolvedValue("password-token");
+      let completed: boolean | undefined;
+      function Runner() {
+        const stepUp = useMobileStepUpAction();
+        return (
+          <>
+            <button
+              onClick={() =>
+                void stepUp.run(action).then((result) => {
+                  completed = result;
+                })
+              }
+            >
+              Run action
+            </button>
+            {stepUp.sheet}
+          </>
+        );
+      }
+      render(<Runner />);
+
+      fireEvent.click(screen.getByText("Run action"));
+
+      await waitFor(() => expect(completed).toBe(true));
+      expect(biometric.readSavedStepUpPassword).toHaveBeenCalledWith(
+        "password",
+        "user-of-old-token",
+      );
+      expect(confirmMobileStepUp).toHaveBeenCalledWith("password", "saved-secret", "old-token");
+      expect(action).toHaveBeenLastCalledWith("password-token");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(biometric.saveStepUpPassword).not.toHaveBeenCalled();
+    });
+
+    it("asks for the password when biometrics are cancelled or off", async () => {
+      action.mockRejectedValueOnce({ method: "password" }).mockResolvedValueOnce(undefined);
+      confirmMobileStepUp.mockResolvedValue("password-token");
+      render(<Harness />);
+
+      fireEvent.click(screen.getByText("Run action"));
+      expect(await screen.findByRole("dialog")).toHaveTextContent("password");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(confirmMobileStepUp).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText("Confirm"));
+      await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+      expect(biometric.saveStepUpPassword).toHaveBeenCalledWith("user-of-password-token", "secret");
+    });
+
+    it("deletes a saved password the server refuses and asks for it", async () => {
+      action.mockRejectedValueOnce({ method: "password" });
+      biometric.readSavedStepUpPassword.mockResolvedValue("old-secret");
+      confirmMobileStepUp.mockRejectedValueOnce({ refused: true });
+      render(<Harness />);
+
+      fireEvent.click(screen.getByText("Run action"));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("saved password no longer works");
+      expect(biometric.clearSavedStepUpPassword).toHaveBeenCalled();
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the saved password after a failure that doesn't prove it wrong", async () => {
+      action.mockRejectedValueOnce({ method: "password" });
+      biometric.readSavedStepUpPassword.mockResolvedValue("saved-secret");
+      confirmMobileStepUp.mockRejectedValueOnce(new Error("Network request failed"));
+      render(<Harness />);
+
+      fireEvent.click(screen.getByText("Run action"));
+
+      expect(await screen.findByRole("dialog")).toHaveTextContent("password");
+      expect(biometric.clearSavedStepUpPassword).not.toHaveBeenCalled();
+    });
+
+    it("never tries biometrics for a two-factor code", async () => {
+      action.mockRejectedValueOnce({ method: "totp" });
+      biometric.readSavedStepUpPassword.mockResolvedValue("saved-secret");
+      render(<Harness />);
+
+      fireEvent.click(screen.getByText("Run action"));
+
+      expect(await screen.findByRole("dialog")).toHaveTextContent("totp");
+      expect(biometric.readSavedStepUpPassword).not.toHaveBeenCalled();
+    });
+
+    it("switches to the code sheet when the account now asks for one", async () => {
+      action.mockRejectedValueOnce({ method: "password" });
+      biometric.readSavedStepUpPassword.mockResolvedValue("saved-secret");
+      confirmMobileStepUp.mockRejectedValueOnce({ method: "totp" });
+      render(<Harness />);
+
+      fireEvent.click(screen.getByText("Run action"));
+
+      expect(await screen.findByRole("dialog")).toHaveTextContent("totp");
+      expect(biometric.clearSavedStepUpPassword).not.toHaveBeenCalled();
+    });
+
+    it("drops the action when the account changes during the biometric check", async () => {
+      action.mockRejectedValueOnce({ method: "password" });
+      biometric.readSavedStepUpPassword.mockResolvedValue("saved-secret");
+      readMobileStepUpContext
+        .mockResolvedValueOnce({ key: "user-1:org-1", accessToken: "old-token" })
+        .mockResolvedValueOnce({ key: "user-1:org-2", accessToken: "other-token" });
+      render(<Harness />);
+
+      fireEvent.click(screen.getByText("Run action"));
+
+      await waitFor(() => expect(readMobileStepUpContext).toHaveBeenCalledTimes(2));
+      expect(confirmMobileStepUp).not.toHaveBeenCalled();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(action).toHaveBeenCalledTimes(1);
+    });
   });
 });

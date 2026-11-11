@@ -1,4 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { getUserIdFromAccessToken } from "../../../shared/lib/access-token";
+import {
+  clearSavedStepUpPassword,
+  isRefusedSavedPassword,
+  readSavedStepUpPassword,
+  saveStepUpPassword,
+} from "../../../shared/lib/biometric-step-up";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { MobileStepUpSheet } from "../components/MobileStepUpSheet";
 import {
@@ -10,6 +17,14 @@ import {
 } from "../lib/step-up";
 
 type Action = (accessToken: string) => Promise<unknown>;
+
+type BiometricOutcome =
+  | { kind: "completed" }
+  | { kind: "abandoned" }
+  | { kind: "fallback"; method: MobileStepUpMethod; error: string | null };
+
+const SAVED_PASSWORD_REFUSED =
+  "Your saved password no longer works. Enter your password to continue.";
 
 interface PendingAction {
   context: string;
@@ -58,10 +73,18 @@ export function useMobileStepUpAction() {
         await action(context.accessToken);
         return true;
       } catch (failure) {
-        const required = getMobileStepUpMethod(failure);
+        let required = getMobileStepUpMethod(failure);
         if (!required) throw failure;
         if (!mounted.current) return false;
-        setError(null);
+        let sheetError: string | null = null;
+        if (required === "password") {
+          const outcome = await confirmWithSavedPassword(context, action);
+          if (outcome.kind === "completed") return true;
+          if (outcome.kind === "abandoned" || !mounted.current) return false;
+          required = outcome.method;
+          sheetError = outcome.error;
+        }
+        setError(sheetError);
         setMethod(required);
         return await new Promise<boolean>((resolve, reject) => {
           pending.current = {
@@ -76,6 +99,48 @@ export function useMobileStepUpAction() {
       pending.current = null;
       running.current = false;
       if (mounted.current) setMethod(null);
+    }
+  }
+
+  /** Face ID or a fingerprint releases the saved password; the server still checks it. */
+  async function confirmWithSavedPassword(
+    context: { key: string; accessToken: string },
+    action: Action,
+  ): Promise<BiometricOutcome> {
+    const password = await readSavedStepUpPassword(
+      "password",
+      getUserIdFromAccessToken(context.accessToken),
+    );
+    if (!password) return { kind: "fallback", method: "password", error: null };
+    if (!mounted.current) return { kind: "abandoned" };
+
+    let accessToken: string;
+    try {
+      const fresh = await readMobileStepUpContext();
+      if (fresh.key !== context.key) return { kind: "abandoned" };
+      accessToken = await confirmMobileStepUp("password", password, fresh.accessToken);
+    } catch (failure) {
+      const refused = isRefusedSavedPassword(failure);
+      if (refused) await clearSavedStepUpPassword();
+      return {
+        kind: "fallback",
+        method: getMobileStepUpMethod(failure) ?? "password",
+        error: refused ? SAVED_PASSWORD_REFUSED : null,
+      };
+    }
+    if (getMobileStepUpContextKey(accessToken) !== context.key) return { kind: "abandoned" };
+
+    try {
+      await action(accessToken);
+      return { kind: "completed" };
+    } catch (failure) {
+      const required = getMobileStepUpMethod(failure);
+      if (!required) throw failure;
+      return {
+        kind: "fallback",
+        method: required,
+        error: "Your identity confirmation expired or changed. Confirm again to continue.",
+      };
     }
   }
 
@@ -105,9 +170,16 @@ export function useMobileStepUpAction() {
       return;
     }
 
+    // The server just accepted this password, so it can open the next check.
+    const keepPassword = () => {
+      if (method === "password") {
+        void saveStepUpPassword(getUserIdFromAccessToken(accessToken), credential);
+      }
+    };
     try {
       await request.action(accessToken);
       request.resolve(true);
+      keepPassword();
     } catch (failure) {
       if (pending.current !== request) return;
       const required = getMobileStepUpMethod(failure);
@@ -116,6 +188,7 @@ export function useMobileStepUpAction() {
         setError("Your identity confirmation expired or changed. Confirm again to continue.");
       } else {
         request.reject(failure);
+        keepPassword();
       }
     }
   }

@@ -78,6 +78,11 @@ const hasHardwareAsync = vi.fn();
 const isEnrolledAsync = vi.fn();
 const authenticateAsync = vi.fn();
 
+const clearSavedStepUpPassword = vi.fn();
+vi.mock("../../../shared/lib/biometric-step-up", () => ({
+  clearSavedStepUpPassword: (...args: unknown[]) => clearSavedStepUpPassword(...args),
+}));
+
 vi.mock("expo-local-authentication", () => ({
   hasHardwareAsync: (...args: unknown[]) => hasHardwareAsync(...args),
   isEnrolledAsync: (...args: unknown[]) => isEnrolledAsync(...args),
@@ -120,6 +125,7 @@ describe("ProfileSecurityScreen", () => {
     isEnrolledAsync.mockReset();
     hasHardwareAsync.mockResolvedValue(true);
     isEnrolledAsync.mockResolvedValue(true);
+    clearSavedStepUpPassword.mockReset();
     authenticateAsync.mockReset();
     authenticateAsync.mockResolvedValue({ success: true });
     // Module-level store, so it survives between tests unless reset.
@@ -287,6 +293,7 @@ describe("ProfileSecurityScreen", () => {
       expect(authenticateAsync).toHaveBeenCalledTimes(1);
       expect(appLockSwitch).not.toBeChecked();
     });
+    expect(clearSavedStepUpPassword).toHaveBeenCalledTimes(1);
   });
 
   it("keeps app lock on when the device check is declined", async () => {
@@ -303,6 +310,7 @@ describe("ProfileSecurityScreen", () => {
 
     await waitFor(() => expect(authenticateAsync).toHaveBeenCalledTimes(1));
     expect(appLockSwitch).toBeChecked();
+    expect(clearSavedStepUpPassword).not.toHaveBeenCalled();
   });
 
   it("requests account deletion after confirming, for a member below super admin", async () => {
