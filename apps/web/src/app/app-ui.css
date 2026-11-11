@@ -4456,6 +4456,54 @@ button.dg-cc-sg-main {
   border-bottom: none;
 }
 
+/* Capsules: a filter's choices, one chosen, wrapping onto a second line
+   rather than scrolling. The chosen one is tinted, never filled with brand
+   blue, which is reserved for the action we want completed. */
+.dg-capsules {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.dg-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--dg-color-border);
+  border-radius: 999px;
+  background: var(--dg-color-surface);
+  color: var(--dg-type-control-color);
+  font-family: inherit;
+  font-size: var(--dg-type-control-size);
+  font-weight: var(--dg-type-control-weight);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease;
+}
+.dg-capsule:hover:not(.active) {
+  background: var(--dg-color-surface-hover);
+}
+.dg-capsule:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 2px;
+}
+.dg-capsule.active {
+  background: var(--dg-color-brand-bg);
+  border-color: var(--dg-color-brand-border);
+  color: var(--dg-color-brand);
+}
+.dg-capsule-count {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
 /* People filter panel: a popover on desktop, a bottom sheet on a phone. */
 .dg-filter-panel {
   display: flex;
@@ -4465,7 +4513,7 @@ button.dg-cc-sg-main {
 }
 .dg-filter-panel--popover {
   position: relative;
-  width: 480px;
+  width: 500px;
   max-width: calc(100vw - 2rem);
   max-height: min(70vh, var(--available-height, 70vh));
   overflow: hidden;
@@ -4486,7 +4534,7 @@ button.dg-cc-sg-main {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 12px 12px 20px;
+  padding: 10px 12px 10px 20px;
   border-bottom: 1px solid var(--dg-color-border-light);
 }
 .dg-filter-panel-body {
@@ -4495,8 +4543,8 @@ button.dg-cc-sg-main {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 20px;
+  gap: 6px;
+  padding: 14px 20px;
 }
 .dg-filter-panel-footer {
   display: grid;
@@ -4506,17 +4554,21 @@ button.dg-cc-sg-main {
 .dg-filter-panel--sheet .dg-filter-panel-footer {
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
 }
+/* Rows are compact so the whole panel fits under the toolbar on a laptop.
+   Every control sits on a 34px line: a label beside wrapped capsules lines
+   up with their first row. */
 .dg-filter-field {
+  --dg-filter-line: 34px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
-  min-height: 40px;
 }
 .dg-filter-field-label {
   flex: 0 0 112px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: var(--dg-filter-line);
   font-size: var(--dg-type-control-size);
   font-weight: 500;
   color: var(--dg-color-text-muted);
@@ -4526,33 +4578,40 @@ button.dg-cc-sg-main {
   flex: 1 1 auto;
   min-width: 0;
 }
-/* A dropdown fills the row; a segmented control keeps its own width. */
-.dg-filter-field-control > :not(.dg-span-tabs) {
+.dg-filter-field-control > * {
   flex: 1 1 auto;
   min-width: 0;
 }
+.dg-filter-field-control > :not(.dg-capsules) {
+  height: var(--dg-filter-line);
+}
+.dg-filter-field-control > .dg-capsules {
+  padding: 2px 0;
+}
 .dg-filter-divider {
+  flex: none;
   height: 1px;
-  margin: 6px 0;
-  background: var(--dg-color-border-light);
+  margin: 4px 0;
+  background: var(--dg-color-border);
 }
 .dg-filter-panel--sheet .dg-filter-panel-body {
-  gap: 14px;
-  padding: 16px 20px;
+  gap: 18px;
+  padding: 16px 20px 20px;
 }
 .dg-filter-panel--sheet .dg-filter-field {
+  --dg-filter-line: var(--dg-toolbar-h);
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
-  min-height: 0;
+  gap: 8px;
 }
 .dg-filter-panel--sheet .dg-filter-field-label {
   flex: none;
+  line-height: 1.3;
 }
-.dg-filter-panel--sheet .dg-filter-field-control > .dg-span-tabs {
-  flex: 1 1 auto;
+.dg-filter-panel--sheet .dg-filter-field-control > .dg-capsules {
+  padding: 0;
 }
-.dg-filter-panel--sheet .dg-filter-field-control .dg-span-tab {
-  flex: 1 1 auto;
-  justify-content: center;
+.dg-filter-panel--sheet .dg-capsule {
+  height: 36px;
+  padding: 0 14px;
 }
