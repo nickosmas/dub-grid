@@ -2004,7 +2004,7 @@ button.dg-cc-sg-main {
    underneath. */
 .dg-modal-footer {
   flex: 0 0 auto;
-  margin: 20px calc(-1 * var(--dg-modal-px)) 0;
+  margin: 0 calc(-1 * var(--dg-modal-px));
   padding: 12px var(--dg-modal-px);
   border-top: 1px solid var(--dg-color-border-light);
   border-radius: 0 0 calc(var(--dg-radius-xl) - 1px) calc(var(--dg-radius-xl) - 1px);
@@ -2012,6 +2012,19 @@ button.dg-cc-sg-main {
 }
 .dg-modal.dg-modal--with-footer {
   padding-bottom: 0;
+}
+/* The 20px above the footer's line is the end of the scroll region, not a
+   margin under it, so a long dialog's content scrolls right up to the line
+   instead of vanishing in a blank band. The spacer is a flex item rather than
+   bottom padding because Safari leaves a flex scroller's end padding out of
+   the scroll range. */
+.dg-modal--with-footer .dg-modal-scroll-region {
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+.dg-modal--with-footer .dg-modal-scroll-region::after {
+  content: "";
+  flex: 0 0 20px;
 }
 /* For a short list of choices: no divider under the last one, and the
    buttons sit as far below it as the list sits below the title. */
@@ -2021,6 +2034,18 @@ button.dg-cc-sg-main {
   border-top: none;
   border-radius: 0;
   background: none;
+}
+.dg-modal--quiet-footer .dg-modal-scroll-region {
+  padding-bottom: 4px;
+  margin-bottom: -4px;
+}
+.dg-modal--quiet-footer .dg-modal-scroll-region::after {
+  content: none;
+}
+/* For a list with its own scroller under a fixed top line: the list itself
+   runs down to the footer's line and keeps its own space under its last row. */
+.dg-modal--scroll-to-footer .dg-modal-scroll-region::after {
+  content: none;
 }
 .dg-scroll-overflow-cue {
   position: absolute;

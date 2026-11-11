@@ -330,6 +330,7 @@ export default function PermissionsEditor({
         subtitle={subtitle}
         onClose={onClose}
         onRequestClose={() => !saving && requestClose()}
+        className="dg-modal--scroll-to-footer"
         style={{ maxWidth: 680 }}
         footer={
           <EditorActionRow
@@ -378,7 +379,7 @@ export default function PermissionsEditor({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-2">
             {groupedModules.map((group) => (
               <section key={group.category} className="pt-5" aria-label={group.label}>
                 <div className="flex items-end border-b border-[var(--dg-color-border-light)] pb-2">
