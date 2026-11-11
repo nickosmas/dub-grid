@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import PermissionsEditor from "@/components/PermissionsEditor";
@@ -21,7 +21,23 @@ function renderEditor(props: Partial<EditorProps> = {}) {
   return { onSave };
 }
 
+// The count's number is bold, so the sentence spans two elements.
+function counter(text: string) {
+  return screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === text);
+}
+
 describe("PermissionsEditor", () => {
+  it("puts the caption under the title and labels View and Edit in each group", () => {
+    renderEditor();
+
+    expect(screen.getByRole("dialog", { name: "Permissions, Test subtitle" })).toBeInTheDocument();
+    for (const group of ["Scheduling and staff", "Dashboard and reports", "Settings"]) {
+      const section = screen.getByRole("region", { name: group });
+      expect(within(section).getByText("View")).toBeInTheDocument();
+      expect(within(section).getByText("Edit")).toBeInTheDocument();
+    }
+  });
+
   it("enables Save only after a real permission change and disables it when reverted", async () => {
     const user = userEvent.setup();
     renderEditor({ initialPermissions: ALL_FALSE_PERMS });
@@ -77,7 +93,7 @@ describe("PermissionsEditor", () => {
     // A stored set that never mentions a key starts from the admin baseline:
     // Schedule edit, Publish, Recurring (view included), Reports, plus the
     // Requests view and Dashboard those bring with them.
-    expect(screen.getByText("7 of 16 turned on")).toBeInTheDocument();
+    expect(counter("7 of 16 turned on")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Reports view" })).toHaveAttribute(
       "aria-checked",
       "true",
@@ -85,7 +101,7 @@ describe("PermissionsEditor", () => {
 
     // One switch, two stored keys behind it.
     await user.click(screen.getByRole("switch", { name: "Departments & labels view" }));
-    expect(screen.getByText("8 of 16 turned on")).toBeInTheDocument();
+    expect(counter("8 of 16 turned on")).toBeInTheDocument();
   });
 
   it("brings View along with Edit and reports it as included while Edit stays on", async () => {
