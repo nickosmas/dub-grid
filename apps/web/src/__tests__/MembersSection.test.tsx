@@ -927,20 +927,19 @@ describe("MembersSection — management roster filters", () => {
 
     renderMembersSection({ canManageEmployees: true, isSuperAdmin: true });
 
-    await user.click(screen.getByRole("button", { name: /Filter/i }));
-    expect(screen.getByText("Employment")).toBeInTheDocument();
-    expect(screen.queryByText("Access role")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Filter" }));
+    expect(screen.getByRole("group", { name: "Employment" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Invitation" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Done" }));
 
     await showManagementView(user);
-    await user.click(screen.getByRole("button", { name: /Filter/i }));
+    await user.click(screen.getByRole("button", { name: "Filter" }));
 
-    expect(screen.queryByText("Employment")).not.toBeInTheDocument();
-    expect(screen.queryByText("Qualifications")).not.toBeInTheDocument();
-    expect(screen.getByText("Invitation")).toBeInTheDocument();
-    expect(screen.getByText("Sort by")).toBeInTheDocument();
-    // Twice: the section of access-level filters, and the sort by it.
-    expect(screen.getAllByText("Access role")).toHaveLength(2);
+    expect(screen.queryByRole("group", { name: "Employment" })).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Invitation" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Access role" })).toBeInTheDocument();
+    // Sorting is the toolbar's dropdown, as on the staff half, not a filter.
+    expect(screen.getByRole("button", { name: "Sort people by" })).toBeInTheDocument();
   });
 
   it("filters the roster by access role", async () => {
@@ -959,7 +958,7 @@ describe("MembersSection — management roster filters", () => {
     renderMembersSection({ canManageEmployees: true, isSuperAdmin: true });
 
     await showManagementView(user);
-    await user.click(screen.getByRole("button", { name: /Filter/i }));
+    await user.click(screen.getByRole("button", { name: "Filter" }));
     await user.click(screen.getByRole("button", { name: "Super Admin" }));
 
     expect(screen.getByText("Sam Lee")).toBeInTheDocument();
@@ -984,7 +983,7 @@ describe("MembersSection — management roster filters", () => {
     renderMembersSection({ canManageEmployees: true, isSuperAdmin: true });
 
     await showManagementView(user);
-    await user.click(screen.getByRole("button", { name: /Filter/i }));
+    await user.click(screen.getByRole("button", { name: "Filter" }));
     await user.click(screen.getByRole("button", { name: /Invitation pending/ }));
 
     expect(screen.getByText("Sam Lee")).toBeInTheDocument();
@@ -1044,8 +1043,8 @@ describe("MembersSection — management roster filters", () => {
 
     expect(namesInOrder()).toEqual(["Alex Brooks", "Zoe Adams"]);
 
-    await user.click(screen.getByRole("button", { name: /Filter/i }));
-    await user.click(screen.getByRole("button", { name: "Access role" }));
+    await user.click(screen.getByRole("button", { name: "Sort people by" }));
+    await user.click(screen.getByRole("option", { name: "Sort: Access role" }));
 
     expect(namesInOrder()).toEqual(["Zoe Adams", "Alex Brooks"]);
   });
@@ -1129,8 +1128,9 @@ describe("MembersSection — certified staff count", () => {
       ],
     });
 
-    await user.click(screen.getByRole("button", { name: /filter/i }));
-    await user.click(screen.getByRole("button", { name: "Not certified" }));
+    await user.click(screen.getByRole("button", { name: "Filter" }));
+    await user.click(screen.getByRole("button", { name: "Certifications" }));
+    await user.click(screen.getByRole("option", { name: "Not certified" }));
 
     expect(screen.getByText(/Robin/)).toBeInTheDocument();
     expect(screen.queryByText(/Casey/)).not.toBeInTheDocument();
@@ -1149,8 +1149,9 @@ describe("MembersSection — certified staff count", () => {
       ],
     });
 
-    await user.click(screen.getByRole("button", { name: /filter/i }));
-    await user.click(screen.getByRole("button", { name: "Certified staff" }));
+    await user.click(screen.getByRole("button", { name: "Filter" }));
+    await user.click(screen.getByRole("button", { name: "Certifications" }));
+    await user.click(screen.getByRole("option", { name: "Certified staff" }));
 
     expect(screen.getByText(/Casey/)).toBeInTheDocument();
     expect(screen.queryByText(/Robin/)).not.toBeInTheDocument();

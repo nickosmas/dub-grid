@@ -26,6 +26,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { InlineRoleSelect } from "./InlineRoleSelect";
 import { AccessInsignia } from "./AccessInsignia";
 import { getAvatarTypography, getAvatarTone, resolveAvatarSeed } from "@dubgrid/design-tokens";
+import {
+  getStaffAccountState,
+  STAFF_ACCOUNT_STATE_LABELS,
+  type StaffAccountState,
+} from "./staff-account-state";
+
+const ACCOUNT_STATE_LOOK: Record<
+  StaffAccountState,
+  { tone: StatusPillTone; icon: "linked" | "invited" | "not-linked" }
+> = {
+  linked: { tone: "success", icon: "linked" },
+  invited: { tone: "warning", icon: "invited" },
+  not_invited: { tone: "neutral", icon: "not-linked" },
+  no_email: { tone: "danger", icon: "not-linked" },
+};
 
 function statusTone(status: Employee["status"], suspendedAt?: string | null): StatusPillTone {
   if (suspendedAt && status === "active") return "danger";
@@ -421,17 +436,11 @@ function StaffRowCells({
               return <Skeleton className="h-5 w-[84px] rounded-full" />;
             }
 
-            const account: {
-              label: string;
-              tone: StatusPillTone;
-              icon: "linked" | "invited" | "not-linked";
-            } = emp.userId
-              ? { label: "Linked", tone: "success", icon: "linked" }
-              : pendingInviteByEmployeeId.has(emp.id)
-                ? { label: "Invited", tone: "warning", icon: "invited" }
-                : emp.email
-                  ? { label: "Not invited", tone: "neutral", icon: "not-linked" }
-                  : { label: "No email", tone: "danger", icon: "not-linked" };
+            const state = getStaffAccountState(emp, pendingInviteByEmployeeId.has(emp.id));
+            const account = {
+              label: STAFF_ACCOUNT_STATE_LABELS[state],
+              ...ACCOUNT_STATE_LOOK[state],
+            };
             return (
               <StatusPill
                 tone={account.tone}

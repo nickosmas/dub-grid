@@ -560,7 +560,6 @@ describe("productive typography contract", () => {
       "components/settings/Coverage.tsx",
       "components/settings/billing/BillingSeatsCard.tsx",
       "components/settings/Jobs.tsx",
-      "components/staff/FilterPanelShell.tsx",
       "components/staff/ManagementStaffPanel.tsx",
       "components/staff/StaffReadOnlyDetailPanel.tsx",
     ];
