@@ -530,18 +530,18 @@ describe("StaffDetailPage", () => {
   it("offers a tab for each section the viewer can see, and switches by URL", async () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
-    const tabs = within(await screen.findByRole("group", { name: "Person sections" }));
-    expect(tabs.getAllByRole("button").map((tab) => tab.textContent)).toEqual([
+    const tabs = within(await screen.findByRole("tablist", { name: "Person sections" }));
+    expect(tabs.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "Account",
       "Schedule",
       "Requests",
       "Activity",
     ]);
-    expect(tabs.getByRole("button", { name: "Account" })).toHaveAttribute("aria-pressed", "true");
+    expect(tabs.getByRole("tab", { name: "Account" })).toHaveAttribute("aria-selected", "true");
 
-    fireEvent.click(tabs.getByRole("button", { name: "Activity" }));
+    fireEvent.click(tabs.getByRole("tab", { name: "Activity" }));
     expect(mockReplace).toHaveBeenCalledWith("/people/emp-1?tab=activity", { scroll: false });
-    fireEvent.click(tabs.getByRole("button", { name: "Account" }));
+    fireEvent.click(tabs.getByRole("tab", { name: "Account" }));
     expect(mockReplace).toHaveBeenCalledWith("/people/emp-1", { scroll: false });
   });
 
@@ -605,8 +605,8 @@ describe("StaffDetailPage", () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
     expect(await screen.findByText("Internal notes")).toBeInTheDocument();
-    const tabs = within(screen.getByRole("group", { name: "Person sections" }));
-    expect(tabs.queryByRole("button", { name: "Activity" })).not.toBeInTheDocument();
+    const tabs = within(screen.getByRole("tablist", { name: "Person sections" }));
+    expect(tabs.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
   });
 
   it("opens the Schedule tab on the month grid for every period, with the list a click away", async () => {

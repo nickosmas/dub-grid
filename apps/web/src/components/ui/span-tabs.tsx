@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment } from "react";
 import { Button } from "@/components/Button";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 
 export interface SpanTabItem<T extends string> {
   value: T;
@@ -11,9 +11,8 @@ export interface SpanTabItem<T extends string> {
 }
 
 /**
- * The pill-in-a-shell selector the dashboard and schedule toolbars use for a
- * period or filter. The 1px dividers appear only between two inactive tabs, so
- * the active pill never sits against a line.
+ * The segmented control: one choice among a few views, filters or answers.
+ * The sections of a page are `UnderlineTabs` instead.
  */
 export function SpanTabs<T extends string>({
   items,
@@ -34,38 +33,26 @@ export function SpanTabs<T extends string>({
       aria-label={ariaLabel}
       className={`dg-span-tabs dg-span-tabs--light ${className}`.trim()}
     >
-      {items.map((item, index) => {
+      {items.map((item) => {
         const isActive = value === item.value;
-        const previousActive = index > 0 && value === items[index - 1].value;
-        const showDivider = index > 0 && !isActive && !previousActive;
-
         return (
-          <Fragment key={item.value}>
-            {index > 0 && (
-              <div
-                aria-hidden
-                className={`w-px h-4 shrink-0 self-center ${
-                  showDivider ? "bg-[var(--dg-color-border)]" : "bg-transparent"
-                }`}
+          <Button
+            key={item.value}
+            type="button"
+            aria-pressed={isActive}
+            onClick={() => onChange(item.value)}
+            className={`dg-span-tab${isActive ? " active" : ""}`}
+          >
+            {item.label}
+            {item.count ? (
+              <NumericBadge
+                count={item.count}
+                tone="label"
+                label={`${item.count} waiting`}
+                className="dg-span-tab-count"
               />
-            )}
-            <Button
-              type="button"
-              aria-pressed={isActive}
-              onClick={() => onChange(item.value)}
-              className={`dg-span-tab${isActive ? " active" : ""}`}
-            >
-              {item.label}
-              {item.count ? (
-                <span
-                  aria-label={`${item.count} waiting`}
-                  className="dg-tabular-nums ml-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--dg-color-brand)] px-1.5 text-[length:var(--dg-type-badge-size)] font-semibold leading-none text-white"
-                >
-                  {item.count}
-                </span>
-              ) : null}
-            </Button>
-          </Fragment>
+            ) : null}
+          </Button>
         );
       })}
     </div>

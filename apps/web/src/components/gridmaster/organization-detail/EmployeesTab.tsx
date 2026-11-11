@@ -1,7 +1,7 @@
 import { EMPLOYMENT_STATUS_LABELS } from "@dubgrid/domain";
 import { StatusDot } from "@/components/gridmaster/organization-detail/shared";
 import { sectionStyle } from "@/lib/styles";
-import { Button } from "@/components/Button";
+import { SpanTabs } from "@/components/ui/span-tabs";
 import { EmptyState } from "@/components/EmptyState";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { type Employee } from "@/types";
@@ -15,7 +15,9 @@ import {
 
 // Employees tab for the gridmaster OrganizationDetail view.
 
-const EMPTY_STATUS_TEXT: Record<"active" | "inactive" | "removed", string> = {
+type StaffStatus = "active" | "inactive" | "removed";
+
+const EMPTY_STATUS_TEXT: Record<StaffStatus, string> = {
   active: "No active staff",
   inactive: "No one is away",
   removed: "No one is archived",
@@ -30,75 +32,23 @@ export function EmployeesTab({
   inactive: Employee[];
   removed: Employee[];
 }) {
-  const [showStatus, setShowStatus] = useState<"active" | "inactive" | "removed">("active");
+  const [showStatus, setShowStatus] = useState<StaffStatus>("active");
 
   const list = showStatus === "active" ? active : showStatus === "inactive" ? inactive : removed;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Status tabs */}
-      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--dg-color-border)" }}>
-        {[
-          {
-            key: "active" as const,
-            label: "Active",
-            count: active.length,
-            color: "var(--dg-color-today-text)",
-          },
-          {
-            key: "inactive" as const,
-            label: EMPLOYMENT_STATUS_LABELS.inactive,
-            count: inactive.length,
-            color: "var(--dg-color-warning)",
-          },
-          {
-            key: "removed" as const,
-            label: EMPLOYMENT_STATUS_LABELS.removed,
-            count: removed.length,
-            color: "var(--dg-color-danger)",
-          },
-        ].map((tab) => {
-          const isActive = showStatus === tab.key;
-          return (
-            <Button
-              key={tab.key}
-              onClick={() => setShowStatus(tab.key)}
-              style={{
-                padding: "8px 20px",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: isActive ? 700 : 500,
-                color: isActive ? tab.color : "var(--dg-color-text-muted)",
-                background: "transparent",
-                border: "none",
-                borderBottom: isActive ? `2px solid ${tab.color}` : "2px solid transparent",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: -1,
-                fontFamily: "inherit",
-                transition: "color 150ms ease, border-color 150ms ease",
-              }}
-            >
-              {tab.label}
-              <span
-                style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  background: isActive ? `${tab.color}15` : "var(--dg-color-border-light)",
-                  color: isActive ? tab.color : "var(--dg-color-text-faint)",
-                  borderRadius: "var(--dg-radius-lg)",
-                  padding: "1px 7px",
-                  minWidth: 20,
-                  textAlign: "center",
-                }}
-              >
-                {tab.count}
-              </span>
-            </Button>
-          );
-        })}
-      </div>
+      <SpanTabs<StaffStatus>
+        aria-label="Staff status"
+        className="self-start"
+        value={showStatus}
+        onChange={setShowStatus}
+        items={[
+          { value: "active", label: "Active", count: active.length },
+          { value: "inactive", label: EMPLOYMENT_STATUS_LABELS.inactive, count: inactive.length },
+          { value: "removed", label: EMPLOYMENT_STATUS_LABELS.removed, count: removed.length },
+        ]}
+      />
 
       <div style={sectionStyle}>
         <div style={{ overflowX: "auto" }}>

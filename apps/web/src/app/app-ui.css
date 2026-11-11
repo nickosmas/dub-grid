@@ -408,17 +408,21 @@
   display: block;
   margin-bottom: 5px;
 }
+/* The same segmented control as `.dg-span-tabs`, for answers laid out in
+   equal columns (`.dg-segment-grid`). */
 .dg-segment {
   display: flex;
   height: var(--dg-toolbar-h);
-  background: var(--dg-color-surface);
-  border-radius: var(--dg-btn-radius);
-  border: 1px solid var(--dg-color-border);
-  overflow: hidden;
+  box-sizing: border-box;
+  padding: var(--dg-tab-shell-pad);
+  gap: var(--dg-tab-shell-pad);
+  background: var(--dg-segment-track);
+  border-radius: var(--dg-tab-shell-radius);
 }
 .dg-segment-btn {
   background: transparent;
   border: none;
+  border-radius: var(--dg-tab-inner-radius);
   color: var(--dg-type-navigation-color);
   padding: 0 14px;
   font-size: var(--dg-type-navigation-size);
@@ -427,65 +431,49 @@
   cursor: pointer;
   transition:
     background 150ms ease,
-    color 150ms ease;
+    color 150ms ease,
+    box-shadow 150ms ease;
   font-family: inherit;
   line-height: 1;
   height: 100%;
 }
-.dg-segment-btn + .dg-segment-btn {
-  border-left: 1px solid var(--dg-color-border);
-}
-.dg-segment-btn:hover {
-  background: var(--dg-color-border-light);
+.dg-segment-btn:hover:not(.active) {
+  color: var(--dg-color-text-primary);
 }
 .dg-segment-btn:focus-visible {
   outline: 2px solid var(--dg-color-border-focus);
-  outline-offset: -2px;
+  outline-offset: 1px;
 }
 .dg-segment-btn:disabled {
   color: var(--dg-color-text-faint);
   cursor: not-allowed;
 }
-.dg-segment-btn:disabled:hover {
-  background: transparent;
-}
-.dg-segment-grid .dg-segment-btn:disabled:hover {
-  background: var(--dg-color-surface);
-}
-
-/* ── Segment Control ────────────────────────────────────── */
 .dg-segment-btn.active {
-  background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
+  background: var(--dg-segment-thumb);
+  color: var(--dg-color-text-primary);
+  box-shadow: var(--dg-segment-thumb-shadow);
 }
-/* Two columns of segments; the 1px gap over the border color draws the dividers. */
 .dg-segment.dg-segment-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
   height: auto;
-  background: var(--dg-color-border);
 }
 .dg-segment-grid .dg-segment-btn {
-  height: var(--dg-toolbar-h);
+  height: calc(var(--dg-toolbar-h) - 2 * var(--dg-tab-shell-pad));
   min-width: 0;
-  background: var(--dg-color-surface);
-  border-left: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.dg-segment-grid .dg-segment-btn:hover {
-  background: var(--dg-color-border-light);
-}
-.dg-segment-grid .dg-segment-btn.active {
-  background: var(--dg-color-brand);
-}
+
+/* The segmented control: one choice among a few views, filters or answers.
+   Sections of a page use `.dg-underline-tabs` instead. */
 .dg-span-tabs {
+  --scrollable-bg: var(--dg-segment-track);
   display: flex;
   align-items: stretch;
   height: var(--dg-toolbar-h);
-  background: var(--dg-color-dark);
+  background: var(--dg-segment-track);
   border-radius: var(--dg-tab-shell-radius);
   padding: var(--dg-tab-shell-pad);
   gap: var(--dg-tab-shell-pad);
@@ -494,10 +482,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   background: transparent;
   border: none;
-  color: var(--dg-on-dark-muted);
-  padding: 0 16px;
+  color: var(--dg-color-text-muted);
+  padding: 0 14px;
   font-size: var(--dg-type-navigation-size);
   font-weight: var(--dg-type-navigation-weight);
   letter-spacing: var(--dg-type-navigation-letter-spacing);
@@ -508,38 +497,147 @@
   line-height: 1;
   white-space: nowrap;
   transition:
-    color 200ms ease,
-    background 200ms ease;
+    color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease;
   flex: 1 0 auto;
 }
-
-/* ── Span Tabs (pill-style period / filter selector) ────── */
+/* Hover darkens an unselected label a step short of the chosen one. */
 .dg-span-tab:hover:not(.active) {
-  color: var(--dg-on-dark-secondary);
-}
-
-.dg-span-tab.active {
-  background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
-}
-/* Light variant — white container, dark active pill */
-.dg-span-tabs--light {
-  background: var(--dg-color-surface);
-  border: 1px solid var(--dg-color-border);
-}
-.dg-span-tabs--light .dg-span-tab {
-  color: var(--dg-type-navigation-color);
-  border-radius: var(--dg-tab-inner-radius);
-}
-
-.dg-span-tabs--light .dg-span-tab:hover:not(.active) {
   color: var(--dg-color-text-secondary);
-  background: var(--dg-color-bg-secondary);
+}
+.dg-span-tab:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: 1px;
+}
+.dg-span-tab:disabled {
+  color: var(--dg-color-text-faint);
+  cursor: not-allowed;
+}
+.dg-span-tab.active {
+  background: var(--dg-segment-thumb);
+  color: var(--dg-color-text-primary);
+  box-shadow: var(--dg-segment-thumb-shadow);
+}
+/* A count beside a label reads as part of it: the label's own color and
+   weight on a quiet tint of that color, in every state and both themes. The
+   pill's shape comes from NumericBadge. */
+.dg-span-tab-count,
+.dg-underline-tab-count {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+.dg-underline-tab.active .dg-underline-tab-count {
+  font-weight: 700;
 }
 
-.dg-span-tabs--light .dg-span-tab.active {
+/* Underline tabs: the sections of a page or panel. */
+.dg-underline-tabs {
+  display: flex;
+  gap: 28px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--dg-color-border);
+}
+.dg-underline-tabs::-webkit-scrollbar {
+  display: none;
+}
+.dg-underline-tabs--compact {
+  gap: 20px;
+}
+.dg-underline-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  position: relative;
+  height: 44px;
+  margin-bottom: -1px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--dg-color-text-muted);
+  font-family: inherit;
+  font-size: var(--dg-type-navigation-size);
+  font-weight: var(--dg-type-navigation-weight);
+  letter-spacing: var(--dg-type-navigation-letter-spacing);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+/* A square 3px bar over the 1px rule, thick enough to find at a glance. */
+.dg-underline-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: transparent;
+  transition: background-color 150ms ease;
+}
+.dg-underline-tab:hover:not(.active) {
+  color: var(--dg-color-text-secondary);
+}
+.dg-underline-tab:focus-visible {
+  outline: 2px solid var(--dg-color-border-focus);
+  outline-offset: -2px;
+  border-radius: var(--dg-radius-xs);
+}
+.dg-underline-tab.active {
+  color: var(--dg-color-text-primary);
+}
+.dg-underline-tab.active::after {
   background: var(--dg-color-brand);
-  color: var(--dg-color-on-brand-text);
+}
+/* The label reserves its bold width, so choosing a tab never nudges the
+   ones after it. */
+.dg-underline-tab-label {
+  display: inline-flex;
+  flex-direction: column;
+}
+.dg-underline-tab-label::after {
+  content: attr(data-label);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 700;
+}
+.dg-underline-tab.active .dg-underline-tab-label {
+  font-weight: 700;
+}
+/* Tabs with something beside them (the staff page's month stepper): one rule
+   runs under both, and on a phone the aside drops below the tabs. */
+.dg-tab-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  min-width: 0;
+  border-bottom: 1px solid var(--dg-color-border);
+}
+.dg-tab-row > .dg-underline-tabs {
+  flex: 0 1 auto;
+  border-bottom: none;
+}
+.dg-tab-row-aside {
+  flex: 0 0 auto;
+  padding-bottom: 6px;
+}
+@media (max-width: 767px) {
+  .dg-tab-row {
+    flex-direction: column;
+    align-items: stretch;
+    border-bottom: none;
+  }
+  .dg-tab-row > .dg-underline-tabs {
+    border-bottom: 1px solid var(--dg-color-border);
+  }
+  .dg-tab-row-aside {
+    padding-bottom: 0;
+  }
 }
 .dg-scrollable-tabs {
   position: relative;
@@ -629,20 +727,8 @@
   outline: 2px solid var(--dg-color-border-focus);
   outline-offset: 1px;
 }
-/* Dark variant — adjust gradient + chevron bg */
-.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-fade--left {
-  background: linear-gradient(to right, var(--dg-color-dark) 30%, transparent);
-}
-.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-fade--right {
-  background: linear-gradient(to left, var(--dg-color-dark) 30%, transparent);
-}
-.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-chevron {
-  background: var(--dg-color-dark);
-  color: var(--dg-on-dark-subtle);
-}
-.dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-chevron:hover {
-  color: var(--dg-color-text-inverse);
-  background: var(--dg-color-dark-elevated);
+.dg-span-tabs .dg-scroll-chevron:hover {
+  background: var(--dg-segment-thumb);
 }
 .dg-nav-tab {
   display: inline-flex;

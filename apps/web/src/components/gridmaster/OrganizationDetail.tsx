@@ -1,7 +1,8 @@
 "use client";
 import { useConfirmLeave } from "@/components/NavigationGuardProvider";
 import CustomSelect from "@/components/CustomSelect";
-import { Button } from "@/components/Button";
+import { SpanTabs } from "@/components/ui/span-tabs";
+import { UnderlineTabs, underlineTabPanelProps } from "@/components/ui/underline-tabs";
 import { StatusDot, InfoRow, MiniStat } from "@/components/gridmaster/organization-detail/shared";
 import { ConfigTab } from "./organization-detail/ConfigTab";
 
@@ -114,16 +115,32 @@ export type OrganizationDetailTab =
   | "invitations"
   | "schedule";
 
-const TABS: { id: OrganizationDetailTab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "billing", label: "Billing" },
-  { id: "users", label: "Users" },
-  { id: "employees", label: "Employees" },
-  { id: "config", label: "Configuration" },
-  { id: "activity", label: "Activity" },
-  { id: "invitations", label: "Invitations" },
-  { id: "schedule", label: "Schedule" },
+type OrganizationSection = "overview" | "people" | "schedule" | "activity" | "billing" | "config";
+type PeopleList = "employees" | "users" | "invitations";
+
+const SECTIONS: { value: OrganizationSection; label: string }[] = [
+  { value: "overview", label: "Overview" },
+  { value: "people", label: "People" },
+  { value: "schedule", label: "Schedule" },
+  { value: "activity", label: "Activity" },
+  { value: "billing", label: "Billing" },
+  { value: "config", label: "Configuration" },
 ];
+
+const PEOPLE_LISTS: { value: PeopleList; label: string }[] = [
+  { value: "employees", label: "Staff" },
+  { value: "users", label: "Accounts" },
+  { value: "invitations", label: "Invitations" },
+];
+
+function isPeopleList(tab: OrganizationDetailTab): tab is PeopleList {
+  return tab === "employees" || tab === "users" || tab === "invitations";
+}
+
+/** Users, Employees and Invitations are lists inside People, so their links still land. */
+function sectionOf(tab: OrganizationDetailTab): OrganizationSection {
+  return isPeopleList(tab) ? "people" : tab;
+}
 
 // A trialing org with no end date hasn't started its trial yet: show "Trial
 // pending" (muted) rather than the green "Trial active" the bare status maps to.
@@ -144,6 +161,7 @@ export default function OrganizationDetail({
   onImpersonate?: (userId: string, orgId?: string) => void;
 }) {
   const [tab, setTab] = useState<OrganizationDetailTab>(initialTab ?? "overview");
+  const section = sectionOf(tab);
   // A tab switch unmounts the one before it, edits included.
   const confirmLeave = useConfirmLeave();
   const queryClient = useQueryClient();
@@ -411,128 +429,111 @@ export default function OrganizationDetail({
         </div>
       )}
 
-      {/* Tab bar */}
-      <div
-        role="tablist"
+      <UnderlineTabs<OrganizationSection>
         aria-label="Organization sections"
-        style={{
-          display: "flex",
-          gap: 0,
-          borderBottom: "2px solid var(--dg-color-border-light)",
-          marginBottom: 20,
-        }}
-      >
-        {TABS.map((t) => (
-          <Button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            aria-controls={`tabpanel-${t.id}`}
-            onClick={() => confirmLeave(() => setTab(t.id))}
+        idPrefix="organization"
+        className="mb-5"
+        items={SECTIONS}
+        value={section}
+        onChange={(next) => confirmLeave(() => setTab(next === "people" ? "employees" : next))}
+      />
+
+      <div {...underlineTabPanelProps("organization", section)}>
+        {section === "people" && isPeopleList(tab) && (
+          <SpanTabs<PeopleList>
+            aria-label="People"
+            className="mb-4 w-max max-w-full"
+            items={PEOPLE_LISTS}
+            value={tab}
+            onChange={(next) => confirmLeave(() => setTab(next))}
+          />
+        )}
+
+        {tabError && (
+          <Banner tone="danger" className="mb-4">
+            {tabError}
+          </Banner>
+        )}
+
+        {tabLoading && (
+          <div
             style={{
-              padding: "10px 18px",
+              padding: 32,
+              textAlign: "center",
+              color: "var(--dg-color-text-muted)",
               fontSize: "var(--dg-fs-label)",
-              fontWeight: tab === t.id ? 700 : 500,
-              color: tab === t.id ? "var(--dg-color-brand)" : "var(--dg-color-text-muted)",
-              background: "transparent",
-              border: "none",
-              borderBottom:
-                tab === t.id ? "2px solid var(--dg-color-brand)" : "2px solid transparent",
-              marginBottom: -2,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              transition: "color 150ms ease",
             }}
           >
-            {t.label}
-          </Button>
-        ))}
+            Loading
+          </div>
+        )}
+
+        {!tabLoading && tab === "overview" && (
+          <OverviewTab organization={organization} stats={stats} onOrgUpdated={onOrgUpdated} />
+        )}
+        {!tabLoading && tab === "billing" && <BillingTab organization={organization} />}
+        {!tabLoading && tab === "users" && usersQuery.data && (
+          <UsersTab
+            users={usersQuery.data ?? []}
+            orgId={organization.id}
+            onUsersChanged={() => {
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.gridmaster.orgUsers(organization.id),
+              });
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.gridmaster.orgAudit(organization.id, 0, 50),
+              });
+            }}
+            onImpersonate={onImpersonate}
+          />
+        )}
+        {!tabLoading && tab === "employees" && employeesQuery.data && (
+          <EmployeesTab
+            active={employeesQuery.data.active}
+            inactive={employeesQuery.data.inactive}
+            removed={employeesQuery.data.removed}
+          />
+        )}
+        {!tabLoading && tab === "config" && configQuery.data && (
+          <ConfigTab
+            focusAreas={configQuery.data.focusAreas}
+            shiftCategories={configQuery.data.shiftCategories}
+            jobs={configQuery.data.jobs}
+            absenceTypes={configQuery.data.absenceTypes}
+            certifications={configQuery.data.certifications}
+            orgRoles={configQuery.data.orgRoles}
+            indicatorTypes={configQuery.data.indicatorTypes}
+            organization={organization}
+          />
+        )}
+        {!tabLoading && tab === "activity" && (
+          <AuditLogView
+            orgId={organization.id}
+            title="Organization Activity"
+            timeZone={organization.timezone ?? null}
+          />
+        )}
+        {!tabLoading && tab === "invitations" && invitationsQuery.data && (
+          <InvitationsTab
+            invitations={invitationsQuery.data}
+            orgId={organization.id}
+            onRefresh={() => {
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.gridmaster.orgInvitations(organization.id),
+              });
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.gridmaster.orgAudit(organization.id, 0, 50),
+              });
+            }}
+          />
+        )}
+        {!tabLoading && tab === "schedule" && (
+          <ReadOnlyScheduleView
+            orgId={organization.id}
+            payPeriodStartDate={organization.payPeriodStartDate}
+          />
+        )}
       </div>
-
-      {tabError && (
-        <Banner tone="danger" className="mb-4">
-          {tabError}
-        </Banner>
-      )}
-
-      {tabLoading && (
-        <div
-          style={{
-            padding: 32,
-            textAlign: "center",
-            color: "var(--dg-color-text-muted)",
-            fontSize: "var(--dg-fs-label)",
-          }}
-        >
-          Loading
-        </div>
-      )}
-
-      {!tabLoading && tab === "overview" && (
-        <OverviewTab organization={organization} stats={stats} onOrgUpdated={onOrgUpdated} />
-      )}
-      {!tabLoading && tab === "billing" && <BillingTab organization={organization} />}
-      {!tabLoading && tab === "users" && usersQuery.data && (
-        <UsersTab
-          users={usersQuery.data ?? []}
-          orgId={organization.id}
-          onUsersChanged={() => {
-            queryClient.invalidateQueries({
-              queryKey: queryKeys.gridmaster.orgUsers(organization.id),
-            });
-            queryClient.invalidateQueries({
-              queryKey: queryKeys.gridmaster.orgAudit(organization.id, 0, 50),
-            });
-          }}
-          onImpersonate={onImpersonate}
-        />
-      )}
-      {!tabLoading && tab === "employees" && employeesQuery.data && (
-        <EmployeesTab
-          active={employeesQuery.data.active}
-          inactive={employeesQuery.data.inactive}
-          removed={employeesQuery.data.removed}
-        />
-      )}
-      {!tabLoading && tab === "config" && configQuery.data && (
-        <ConfigTab
-          focusAreas={configQuery.data.focusAreas}
-          shiftCategories={configQuery.data.shiftCategories}
-          jobs={configQuery.data.jobs}
-          absenceTypes={configQuery.data.absenceTypes}
-          certifications={configQuery.data.certifications}
-          orgRoles={configQuery.data.orgRoles}
-          indicatorTypes={configQuery.data.indicatorTypes}
-          organization={organization}
-        />
-      )}
-      {!tabLoading && tab === "activity" && (
-        <AuditLogView
-          orgId={organization.id}
-          title="Organization Activity"
-          timeZone={organization.timezone ?? null}
-        />
-      )}
-      {!tabLoading && tab === "invitations" && invitationsQuery.data && (
-        <InvitationsTab
-          invitations={invitationsQuery.data}
-          orgId={organization.id}
-          onRefresh={() => {
-            queryClient.invalidateQueries({
-              queryKey: queryKeys.gridmaster.orgInvitations(organization.id),
-            });
-            queryClient.invalidateQueries({
-              queryKey: queryKeys.gridmaster.orgAudit(organization.id, 0, 50),
-            });
-          }}
-        />
-      )}
-      {!tabLoading && tab === "schedule" && (
-        <ReadOnlyScheduleView
-          orgId={organization.id}
-          payPeriodStartDate={organization.payPeriodStartDate}
-        />
-      )}
     </div>
   );
 }
