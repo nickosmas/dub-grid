@@ -488,23 +488,10 @@ export default function ShiftPicker({
       {/* Tabs — stretch to fill when few, horizontal scroll when many */}
       {allPickerAreas.length > 1 && (
         <ScrollableTabs className="dg-span-tabs dg-span-tabs--light">
-          {allPickerAreas.map((fa, i) => {
+          {allPickerAreas.map((fa) => {
             const isActive = pickerTab === fa.id;
-            const prevActive = i > 0 && pickerTab === allPickerAreas[i - 1].id;
-            const showDivider = i > 0 && !isActive && !prevActive;
             return (
               <Fragment key={fa.id}>
-                {i > 0 && (
-                  <div
-                    style={{
-                      width: 1,
-                      height: 16,
-                      background: showDivider ? "var(--dg-color-border)" : "transparent",
-                      flexShrink: 0,
-                      alignSelf: "center",
-                    }}
-                  />
-                )}
                 <Button
                   onClick={() => setPickerTab(fa.id)}
                   className={`dg-span-tab${isActive ? " active" : ""}`}

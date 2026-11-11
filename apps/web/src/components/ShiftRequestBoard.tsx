@@ -1,13 +1,14 @@
 "use client";
 import { ArrowUpDown, ChevronLeft, Clock, Hourglass } from "lucide-react";
 
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 import type { ShiftRequest, ShiftRequestStatus, ShiftRequestType, AbsenceType } from "@/types";
 import { Button } from "@/components/Button";
+import { UnderlineTabs, underlineTabPanelProps } from "@/components/ui/underline-tabs";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { CloseButton } from "@/components/ui/CloseButton";
@@ -21,7 +22,6 @@ import {
   loadApprovalDraftWarning,
 } from "@/components/shift-requests/approval-draft-warning";
 import ProgressBar from "@/components/ProgressBar";
-import ScrollableTabs from "@/components/ScrollableTabs";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
 import { absenceStripeFill } from "@/lib/absence-stripes";
@@ -981,54 +981,22 @@ export default function ShiftRequestBoard({
           {!isMobile && <CloseButton size="lg" onClick={close} aria-label="Close panel" />}
         </div>
 
-        {/* Tab bar */}
-        <div
-          style={{
-            padding: "12px 20px",
-            borderBottom: "1px solid var(--dg-color-border)",
-            background: "var(--dg-color-surface)",
-            flexShrink: 0,
-          }}
-        >
-          <ScrollableTabs className="dg-span-tabs dg-span-tabs--light">
-            {tabs
-              .filter((t) => t.visible)
-              .map((tab, i, visibleTabs) => {
-                const isActive = activeTab === tab.key;
-                const prevActive = i > 0 && activeTab === visibleTabs[i - 1].key;
-                const showDivider = i > 0 && !isActive && !prevActive;
-                return (
-                  <Fragment key={tab.key}>
-                    {i > 0 && (
-                      <div
-                        style={{
-                          width: 1,
-                          height: 16,
-                          background: showDivider ? "var(--dg-color-border)" : "transparent",
-                          flexShrink: 0,
-                          alignSelf: "center",
-                        }}
-                      />
-                    )}
-                    <Button
-                      onClick={() => setActiveTab(tab.key)}
-                      className={`dg-span-tab${isActive ? " active" : ""}`}
-                    >
-                      {tab.label}
-                      <NumericBadge
-                        count={tab.count}
-                        tone={isActive ? "onAccent" : "neutral"}
-                        style={{ marginLeft: 6 }}
-                      />
-                    </Button>
-                  </Fragment>
-                );
-              })}
-          </ScrollableTabs>
+        <div className="shrink-0 bg-[var(--dg-color-surface)] px-5">
+          <UnderlineTabs<Tab>
+            compact
+            aria-label="Shift request lists"
+            idPrefix="shift-requests"
+            items={tabs
+              .filter((tab) => tab.visible)
+              .map((tab) => ({ value: tab.key, label: tab.label, count: tab.count }))}
+            value={activeTab}
+            onChange={setActiveTab}
+          />
         </div>
 
         {/* Scrollable content */}
         <div
+          {...underlineTabPanelProps("shift-requests", activeTab)}
           style={{
             flex: 1,
             minHeight: 0,

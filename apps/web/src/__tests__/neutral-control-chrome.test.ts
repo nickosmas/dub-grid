@@ -96,7 +96,7 @@ describe("shared chrome theming", () => {
     expect(globalsCss).toContain("--dg-radius-lg: 10px;");
     expect(globalsCss).toContain("--dg-radius-xl: 12px;");
     expect(globalsCss).toContain("--dg-tab-shell-radius: var(--dg-radius-md);");
-    expect(globalsCss).toContain("--dg-tab-shell-pad: 2px;");
+    expect(globalsCss).toContain("--dg-tab-shell-pad: 3px;");
     expect(globalsCss).toContain(
       "--dg-tab-inner-radius: calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad));",
     );
@@ -149,12 +149,37 @@ describe("shared chrome theming", () => {
       /\.dg-span-tab\s*\{[\s\S]*border-radius: var\(--dg-tab-inner-radius\);[\s\S]*\}/,
     );
     expect(globalsCss).toMatch(
-      /\.dg-span-tabs--light \.dg-span-tab\s*\{[\s\S]*border-radius: var\(--dg-tab-inner-radius\);[\s\S]*\}/,
+      /\.dg-segment-btn\s*\{[^}]*border-radius: var\(--dg-tab-inner-radius\);[^}]*\}/,
     );
     expect(globalsCss).toMatch(
       /\.dg-nav-tab\s*\{[\s\S]*min-height: var\(--dg-toolbar-h\);[\s\S]*border-radius: var\(--dg-btn-radius\);[\s\S]*\}/,
     );
     expect(globalsCss).toMatch(/\.dg-scroll-inner\s*\{[\s\S]*height: 100%;[\s\S]*\}/);
+  });
+
+  it("draws a chosen segment raised on a gray track, never in brand blue", () => {
+    for (const selector of ["\\.dg-span-tab\\.active", "\\.dg-segment-btn\\.active"]) {
+      const block = globalsCss.match(new RegExp(`${selector}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+      expect(block).toContain("background: var(--dg-segment-thumb);");
+      expect(block).toContain("box-shadow: var(--dg-segment-thumb-shadow);");
+      expect(block).not.toContain("--dg-color-brand");
+    }
+    expect(globalsCss).toMatch(/\.dg-span-tabs\s*\{[^}]*background: var\(--dg-segment-track\);/);
+    expect(globalsCss).toMatch(/\.dg-segment\s*\{[^}]*background: var\(--dg-segment-track\);/);
+    expect(globalsCss).toMatch(/\.dark\s*\{[^}]*--dg-segment-thumb: #2c2c31;/);
+  });
+
+  it("marks the chosen section tab with a bold label over a 3px brand bar only", () => {
+    const active = globalsCss.match(/\.dg-underline-tab\.active\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(active).toContain("color: var(--dg-color-text-primary);");
+    expect(active).not.toContain("background");
+    expect(globalsCss).toMatch(/\.dg-underline-tab::after\s*\{[^}]*height: 3px;/);
+    expect(globalsCss).toMatch(
+      /\.dg-underline-tab\.active::after\s*\{[^}]*background: var\(--dg-color-brand\);/,
+    );
+    expect(globalsCss).toMatch(
+      /\.dg-underline-tab\.active \.dg-underline-tab-label\s*\{[^}]*font-weight: 700;/,
+    );
   });
 
   it("maps shared surface primitives onto the radius tokens", () => {

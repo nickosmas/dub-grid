@@ -14,7 +14,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
-import { NumericBadge } from "@/components/ui/numeric-badge";
 import {
   Archive,
   ArchiveRestore,
@@ -773,7 +772,7 @@ interface Segment<T extends string> {
   icon?: React.ReactNode;
 }
 
-/** A row of exclusive choices in the toolbar, in the shared tab-shell look. */
+/** A row of exclusive choices in the toolbar: the shared segmented control, with icons. */
 function Segments<T extends string>({
   label,
   value,
@@ -794,40 +793,24 @@ function Segments<T extends string>({
       // be inline to shrink-wrap the control. Same override as PrintOptionsModal.
       style={{ display: "inline-flex", flexShrink: 0 }}
     >
-      {segments.map((segment, index) => {
+      {segments.map((segment) => {
         const active = value === segment.value;
-        const prevActive = index > 0 && value === segments[index - 1].value;
-        const showDivider = index > 0 && !active && !prevActive;
         return (
-          <Fragment key={segment.value}>
-            {index > 0 && (
-              <div
-                style={{
-                  width: 1,
-                  height: 16,
-                  background: showDivider ? "var(--dg-color-border)" : "transparent",
-                  flexShrink: 0,
-                  alignSelf: "center",
-                }}
-              />
+          <Button
+            key={segment.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(segment.value)}
+            className={`dg-span-tab${active ? " active" : ""}`}
+          >
+            {segment.icon && (
+              <span style={{ display: "inline-flex", marginRight: 6 }}>{segment.icon}</span>
             )}
-            <Button
-              type="button"
-              aria-pressed={active}
-              onClick={() => onChange(segment.value)}
-              className={`dg-span-tab${active ? " active" : ""}`}
-            >
-              {segment.icon && (
-                <span style={{ display: "inline-flex", marginRight: 6 }}>{segment.icon}</span>
-              )}
-              {segment.label}
-              <NumericBadge
-                count={segment.count ?? 0}
-                tone={active ? "onAccent" : "neutral"}
-                style={{ marginLeft: 6 }}
-              />
-            </Button>
-          </Fragment>
+            {segment.label}
+            {segment.count ? (
+              <span className="dg-span-tab-count dg-tabular-nums">{segment.count}</span>
+            ) : null}
+          </Button>
         );
       })}
     </div>

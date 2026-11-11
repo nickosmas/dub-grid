@@ -94,19 +94,21 @@ test.describe("gridmaster portal states", () => {
     const content = page.getByLabel("Gridmaster content");
     await expect(content.getByText("Support Snapshot")).toBeVisible({ timeout: 20_000 });
 
-    const tabs: [string, (c: typeof content) => ReturnType<Page["getByText"]>][] = [
-      ["Overview", (c) => c.getByText("Organization Details")],
-      ["Billing", (c) => c.getByRole("heading", { name: "Billing", exact: true })],
-      ["Users", (c) => c.getByText("Organization role")],
-      ["Employees", (c) => c.getByText("Employee ID")],
-      ["Configuration", (c) => c.getByText("Short code")],
-      ["Activity", (c) => c.getByRole("heading", { name: "Organization Activity" })],
-      ["Invitations", (c) => c.getByText("Expires")],
-      ["Schedule", (c) => c.getByText(/No shifts found|^Schedule area$/)],
+    // People holds three lists behind a segmented switch; the rest are tabs.
+    const steps: [string, string, (c: typeof content) => ReturnType<Page["getByText"]>][] = [
+      ["tab", "Overview", (c) => c.getByText("Organization Details")],
+      ["tab", "Billing", (c) => c.getByRole("heading", { name: "Billing", exact: true })],
+      ["tab", "People", (c) => c.getByText("Employee ID")],
+      ["button", "Accounts", (c) => c.getByText("Organization role")],
+      ["button", "Invitations", (c) => c.getByText("Expires")],
+      ["button", "Staff", (c) => c.getByText("Employee ID")],
+      ["tab", "Configuration", (c) => c.getByText("Short code")],
+      ["tab", "Activity", (c) => c.getByRole("heading", { name: "Organization Activity" })],
+      ["tab", "Schedule", (c) => c.getByText(/No shifts found|^Schedule area$/)],
     ];
-    for (const [name, marker] of tabs) {
-      await content.getByRole("tab", { name, exact: true }).click();
-      await expect(marker(content).first(), `${name} tab`).toBeVisible({ timeout: 20_000 });
+    for (const [role, name, marker] of steps) {
+      await content.getByRole(role as "tab" | "button", { name, exact: true }).click();
+      await expect(marker(content).first(), `${name}`).toBeVisible({ timeout: 20_000 });
     }
 
     expect(failures).toEqual([]);

@@ -106,7 +106,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import EditEmployeePanel, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
-import { SpanTabs } from "@/components/ui/span-tabs";
+import { UnderlineTabs, underlineTabPanelProps } from "@/components/ui/underline-tabs";
 import { useClipTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import { usePersonPeriod } from "@/hooks/usePersonPeriod";
 import { formatPersonPeriodPhrase } from "@/lib/person-period";
@@ -1428,32 +1428,32 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             </div>
 
             <div className="flex min-w-0 flex-col gap-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="max-w-full overflow-x-auto">
-                  <SpanTabs<StaffPageTab>
-                    aria-label="Person sections"
-                    className="w-max"
-                    items={availableTabs.map((tab) => ({
-                      value: tab,
-                      label: TAB_LABELS[tab],
-                      count: tab === "requests" ? waitingRequests?.length : undefined,
-                    }))}
-                    value={activeTab}
-                    onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
-                  />
-                </div>
+              <div className="dg-tab-row">
+                <UnderlineTabs<StaffPageTab>
+                  aria-label="Person sections"
+                  idPrefix="person"
+                  items={availableTabs.map((tab) => ({
+                    value: tab,
+                    label: TAB_LABELS[tab],
+                    count: tab === "requests" ? waitingRequests?.length : undefined,
+                  }))}
+                  value={activeTab}
+                  onChange={(tab) => router.replace(hrefForTab(tab), { scroll: false })}
+                />
                 {activeTab !== "account" ? (
-                  <PersonPeriodControl
-                    period={period}
-                    today={periodToday}
-                    onStep={stepPeriod}
-                    onToday={goToPeriodToday}
-                    onCustomRangeChange={setPeriodRange}
-                  />
+                  <div className="dg-tab-row-aside">
+                    <PersonPeriodControl
+                      period={period}
+                      today={periodToday}
+                      onStep={stepPeriod}
+                      onToday={goToPeriodToday}
+                      onCustomRangeChange={setPeriodRange}
+                    />
+                  </div>
                 ) : null}
               </div>
 
-              <section aria-label={TAB_LABELS[activeTab]}>
+              <section {...underlineTabPanelProps("person", activeTab)}>
                 {/* Stays mounted so a draft survives a look at another tab. */}
                 <div hidden={activeTab !== "account"} className="flex flex-col gap-4">
                   {canEditDetails ? (

@@ -107,6 +107,16 @@
   the final action spans both columns (three is two above, one full-width below;
   five continues with two equal rows, then one full-width below). Do not let
   labels or variants make a peer larger within a row.
+- Tabs and segmented controls do different jobs (owner, 2026-11-10).
+  Choosing a section of a page or panel, where each choice shows different
+  content, is `UnderlineTabs` (`components/ui/underline-tabs.tsx`): a rule
+  under the row, the chosen label dark with a brand underline. Switching a
+  view of the same content, filtering one list, or answering a question in a
+  form is the segmented control (`SpanTabs`, `.dg-span-tabs`, `.dg-segment`):
+  a gray track with the chosen segment raised in the surface color. Neither
+  fills a choice with brand blue, which is reserved for the action we want
+  completed. Counts inside either use the shared quiet count, never a blue
+  badge.
 - Dropdowns are never wider than they need to be (owner, 2026-11-07). A
   trigger (`CustomSelect`, `StaffMultiSelect`, `DateRangePicker`) sizes to
   its label and truncates in a narrow row; in a toolbar with a search field

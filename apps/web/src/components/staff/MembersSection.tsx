@@ -1223,24 +1223,11 @@ export function MembersSection({
                     maxWidth: "100%",
                   }}
                 >
-                  {tabs.map((tab, index) => {
+                  {tabs.map((tab) => {
                     const active = activeTab === tab.key;
-                    const prevActive = index > 0 && activeTab === tabs[index - 1].key;
-                    const showDivider = index > 0 && !active && !prevActive;
 
                     return (
                       <span key={tab.key} style={{ display: "contents" }}>
-                        {index > 0 && (
-                          <div
-                            style={{
-                              width: 1,
-                              height: 16,
-                              background: showDivider ? "var(--dg-color-border)" : "transparent",
-                              flexShrink: 0,
-                              alignSelf: "center",
-                            }}
-                          />
-                        )}
                         <Button
                           onClick={() => {
                             setActiveTab(tab.key);
@@ -1252,27 +1239,7 @@ export function MembersSection({
                           className={`dg-span-tab${active ? " active" : ""}`}
                         >
                           {tab.label}
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              minWidth: 18,
-                              height: 18,
-                              borderRadius: "50%",
-                              padding: "0 4px",
-                              fontSize: "var(--dg-fs-micro)",
-                              fontWeight: 700,
-                              lineHeight: 1,
-                              background: active
-                                ? "rgba(255,255,255,0.25)"
-                                : "var(--dg-color-border-light)",
-                              color: active ? "inherit" : "var(--dg-color-text-muted)",
-                              marginLeft: 3,
-                            }}
-                          >
-                            {tab.count}
-                          </span>
+                          <span className="dg-span-tab-count dg-tabular-nums">{tab.count}</span>
                         </Button>
                       </span>
                     );
@@ -1293,74 +1260,23 @@ export function MembersSection({
                     className={`dg-span-tab${deptFilterId === null ? " active" : ""}`}
                   >
                     All
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        minWidth: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        padding: "0 4px",
-                        fontSize: "var(--dg-fs-micro)",
-                        fontWeight: 700,
-                        lineHeight: 1,
-                        background:
-                          deptFilterId === null
-                            ? "rgba(255,255,255,0.25)"
-                            : "var(--dg-color-border-light)",
-                        color: deptFilterId === null ? "inherit" : "var(--dg-color-text-muted)",
-                        marginLeft: 3,
-                      }}
-                    >
+                    <span className="dg-span-tab-count dg-tabular-nums">
                       {departmentUsers.length}
                     </span>
                   </Button>
                   {managementDepts
                     .filter((department) => deptCounts.has(department.id))
-                    .map((department, index, visibleDepartments) => {
+                    .map((department) => {
                       const active = deptFilterId === department.id;
-                      const prevActive =
-                        index === 0
-                          ? deptFilterId === null
-                          : deptFilterId === visibleDepartments[index - 1]?.id;
-                      const showDivider = !active && !prevActive;
 
                       return (
                         <span key={department.id} style={{ display: "contents" }}>
-                          <div
-                            style={{
-                              width: 1,
-                              height: 16,
-                              background: showDivider ? "var(--dg-color-border)" : "transparent",
-                              flexShrink: 0,
-                              alignSelf: "center",
-                            }}
-                          />
                           <Button
                             onClick={() => setDeptFilterId(active ? null : department.id)}
                             className={`dg-span-tab${active ? " active" : ""}`}
                           >
                             {department.name}
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                minWidth: 18,
-                                height: 18,
-                                borderRadius: "50%",
-                                padding: "0 4px",
-                                fontSize: "var(--dg-fs-micro)",
-                                fontWeight: 700,
-                                lineHeight: 1,
-                                background: active
-                                  ? "rgba(255,255,255,0.25)"
-                                  : "var(--dg-color-border-light)",
-                                color: active ? "inherit" : "var(--dg-color-text-muted)",
-                                marginLeft: 3,
-                              }}
-                            >
+                            <span className="dg-span-tab-count dg-tabular-nums">
                               {deptCounts.get(department.id) ?? 0}
                             </span>
                           </Button>

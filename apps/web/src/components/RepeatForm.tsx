@@ -604,24 +604,11 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
       <fieldset style={sectionFieldsetStyle}>
         <legend style={frequencyLabelStyle}>Frequency</legend>
         <ScrollableTabs className="dg-span-tabs dg-span-tabs--light" style={{ width: "100%" }}>
-          {(["daily", "weekly", "biweekly"] as SeriesFrequency[]).map((f, i, all) => {
+          {(["daily", "weekly", "biweekly"] as SeriesFrequency[]).map((f) => {
             const isActive = frequency === f;
-            const prevActive = i > 0 && frequency === all[i - 1];
-            const showDivider = i > 0 && !isActive && !prevActive;
 
             return (
               <Fragment key={f}>
-                {i > 0 && (
-                  <div
-                    style={{
-                      width: 1,
-                      height: 16,
-                      background: showDivider ? "var(--dg-color-border)" : "transparent",
-                      flexShrink: 0,
-                      alignSelf: "center",
-                    }}
-                  />
-                )}
                 <Button
                   type="button"
                   onClick={() => setFrequency(f)}
