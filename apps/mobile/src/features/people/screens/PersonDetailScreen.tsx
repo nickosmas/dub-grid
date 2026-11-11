@@ -26,6 +26,7 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { Text } from "../../../shared/components/Text";
+import { AppText } from "../../../shared/components/AppText";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -2815,20 +2816,20 @@ function EditPanel({
             onFocus={() => setFocusedField("email")}
           />
           {hasAccount ? (
-            <Text style={styles.statusMessage}>
-              They sign in with this email, so they&apos;ll need to change it from their profile.
-            </Text>
-          ) : null}
-          {hasAccount && onMoveToNewEmail ? (
-            <View style={styles.moveEmailRow}>
-              <Text style={styles.statusMessage}>Lost access to this email?</Text>
-              <Button
-                fullWidth={false}
-                label="Move them to a new one"
-                onPress={onMoveToNewEmail}
-                size="sm"
-                tone="link"
-              />
+            <View style={styles.signInEmailNote}>
+              <Text style={styles.statusMessage}>
+                They sign in with this email, so they&apos;ll need to change it from their profile.
+              </Text>
+              {onMoveToNewEmail ? (
+                <View style={styles.moveEmailRow}>
+                  <Text style={styles.statusMessage}>Lost access to this email?</Text>
+                  <Pressable accessibilityRole="link" hitSlop={8} onPress={onMoveToNewEmail}>
+                    <AppText tone="brand" variant="bodyStrong">
+                      Move them to a new one
+                    </AppText>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </ProfilePanel>
@@ -2939,8 +2940,11 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.body,
       color: mobileColors.textSecondary,
     },
+    signInEmailNote: {
+      gap: mobileSpace.xs,
+    },
     moveEmailRow: {
-      alignItems: "center",
+      alignItems: "baseline",
       flexDirection: "row",
       flexWrap: "wrap",
       columnGap: mobileSpace.xs,

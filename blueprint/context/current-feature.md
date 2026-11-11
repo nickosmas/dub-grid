@@ -1,7 +1,7 @@
 # Fix: Move to a new email on mobile
 
 **Type:** Fix
-**Status:** in progress
+**Status:** verified
 **Branch:** `fix/mobile-move-email`
 
 ## The problem
@@ -58,10 +58,10 @@ move only.
 
 ## Steps
 
-- [ ] 1. Shared move function, web route on it, mobile route and contract, route tests and the boundary classification.
-- [ ] 2. Shared `canOfferMoveToNewEmail` in `@dubgrid/domain`, with tests.
-- [ ] 3. Mobile API client, the move sheet and the link in Edit, with screen tests.
-- [ ] 4. Check on the iOS Simulator as `qa-super-admin@dubgrid.test`.
+- [x] 1. Shared move function, web route on it, mobile route and contract, route tests and the boundary classification.
+- [x] 2. Shared `canOfferMoveToNewEmail` in `@dubgrid/domain`, with tests.
+- [x] 3. Mobile API client, the move sheet and the link in Edit, with screen tests.
+- [x] 4. Check on the iOS Simulator as `qa-super-admin@dubgrid.test`.
 
 ## Done when
 
@@ -70,3 +70,24 @@ move only.
 - Route tests cover the mobile path (fresh proof, permission, refusals, the
   move itself); screen tests cover the link and the sheet.
 - Seen working on the iOS Simulator with the QA Super Admin account.
+
+## Verification
+
+- Route tests: the web route's 18 tests pass unchanged on the shared move; 8
+  new tests cover the app's route (fresh proof first, the staff permission,
+  the body, the token's organization, who may move an Admin, refusals passed
+  through, the reload). The boundary test classifies the new route and checks
+  the shared move keeps its order. 6 new screen tests cover the link and the
+  sheet.
+- iOS Simulator (iPhone 17 Pro, iOS 26.5) as `qa-super-admin@dubgrid.test`
+  against a local web build of this branch: Edit on a joined User showed the
+  note and **Move them to a new one**; the sheet showed web's wording and
+  refused an incomplete address; **Move** got the server's step-up refusal,
+  the identity check opened, and after the password the move went through.
+  The record took the new address with no sign-in, the old membership was
+  archived, a User invitation and the audit row were written, and the page
+  showed the pending App invite. Someone without a sign-in got no link. The
+  test person was restored afterwards.
+- The first identity check on the simulator failed while the local dev server
+  compiled the password route for the first time (longer than the app's
+  request timeout); the retry succeeded. The step-up hook was not changed.

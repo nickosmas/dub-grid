@@ -2749,7 +2749,7 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
       expect(screen.getByText("Lost access to this email?")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Move them to a new one" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Move them to a new one" })).toBeInTheDocument();
     });
 
     it("withholds the move for someone who hasn't joined", () => {
@@ -2758,7 +2758,7 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
       expect(
-        screen.queryByRole("button", { name: "Move them to a new one" }),
+        screen.queryByRole("link", { name: "Move them to a new one" }),
       ).not.toBeInTheDocument();
     });
 
@@ -2773,7 +2773,7 @@ describe("PersonDetailScreen", () => {
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
       expect(
-        screen.queryByRole("button", { name: "Move them to a new one" }),
+        screen.queryByRole("link", { name: "Move them to a new one" }),
       ).not.toBeInTheDocument();
     });
 
@@ -2785,7 +2785,7 @@ describe("PersonDetailScreen", () => {
       });
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.click(screen.getByRole("button", { name: "Move them to a new one" }));
+      fireEvent.click(screen.getByRole("link", { name: "Move them to a new one" }));
 
       expect(screen.getByText("Move to a new email")).toBeInTheDocument();
       expect(
@@ -2824,7 +2824,7 @@ describe("PersonDetailScreen", () => {
       }));
 
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.click(screen.getByRole("button", { name: "Move them to a new one" }));
+      fireEvent.click(screen.getByRole("link", { name: "Move them to a new one" }));
       fireEvent.change(screen.getByLabelText("New email"), {
         target: { value: "new@dubgrid.test" },
       });
