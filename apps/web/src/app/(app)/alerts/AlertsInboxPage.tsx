@@ -14,6 +14,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 import {
   Archive,
   ArchiveRestore,
@@ -807,9 +808,7 @@ function Segments<T extends string>({
               <span style={{ display: "inline-flex", marginRight: 6 }}>{segment.icon}</span>
             )}
             {segment.label}
-            {segment.count ? (
-              <span className="dg-span-tab-count dg-tabular-nums">{segment.count}</span>
-            ) : null}
+            <NumericBadge count={segment.count ?? 0} tone="label" className="dg-span-tab-count" />
           </Button>
         );
       })}

@@ -46,7 +46,7 @@ test.describe("role variance: route entry contract", () => {
         // On schedule, so the Schedule tab is offered.
         path: "/profile",
         finalUrl: /\/profile/,
-        marker: (p) => p.getByRole("button", { name: "Schedule", exact: true }),
+        marker: (p) => p.getByRole("tab", { name: "Schedule", exact: true }),
       },
       // canViewReports is false for the user role: ReportsPageContent
       // replaces the route with /dashboard.
@@ -95,7 +95,7 @@ test.describe("role variance: route entry contract", () => {
       {
         path: "/profile",
         finalUrl: /\/profile/,
-        marker: (p) => p.getByRole("button", { name: "Schedule", exact: true }),
+        marker: (p) => p.getByRole("tab", { name: "Schedule", exact: true }),
       },
       { path: "/reports", finalUrl: /\/dashboard$/ },
       { path: "/alerts", finalUrl: /\/alerts$/, marker: (p) => p.getByText("Inbox") },
@@ -227,7 +227,7 @@ test.describe("role variance: interaction contract", () => {
     await expectNoManageControls(page, page);
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile`);
-    await expect(page.getByRole("button", { name: "Schedule", exact: true })).toBeVisible({
+    await expect(page.getByRole("tab", { name: "Schedule", exact: true })).toBeVisible({
       timeout: 20_000,
     });
 
@@ -296,7 +296,7 @@ test.describe("role variance: interaction contract", () => {
     await expectNoManageControls(page, page);
 
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/profile`);
-    await expect(page.getByRole("button", { name: "Schedule", exact: true })).toBeVisible({
+    await expect(page.getByRole("tab", { name: "Schedule", exact: true })).toBeVisible({
       timeout: 20_000,
     });
 

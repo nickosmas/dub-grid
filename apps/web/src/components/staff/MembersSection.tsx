@@ -1239,7 +1239,11 @@ export function MembersSection({
                           className={`dg-span-tab${active ? " active" : ""}`}
                         >
                           {tab.label}
-                          <span className="dg-span-tab-count dg-tabular-nums">{tab.count}</span>
+                          <NumericBadge
+                            count={tab.count}
+                            tone="label"
+                            className="dg-span-tab-count"
+                          />
                         </Button>
                       </span>
                     );
@@ -1260,9 +1264,11 @@ export function MembersSection({
                     className={`dg-span-tab${deptFilterId === null ? " active" : ""}`}
                   >
                     All
-                    <span className="dg-span-tab-count dg-tabular-nums">
-                      {departmentUsers.length}
-                    </span>
+                    <NumericBadge
+                      count={departmentUsers.length}
+                      tone="label"
+                      className="dg-span-tab-count"
+                    />
                   </Button>
                   {managementDepts
                     .filter((department) => deptCounts.has(department.id))
@@ -1276,9 +1282,11 @@ export function MembersSection({
                             className={`dg-span-tab${active ? " active" : ""}`}
                           >
                             {department.name}
-                            <span className="dg-span-tab-count dg-tabular-nums">
-                              {deptCounts.get(department.id) ?? 0}
-                            </span>
+                            <NumericBadge
+                              count={deptCounts.get(department.id) ?? 0}
+                              tone="label"
+                              className="dg-span-tab-count"
+                            />
                           </Button>
                         </span>
                       );

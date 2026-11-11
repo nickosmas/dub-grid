@@ -502,8 +502,9 @@
     box-shadow 150ms ease;
   flex: 1 0 auto;
 }
+/* Hover darkens an unselected label a step short of the chosen one. */
 .dg-span-tab:hover:not(.active) {
-  color: var(--dg-color-text-primary);
+  color: var(--dg-color-text-secondary);
 }
 .dg-span-tab:focus-visible {
   outline: 2px solid var(--dg-color-border-focus);
@@ -519,22 +520,13 @@
   box-shadow: var(--dg-segment-thumb-shadow);
 }
 /* A count beside a label reads as part of it: the label's own color and
-   weight on a quiet tint of that color, in every state and both themes. */
+   weight on a quiet tint of that color, in every state and both themes. The
+   pill's shape comes from NumericBadge. */
 .dg-span-tab-count,
 .dg-underline-tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  box-sizing: border-box;
-  border-radius: 999px;
   background: color-mix(in srgb, currentColor 12%, transparent);
   color: inherit;
-  font-size: var(--dg-type-badge-size);
   font-weight: inherit;
-  line-height: 1;
 }
 .dg-underline-tab.active .dg-underline-tab-count {
   font-weight: 700;
@@ -587,7 +579,7 @@
   transition: background-color 150ms ease;
 }
 .dg-underline-tab:hover:not(.active) {
-  color: var(--dg-color-text-primary);
+  color: var(--dg-color-text-secondary);
 }
 .dg-underline-tab:focus-visible {
   outline: 2px solid var(--dg-color-border-focus);

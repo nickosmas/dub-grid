@@ -2,6 +2,7 @@
 
 import { useRef, type KeyboardEvent } from "react";
 import { Button } from "@/components/Button";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 
 export interface UnderlineTabItem<T extends string> {
   value: T;
@@ -98,12 +99,12 @@ export function UnderlineTabs<T extends string>({
               {item.label}
             </span>
             {item.count ? (
-              <span
-                aria-label={`${item.count} waiting`}
-                className="dg-underline-tab-count dg-tabular-nums"
-              >
-                {item.count}
-              </span>
+              <NumericBadge
+                count={item.count}
+                tone="label"
+                label={`${item.count} waiting`}
+                className="dg-underline-tab-count"
+              />
             ) : null}
           </Button>
         );

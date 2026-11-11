@@ -16,6 +16,9 @@ const numericBadgeVariants = cva(
         // Sits on a filled control (an active tab), so it borrows the control's
         // text color and lightens its fill instead of picking a surface.
         onAccent: "bg-[rgba(255,255,255,0.25)] text-inherit",
+        // Beside a tab or segment label: the control's count class gives it the
+        // label's own color and weight.
+        label: "",
       },
     },
     defaultVariants: {

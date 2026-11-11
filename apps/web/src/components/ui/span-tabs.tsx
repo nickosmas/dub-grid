@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/Button";
+import { NumericBadge } from "@/components/ui/numeric-badge";
 
 export interface SpanTabItem<T extends string> {
   value: T;
@@ -44,12 +45,12 @@ export function SpanTabs<T extends string>({
           >
             {item.label}
             {item.count ? (
-              <span
-                aria-label={`${item.count} waiting`}
-                className="dg-span-tab-count dg-tabular-nums"
-              >
-                {item.count}
-              </span>
+              <NumericBadge
+                count={item.count}
+                tone="label"
+                label={`${item.count} waiting`}
+                className="dg-span-tab-count"
+              />
             ) : null}
           </Button>
         );
