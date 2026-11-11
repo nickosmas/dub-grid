@@ -266,7 +266,7 @@
      Never brand blue, which is reserved for the action we want completed. */
   --dg-segment-track: var(--dg-color-bg-secondary);
   --dg-segment-thumb: var(--dg-color-surface);
-  --dg-segment-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --dg-segment-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.05);
   --tooltip-font-size: var(--dg-fs-label);
   --tooltip-border-radius: var(--dg-radius-sm);
   --dg-overlay: rgba(0, 0, 0, 0.6);
@@ -498,7 +498,7 @@
   /* The surface sits darker than the track in dark mode, so the chosen
      segment takes a lighter step of its own to read as raised. */
   --dg-segment-thumb: #2c2c31;
-  --dg-segment-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --dg-segment-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.04);
   --dg-color-row-alt: #0a0a0b;
   --dg-color-row-hover: #1c1c1f;
   --dg-color-border: #2e2e33;
