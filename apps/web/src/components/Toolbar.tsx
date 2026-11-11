@@ -852,23 +852,10 @@ export default function Toolbar({
                 className="dg-span-tabs dg-span-tabs--light"
                 style={{ flex: isTablet ? 1 : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
               >
-                {focusAreaOptions.map((w, i) => {
+                {focusAreaOptions.map((w) => {
                   const isActive = activeFocusArea === w.id;
-                  const prevActive = i > 0 && activeFocusArea === focusAreaOptions[i - 1].id;
-                  const showDivider = i > 0 && !isActive && !prevActive;
                   return (
                     <Fragment key={w.id ?? "all"}>
-                      {i > 0 && (
-                        <div
-                          style={{
-                            width: 1,
-                            height: 16,
-                            background: showDivider ? "var(--dg-color-border)" : "transparent",
-                            flexShrink: 0,
-                            alignSelf: "center",
-                          }}
-                        />
-                      )}
                       <Button
                         onClick={() => onFocusAreaChange(w.id)}
                         className={`dg-span-tab${isActive ? " active" : ""}`}

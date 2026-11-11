@@ -303,23 +303,10 @@ function ViewModeTabs({
 }) {
   return (
     <div data-tour="dashboard-view-mode" className="dg-span-tabs dg-span-tabs--light" style={style}>
-      {modes.map((m, i) => {
+      {modes.map((m) => {
         const isActive = viewMode === m.value;
-        const prevActive = i > 0 && viewMode === modes[i - 1].value;
-        const showDivider = i > 0 && !isActive && !prevActive;
         return (
           <Fragment key={m.value}>
-            {i > 0 && (
-              <div
-                style={{
-                  width: 1,
-                  height: 16,
-                  background: showDivider ? "var(--dg-color-border)" : "transparent",
-                  flexShrink: 0,
-                  alignSelf: "center",
-                }}
-              />
-            )}
             <Button
               onClick={() => onViewModeChange(m.value)}
               className={`dg-span-tab${isActive ? " active" : ""}`}

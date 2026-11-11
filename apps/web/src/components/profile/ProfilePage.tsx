@@ -9,7 +9,7 @@ import { getIsoDateInTimeZone } from "@dubgrid/schedule-core";
 import ProgressBar from "@/components/ProgressBar";
 import { PersonPageSkeleton } from "@/components/LoadingSkeletons";
 import { Button } from "@/components/Button";
-import { SpanTabs } from "@/components/ui/span-tabs";
+import { UnderlineTabs, underlineTabPanelProps } from "@/components/ui/underline-tabs";
 import { usePermissions, useOrganizationData } from "@/hooks";
 import { useSelfProfileData } from "@/hooks/useSelfProfileData";
 import { useSkeletonGate } from "@/hooks/useSkeletonGate";
@@ -259,31 +259,31 @@ export function ProfilePage() {
         ) : null}
 
         <div className="flex min-w-0 flex-col gap-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="max-w-full overflow-x-auto">
-              <SpanTabs<ProfileTab>
-                aria-label="Profile sections"
-                className="w-max max-sm:[&_.dg-span-tab]:px-1!"
-                items={tabs.map((tab) => ({ value: tab, label: TAB_LABELS[tab] }))}
-                value={activeTab}
-                onChange={(tab) => openTab(tab)}
-              />
-            </div>
+          <div className="dg-tab-row">
+            <UnderlineTabs<ProfileTab>
+              aria-label="Profile sections"
+              idPrefix="profile"
+              items={tabs.map((tab) => ({ value: tab, label: TAB_LABELS[tab] }))}
+              value={activeTab}
+              onChange={(tab) => openTab(tab)}
+            />
             {activeTab === "schedule" && isOnSchedule ? (
-              <PersonPeriodControl
-                span={periodSpan}
-                period={period}
-                today={periodToday}
-                payPeriodStartDate={payPeriodStartDate}
-                onSpanChange={setPeriodSpan}
-                onStep={stepPeriod}
-                onToday={goToPeriodToday}
-                onCustomRangeChange={setPeriodRange}
-              />
+              <div className="dg-tab-row-aside">
+                <PersonPeriodControl
+                  span={periodSpan}
+                  period={period}
+                  today={periodToday}
+                  payPeriodStartDate={payPeriodStartDate}
+                  onSpanChange={setPeriodSpan}
+                  onStep={stepPeriod}
+                  onToday={goToPeriodToday}
+                  onCustomRangeChange={setPeriodRange}
+                />
+              </div>
             ) : null}
           </div>
 
-          <section aria-label={TAB_LABELS[activeTab]}>
+          <section {...underlineTabPanelProps("profile", activeTab)}>
             {activeTab === "schedule" && employee && isOnSchedule && (
               <>
                 <StaffOverviewTab

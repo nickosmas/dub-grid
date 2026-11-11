@@ -260,8 +260,13 @@
   --dg-radius-xl: 12px;
   --dg-radius-2xl: 14px;
   --dg-tab-shell-radius: var(--dg-radius-md);
-  --dg-tab-shell-pad: 2px;
+  --dg-tab-shell-pad: 3px;
   --dg-tab-inner-radius: calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad));
+  /* The segmented control: a gray track with the chosen segment raised on it.
+     Never brand blue, which is reserved for the action we want completed. */
+  --dg-segment-track: var(--dg-color-bg-secondary);
+  --dg-segment-thumb: var(--dg-color-surface);
+  --dg-segment-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
   --tooltip-font-size: var(--dg-fs-label);
   --tooltip-border-radius: var(--dg-radius-sm);
   --dg-overlay: rgba(0, 0, 0, 0.6);
@@ -490,6 +495,10 @@
   --dg-color-surface-editor: #151517;
   --dg-color-field: #0a0a0b;
   --dg-color-bg-secondary: #1c1c1f;
+  /* The surface sits darker than the track in dark mode, so the chosen
+     segment takes a lighter step of its own to read as raised. */
+  --dg-segment-thumb: #2c2c31;
+  --dg-segment-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   --dg-color-row-alt: #0a0a0b;
   --dg-color-row-hover: #1c1c1f;
   --dg-color-border: #2e2e33;
