@@ -134,7 +134,7 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 | POST   | `/api/employees/check-phone`       | Pre-flight duplicate check for an invite phone number                                                                                                              |
 | GET    | `/api/people/change-requests`      | List pending people change requests (account deletions are listed for super admins only)                                                                           |
 | PATCH  | `/api/people/change-requests/[id]` | Approve or reject a people change request (only a super admin decides an account deletion, and approving one requires fresh sensitive-action auth)                 |
-| POST   | `/api/import/employees`            | Bulk-import employees from CSV (blocks exact duplicates, warns on similar names)                                                                                   |
+| POST   | `/api/import/employees`            | Add the checked rows of a staff CSV through `insertEmployees`; refuses duplicates and unknown references per row, needs an impersonation for a Gridmaster          |
 
 ---
 

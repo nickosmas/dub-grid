@@ -4368,7 +4368,7 @@ button.dg-cc-sg-main {
   gap: 6px;
   width: 100%;
   padding: 36px 24px;
-  border: 1.5px dashed var(--dg-color-control-active-border);
+  border: 1.5px dashed var(--dg-color-border);
   border-radius: var(--dg-radius-lg);
   background: var(--dg-color-bg);
   font: inherit;
@@ -4402,7 +4402,7 @@ button.dg-cc-sg-main {
   table-layout: fixed;
   font-size: 13px;
 }
-.dg-import-table th {
+.dg-import-table thead th {
   position: sticky;
   top: 0;
   z-index: 1;
