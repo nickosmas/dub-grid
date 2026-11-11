@@ -11,6 +11,9 @@ import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { Employee } from "@/types";
 
+/** Shared with the app, so both offer the move to the same people. */
+export { canOfferMoveToNewEmail } from "@dubgrid/domain";
+
 interface MoveEmailDialogProps {
   employee: Employee;
   orgId: string;

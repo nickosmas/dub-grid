@@ -24,9 +24,14 @@ vi.mock("@/features/employees/client", () => ({
 const requireCredentialAssurance = vi.fn(async (_accessToken: string) => ({
   success: true as const,
 }));
+const updateBrowserUserEmail = vi.fn(async (_email: string) => undefined);
 vi.mock("@/features/account/client", () => ({
   requireCredentialAssurance: (accessToken: string) => requireCredentialAssurance(accessToken),
+  updateBrowserUserEmail: (email: string) => updateBrowserUserEmail(email),
 }));
+
+const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("sonner", () => ({ toast: toastMock }));
 
 const stepUpRun = vi.fn(async (action: (token: string) => Promise<unknown>) => {
   await action("access-token");
@@ -151,6 +156,7 @@ function renderPanel(
     certifications: NamedItem[];
     persistent: boolean;
     sectioned: boolean;
+    isOwnRecord: boolean;
   }> = {},
 ) {
   const onSave = overrides.onSave ?? vi.fn();
@@ -164,6 +170,7 @@ function renderPanel(
       certifications={overrides.certifications ?? [...DESIGNATIONS]}
       roles={overrides.roles ?? [...ROLES]}
       isManagementUser={overrides.isManagementUser}
+      isOwnRecord={overrides.isOwnRecord}
       onSave={onSave}
       onSaveCompleted={overrides.onSaveCompleted}
       onCancel={onCancel}
@@ -929,8 +936,76 @@ describe("EditEmployeePanel", () => {
 
       expect(screen.getByLabelText("Email")).toHaveAttribute("readonly");
       expect(
-        screen.getByText("This is their sign-in email, so they change it on their own profile."),
+        screen.getByText(
+          "They sign in with this email, so they'll need to change it from their profile.",
+        ),
       ).toBeInTheDocument();
+    });
+
+    describe("your own record", () => {
+      const own = { ...employee, userId: "user-42" };
+
+      beforeEach(() => {
+        updateBrowserUserEmail.mockClear();
+        toastMock.success.mockClear();
+        toastMock.error.mockClear();
+      });
+
+      it("lets you edit your own email with no note", () => {
+        renderPanel({ employee: own, isOwnRecord: true });
+
+        expect(screen.getByLabelText("Email")).not.toHaveAttribute("readonly");
+        expect(screen.queryByText(/sign in with this email/)).toBeNull();
+      });
+
+      it("starts the confirmed email change, and saves nothing else, when only the email changed", async () => {
+        const user = userEvent.setup();
+        const onSave = vi.fn();
+        const onSaveCompleted = vi.fn();
+        renderPanel({ employee: own, isOwnRecord: true, onSave, onSaveCompleted });
+
+        await changeEmail(user);
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => expect(onSaveCompleted).toHaveBeenCalledOnce());
+        expect(stepUpRun).toHaveBeenCalledOnce();
+        expect(requireCredentialAssurance).toHaveBeenCalledWith("access-token");
+        expect(updateBrowserUserEmail).toHaveBeenCalledWith("new.address@example.com");
+        expect(onSave).not.toHaveBeenCalled();
+        expect(toastMock.success).toHaveBeenCalledWith(
+          "We emailed a link to your current address and your new one. Your email changes once you confirm both.",
+        );
+      });
+
+      it("saves your other changes with the current email, then starts the email change", async () => {
+        const user = userEvent.setup();
+        const onSave = vi.fn().mockResolvedValue(true);
+        renderPanel({ employee: own, isOwnRecord: true, onSave });
+
+        await changeEmail(user);
+        const phone = screen.getByLabelText("Phone");
+        await user.clear(phone);
+        await user.type(phone, "(415) 555-0199");
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => expect(updateBrowserUserEmail).toHaveBeenCalledOnce());
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({ email: own.email, phone: "(415) 555-0199" }),
+        );
+      });
+
+      it("keeps the editor open and says so when the email change can't start", async () => {
+        const user = userEvent.setup();
+        const onSaveCompleted = vi.fn();
+        updateBrowserUserEmail.mockRejectedValueOnce(new Error("Email rate limit exceeded"));
+        renderPanel({ employee: own, isOwnRecord: true, onSaveCompleted });
+
+        await changeEmail(user);
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => expect(toastMock.error).toHaveBeenCalledOnce());
+        expect(onSaveCompleted).not.toHaveBeenCalled();
+      });
     });
 
     it("does not ask for identity when a person without an account changes email", async () => {

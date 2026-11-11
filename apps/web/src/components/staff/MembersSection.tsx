@@ -45,7 +45,9 @@ import * as Sentry from "@/lib/sentry";
 import {
   applyManagementDirectoryUpdate,
   mergeEmployeeIntoDirectoryPerson,
+  upsertEmployeeInList,
 } from "@/lib/staff-directory";
+import { MoveEmailDialog, canOfferMoveToNewEmail } from "@/components/staff-detail/MoveEmailDialog";
 import type {
   AbsenceType,
   AdminPermissions,
@@ -324,6 +326,7 @@ export function MembersSection({
   // access sort would be acting on a column this viewer never sees.
   const showAccessControls = !regularUserMode && canViewEmployeeDetails && canSeeManagementUsers;
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
+  const [movingEmailEmpId, setMovingEmailEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
@@ -923,6 +926,14 @@ export function MembersSection({
         nowMs,
       )
     : null;
+  const canMoveSelectedToNewEmail =
+    !!selectedEmployee &&
+    canOfferMoveToNewEmail({
+      employee: selectedEmployee,
+      orgRole: effectiveOrgRoleByEmployeeId.get(selectedEmployee.id) ?? null,
+      currentUserId,
+      canGrantElevatedRoles: canManageManagementAccess,
+    });
   const selectedEmployeeDirectoryPerson = selectedEmployee
     ? (directory.find((person) => person.employeeId === selectedEmployee.id) ?? null)
     : null;
@@ -2229,6 +2240,29 @@ export function MembersSection({
           }
           onRevoke={handleRevokeInvitation}
           onResend={handleResendInvitation}
+          onMoveToNewEmail={
+            canMoveSelectedToNewEmail ? () => setMovingEmailEmpId(selectedEmployee.id) : undefined
+          }
+        />
+      )}
+
+      {selectedEmployee && movingEmailEmpId === selectedEmployee.id && orgId && (
+        <MoveEmailDialog
+          employee={selectedEmployee}
+          orgId={orgId}
+          name={getEmployeeDisplayName(selectedEmployee)}
+          onMoved={(moved) => {
+            queryClient.setQueryData(
+              queryKeys.employees.all(orgId),
+              (current: Employee[] | undefined) =>
+                current ? upsertEmployeeInList(current, moved) : current,
+            );
+            void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.org.invitations(orgId) });
+          }}
+          onClose={() => setMovingEmailEmpId(null)}
         />
       )}
 
