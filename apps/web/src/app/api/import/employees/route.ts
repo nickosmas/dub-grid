@@ -1,41 +1,172 @@
 import { NextRequest, NextResponse } from "next/server";
-import { API_ERRORS } from "@dubgrid/client-errors";
-import { requireAuthenticatedSession } from "@/lib/api-auth";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { API_ERRORS } from "@dubgrid/client-errors";
+import { withoutHiddenStaff } from "@dubgrid/data-access";
+import { resolveOrganizationLabel } from "@dubgrid/domain";
+import { requireAuthenticatedSession } from "@/lib/api-auth";
+import { fetchHiddenPeople, requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
-import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import { isFeatureEnabled } from "@/lib/feature-flags";
+import { insertEmployees, MAX_EMPLOYEE_BATCH } from "@/features/employees/server/insert-employees";
+import type { NewEmployeeInput } from "@/features/employees/server/insert-employees";
+import { fetchOrgToday } from "@/features/employees/server/org-today";
+import {
+  checkStaffImportRows,
+  staffImportReason,
+  STAFF_IMPORT_MAX_ROWS,
+  type ResolvedStaffImportRow,
+  type StaffImportLabels,
+  type StaffImportReferences,
+  type StaffImportRow,
+} from "@/features/employees/staff-import";
 
 export const dynamic = "force-dynamic";
 
-const MAX_ROWS = 500;
+const cell = z.string().max(2000).optional().default("");
 
 const rowSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required"),
-  lastName: z.string().trim().min(1, "Last name is required"),
-  email: z.string().trim().email().or(z.literal("")).optional().default(""),
-  phone: z.string().trim().optional().default(""),
-  focusAreaNames: z.string().trim().optional().default(""),
-  certificationName: z.string().trim().optional().default(""),
-  roleNames: z.string().trim().optional().default(""),
-  contactNotes: z.string().trim().optional().default(""),
+  rowNumber: z.number().int().positive(),
+  firstName: cell,
+  lastName: cell,
+  email: cell,
+  phone: cell,
+  focusAreaNames: cell,
+  certificationName: cell,
+  roleNames: cell,
+  employment: cell,
+  firstDay: cell,
+  contactNotes: cell,
 });
 
-// `rows` is validated as an array of unknown, unvalidated shapes here — each
-// element is validated individually against `rowSchema` further down, so one
-// malformed row (e.g. a bad email) surfaces as a per-row error instead of
-// failing Zod's whole-array parse and rejecting the entire batch.
 const bodySchema = z.object({
   orgId: z.string().uuid(),
-  rows: z.array(z.unknown()).min(1).max(MAX_ROWS),
+  rows: z.array(rowSchema).min(1).max(STAFF_IMPORT_MAX_ROWS),
 });
 
-type ImportRow = z.infer<typeof rowSchema>;
+export interface ImportedPerson {
+  rowNumber: number;
+  id: string;
+  email: string;
+}
+
+export interface RefusedImportRow {
+  rowNumber: number;
+  name: string;
+  reason: string;
+}
+
+const INSERT_FALLBACK = "We couldn't add this person. Try again.";
+
+function getRequestIp(req: NextRequest): string | null {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+}
+
+async function loadImportContext(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  hiddenUserIds: string[],
+) {
+  const [org, focusAreas, certifications, roles, employees, today] = await Promise.all([
+    serviceClient
+      .from("organizations")
+      .select("focus_area_label, certification_label, role_label")
+      .eq("id", orgId)
+      .single(),
+    serviceClient
+      .from("focus_areas")
+      .select("id, name")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    serviceClient
+      .from("certifications")
+      .select("id, name, abbr")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    serviceClient
+      .from("organization_roles")
+      .select("id, name")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    // Everyone in any status holds their name, email and phone, so all are checked.
+    withoutHiddenStaff(
+      serviceClient
+        .from("employees")
+        .select("id, first_name, last_name, email, phone")
+        .eq("org_id", orgId),
+      hiddenUserIds,
+    ).limit(10000),
+    fetchOrgToday(serviceClient, orgId),
+  ]);
+  const failed = [org, focusAreas, certifications, roles, employees].find((result) => result.error);
+  if (failed?.error) throw failed.error;
+
+  const labelRow = org.data as {
+    focus_area_label: string | null;
+    certification_label: string | null;
+    role_label: string | null;
+  };
+  const labels: StaffImportLabels = {
+    focusArea: resolveOrganizationLabel("focusArea", labelRow.focus_area_label),
+    certification: resolveOrganizationLabel("certification", labelRow.certification_label),
+    role: resolveOrganizationLabel("role", labelRow.role_label),
+  };
+  const references: StaffImportReferences = {
+    focusAreas: (focusAreas.data ?? []) as { id: number; name: string }[],
+    certifications: (certifications.data ?? []) as {
+      id: number;
+      name: string;
+      abbr: string | null;
+    }[],
+    roles: (roles.data ?? []) as { id: number; name: string }[],
+  };
+  const existing = (
+    (employees.data ?? []) as {
+      id: string;
+      first_name: string;
+      last_name: string;
+      email: string | null;
+      phone: string | null;
+    }[]
+  ).map((row) => ({
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email ?? "",
+    phone: row.phone ?? "",
+  }));
+  return { ...references, labels, existing, today };
+}
+
+function toNewEmployee(row: ResolvedStaffImportRow): NewEmployeeInput {
+  return {
+    firstName: row.firstName,
+    lastName: row.lastName,
+    employmentType: row.employmentType,
+    status: "active",
+    statusChangedAt: null,
+    statusNote: "",
+    firstDay: row.firstDay,
+    certificationId: row.certificationId,
+    roleIds: row.roleIds,
+    focusAreaIds: row.focusAreaIds,
+    phone: row.phone,
+    email: row.email,
+    contactNotes: row.contactNotes,
+    userId: null,
+    departmentIds: [],
+    deptAdminIds: [],
+    version: 0,
+  };
+}
+
+function personName(row: StaffImportRow): string {
+  return `${row.firstName} ${row.lastName}`.trim();
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,7 +177,6 @@ export async function POST(req: NextRequest) {
     if ("response" in auth) return auth.response;
     const { user } = auth;
 
-    // Rate limit by user ID
     const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
     if (misconfigured) {
       return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
@@ -67,8 +197,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const parsed = bodySchema.safeParse(body);
+    const parsed = bodySchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json(
         { error: API_ERRORS.INVALID_INPUT, details: parsed.error.flatten() },
@@ -76,229 +205,78 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { orgId: requestedOrgId, rows: rawRows } = parsed.data;
-
-    // Validate each row individually — one malformed row (e.g. an invalid
-    // email) shouldn't fail the whole batch. Its error joins the same
-    // per-row `errors` array used below for name-resolution failures, and
-    // the remaining valid rows still get imported.
-    const errors: { row: number; error: string }[] = [];
-    const parsedRows: { originalIndex: number; row: ImportRow }[] = [];
-    for (let i = 0; i < rawRows.length; i++) {
-      const rowResult = rowSchema.safeParse(rawRows[i]);
-      if (!rowResult.success) {
-        const firstIssue = rowResult.error.issues[0];
-        errors.push({ row: i + 1, error: firstIssue?.message ?? "Invalid row data" });
-        continue;
-      }
-      parsedRows.push({ originalIndex: i, row: rowResult.data });
-    }
-
     const orgAuth = await requireOrgPermissions(
       req,
-      requestedOrgId,
+      parsed.data.orgId,
       (permissions) =>
         permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
-      { allowDuringSetup: true },
+      { allowDuringSetup: true, gridmasterNeedsImpersonation: true },
     );
-    if ("response" in orgAuth) {
-      return orgAuth.response;
-    }
-    const serviceClient = orgAuth.serviceClient;
+    if ("response" in orgAuth) return orgAuth.response;
     // The effective organization: a caller inside a Test Sandbox imports into
     // the sandbox, never into the real organization their client named.
-    const orgId = orgAuth.orgId;
+    const { serviceClient, orgId } = orgAuth;
 
-    // Fetch org's focus areas, certifications, and roles for name matching,
-    // plus the current max seniority so imported rows can be appended to the
-    // end of the seniority order (in CSV row order) — seniority isn't part
-    // of the CSV and can be adjusted afterward via the People table reorder.
-    const [{ data: focusAreas }, { data: certs }, { data: orgRoles }, { data: maxSeniorityRow }] =
-      await Promise.all([
-        serviceClient
-          .from("focus_areas")
-          .select("id, name")
-          .eq("org_id", orgId)
-          .is("archived_at", null),
-        serviceClient
-          .from("certifications")
-          .select("id, name")
-          .eq("org_id", orgId)
-          .is("archived_at", null),
-        serviceClient
-          .from("organization_roles")
-          .select("id, name")
-          .eq("org_id", orgId)
-          .is("archived_at", null),
-        serviceClient
-          .from("employees")
-          .select("seniority")
-          .eq("org_id", orgId)
-          .order("seniority", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
+    const context = await loadImportContext(serviceClient, orgId, await fetchHiddenPeople(orgAuth));
+    const checks = checkStaffImportRows(parsed.data.rows, context);
 
-    const baseSeniority = (maxSeniorityRow as { seniority: number } | null)?.seniority ?? 0;
-
-    const faNameMap = new Map(
-      (focusAreas ?? []).map((fa: Record<string, unknown>) => [
-        (fa.name as string).toLowerCase(),
-        fa.id as number,
-      ]),
-    );
-    const certNameMap = new Map(
-      (certs ?? []).map((c: Record<string, unknown>) => [
-        (c.name as string).toLowerCase(),
-        c.id as number,
-      ]),
-    );
-    const roleNameMap = new Map(
-      (orgRoles ?? []).map((r: Record<string, unknown>) => [
-        (r.name as string).toLowerCase(),
-        r.id as number,
-      ]),
-    );
-
-    // Resolve names to IDs and build insert records
-    const insertRecords: { index: number; record: Record<string, unknown> }[] = [];
-
-    for (const { originalIndex, row } of parsedRows) {
-      const errorCountBeforeRow = errors.length;
-
-      // Resolve focus area names to IDs
-      const faIds: number[] = [];
-      if (row.focusAreaNames) {
-        for (const name of row.focusAreaNames
-          .split(";")
-          .map((s) => s.trim())
-          .filter(Boolean)) {
-          const id = faNameMap.get(name.toLowerCase());
-          if (id) faIds.push(id);
-          else
-            errors.push({
-              row: originalIndex + 1,
-              error: `"${name}" doesn't match any schedule area in your organization.`,
-            });
-        }
-      }
-
-      // Resolve certification name
-      let certId: number | null = null;
-      if (row.certificationName) {
-        certId = certNameMap.get(row.certificationName.toLowerCase()) ?? null;
-        if (!certId) {
-          errors.push({
-            row: originalIndex + 1,
-            error: `Unknown certification: "${row.certificationName}"`,
-          });
-        }
-      }
-
-      // Resolve role names
-      const roleIds: number[] = [];
-      if (row.roleNames) {
-        for (const name of row.roleNames
-          .split(";")
-          .map((s) => s.trim())
-          .filter(Boolean)) {
-          const id = roleNameMap.get(name.toLowerCase());
-          if (id) roleIds.push(id);
-          else errors.push({ row: originalIndex + 1, error: `Unknown role: "${name}"` });
-        }
-      }
-
-      // An unresolved reference must reject this row instead of silently
-      // creating an employee without the requested focus area, certification,
-      // or role. The per-row error collected above is returned to the import
-      // results screen while the rest of the file can still be imported.
-      if (errors.length > errorCountBeforeRow) continue;
-
-      insertRecords.push({
-        index: originalIndex,
-        record: {
-          org_id: orgId,
-          first_name: row.firstName,
-          last_name: row.lastName,
-          email: row.email || "",
-          phone: row.phone || "",
-          seniority: baseSeniority + originalIndex + 1,
-          focus_area_ids: faIds,
-          certification_id: certId,
-          role_ids: roleIds,
-          contact_notes: row.contactNotes || "",
-        },
-      });
-    }
-
-    // Batch insert in chunks of 50 instead of one-at-a-time
-    const BATCH_SIZE = 50;
-    const inserted: { row: number; name: string }[] = [];
-
-    for (let batchStart = 0; batchStart < insertRecords.length; batchStart += BATCH_SIZE) {
-      const batch = insertRecords.slice(batchStart, batchStart + BATCH_SIZE);
-      const { error: batchError } = await serviceClient
-        .from("employees")
-        .insert(batch.map((b) => b.record));
-
-      if (batchError) {
-        // If batch fails, fall back to individual inserts for this batch
-        for (const item of batch) {
-          const { error: insertError } = await serviceClient.from("employees").insert(item.record);
-          if (insertError) {
-            // Surface the real reason — contact-uniqueness conflicts
-            // (duplicate email/phone, or email belongs to a different
-            // user account) come back via getEmployeeContactConflict so
-            // the admin sees WHICH CSV rows were skipped and why.
-            const contactConflict = getEmployeeContactConflict(insertError);
-            const message =
-              contactConflict?.message ?? "We couldn't import this employee. Try again.";
-            logger.error({ error: insertError, row: item.index + 1 }, "Employee insert failed");
-            errors.push({ row: item.index + 1, error: message });
-          } else {
-            inserted.push({
-              row: item.index + 1,
-              name: `${item.record.first_name} ${item.record.last_name}`,
-            });
-          }
-        }
+    const refused: RefusedImportRow[] = [];
+    const toAdd: { row: StaffImportRow; resolved: ResolvedStaffImportRow }[] = [];
+    for (const check of checks) {
+      if (check.status === "blocked") {
+        refused.push({
+          rowNumber: check.row.rowNumber,
+          name: personName(check.row),
+          reason: staffImportReason(check.issues),
+        });
       } else {
-        for (const item of batch) {
-          inserted.push({
-            row: item.index + 1,
-            name: `${item.record.first_name} ${item.record.last_name}`,
+        toAdd.push({ row: check.row, resolved: check.resolved });
+      }
+    }
+
+    const added: ImportedPerson[] = [];
+    for (let start = 0; start < toAdd.length; start += MAX_EMPLOYEE_BATCH) {
+      const batch = toAdd.slice(start, start + MAX_EMPLOYEE_BATCH);
+      const outcome = await insertEmployees({
+        serviceClient,
+        orgId,
+        actor: orgAuth.actor,
+        employees: batch.map(({ resolved }) => toNewEmployee(resolved)),
+        ip: getRequestIp(req),
+        userAgent: req.headers.get("user-agent"),
+        auditDetails: { source: "import" },
+        reportEveryFailure: true,
+      });
+
+      if ("response" in outcome) {
+        // A reference or first day the checks passed was refused anyway, most
+        // likely changed in Settings mid-import; nothing in this batch was written.
+        const body = (await outcome.response.json().catch(() => null)) as { error?: string } | null;
+        for (const { row } of batch) {
+          refused.push({
+            rowNumber: row.rowNumber,
+            name: personName(row),
+            reason: body?.error ?? INSERT_FALLBACK,
           });
         }
+        continue;
       }
-    }
 
-    // Audit log — only when the import actually created someone.
-    if (inserted.length > 0) {
-      const { error: auditError } = await serviceClient.from("audit_log").insert({
-        org_id: orgId,
-        actor_id: user.id,
-        actor_email: user.email,
-        action: "employee.created",
-        resource_type: "employee",
-        resource_id: null,
-        details: {
-          bulkImport: true,
-          total: rawRows.length,
-          inserted: inserted.length,
-          errors: errors.length,
-        },
+      const failedAt = new Map(outcome.failed.map((failure) => [failure.index, failure.error]));
+      let next = 0;
+      batch.forEach(({ row }, index) => {
+        const error = failedAt.get(index);
+        if (error) {
+          refused.push({ rowNumber: row.rowNumber, name: personName(row), reason: error });
+          return;
+        }
+        const employee = outcome.employees[next++];
+        added.push({ rowNumber: row.rowNumber, id: employee.id, email: employee.email });
       });
-      if (auditError) {
-        logger.error({ error: auditError, orgId }, "Bulk import audit log write failed");
-      }
     }
 
-    return NextResponse.json({
-      success: true,
-      inserted: inserted.length,
-      errors,
-      total: rawRows.length,
-    });
+    refused.sort((a, b) => a.rowNumber - b.rowNumber);
+    return NextResponse.json({ added, refused, total: parsed.data.rows.length });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "import-employees" } });
     logger.error({ error: err }, "Bulk import failed");

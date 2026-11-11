@@ -4349,3 +4349,109 @@ button.dg-cc-sg-main {
     color: var(--dg-color-danger);
   }
 }
+
+/* Import staff: a 720px dialog to choose a file, 1080px to check its rows. */
+.dg-modal.dg-modal--import,
+.dg-modal.dg-modal--import-check {
+  min-width: 0;
+  width: min(720px, calc(100vw - 48px));
+  max-width: 720px;
+}
+.dg-modal.dg-modal--import-check {
+  width: min(1080px, calc(100vw - 48px));
+  max-width: 1080px;
+}
+.dg-import-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 36px 24px;
+  border: 1.5px dashed var(--dg-color-control-active-border);
+  border-radius: var(--dg-radius-lg);
+  background: var(--dg-color-bg);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--dg-duration-fast) ease,
+    background var(--dg-duration-fast) ease;
+}
+.dg-import-drop:hover,
+.dg-import-drop.is-active {
+  border-color: var(--dg-color-border-focus);
+  background: var(--dg-color-bg-secondary);
+}
+.dg-import-drop:focus-visible {
+  outline: none;
+  border-color: var(--dg-color-border-focus);
+  box-shadow: 0 0 0 3px var(--dg-focus-ring);
+}
+.dg-import-table-wrap {
+  max-height: min(400px, calc(100vh - 380px));
+  min-height: 160px;
+  overflow: auto;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-radius-lg);
+}
+.dg-import-table {
+  width: 100%;
+  min-width: 960px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+.dg-import-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--dg-color-border);
+  background: var(--dg-color-bg);
+  color: var(--dg-color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+.dg-import-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--dg-color-border-light);
+  color: var(--dg-color-text-secondary);
+  line-height: 1.45;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.dg-import-table tr:last-child td {
+  border-bottom: none;
+}
+.dg-import-status-icon.is-success {
+  color: var(--dg-color-banner-success-icon);
+}
+.dg-import-status-icon.is-warning {
+  color: var(--dg-color-banner-warning-icon);
+}
+.dg-import-status-icon.is-danger {
+  color: var(--dg-color-banner-danger-icon);
+}
+.dg-import-refused {
+  max-height: 330px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--dg-color-border);
+  border-radius: var(--dg-radius-lg);
+  list-style: none;
+}
+.dg-import-refused li {
+  display: flex;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--dg-color-border-light);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.dg-import-refused li:last-child {
+  border-bottom: none;
+}

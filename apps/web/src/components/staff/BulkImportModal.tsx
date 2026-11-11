@@ -1,216 +1,103 @@
 "use client";
 
-import { pluralLabelNoun, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
-import { AlertTriangle, FileWarning, Import as ImportIcon, Users, XCircle } from "lucide-react";
-import { Banner } from "@/components/ui/Banner";
-import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { capitalizeFirst, DEFAULT_ORGANIZATION_LABELS, singularLabelNoun } from "@dubgrid/domain";
+import { FileUp } from "lucide-react";
+import Modal from "@/components/Modal";
 import { Button } from "@/components/Button";
-import { MaybeHint } from "@/components/ui/hint";
-import { CloseButton } from "@/components/ui/CloseButton";
-import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
-import { toast } from "sonner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Banner } from "@/components/ui/Banner";
+import { StatusIcon } from "@/components/ui/StatusIcon";
+import { SpanTabs } from "@/components/ui/span-tabs";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { InviteOptionBox } from "@/components/staff/InviteOptionBox";
+import { useEmployees } from "@/hooks";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { thStyle } from "@/lib/styles";
-import { MOBILE, useEmployees, useMediaQuery } from "@/hooks";
+import { downloadCsvFile } from "@/lib/export-csv";
+import { formatDateKey } from "@/lib/utils";
+import { inviteRoleOptions } from "@/features/employees/client/invite-on-save";
 import {
-  classifyRowAgainstExisting,
-  type ExistingEmployeeLite,
-  type RowDuplicateClassification,
-} from "@/lib/employee-duplicate-detection";
-import { getImportReferenceErrors } from "./import-reference-validation";
-import type { FocusArea, NamedItem } from "@/types";
+  useInviteNewStaff,
+  type InviteNewStaffResult,
+} from "@/features/employees/client/use-invite-new-staff";
+import {
+  buildStaffImportTemplate,
+  checkStaffImportRows,
+  isCsvFileName,
+  parseImportDate,
+  parseStaffCsv,
+  staffImportReason,
+  STAFF_IMPORT_MAX_BYTES,
+  STAFF_IMPORT_MAX_ROWS,
+  type StaffImportLabels,
+  type StaffImportRow,
+  type StaffImportRowCheck,
+} from "@/features/employees/staff-import";
+import type { AdminPermissions, AssignableOrganizationRole, FocusArea, NamedItem } from "@/types";
 
-interface ParsedRow {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  focusAreaNames: string;
-  certificationName: string;
-  roleNames: string;
-  contactNotes: string;
+type Step = "choose" | "check" | "done";
+type RowFilter = "all" | "ready" | "blocked";
+
+interface ImportOutcome {
+  added: { rowNumber: number; id: string; email: string }[];
+  refused: { rowNumber: number; name: string; reason: string }[];
+  invites: InviteNewStaffResult | null;
 }
 
-interface ImportResult {
-  success: boolean;
-  inserted: number;
-  errors: { row: number; error: string }[];
-  total: number;
+interface BulkImportModalProps {
+  orgId: string;
+  focusAreas: FocusArea[];
+  certifications: NamedItem[];
+  roles: NamedItem[];
+  focusAreaLabel?: string;
+  certificationLabel?: string;
+  roleLabel?: string;
+  /** A Super Admin or Gridmaster, who alone invites Admins and Super Admins. */
+  canGrantElevatedRoles?: boolean;
+  onClose: () => void;
+  onImported: () => void;
 }
 
-const EXPECTED_HEADERS = [
-  "first_name",
-  "last_name",
-  "email",
-  "phone",
-  "focus_areas",
-  "certification",
-  "roles",
-  "notes",
-];
+const COUNT_NOUN = (count: number) => (count === 1 ? "person" : "people");
 
-const SAMPLE_CSV_ROWS = [
-  ["John", "Doe", "john@example.com", "555-0100", "ER;ICU", "RN", "Charge Nurse", ""],
-  ["Jane", "Smith", "jane@example.com", "555-0101", "ICU", "LPN", "", "Experienced"],
-];
-
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ",") {
-        fields.push(current.trim());
-        current = "";
-      } else {
-        current += ch;
-      }
-    }
-  }
-  fields.push(current.trim());
-  return fields;
+function displayDay(value: string): string {
+  const date = parseImportDate(value);
+  if (!date) return value;
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
-function parseCsv(text: string): { rows: ParsedRow[]; errors: string[] } {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 2)
-    return { rows: [], errors: ["File must have a header row and at least one data row"] };
-
-  const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, "_"));
-
-  // Validate at minimum first_name and last_name headers
-  if (!headers.includes("first_name") || !headers.includes("last_name")) {
-    return {
-      rows: [],
-      errors: [
-        `CSV must include "first_name" and "last_name" columns. Found: ${headers.join(", ")}`,
-      ],
-    };
-  }
-
-  const idxFirst = headers.indexOf("first_name");
-  const idxLast = headers.indexOf("last_name");
-  const idxEmail = headers.indexOf("email");
-  const idxPhone = headers.indexOf("phone");
-  const idxFocus = headers.indexOf("focus_areas");
-  const idxCert = headers.indexOf("certification");
-  const idxRoles = headers.indexOf("roles");
-  const idxNotes = headers.indexOf("notes");
-
-  const rows: ParsedRow[] = [];
-  const errors: string[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const fields = parseCsvLine(lines[i]);
-    const firstName = fields[idxFirst]?.trim() ?? "";
-    const lastName = fields[idxLast]?.trim() ?? "";
-
-    if (!firstName && !lastName) continue; // skip blank rows
-
-    if (!firstName) {
-      errors.push(`Row ${i}: missing first_name`);
-      continue;
-    }
-    if (!lastName) {
-      errors.push(`Row ${i}: missing last_name`);
-      continue;
-    }
-
-    rows.push({
-      firstName,
-      lastName,
-      email: idxEmail >= 0 ? (fields[idxEmail]?.trim() ?? "") : "",
-      phone: idxPhone >= 0 ? (fields[idxPhone]?.trim() ?? "") : "",
-      focusAreaNames: idxFocus >= 0 ? (fields[idxFocus]?.trim() ?? "") : "",
-      certificationName: idxCert >= 0 ? (fields[idxCert]?.trim() ?? "") : "",
-      roleNames: idxRoles >= 0 ? (fields[idxRoles]?.trim() ?? "") : "",
-      contactNotes: idxNotes >= 0 ? (fields[idxNotes]?.trim() ?? "") : "",
-    });
-  }
-
-  return { rows, errors };
-}
-
-function previewColumns(focusAreaLabel: string): {
-  key: "name" | keyof ParsedRow;
-  label: string;
-  maxWidth?: number;
-}[] {
-  return [
-    { key: "name", label: "Name", maxWidth: 180 },
-    { key: "email", label: "Email", maxWidth: 220 },
-    { key: "phone", label: "Phone", maxWidth: 120 },
-    { key: "focusAreaNames", label: focusAreaLabel, maxWidth: 160 },
-    { key: "certificationName", label: "Certification", maxWidth: 160 },
-    { key: "roleNames", label: "Roles", maxWidth: 160 },
-    { key: "contactNotes", label: "Notes", maxWidth: 200 },
-  ];
-}
-
-function previewCellValue(row: ParsedRow, key: "name" | keyof ParsedRow): string {
-  if (key === "name") return `${row.firstName} ${row.lastName}`;
-  const value = row[key];
-  return typeof value === "string" ? value : String(value);
-}
-
-// Rows can be flagged against a real DB employee ("existing") or against
-// another row in the same CSV upload ("batch") — a CSV with two rows for the
-// same (or a typo-similar) person has no DB constraint to catch it, since
-// neither has been inserted yet.
-type ClassificationSource = "existing" | "batch";
-
-interface EnrichedClassification extends RowDuplicateClassification {
-  source: ClassificationSource | null;
-  batchRowIndex?: number;
-}
-
-function classificationTitle(classification: EnrichedClassification): string | undefined {
-  if (!classification.match) return undefined;
-  const { employee, reason } = classification.match;
-  const name = `${employee.firstName} ${employee.lastName}`;
-  const who =
-    classification.source === "batch"
-      ? `${name} (row ${(classification.batchRowIndex ?? 0) + 1} in this file)`
-      : `existing employee ${name}`;
-  if (classification.status === "blocked") {
-    const reasonLabel = reason === "name" ? "name" : reason === "email" ? "email" : "phone";
-    return `Duplicate of ${who} (matched by ${reasonLabel}), will not be imported`;
-  }
-  return `Similar to ${who}: different contact info, double-check before importing`;
-}
-
-function classificationRowBackground(
-  status: RowDuplicateClassification["status"],
-): string | undefined {
-  if (status === "blocked") return "var(--dg-color-danger-bg)";
-  if (status === "warning") return "var(--dg-color-warning-bg)";
-  return undefined;
-}
-
-function statusTitle(
-  classification: EnrichedClassification,
-  referenceErrors: string[],
-): string | undefined {
-  const duplicateTitle = classificationTitle(classification);
-  return [...referenceErrors, duplicateTitle].filter(Boolean).join(" ") || undefined;
+function RowStatus({ check }: { check: StaffImportRowCheck }) {
+  const { tone, title, detail } =
+    check.status === "ready"
+      ? { tone: "success" as const, title: "Ready", detail: check.note }
+      : check.status === "similar"
+        ? { tone: "warning" as const, title: check.issue.title, detail: check.issue.detail }
+        : {
+            tone: "danger" as const,
+            title: check.issues[0]?.title ?? "Won't be added",
+            detail: staffImportReason(check.issues),
+          };
+  return (
+    <div className="flex items-start gap-2">
+      <StatusIcon
+        tone={tone}
+        size={16}
+        className={`dg-import-status-icon mt-px shrink-0 is-${tone}`}
+      />
+      <div className="min-w-0">
+        <div className="font-medium">{title}</div>
+        {detail ? (
+          <div className="text-[12px] text-[var(--dg-color-text-muted)]">{detail}</div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function BulkImportModal({
@@ -219,45 +106,39 @@ export function BulkImportModal({
   certifications,
   roles,
   focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
+  certificationLabel = DEFAULT_ORGANIZATION_LABELS.certification,
+  roleLabel = DEFAULT_ORGANIZATION_LABELS.role,
+  canGrantElevatedRoles = false,
   onClose,
   onImported,
-}: {
-  orgId: string;
-  focusAreaLabel?: string;
-  focusAreas: FocusArea[];
-  certifications: NamedItem[];
-  roles: NamedItem[];
-  onClose: () => void;
-  onImported: () => void;
-}) {
-  const [step, setStep] = useState<"upload" | "preview" | "result">("upload");
-  const [rows, setRows] = useState<ParsedRow[]>([]);
-  const [parseErrors, setParseErrors] = useState<string[]>([]);
+}: BulkImportModalProps) {
+  const labels: StaffImportLabels = useMemo(
+    () => ({ focusArea: focusAreaLabel, certification: certificationLabel, role: roleLabel }),
+    [focusAreaLabel, certificationLabel, roleLabel],
+  );
+  const references = useMemo(
+    () => ({ focusAreas, certifications, roles }),
+    [focusAreas, certifications, roles],
+  );
+  const roleOptions = inviteRoleOptions(canGrantElevatedRoles);
+
+  const [step, setStep] = useState<Step>("choose");
+  const [fileName, setFileName] = useState("");
+  const [rows, setRows] = useState<StaffImportRow[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [filter, setFilter] = useState<RowFilter>("all");
+  const [invite, setInvite] = useState(true);
+  const [role, setRole] = useState<AssignableOrganizationRole>("user");
+  const [adminPermissions, setAdminPermissions] = useState<AdminPermissions | null>(null);
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<ImportResult | null>(null);
-  const [skippedDuplicates, setSkippedDuplicates] = useState(0);
-  const [isDragActive, setIsDragActive] = useState(false);
+  const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const isMobile = useMediaQuery(MOBILE);
-  const hasUnsavedChanges = step === "preview" && rows.length > 0;
-  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
-    hasUnsavedChanges,
-    onDiscard: onClose,
-  });
+  const newStaffInvites = useInviteNewStaff(orgId);
 
-  // Fetch independently rather than relying on a parent-provided employees
-  // prop — callers like PeoplePageContent filter their own `employees` down
-  // to "on schedule" staff (focusAreaIds.length > 0) for the directory view,
-  // which would silently hide active employees with no focus area from
-  // duplicate-checking. This hits the same React Query cache the rest of
-  // the page already populated, so it's not an extra network round trip in
-  // practice.
+  // Everyone in any status holds their name, email and phone, so all are checked.
   const { employees, inactiveEmployees, removedEmployees } = useEmployees(orgId);
-
-  // Employees in any status still occupy the DB's uniqueness slots (name,
-  // email, phone are unique per org regardless of active/inactive/removed),
-  // so all three lists must be checked, not just active employees.
-  const existingLite: ExistingEmployeeLite[] = useMemo(
+  const existing = useMemo(
     () =>
       [...employees, ...inactiveEmployees, ...removedEmployees].map((e) => ({
         id: e.id,
@@ -269,632 +150,510 @@ export function BulkImportModal({
     [employees, inactiveEmployees, removedEmployees],
   );
 
-  // Each row as an ExistingEmployeeLite so rows can also be checked against
-  // each other — a CSV can contain its own internal duplicates before any of
-  // it has been inserted, so the DB's constraints can't catch that case.
-  const rowsAsLite: ExistingEmployeeLite[] = useMemo(
+  const checks = useMemo(
     () =>
-      rows.map((r, i) => ({
-        id: `row-${i}`,
-        firstName: r.firstName,
-        lastName: r.lastName,
-        email: r.email,
-        phone: r.phone,
-      })),
-    [rows],
-  );
-
-  const classifications: EnrichedClassification[] = useMemo(
-    () =>
-      rows.map((row, i) => {
-        const existingMatch = classifyRowAgainstExisting(row, existingLite);
-        // "blocked" is already the strictest possible status — no need to
-        // also check sibling rows, nothing could override it.
-        if (existingMatch.status === "blocked") {
-          return { ...existingMatch, source: "existing" };
-        }
-
-        const siblings = rowsAsLite.filter((_, j) => j !== i);
-        const batchMatch = classifyRowAgainstExisting(row, siblings);
-        if (batchMatch.status === "blocked" && batchMatch.match) {
-          const batchRowIndex = Number(batchMatch.match.employee.id.replace("row-", ""));
-          return { ...batchMatch, source: "batch", batchRowIndex };
-        }
-
-        // Neither source blocked this row — take a "warning" from either,
-        // preferring the existing-employee one if both apply.
-        if (existingMatch.status === "warning") {
-          return { ...existingMatch, source: "existing" };
-        }
-        if (batchMatch.status === "warning" && batchMatch.match) {
-          const batchRowIndex = Number(batchMatch.match.employee.id.replace("row-", ""));
-          return { ...batchMatch, source: "batch", batchRowIndex };
-        }
-
-        return { status: "ok", match: null, source: null };
+      checkStaffImportRows(rows, {
+        ...references,
+        labels,
+        existing,
+        today: formatDateKey(new Date()),
       }),
-    [rows, existingLite, rowsAsLite],
+    [rows, references, labels, existing],
+  );
+  const addable = checks.filter(
+    (check): check is Exclude<StaffImportRowCheck, { status: "blocked" }> =>
+      check.status !== "blocked",
+  );
+  const blockedCount = checks.length - addable.length;
+  const invitable = addable.filter((check) => check.resolved.email).length;
+  const inviting = invite && invitable > 0;
+  const visible = checks.filter(
+    (check) =>
+      filter === "all" ||
+      (filter === "blocked" ? check.status === "blocked" : check.status !== "blocked"),
   );
 
-  const referenceErrorsByRow = useMemo(
-    () =>
-      rows.map((row) =>
-        getImportReferenceErrors(row, {
-          focusAreaNames: focusAreas.map((area) => area.name),
-          certificationNames: certifications.map((certification) => certification.name),
-          roleNames: roles.map((role) => role.name),
-        }),
-      ),
-    [rows, focusAreas, certifications, roles],
-  );
-
-  const blockedCount = useMemo(
-    () =>
-      classifications.filter(
-        (classification, index) =>
-          classification.status === "blocked" || referenceErrorsByRow[index].length > 0,
-      ).length,
-    [classifications, referenceErrorsByRow],
-  );
-  const duplicateBlockedCount = useMemo(
-    () => classifications.filter((classification) => classification.status === "blocked").length,
-    [classifications],
-  );
-  const referenceBlockedRows = useMemo(
-    () => referenceErrorsByRow.filter((errors) => errors.length > 0),
-    [referenceErrorsByRow],
-  );
-  const warningCount = useMemo(
-    () => classifications.filter((c) => c.status === "warning").length,
-    [classifications],
-  );
-  const importableCount = rows.length - blockedCount;
-
-  // Positions (into `rows`) of everything that isn't blocked — this is what
-  // actually gets sent to the API. Kept around so server-side error row
-  // numbers can be remapped back to what the admin saw in the preview table.
-  const sendableIndices = useMemo(
-    () =>
-      rows
-        .map((_, i) => i)
-        .filter(
-          (i) => classifications[i]?.status !== "blocked" && referenceErrorsByRow[i].length === 0,
-        ),
-    [rows, classifications, referenceErrorsByRow],
-  );
-
+  const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
+    hasUnsavedChanges: step === "check" && rows.length > 0,
+    onDiscard: onClose,
+  });
   const handleRequestClose = useCallback(() => {
-    if (importing) return;
-    if (requestClose()) {
-      onClose();
-    }
-  }, [importing, onClose, requestClose]);
+    if (importing) return false;
+    return requestClose();
+  }, [importing, requestClose]);
 
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") handleRequestClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [handleRequestClose]);
-
-  const handleFile = useCallback((file: File) => {
-    if (!file.name.endsWith(".csv")) {
-      toast.error("Choose a CSV file");
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("File too large (max 2MB)");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const { rows: parsed, errors } = parseCsv(text);
-      setRows(parsed);
-      setParseErrors(errors);
-      if (parsed.length > 0) setStep("preview");
-      else if (errors.length > 0) toast.error(errors[0]);
-      else toast.error("No data rows found in CSV");
-    };
-    reader.readAsText(file);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragActive(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
+  const readFile = useCallback(
+    (file: File) => {
+      setFileError(null);
+      if (!isCsvFileName(file.name)) {
+        setFileError(`We couldn't read ${file.name}. Save it as a CSV file and choose it again.`);
+        return;
+      }
+      if (file.size > STAFF_IMPORT_MAX_BYTES) {
+        setFileError(`${file.name} is larger than 2 MB. Split it into smaller files.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const parsed = parseStaffCsv(String(reader.result ?? ""), labels);
+        if (!parsed.ok) {
+          setFileError(parsed.error);
+          return;
+        }
+        setFileName(file.name);
+        setRows(parsed.rows);
+        setFilter("all");
+        setStep("check");
+      };
+      reader.onerror = () => setFileError(`We couldn't read ${file.name}. Choose it again.`);
+      reader.readAsText(file);
     },
-    [handleFile],
+    [labels],
   );
+
+  const backToChoose = () => {
+    setStep("choose");
+    setRows([]);
+    setFileName("");
+    if (fileRef.current) fileRef.current.value = "";
+  };
 
   async function handleImport() {
-    if (importableCount === 0) return;
+    if (addable.length === 0) return;
+    setFileError(null);
     setImporting(true);
-    setSkippedDuplicates(blockedCount);
     try {
-      const payloadRows = sendableIndices.map((i) => rows[i]);
       const res = await fetch("/api/import/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId, rows: payloadRows }),
+        body: JSON.stringify({ orgId, rows: addable.map((check) => check.row) }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        toast.error(formatClientErrorMessage(data.error, "We couldn't import those employees."));
-        return;
+        throw new Error(formatClientErrorMessage(data?.error, "We couldn't import those people."));
       }
-      // `data.errors[].row` is positioned within `payloadRows` — remap back
-      // to the row number the admin actually saw in the preview table.
-      const remappedErrors = (data.errors ?? []).map((e: { row: number; error: string }) => ({
-        ...e,
-        row: sendableIndices[e.row - 1] + 1,
-      }));
-      setResult({ ...(data as ImportResult), errors: remappedErrors });
-      setStep("result");
-      if (data.inserted > 0) {
-        toast.success(
-          data.inserted === 1 ? "1 employee imported" : `${data.inserted} employees imported`,
+      const added = (data.added ?? []) as ImportOutcome["added"];
+      const refusedHere = checks
+        .filter(
+          (check): check is Extract<StaffImportRowCheck, { status: "blocked" }> =>
+            check.status === "blocked",
+        )
+        .map((check) => ({
+          rowNumber: check.row.rowNumber,
+          name: `${check.row.firstName} ${check.row.lastName}`.trim(),
+          reason: staffImportReason(check.issues),
+        }));
+      const refused = [...refusedHere, ...((data.refused ?? []) as ImportOutcome["refused"])].sort(
+        (a, b) => a.rowNumber - b.rowNumber,
+      );
+      if (added.length > 0) onImported();
+
+      let invites: InviteNewStaffResult | null = null;
+      if (invite && added.some((person) => person.email)) {
+        invites = await newStaffInvites.inviteAddedPeople(
+          added,
+          added
+            .filter((person) => person.email)
+            .map((person) => ({
+              email: person.email,
+              role,
+              ...(canGrantElevatedRoles && role === "admin" && adminPermissions
+                ? { adminPermissions: { ...adminPermissions } }
+                : {}),
+            })),
         );
-        onImported();
       }
-    } catch {
-      toast.error("We couldn't import those people. Try again.");
+      setOutcome({ added, refused, invites });
+      setStep("done");
+    } catch (error) {
+      setFileError(
+        error instanceof Error ? error.message : "We couldn't import those people. Try again.",
+      );
     } finally {
       setImporting(false);
     }
   }
 
-  return createPortal(
-    <div
-      className="dg-modal-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) handleRequestClose();
-      }}
-    >
-      <div
-        className="dg-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Import staff"
-        style={{
-          padding: 0,
-          // Sized so each step's table fits without an inner horizontal
-          // scrollbar: the upload step's 8-column CSV format sample and the
-          // preview step's 9-column data table (both wider than the base
-          // .dg-modal) each get enough room for their widest realistic
-          // content.
-          maxWidth: step === "preview" ? 1360 : 860,
-          width: isMobile
-            ? "calc(100vw - 32px)"
-            : `min(${step === "preview" ? 1360 : 860}px, calc(100vw - 48px))`,
-          maxHeight: isMobile ? "calc(100dvh - 24px)" : "calc(100vh - 40px)",
-          overflow: "hidden",
+  const certificationColumn = capitalizeFirst(singularLabelNoun(certificationLabel));
+
+  const chooseStep = (
+    <div className="flex flex-col gap-5">
+      {fileError ? (
+        <Banner tone="danger" role="alert">
+          {fileError}
+        </Banner>
+      ) : null}
+      <button
+        type="button"
+        className={`dg-import-drop${dragActive ? " is-active" : ""}`}
+        onClick={() => fileRef.current?.click()}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragActive(true);
+        }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragActive(false);
+          const file = event.dataTransfer.files[0];
+          if (file) readFile(file);
         }}
       >
-        {/* Header */}
-        <div className="dg-modal-header" style={{ padding: "24px 24px 0", flexShrink: 0 }}>
-          <div className="dg-modal-heading">
-            <span className="dg-modal-title">
-              {step === "upload" && "Import staff"}
-              {step === "preview" && `Preview (${rows.length} rows)`}
-              {step === "result" && "Import results"}
-            </span>
+        <FileUp
+          size={32}
+          strokeWidth={1.6}
+          aria-hidden="true"
+          className="text-[var(--dg-color-text-faint)]"
+        />
+        <span className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
+          Drop a CSV file here
+        </span>
+        <span className="text-[13px] text-[var(--dg-color-text-muted)]">
+          or choose one from your computer
+        </span>
+        <span className="dg-btn dg-btn-secondary mt-1">Choose file</span>
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv,text/csv"
+        hidden
+        aria-label="Choose a CSV file"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) readFile(file);
+        }}
+      />
+
+      <div className="flex flex-col gap-2.5">
+        <div className="text-[13px] font-semibold">What the file needs</div>
+        <ul className="m-0 flex list-disc flex-col gap-1.5 pl-[18px] text-[13px] leading-[1.5] text-[var(--dg-color-text-secondary)]">
+          <li>
+            A first name, last name and at least one {singularLabelNoun(focusAreaLabel)} for each
+            person, up to {STAFF_IMPORT_MAX_ROWS} people.
+          </li>
+          <li>
+            Names that match your settings. Separate several {focusAreaLabel.toLowerCase()} or{" "}
+            {roleLabel.toLowerCase()} with a semicolon (;).
+          </li>
+          <li>
+            Optional: email, phone, {singularLabelNoun(certificationLabel)},{" "}
+            {roleLabel.toLowerCase()}, employment, first day and notes.
+          </li>
+        </ul>
+        <div className="mt-1.5 flex items-center justify-between gap-4 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] px-3.5 py-3">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="text-[13px] font-medium">Template</div>
+            <div className="text-[12px] text-[var(--dg-color-text-muted)]">
+              Every column, with two example rows using your own {focusAreaLabel.toLowerCase()},{" "}
+              {certificationLabel.toLowerCase()} and {roleLabel.toLowerCase()}.
+            </div>
           </div>
-          <CloseButton size="lg" onClick={handleRequestClose} aria-label="Close import dialog" />
+          <Button
+            type="button"
+            className="dg-btn dg-btn-secondary shrink-0"
+            onClick={() =>
+              downloadCsvFile(
+                buildStaffImportTemplate(labels, references),
+                "staff-import-template.csv",
+              )
+            }
+          >
+            Download template
+          </Button>
         </div>
-
-        {/* Body */}
-        <div style={{ padding: "0 24px 24px", overflow: "auto", flex: 1 }}>
-          {step === "upload" && (
-            <div>
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragActive(true);
-                }}
-                onDragLeave={() => setIsDragActive(false)}
-                onDrop={handleDrop}
-                onClick={() => fileRef.current?.click()}
-                style={{
-                  border: `2px dashed ${isDragActive ? "var(--dg-color-border-focus)" : "var(--dg-color-border)"}`,
-                  borderRadius: "var(--dg-radius-md)",
-                  padding: "48px 24px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 12,
-                  background: isDragActive ? "var(--dg-color-bg-secondary)" : "transparent",
-                  transition:
-                    "border-color var(--dg-duration-fast) ease, background var(--dg-duration-fast) ease",
-                }}
-              >
-                <ImportIcon
-                  size={32}
-                  style={{
-                    color: isDragActive
-                      ? "var(--dg-color-border-focus)"
-                      : "var(--dg-color-text-muted)",
-                  }}
-                />
-                <p style={{ margin: 0, fontWeight: 600, fontSize: "var(--dg-fs-body)" }}>
-                  Drop CSV file here or click to browse
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "var(--dg-fs-caption)",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  Max 500 rows, 2MB
-                </p>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".csv"
-                  hidden
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFile(file);
-                  }}
-                />
-              </div>
-
-              <div style={{ marginTop: 20 }}>
-                <div className="dg-modal-section-label" style={{ marginBottom: 8 }}>
-                  EXPECTED CSV FORMAT
-                </div>
-                <div
-                  style={{
-                    border: "1px solid var(--dg-color-border)",
-                    borderRadius: "var(--dg-radius-md)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ overflowX: "auto" }}>
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        fontSize: "var(--dg-fs-footnote)",
-                      }}
-                    >
-                      <thead>
-                        <tr style={{ background: "var(--dg-color-bg)" }}>
-                          {EXPECTED_HEADERS.map((header) => (
-                            <th
-                              key={header}
-                              style={{
-                                ...thStyle,
-                                padding: "6px 10px",
-                                borderBottom: "1px solid var(--dg-color-border)",
-                              }}
-                            >
-                              {header}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {SAMPLE_CSV_ROWS.map((row, i) => (
-                          <tr key={`sample-${row[2]}`}>
-                            {row.map((cell, j) => (
-                              <td
-                                key={`sample-${row[2]}-${EXPECTED_HEADERS[j]}`}
-                                style={{
-                                  padding: "6px 10px",
-                                  whiteSpace: "nowrap",
-                                  color: "var(--dg-color-text-secondary)",
-                                  borderBottom:
-                                    i === SAMPLE_CSV_ROWS.length - 1
-                                      ? "none"
-                                      : "1px solid var(--dg-color-border-light)",
-                                }}
-                              >
-                                {cell || "-"}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <p
-                  style={{
-                    margin: "8px 0 0",
-                    fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  {`Separate several ${pluralLabelNoun(focusAreaLabel)} or roles with semicolons (;). Names must match your organization's settings.`}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {step === "preview" && (
-            <div>
-              {(blockedCount > 0 || warningCount > 0) && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-                  {blockedCount > 0 && (
-                    <Banner tone="danger" icon={XCircle}>
-                      <div>
-                        <div>
-                          {importableCount} of {rows.length} row{rows.length !== 1 ? "s" : ""} will
-                          be imported. {blockedCount} row{blockedCount !== 1 ? "s" : ""} blocked.
-                          {duplicateBlockedCount > 0 &&
-                            ` ${duplicateBlockedCount} duplicate${duplicateBlockedCount !== 1 ? "s" : ""} of existing employees.`}
-                        </div>
-                        {referenceBlockedRows.length > 0 && (
-                          <ul style={{ margin: "6px 0 0", paddingLeft: 20 }}>
-                            {referenceErrorsByRow.flatMap((errors, index) =>
-                              errors.map((error) => (
-                                <li key={`${index}-${error}`}>
-                                  Row {index + 1}: {error}
-                                </li>
-                              )),
-                            )}
-                          </ul>
-                        )}
-                      </div>
-                    </Banner>
-                  )}
-                  {warningCount > 0 && (
-                    <Banner tone="warning" icon={Users}>
-                      <div>
-                        {warningCount} row{warningCount !== 1 ? "s" : ""}{" "}
-                        {warningCount !== 1 ? "look" : "looks"} like people already on staff. Check
-                        them before importing.
-                      </div>
-                    </Banner>
-                  )}
-                </div>
-              )}
-
-              {parseErrors.length > 0 && (
-                <Banner tone="warning" icon={FileWarning} className="mb-4">
-                  <div>
-                    <strong>
-                      {parseErrors.length} {parseErrors.length === 1 ? "warning" : "warnings"}:
-                    </strong>
-                    <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
-                      {parseErrors.slice(0, 5).map((e, i) => (
-                        <li key={`parse-${i}-${e.slice(0, 30)}`}>{e}</li>
-                      ))}
-                      {parseErrors.length > 5 && <li>...and {parseErrors.length - 5} more</li>}
-                    </ul>
-                  </div>
-                </Banner>
-              )}
-
-              <div
-                style={{
-                  border: "1px solid var(--dg-color-border)",
-                  borderRadius: "var(--dg-radius-md)",
-                  overflow: "hidden",
-                }}
-              >
-                <div style={{ overflowX: "auto" }}>
-                  <table
-                    style={{
-                      width: "100%",
-                      borderCollapse: "collapse",
-                      fontSize: "var(--dg-fs-caption)",
-                    }}
-                  >
-                    <thead>
-                      <tr style={{ background: "var(--dg-color-bg)" }}>
-                        <th
-                          style={{
-                            ...thStyle,
-                            padding: "8px 12px",
-                            borderBottom: "1px solid var(--dg-color-border)",
-                          }}
-                        >
-                          #
-                        </th>
-                        <th
-                          style={{
-                            ...thStyle,
-                            padding: "8px 12px",
-                            borderBottom: "1px solid var(--dg-color-border)",
-                          }}
-                        >
-                          Status
-                        </th>
-                        {previewColumns(focusAreaLabel).map((col) => (
-                          <th
-                            key={col.key}
-                            style={{
-                              ...thStyle,
-                              padding: "8px 12px",
-                              borderBottom: "1px solid var(--dg-color-border)",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {col.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.slice(0, 20).map((row, i) => {
-                        const classification = classifications[i];
-                        const referenceErrors = referenceErrorsByRow[i];
-                        const isBlocked =
-                          classification.status === "blocked" || referenceErrors.length > 0;
-                        const isLastRow = i === Math.min(rows.length, 20) - 1;
-                        const borderBottom = isLastRow
-                          ? "none"
-                          : "1px solid var(--dg-color-border-light)";
-                        return (
-                          <tr
-                            key={`preview-${row.firstName}-${row.lastName}-${i}`}
-                            style={{
-                              background: isBlocked
-                                ? classificationRowBackground("blocked")
-                                : classificationRowBackground(classification.status),
-                            }}
-                          >
-                            <td
-                              style={{
-                                padding: "8px 12px",
-                                borderBottom,
-                                color: "var(--dg-color-text-muted)",
-                              }}
-                            >
-                              {i + 1}
-                            </td>
-                            <MaybeHint content={statusTitle(classification, referenceErrors)}>
-                              <td style={{ padding: "8px 12px", borderBottom }}>
-                                {isBlocked && (
-                                  <XCircle
-                                    size={16}
-                                    style={{ color: "var(--dg-color-danger-text)" }}
-                                  />
-                                )}
-                                {classification.status === "warning" && (
-                                  <AlertTriangle
-                                    size={16}
-                                    style={{ color: "var(--dg-color-warning-text)" }}
-                                  />
-                                )}
-                              </td>
-                            </MaybeHint>
-                            {previewColumns(focusAreaLabel).map((col) => (
-                              <MaybeHint
-                                key={col.key}
-                                content={col.maxWidth ? previewCellValue(row, col.key) : null}
-                              >
-                                <td
-                                  style={{
-                                    padding: "8px 12px",
-                                    borderBottom,
-                                    color:
-                                      col.key === "name" ? undefined : "var(--dg-color-text-muted)",
-                                    ...(col.maxWidth
-                                      ? {
-                                          maxWidth: col.maxWidth,
-                                          overflow: "hidden",
-                                          textOverflow: "ellipsis",
-                                          whiteSpace: "nowrap",
-                                        }
-                                      : { whiteSpace: "nowrap" }),
-                                  }}
-                                >
-                                  {previewCellValue(row, col.key) || "-"}
-                                </td>
-                              </MaybeHint>
-                            ))}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              {rows.length > 20 && (
-                <p
-                  style={{
-                    margin: "8px 0 0",
-                    fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--dg-color-text-muted)",
-                  }}
-                >
-                  Showing first 20 of {rows.length} rows
-                </p>
-              )}
-            </div>
-          )}
-
-          {step === "result" && result && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <Banner tone={result.inserted > 0 ? "success" : "danger"}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: "var(--dg-fs-body)" }}>
-                    {result.inserted} of {result.total} employees imported
-                  </div>
-                  {(result.errors.length > 0 || skippedDuplicates > 0) && (
-                    <div style={{ fontWeight: 400, marginTop: 2 }}>
-                      {result.errors.length > 0 &&
-                        `${result.errors.length} ${result.errors.length === 1 ? "error" : "errors"}`}
-                      {result.errors.length > 0 && skippedDuplicates > 0 && " · "}
-                      {skippedDuplicates > 0 &&
-                        `${skippedDuplicates} duplicate ${skippedDuplicates === 1 ? "row" : "rows"} skipped before import`}
-                    </div>
-                  )}
-                </div>
-              </Banner>
-
-              {result.errors.length > 0 && (
-                <Banner tone="danger">
-                  <strong>Errors:</strong>
-                  <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
-                    {result.errors.slice(0, 10).map((e) => (
-                      <li key={`err-${e.row}`}>
-                        Row {e.row}: {e.error}
-                      </li>
-                    ))}
-                    {result.errors.length > 10 && <li>...and {result.errors.length - 10} more</li>}
-                  </ul>
-                </Banner>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="dg-modal-actions dg-footer-bar [--dg-footer-bar-px:24px]">
-          {step === "preview" && (
-            <>
-              <Button
-                className="dg-btn dg-btn-secondary"
-                onClick={() => {
-                  setStep("upload");
-                  setRows([]);
-                  setParseErrors([]);
-                }}
-              >
-                Back
-              </Button>
-              <Button
-                className="dg-btn dg-btn-primary"
-                onClick={handleImport}
-                disabled={importing || importableCount === 0}
-              >
-                <ButtonLoading
-                  loading={importing}
-                  spinnerColor="var(--dg-color-text-inverse)"
-                  spinnerSize={16}
-                >
-                  <ImportIcon size={14} style={{ marginRight: 4 }} />
-                  Import {importableCount} Employee{importableCount !== 1 ? "s" : ""}
-                </ButtonLoading>
-              </Button>
-            </>
-          )}
-          {step === "result" && (
-            <Button className="dg-btn dg-btn-primary" onClick={onClose}>
-              Done
-            </Button>
-          )}
-          {step === "upload" && (
-            <Button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
-              {EDITOR_ACTION_LABELS.close}
-            </Button>
-          )}
-        </div>
-        <ScrollOverflowCue />
       </div>
+    </div>
+  );
+
+  const checkStep = (
+    <div className="flex min-h-0 flex-col gap-3.5">
+      {fileError ? (
+        <Banner tone="danger" role="alert">
+          {fileError}
+        </Banner>
+      ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <SpanTabs<RowFilter>
+          aria-label="Show rows"
+          value={filter}
+          onChange={setFilter}
+          items={[
+            {
+              value: "all",
+              label: "All",
+              count: checks.length,
+              countLabel: `${checks.length} rows`,
+            },
+            {
+              value: "ready",
+              label: "Ready",
+              count: addable.length,
+              countLabel: `${addable.length} rows`,
+            },
+            {
+              value: "blocked",
+              label: "Won't be added",
+              count: blockedCount,
+              countLabel: `${blockedCount} rows`,
+            },
+          ]}
+        />
+        <div className="text-[12px] text-[var(--dg-color-text-muted)]">
+          Rows that won&apos;t be added are left out. Fix them in your file and choose it again.
+        </div>
+      </div>
+
+      <div className="dg-import-table-wrap">
+        {visible.length === 0 ? (
+          <div className="px-4 py-10 text-center text-[13px] text-[var(--dg-color-text-muted)]">
+            {filter === "blocked" ? "Every row can be added." : "No row can be added yet."}
+          </div>
+        ) : (
+          <table className="dg-import-table">
+            <thead>
+              <tr>
+                <th className="w-[52px]">Row</th>
+                <th className="w-[210px]">Person</th>
+                <th className="w-[160px]">{focusAreaLabel}</th>
+                <th className="w-[104px]">{certificationColumn}</th>
+                <th className="w-[110px]">{roleLabel}</th>
+                <th className="w-[96px]">Employment</th>
+                <th className="w-[104px]">First day</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((check) => {
+                const { row } = check;
+                return (
+                  <tr key={row.rowNumber}>
+                    <td className="dg-tabular-nums text-[var(--dg-color-text-faint)]">
+                      {row.rowNumber}
+                    </td>
+                    <td>
+                      <div className="truncate font-medium">
+                        {`${row.firstName} ${row.lastName}`.trim() || "No name"}
+                      </div>
+                      <div
+                        className={`truncate text-[12px] ${row.email ? "text-[var(--dg-color-text-muted)]" : "text-[var(--dg-color-text-faint)]"}`}
+                      >
+                        {row.email || "No email"}
+                      </div>
+                    </td>
+                    <td>{row.focusAreaNames || "-"}</td>
+                    <td>{row.certificationName || "-"}</td>
+                    <td>{row.roleNames || "-"}</td>
+                    <td>{row.employment || "Full-time"}</td>
+                    <td className="dg-tabular-nums whitespace-nowrap">
+                      {row.firstDay ? displayDay(row.firstDay) : "-"}
+                    </td>
+                    <td>
+                      <RowStatus check={check} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {invitable > 0 ? (
+        <InviteOptionBox
+          label={`Invite everyone with an email (${invitable} of ${addable.length})`}
+          checked={invite}
+          onCheckedChange={setInvite}
+          role={
+            roleOptions.length > 1
+              ? { value: role, options: roleOptions, onChange: setRole }
+              : undefined
+          }
+          permissions={
+            canGrantElevatedRoles && role === "admin"
+              ? { value: adminPermissions, onChange: setAdminPermissions }
+              : undefined
+          }
+        />
+      ) : null}
+    </div>
+  );
+
+  const doneStep = outcome ? (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-start gap-3 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] px-4 py-3.5">
+        <StatusIcon
+          tone={outcome.added.length > 0 ? "success" : "danger"}
+          size={20}
+          className={`dg-import-status-icon mt-px shrink-0 is-${outcome.added.length > 0 ? "success" : "danger"}`}
+        />
+        <div className="flex flex-col gap-0.5">
+          <div className="text-[15px] font-semibold">
+            {outcome.added.length > 0 ? (
+              <>
+                <span className="dg-tabular-nums">{outcome.added.length}</span>{" "}
+                {COUNT_NOUN(outcome.added.length)} added
+              </>
+            ) : (
+              "No one was added"
+            )}
+          </div>
+          <InviteSummary result={outcome.invites} added={outcome.added.length} />
+        </div>
+      </div>
+
+      {outcome.refused.length > 0 ? (
+        <div className="flex flex-col gap-2.5">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <div className="text-[13px] font-semibold">
+              <span className="dg-tabular-nums">{outcome.refused.length}</span>{" "}
+              {outcome.refused.length === 1 ? "row wasn't" : "rows weren't"} added
+            </div>
+            <div className="text-[12px] text-[var(--dg-color-text-muted)]">
+              Fix them in your file and import it again. People already added are skipped.
+            </div>
+          </div>
+          <ul className="dg-import-refused">
+            {outcome.refused.map((row) => (
+              <li key={row.rowNumber}>
+                <span className="dg-tabular-nums w-[52px] shrink-0 text-[var(--dg-color-text-faint)]">
+                  Row {row.rowNumber}
+                </span>
+                <span className="flex min-w-0 flex-col gap-px">
+                  <span className="font-medium">{row.name || "No name"}</span>
+                  <span className="text-[var(--dg-color-text-muted)]">{row.reason}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  ) : null;
+
+  const footer =
+    step === "check" ? (
+      <div className="flex items-center justify-between gap-4">
+        <div className="text-[12px] text-[var(--dg-color-text-muted)]">
+          {inviting
+            ? invitable === 1
+              ? "We email the person you invite a link to join."
+              : `We email each of the ${invitable} people you invite a link to join.`
+            : "Anyone you don't invite now can be invited from their page."}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            className="dg-btn dg-btn-secondary"
+            disabled={importing}
+            onClick={() => {
+              if (handleRequestClose()) onClose();
+            }}
+          >
+            {EDITOR_ACTION_LABELS.close}
+          </Button>
+          <Button
+            type="button"
+            className="dg-btn dg-btn-primary"
+            disabled={importing || addable.length === 0}
+            onClick={handleImport}
+          >
+            <ButtonLoading
+              loading={importing}
+              spinnerColor="var(--dg-color-text-inverse)"
+              spinnerSize={16}
+            >
+              {inviting
+                ? `Add ${addable.length} & invite ${invitable}`
+                : `Add ${addable.length} ${COUNT_NOUN(addable.length)}`}
+            </ButtonLoading>
+          </Button>
+        </div>
+      </div>
+    ) : (
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          className={`dg-btn ${step === "done" ? "dg-btn-primary" : "dg-btn-secondary"}`}
+          onClick={onClose}
+        >
+          {step === "done" ? "Done" : EDITOR_ACTION_LABELS.close}
+        </Button>
+      </div>
+    );
+
+  return (
+    <>
+      <Modal
+        title={
+          step === "choose"
+            ? "Import staff"
+            : step === "check"
+              ? "Check before adding"
+              : "Import finished"
+        }
+        subtitle={
+          step === "choose"
+            ? `Add people from a CSV file, up to ${STAFF_IMPORT_MAX_ROWS} rows.`
+            : `${fileName} · ${rows.length} ${rows.length === 1 ? "row" : "rows"}`
+        }
+        onBack={step === "check" && !importing ? backToChoose : undefined}
+        onClose={onClose}
+        onRequestClose={handleRequestClose}
+        disableOverlayClose={importing}
+        className={step === "check" ? "dg-modal--import-check" : "dg-modal--import"}
+        footer={footer}
+      >
+        {step === "choose" ? chooseStep : step === "check" ? checkStep : doneStep}
+      </Modal>
       {unsavedChangesDialog}
-    </div>,
-    document.body,
+      {newStaffInvites.dialog}
+    </>
+  );
+}
+
+function InviteSummary({ result, added }: { result: InviteNewStaffResult | null; added: number }) {
+  if (added === 0) {
+    return (
+      <div className="text-[13px] text-[var(--dg-color-text-muted)]">
+        Every row needs a fix before it can be added.
+      </div>
+    );
+  }
+  const onPeople = "They're on People now.";
+  if (!result) {
+    return (
+      <div className="text-[13px] text-[var(--dg-color-text-muted)]">
+        {onPeople} Invite them from their page when you&apos;re ready.
+      </div>
+    );
+  }
+  if (result.status === "cancelled") {
+    return (
+      <div className="text-[13px] text-[var(--dg-color-text-muted)]">
+        {onPeople} No invites were sent. Invite them from their page.
+      </div>
+    );
+  }
+  if (result.status === "error") {
+    return (
+      <div className="text-[13px] text-[var(--dg-color-text-muted)]">
+        {onPeople} {result.message} Invite them from their page.
+      </div>
+    );
+  }
+  return (
+    <div className="text-[13px] text-[var(--dg-color-text-muted)]">
+      {result.sent > 0 ? (
+        <>
+          We emailed <span className="dg-tabular-nums">{result.sent}</span> of them a link to
+          join.{" "}
+        </>
+      ) : null}
+      {onPeople}
+      {result.failed.length > 0
+        ? ` We couldn't invite ${result.failed.join(", ")}. Invite ${result.failed.length === 1 ? "them" : "each"} from their page.`
+        : ""}
+    </div>
   );
 }

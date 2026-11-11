@@ -20,14 +20,16 @@ On **Schedule**, **Tools > Print** opens **Print schedule**: choose the view (1 
 
 ## Exporting to a spreadsheet
 
-| Export           | Where                                                                                                                                                             | Who                               |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| **The schedule** | **Schedule > Tools > Export CSV** exports what's on screen.                                                                                                       | People who can edit shifts        |
-| **Staff**        | **People > Export**, on a desktop-sized screen. Includes each person's name, contact details, status, seniority, schedule areas, certification, roles, and notes. | People who can view staff details |
-| **Reports**      | **Export CSV** or **Export PDF** on any report. See [Reports](/features/reports).                                                                                 | People who can view reports       |
+| Export           | Where                                                                                                                                                                                             | Who                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| **The schedule** | **Schedule > Tools > Export CSV** exports what's on screen.                                                                                                                                       | People who can edit shifts        |
+| **Staff**        | **People > Export**, on a desktop-sized screen. Includes each person's name, contact details, schedule areas, certification, roles, employment, upcoming first day, notes, status, and seniority. | People who can view staff details |
+| **Reports**      | **Export CSV** or **Export PDF** on any report. See [Reports](/features/reports).                                                                                                                 | People who can view reports       |
 
 In the schedule export, a shift with an absence beside it reads as the shift and the absence with the time it covers, such as `Day / Sick 11:00 AM - 3:00 PM`, or the absence first when the person arrived late. An absence saved without its own time reads `Day / Sick`.
 
 The schedule export lists each person's schedule areas beside their name, and a shift in another schedule area names it, such as `Day Shift · West Wing`.
+
+The staff export uses your organization's names for schedule areas, certifications, and roles, and its columns are the ones [Import](/staff/roster#importing-a-list) reads, so the file imports again. Status reads as people see it, such as `Away until Jan 4`, `Suspended`, or `Offboarded`. A cell that starts with `=`, `+`, `-`, or `@` is written with an apostrophe first, so a spreadsheet shows it as text instead of running it.
 
 Staff and report exports may not be available in every organization.
