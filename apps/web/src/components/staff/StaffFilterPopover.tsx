@@ -2,7 +2,7 @@
 
 import { ORG_ROLE_LABELS, ORG_ROLE_PRIVILEGE_ORDER } from "@dubgrid/domain";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
-import { SpanTabs, type SpanTabItem } from "@/components/ui/span-tabs";
+import { CapsuleChoices, type CapsuleChoice } from "@/components/ui/capsule-choices";
 import type { Department, FocusArea, NamedItem } from "@/types";
 import { FilterDivider, FilterField, FilterPanelShell } from "./FilterPanelShell";
 import { STAFF_ACCOUNT_STATES, STAFF_ACCOUNT_STATE_LABELS } from "./staff-account-state";
@@ -14,18 +14,18 @@ import type {
   PhonePresenceFilter,
 } from "./useStaffFilters";
 
-const EMPLOYMENT_ITEMS: SpanTabItem<EmploymentTypeFilter>[] = [
+const EMPLOYMENT_ITEMS: CapsuleChoice<EmploymentTypeFilter>[] = [
   { value: "all", label: "All" },
   { value: "full_time", label: "Full-time" },
   { value: "part_time", label: "Part-time" },
 ];
 
-const ACCESS_ROLE_ITEMS: SpanTabItem<OrgRoleFilter>[] = [
+const ACCESS_ROLE_ITEMS: CapsuleChoice<OrgRoleFilter>[] = [
   { value: "all", label: "All" },
   ...ORG_ROLE_PRIVILEGE_ORDER.map((role) => ({ value: role, label: ORG_ROLE_LABELS[role] })),
 ];
 
-const PHONE_ITEMS: SpanTabItem<PhonePresenceFilter>[] = [
+const PHONE_ITEMS: CapsuleChoice<PhonePresenceFilter>[] = [
   { value: "all", label: "All" },
   { value: "present", label: "Has phone" },
   { value: "missing", label: "Missing phone" },
@@ -146,7 +146,7 @@ export function StaffFilterPopover({
     >
       {showAdministrativeFilters && (
         <FilterField label="Employment">
-          <SpanTabs
+          <CapsuleChoices
             aria-label="Employment"
             items={EMPLOYMENT_ITEMS}
             value={filterEmploymentType}
@@ -214,7 +214,7 @@ export function StaffFilterPopover({
 
       {showAccessControls && (
         <FilterField label="Access role">
-          <SpanTabs
+          <CapsuleChoices
             aria-label="Access role"
             items={ACCESS_ROLE_ITEMS}
             value={filterOrgRole}
@@ -225,7 +225,7 @@ export function StaffFilterPopover({
 
       {showAdministrativeFilters && (
         <FilterField label="Phone">
-          <SpanTabs
+          <CapsuleChoices
             aria-label="Phone"
             items={PHONE_ITEMS}
             value={filterPhonePresence}
