@@ -478,6 +478,15 @@
   padding: var(--dg-tab-shell-pad);
   gap: var(--dg-tab-shell-pad);
 }
+/* A scrolling row clips at its scroll box, so the track's inset moves inside
+   it, leaving the raised segment's shadow room to show. */
+.dg-span-tabs.dg-scrollable-tabs {
+  padding: 0;
+}
+.dg-span-tabs > .dg-scroll-inner {
+  padding: var(--dg-tab-shell-pad);
+  gap: var(--dg-tab-shell-pad);
+}
 .dg-span-tab {
   display: inline-flex;
   align-items: center;
@@ -615,6 +624,9 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px 24px;
+  /* Room for the aside's controls (about 42px) over its 6px gap and the rule,
+     on every tab, so a tab that shows them never moves the tabs. */
+  min-height: 50px;
   min-width: 0;
   border-bottom: 1px solid var(--dg-color-border);
 }
@@ -630,6 +642,7 @@
   .dg-tab-row {
     flex-direction: column;
     align-items: stretch;
+    min-height: 0;
     border-bottom: none;
   }
   .dg-tab-row > .dg-underline-tabs {
@@ -4148,7 +4161,7 @@ button.dg-cc-sg-main {
     cursor: pointer;
     font-family: inherit;
     text-align: left;
-    min-height: 48px;
+    min-height: 50px;
     transition: background 120ms ease;
   }
   .dg-bottom-sheet-main-item:first-child {
