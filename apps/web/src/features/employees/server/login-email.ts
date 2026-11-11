@@ -6,7 +6,7 @@ import {
 
 export const LINKED_EMAIL_REQUIRED_MESSAGE = "An account needs an email to sign in with.";
 export const LINKED_EMAIL_OWNER_ONLY_MESSAGE =
-  "This is their sign-in email, so they change it on their own profile.";
+  "They sign in with this email, so they'll need to change it from their profile.";
 
 /** Thrown when GoTrue refuses the new address because another account holds it. */
 export class LoginEmailConflictError extends Error {
