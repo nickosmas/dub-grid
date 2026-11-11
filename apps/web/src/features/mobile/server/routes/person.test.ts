@@ -487,7 +487,7 @@ describe("mobile person route", () => {
 
         expect(response.status).toBe(400);
         expect((await response.json()).fieldErrors.email).toBe(
-          "This is their sign-in email, so they change it on their own profile.",
+          "They sign in with this email, so they'll need to change it from their profile.",
         );
         expect(updateUserById).not.toHaveBeenCalled();
         expect(followUpLinkedLoginEmailChange).not.toHaveBeenCalled();

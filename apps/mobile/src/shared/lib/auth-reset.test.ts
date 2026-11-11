@@ -8,6 +8,11 @@ const signOut = vi.fn();
 const replaceAuthSession = vi.fn();
 const routerReplace = vi.fn();
 const queryClientClear = vi.fn();
+const clearSavedStepUpPassword = vi.fn();
+
+vi.mock("./biometric-step-up", () => ({
+  clearSavedStepUpPassword: (...args: unknown[]) => clearSavedStepUpPassword(...args),
+}));
 
 vi.mock("expo-router", () => ({
   router: { replace: (...args: unknown[]) => routerReplace(...args) },
@@ -58,6 +63,7 @@ describe("auth-reset", () => {
     disablePushToken.mockResolvedValue(undefined);
     signOut.mockResolvedValue({ error: null });
     signOutMobileSessions.mockResolvedValue({ success: true });
+    clearSavedStepUpPassword.mockResolvedValue(undefined);
   });
 
   describe("disablePushForCurrentDevice", () => {
@@ -109,6 +115,13 @@ describe("auth-reset", () => {
       expect(signOut).toHaveBeenCalledWith({ scope: "local" });
       expect(replaceAuthSession).toHaveBeenCalledWith(null);
       expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+    });
+
+    it("forgets the password saved behind biometrics, whoever signed out", async () => {
+      await handleExpiredMobileSession();
+      await handleExpiredMobileSession({ skipSignOut: true });
+
+      expect(clearSavedStepUpPassword).toHaveBeenCalledTimes(2);
     });
 
     it("records the revocation in DubGrid before the device drops its token", async () => {
