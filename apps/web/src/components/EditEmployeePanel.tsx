@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useState,
   useCallback,
@@ -108,6 +109,8 @@ export interface EditEmployeePanelProps {
   pendingInvitation?: Invitation;
   /** Offered beside a joined person's locked email, when this viewer may move them. */
   onMoveToNewEmail?: () => void;
+  /** The viewer is editing their own record, so the locked email points them to their profile. */
+  isOwnRecord?: boolean;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onResend?: (invitationId: string) => Promise<boolean> | boolean | void;
   /** Offers an invite beside the email (the staff page and the People
@@ -225,6 +228,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
       onInvite,
       pendingInvitation,
       onMoveToNewEmail,
+      isOwnRecord = false,
       onRevoke,
       onResend,
       inviteOnSave,
@@ -1063,8 +1067,23 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                               marginTop: 4,
                             }}
                           >
-                            They sign in with this email, so they&apos;ll need to change it from
-                            their profile.
+                            {isOwnRecord ? (
+                              <>
+                                You sign in with this email, so change it on{" "}
+                                <Link
+                                  href="/profile?tab=account"
+                                  className="font-semibold text-[var(--dg-color-link)] hover:underline"
+                                >
+                                  your profile
+                                </Link>
+                                .
+                              </>
+                            ) : (
+                              <>
+                                They sign in with this email, so they&apos;ll need to change it from
+                                their profile.
+                              </>
+                            )}
                             {onMoveToNewEmail ? (
                               <span className="block">
                                 Lost access to this email?{" "}

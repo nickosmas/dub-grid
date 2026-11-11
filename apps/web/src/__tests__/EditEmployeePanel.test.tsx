@@ -151,6 +151,7 @@ function renderPanel(
     certifications: NamedItem[];
     persistent: boolean;
     sectioned: boolean;
+    isOwnRecord: boolean;
   }> = {},
 ) {
   const onSave = overrides.onSave ?? vi.fn();
@@ -164,6 +165,7 @@ function renderPanel(
       certifications={overrides.certifications ?? [...DESIGNATIONS]}
       roles={overrides.roles ?? [...ROLES]}
       isManagementUser={overrides.isManagementUser}
+      isOwnRecord={overrides.isOwnRecord}
       onSave={onSave}
       onSaveCompleted={overrides.onSaveCompleted}
       onCancel={onCancel}
@@ -933,6 +935,17 @@ describe("EditEmployeePanel", () => {
           "They sign in with this email, so they'll need to change it from their profile.",
         ),
       ).toBeInTheDocument();
+    });
+
+    it("points someone editing their own record to their profile", () => {
+      renderPanel({ employee: { ...employee, userId: "user-42" }, isOwnRecord: true });
+
+      expect(screen.queryByText(/They sign in with this email/)).toBeNull();
+      expect(screen.getByText(/You sign in with this email, so change it on/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "your profile" })).toHaveAttribute(
+        "href",
+        "/profile?tab=account",
+      );
     });
 
     it("does not ask for identity when a person without an account changes email", async () => {

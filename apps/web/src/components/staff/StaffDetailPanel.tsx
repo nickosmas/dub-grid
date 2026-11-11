@@ -445,6 +445,7 @@ export function StaffDetailPanel({
             inviteOnSave={inviteOnSave}
             onSaveLabelChange={setSaveLabel}
             onMoveToNewEmail={onMoveToNewEmail}
+            isOwnRecord={isSelf}
           />
         </div>
 
