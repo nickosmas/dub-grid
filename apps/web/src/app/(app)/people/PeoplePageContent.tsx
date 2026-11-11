@@ -19,11 +19,8 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { useSharedStepUp } from "@/hooks/useSharedStepUp";
 import { useFocusAreaShiftsQuestion } from "@/hooks/useFocusAreaShiftsQuestion";
 import type { BulkStatusChangeHandler, BulkStatusOutcome } from "@/features/employees/client";
-import {
-  sendNewStaffInvites,
-  type NewStaffInvite,
-} from "@/features/employees/client/new-staff-invites";
-import { createOrganizationInvitation } from "@/features/organization/client";
+import type { NewStaffInvite } from "@/features/employees/client/new-staff-invites";
+import { useInviteNewStaff } from "@/features/employees/client/use-invite-new-staff";
 
 // The People sections other than the directory, which draw their own content.
 const OTHER_SECTIONS = new Set(["requests", "recurring-schedule"]);
@@ -87,42 +84,20 @@ function PeopleContent() {
 
   // Only an impersonating Gridmaster is asked for fresh proof (F-96).
   const statusStepUp = useSharedStepUp();
-  const inviteStepUp = useSharedStepUp();
 
+  const newStaffInvites = useInviteNewStaff(orgId ?? org?.id);
   const inviteAddedPeople = useCallback(
     async (added: { id: string; email: string }[], invites: NewStaffInvite[]) => {
-      const inviteOrgId = orgId ?? org?.id;
-      if (!inviteOrgId || invites.length === 0) return;
-      const pending = new Map(invites.map((invite) => [invite.email.toLowerCase(), invite]));
-      const failed: string[] = [];
-      try {
-        const completed = await inviteStepUp.run((accessToken) =>
-          sendNewStaffInvites({
-            added,
-            pending,
-            failed,
-            send: (invite) =>
-              createOrganizationInvitation(
-                {
-                  email: invite.email,
-                  role: invite.role,
-                  orgId: inviteOrgId,
-                  employeeId: invite.employeeId,
-                  ...(invite.adminPermissions ? { adminPermissions: invite.adminPermissions } : {}),
-                },
-                accessToken,
-              ),
-          }),
-        );
-        if (!completed) {
-          toast.info("No invites were sent. Invite them from their page.");
-          return;
-        }
-      } catch (err) {
-        toast.error(formatClientErrorMessage(err, "We couldn't send those invites. Try again."));
+      const result = await newStaffInvites.inviteAddedPeople(added, invites);
+      if (result.status === "cancelled") {
+        toast.info("No invites were sent. Invite them from their page.");
         return;
       }
-      const sent = invites.length - failed.length;
+      if (result.status === "error") {
+        toast.error(result.message);
+        return;
+      }
+      const { sent, failed } = result;
       if (failed.length > 0) {
         toast.error(
           `Couldn't invite ${failed.join(", ")}. Invite ${failed.length === 1 ? "them" : "each"} from their page.`,
@@ -130,7 +105,7 @@ function PeopleContent() {
       }
       if (sent > 0) toast.success(sent === 1 ? "Invite sent" : `${sent} invites sent`);
     },
-    [inviteStepUp, org?.id, orgId],
+    [newStaffInvites],
   );
   /** Resolves whether the change went through; a cancelled prompt counts as not. */
   const runStatusChange = async (
@@ -235,7 +210,7 @@ function PeopleContent() {
     <>
       <ProgressBar loading={isLoading} />
       {statusStepUp.dialog}
-      {inviteStepUp.dialog}
+      {newStaffInvites.dialog}
       {focusAreaQuestion.dialog}
 
       {skeleton}

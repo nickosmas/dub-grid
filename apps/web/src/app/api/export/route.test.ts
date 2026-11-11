@@ -164,6 +164,64 @@ describe("GET /api/export", () => {
     expect(await exportFor(true)).toContain("QA");
   });
 
+  it("writes the import's columns in the organization's words, with readable statuses", async () => {
+    const { serviceClient } = createServiceClientMock({
+      employees: [
+        {
+          id: "e1",
+          first_name: "Rosa",
+          last_name: "Diaz",
+          email: "rosa@x.org",
+          phone: "(555) 201-0100",
+          status: "inactive",
+          away_until: "2027-01-04",
+          employment_type: "part_time",
+          first_day: "2099-01-01",
+          seniority: 2,
+          focus_area_ids: [],
+          role_ids: [],
+          certification_id: null,
+          contact_notes: "=HYPERLINK(1)",
+          user_id: null,
+        },
+        {
+          id: "e2",
+          first_name: "Ida",
+          last_name: "Wu",
+          email: "",
+          phone: "",
+          status: "removed",
+          employment_type: "full_time",
+          first_day: "2020-01-01",
+          seniority: 3,
+          focus_area_ids: [],
+          role_ids: [],
+          certification_id: null,
+          contact_notes: "",
+          user_id: null,
+        },
+      ],
+    });
+    requireOrgPermissions.mockResolvedValue({
+      orgId: REQUESTED_ORG_ID,
+      serviceClient,
+      actor: { id: "user-1" },
+      permissions: { isGridmaster: false },
+    });
+    const { GET } = await import("./route");
+    const csv = await (await GET(makeRequest(REQUESTED_ORG_ID))).text();
+    const lines = csv.replace(/^﻿/, "").trimEnd().split("\r\n");
+
+    expect(lines[0]).toBe(
+      "First Name,Last Name,Email,Phone,Wings,Certification,Roles,Employment,First Day,Notes,Status,Seniority",
+    );
+    expect(lines[1]).toBe(
+      "Rosa,Diaz,rosa@x.org,(555) 201-0100,,,,Part-time,2099-01-01,'=HYPERLINK(1),Away until Jan 4,2",
+    );
+    // A first day already passed isn't one to import again.
+    expect(lines[2]).toBe("Ida,Wu,,,,,,Full-time,,,Offboarded,3");
+  });
+
   it("gates staff export on employee details and schedule export on shift editing", async () => {
     requireOrgPermissions.mockResolvedValue({
       response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),

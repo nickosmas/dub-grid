@@ -2104,8 +2104,11 @@ export function MembersSection({
           orgId={orgId}
           focusAreas={focusAreas}
           focusAreaLabel={focusAreaLabel}
+          certificationLabel={certificationLabel}
+          roleLabel={roleLabel}
           certifications={certifications}
           roles={roles}
+          canGrantElevatedRoles={!!isSuperAdmin || !!isGridmaster}
           onClose={() => setShowImport(false)}
           onImported={() => {
             void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });

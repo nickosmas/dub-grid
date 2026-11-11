@@ -49,6 +49,10 @@ export async function insertEmployees(args: {
   employees: NewEmployeeInput[];
   ip: string | null;
   userAgent: string | null;
+  /** Added to each person's audit row, such as where they came from. */
+  auditDetails?: Record<string, unknown>;
+  /** Report every refused row in `failed` even when none was added, for a caller that lists them. */
+  reportEveryFailure?: boolean;
 }): Promise<InsertEmployeesOutcome> {
   const { serviceClient, orgId, actor, employees } = args;
 
@@ -118,6 +122,7 @@ export async function insertEmployees(args: {
         resource_type: "employee",
         resource_id: employee.id,
         details: {
+          ...args.auditDetails,
           firstName: employees[index].firstName,
           lastName: employees[index].lastName,
           ...(employees[index].firstDay ? { firstDay: employees[index].firstDay } : {}),
@@ -131,7 +136,7 @@ export async function insertEmployees(args: {
     }
   }
 
-  if (added.length === 0 && failed.length > 0) {
+  if (added.length === 0 && failed.length > 0 && !args.reportEveryFailure) {
     const conflict = getEmployeeContactConflict(failed[0].cause);
     return {
       response: conflict
