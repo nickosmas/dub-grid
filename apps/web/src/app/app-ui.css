@@ -1764,6 +1764,22 @@ button.dg-cc-sg-main {
   padding: 4px;
   margin: -4px;
 }
+/* A dialog's filter line: at the dialog's own edge, no box, a rule under it.
+   Filters sit on the left and the count after them on the right. */
+.dg-dialog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--dg-color-border-light);
+}
+.dg-dialog-toolbar-meta {
+  margin-left: auto;
+  font-size: var(--dg-type-metadata-size);
+  color: var(--dg-color-text-subtle);
+  white-space: nowrap;
+}
 /* Every card, popup and slideover ends the same way: a line across the whole
    container, then its bottom buttons on a faint strip, 12px above and below. */
 .dg-footer-bar {

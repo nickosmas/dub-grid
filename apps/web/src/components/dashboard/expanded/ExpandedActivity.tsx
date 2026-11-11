@@ -32,17 +32,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
     <Modal title="Recent activity" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Type filter tabs */}
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap",
-            padding: 16,
-            borderRadius: "var(--dg-radius-md)",
-            background: "var(--dg-color-bg)",
-            border: "1px solid var(--dg-color-border)",
-          }}
-        >
+        <div className="dg-dialog-toolbar">
           {TYPE_FILTERS.map((f) => {
             const active = typeFilter === f.value;
             return (
@@ -66,14 +56,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
               </Button>
             );
           })}
-          <span
-            style={{
-              fontSize: "var(--dg-type-metadata-size)",
-              color: "var(--dg-color-text-subtle)",
-              marginLeft: "auto",
-              alignSelf: "center",
-            }}
-          >
+          <span className="dg-dialog-toolbar-meta">
             {filtered.length} event{filtered.length !== 1 ? "s" : ""}
           </span>
         </div>
