@@ -122,7 +122,12 @@ import {
 } from "./useManagementFilters";
 import { StaffPagination } from "./StaffPagination";
 import { StaffReorderListRow, StaffTableRow } from "./StaffTableRow";
-import { STAFF_SORT_OPTIONS, useStaffFilters, type EmployeeTab } from "./useStaffFilters";
+import {
+  STAFF_SORT_OPTIONS,
+  useStaffFilters,
+  type EmployeeTab,
+  type OrgRoleFilter,
+} from "./useStaffFilters";
 import { useStaffReorder } from "./useStaffReorder";
 import { useSmoothReorder } from "@/hooks/useSmoothReorder";
 import { useStaffSelection } from "./useStaffSelection";
@@ -133,6 +138,8 @@ import ScrollableTabs from "@/components/ScrollableTabs";
 const REORDER_SETTLE_MS = 220;
 
 const getEmployeeId = (employee: Employee) => employee.id;
+/** What the pill bar is given when this viewer can't see the Access column. */
+const NO_ORG_ROLES: OrgRoleFilter = [];
 
 function isExpiredInvitation(invitation: Invitation): boolean {
   return (
@@ -845,16 +852,18 @@ export function MembersSection({
     sortConfig.key === "seniority" &&
     sortConfig.dir === "asc" &&
     !searchQuery &&
-    filterEmploymentType === "all" &&
-    !filterDepartment &&
-    !filterFocusArea &&
-    !filterCertification &&
-    !filterRole &&
-    filterAccount === "all" &&
     // Reordering writes seniority across the whole roster, so it must never run
     // against a list with rows filtered out of view.
-    filterOrgRole === "all" &&
-    filterPhonePresence === "all" &&
+    [
+      filterEmploymentType,
+      filterDepartment,
+      filterFocusArea,
+      filterCertification,
+      filterRole,
+      filterAccount,
+      filterOrgRole,
+      filterPhonePresence,
+    ].every((filter) => filter.length === 0) &&
     canManageEmployees &&
     !showManagement;
   const hasReorderableStaffRows = sorted.length >= 2;
@@ -1507,17 +1516,17 @@ export function MembersSection({
               filterCertification={filterCertification}
               filterRole={filterRole}
               filterAccount={filterAccount}
-              filterOrgRole={showAccessControls ? filterOrgRole : "all"}
+              filterOrgRole={showAccessControls ? filterOrgRole : NO_ORG_ROLES}
               filterPhonePresence={filterPhonePresence}
               hasActiveFilters={hasActiveFilters}
-              onClearEmploymentType={() => setFilterEmploymentType("all")}
-              onClearDepartment={() => setFilterDepartment(null)}
-              onClearFocusArea={() => setFilterFocusArea(null)}
-              onClearCertification={() => setFilterCertification(null)}
-              onClearRole={() => setFilterRole(null)}
-              onClearAccount={() => setFilterAccount("all")}
-              onClearOrgRole={() => setFilterOrgRole("all")}
-              onClearPhonePresence={() => setFilterPhonePresence("all")}
+              onClearEmploymentType={() => setFilterEmploymentType([])}
+              onClearDepartment={() => setFilterDepartment([])}
+              onClearFocusArea={() => setFilterFocusArea([])}
+              onClearCertification={() => setFilterCertification([])}
+              onClearRole={() => setFilterRole([])}
+              onClearAccount={() => setFilterAccount([])}
+              onClearOrgRole={() => setFilterOrgRole([])}
+              onClearPhonePresence={() => setFilterPhonePresence([])}
               onClearAll={clearFilters}
               focusAreas={focusAreas}
               certifications={certifications}

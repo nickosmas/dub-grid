@@ -537,9 +537,9 @@ describe("StaffView", () => {
 
       await user.click(screen.getByRole("button", { name: "Filter" }));
 
-      expect(screen.getByRole("button", { name: "Certifications" })).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Certifications" })).toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Employment" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Account" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Account" })).not.toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Phone" })).not.toBeInTheDocument();
     });
   });
@@ -655,8 +655,9 @@ describe("StaffView", () => {
       filter: string,
       option: string,
     ) {
-      await user.click(screen.getByRole("button", { name: filter }));
-      await user.click(screen.getByRole("option", { name: option }));
+      await user.click(
+        within(screen.getByRole("group", { name: filter })).getByRole("checkbox", { name: option }),
+      );
     }
 
     it("matches only visible directory fields for regular users", async () => {
@@ -701,7 +702,7 @@ describe("StaffView", () => {
       renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
 
       await user.click(screen.getByRole("button", { name: "Filter" }));
-      await user.click(screen.getByRole("button", { name: "Part-time" }));
+      await pickFilterOption(user, "Employment", "Part-time");
 
       expect(screen.getByRole("link", { name: "Bob Beta" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Alice Alpha" })).not.toBeInTheDocument();
@@ -727,7 +728,7 @@ describe("StaffView", () => {
       renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
 
       await user.click(screen.getByRole("button", { name: "Filter" }));
-      await user.click(screen.getByRole("button", { name: "Full-time" }));
+      await pickFilterOption(user, "Employment", "Full-time");
       await pickFilterOption(user, "Certifications", "CSN II");
       await pickFilterOption(user, "Roles", "DVCSN");
 
@@ -745,13 +746,28 @@ describe("StaffView", () => {
       await user.type(screen.getByPlaceholderText("Search by name, email, or phone..."), "Alice");
       await user.click(screen.getByRole("button", { name: "Filter" }));
       await pickFilterOption(user, "Account", "Linked");
-      await user.click(screen.getByRole("button", { name: "Has phone" }));
+      await pickFilterOption(user, "Phone", "Has phone");
 
       expect(screen.getByRole("link", { name: "Alice Alpha" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Bob Beta" })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Casey Clark" })).not.toBeInTheDocument();
       expect(screen.getByText("Account: Linked")).toBeInTheDocument();
       expect(screen.getByText("Phone: Has phone")).toBeInTheDocument();
+    });
+
+    it("keeps anyone matching either of two choices in one filter, named in one pill", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
+
+      await user.click(screen.getByRole("button", { name: "Filter" }));
+      await pickFilterOption(user, "Account", "No email");
+      expect(screen.queryByRole("link", { name: "Alice Alpha" })).not.toBeInTheDocument();
+
+      await pickFilterOption(user, "Account", "Linked");
+
+      expect(screen.getByRole("link", { name: "Alice Alpha" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Bob Beta" })).toBeInTheDocument();
+      expect(screen.getByText("Account: Linked, No email")).toBeInTheDocument();
     });
 
     it("finds people with no email, then clears the filters", async () => {

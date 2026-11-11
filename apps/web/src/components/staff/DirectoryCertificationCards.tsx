@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import type { NamedItem } from "@/types";
-import type { CertificationFilter } from "./useStaffFilters";
+import type { CertificationChoice, CertificationFilter } from "./useStaffFilters";
 
 /**
  * A compact tile. The certified-staff total and each certification share this
@@ -62,15 +62,23 @@ export function DirectoryCertificationCards({
   certifiedCount: number;
   uncertifiedCount: number;
   selectedCertification: CertificationFilter;
-  onSelectCertification: (value: CertificationFilter) => void;
+  onSelectCertification: (value: CertificationChoice[]) => void;
 }) {
   if (counts.length === 0) {
     return null;
   }
 
   const certificationById = new Map(certifications.map((c) => [c.id, c]));
-  const certifiedSelected = selectedCertification === "any";
-  const uncertifiedSelected = selectedCertification === "none";
+  const certifiedSelected = selectedCertification.includes("any");
+  const uncertifiedSelected = selectedCertification.includes("none");
+  // A tile ticks or unticks its choice in the panel's Certifications filter,
+  // leaving any others ticked there alone.
+  const toggle = (choice: CertificationChoice) =>
+    onSelectCertification(
+      selectedCertification.includes(choice)
+        ? selectedCertification.filter((value) => value !== choice)
+        : [...selectedCertification, choice],
+    );
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3">
@@ -81,7 +89,7 @@ export function DirectoryCertificationCards({
         type="button"
         aria-label={`Certified staff count, ${certifiedCount}`}
         aria-pressed={certifiedSelected}
-        onClick={() => onSelectCertification(certifiedSelected ? null : "any")}
+        onClick={() => toggle("any")}
         className="h-auto w-full items-stretch text-left"
       >
         <CountTile label="Certified staff" count={certifiedCount} selected={certifiedSelected} />
@@ -97,7 +105,8 @@ export function DirectoryCertificationCards({
         const fullName = isArchived
           ? `Holders of an archived ${certificationLabel.toLowerCase()} entry`
           : (certification?.name ?? null);
-        const isSelected = selectedCertification === certificationId;
+        const isSelected =
+          typeof certificationId === "number" && selectedCertification.includes(certificationId);
 
         return (
           <MaybeHint key={String(certificationId)} content={fullName}>
@@ -107,9 +116,7 @@ export function DirectoryCertificationCards({
               aria-pressed={isSelected}
               disabled={isArchived}
               onClick={() => {
-                if (!isArchived) {
-                  onSelectCertification(isSelected ? null : (certificationId as number));
-                }
+                if (typeof certificationId === "number") toggle(certificationId);
               }}
               className="h-auto w-full items-stretch text-left disabled:cursor-default"
             >
@@ -126,7 +133,7 @@ export function DirectoryCertificationCards({
           type="button"
           aria-label={`Not certified count, ${uncertifiedCount}`}
           aria-pressed={uncertifiedSelected}
-          onClick={() => onSelectCertification(uncertifiedSelected ? null : "none")}
+          onClick={() => toggle("none")}
           className="h-auto w-full items-stretch text-left"
         >
           <CountTile
