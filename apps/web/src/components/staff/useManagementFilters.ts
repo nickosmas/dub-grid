@@ -12,6 +12,12 @@ export type ManagementRoleFilter = "all" | OrganizationRole;
 export type ManagementInvitationFilter = "all" | "has_access" | "pending";
 export type ManagementSortKey = "name" | "access";
 
+/** What the roster's toolbar sort dropdown offers, matching the staff half's. */
+export const MANAGEMENT_SORT_OPTIONS: { value: ManagementSortKey; label: string }[] = [
+  { value: "name", label: "Sort: Name" },
+  { value: "access", label: "Sort: Access role" },
+];
+
 /** Offered in the same order the access sort ranks them. */
 export const MANAGEMENT_ROLE_FILTERS: readonly OrganizationRole[] = ORG_ROLE_PRIVILEGE_ORDER;
 
@@ -54,7 +60,6 @@ export function useManagementFilters({
     deptFilterId !== null,
     filterRole !== "all",
     filterInvitation !== "all",
-    sortKey !== "name",
   ].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
 
@@ -62,7 +67,6 @@ export function useManagementFilters({
     setDeptFilterId(null);
     setFilterRole("all");
     setFilterInvitation("all");
-    setSortKey("name");
   }
 
   const filteredUsers = useMemo(() => {

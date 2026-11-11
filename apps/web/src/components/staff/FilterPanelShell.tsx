@@ -1,26 +1,25 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/Button";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { useMediaQuery, MOBILE } from "@/hooks";
 
+/** Keeps the panel clear of the 56px app header when it opens near the top. */
+const COLLISION_PADDING = { top: 64, right: 8, bottom: 8, left: 8 };
+
 /**
- * The directory's filter panel: a popover on desktop, a bottom sheet on
- * mobile, with the Clear all / Done footer both halves of the directory share.
- *
- * The staff list and the management roster describe different populations, so
- * each fills this with the filters its own rows can answer — but they stay one
- * control rather than two lookalikes drifting apart.
+ * The directory's filter panel: a popover on desktop, a bottom sheet on a
+ * phone. The staff list and the management roster fill it with the filters
+ * their own rows can answer.
  */
 export function FilterPanelShell({
   open,
   onClose,
   anchorRef,
-  title,
-  widthClassName = "w-[560px]",
   hasActiveFilters,
   onClearAll,
   children,
@@ -28,42 +27,32 @@ export function FilterPanelShell({
   open: boolean;
   onClose: () => void;
   anchorRef: HTMLElement | null;
-  /** Names the sheet for screen readers; never shown on desktop. */
-  title: string;
-  widthClassName?: string;
   hasActiveFilters: boolean;
   onClearAll: () => void;
   children: ReactNode;
 }) {
   const isMobile = useMediaQuery(MOBILE);
+  const titleId = useId();
 
-  const content = (
-    <div className="flex max-h-[inherit] flex-col">
-      <div className="flex-1 overflow-y-auto px-4 py-3">{children}</div>
-
-      <div className="dg-footer-bar flex items-center justify-between rounded-b-[inherit] [--dg-footer-bar-px:16px]">
+  const body = (
+    <>
+      <div className="dg-filter-panel-body">{children}</div>
+      <div className="dg-footer-bar dg-filter-panel-footer">
         <Button
           type="button"
+          className="dg-btn dg-btn-secondary"
           onClick={onClearAll}
           disabled={!hasActiveFilters}
-          className={`text-[length:var(--dg-type-control-size)] font-medium transition-colors ${
-            hasActiveFilters
-              ? "text-[var(--dg-color-text-primary)] hover:text-[var(--dg-color-text-secondary)]"
-              : "cursor-not-allowed text-[var(--dg-color-text-faint)]"
-          }`}
         >
-          Clear all
+          Clear filters
         </Button>
-        <Button
-          type="button"
-          onClick={onClose}
-          className="rounded-[var(--dg-radius-sm)] bg-[var(--dg-color-brand)] px-3 py-1.5 text-[length:var(--dg-type-control-size)] font-medium text-[var(--dg-color-text-inverse)] transition-opacity hover:opacity-90"
-        >
+        <Button type="button" className="dg-btn dg-btn-primary" onClick={onClose}>
           Done
         </Button>
       </div>
-    </div>
+    </>
   );
+  const close = <CloseButton aria-label="Close filters" onClick={onClose} />;
 
   if (isMobile) {
     return (
@@ -76,15 +65,13 @@ export function FilterPanelShell({
         <SheetContent
           side="bottom"
           showCloseButton={false}
-          className="max-h-[75vh] gap-0 rounded-t-2xl p-0"
+          className="dg-filter-panel dg-filter-panel--sheet"
         >
-          <SheetHeader className="sr-only">
-            <SheetTitle>{title}</SheetTitle>
-          </SheetHeader>
-          <div className="flex justify-center pb-1 pt-3">
-            <div className="h-1 w-8 rounded-full bg-[var(--dg-color-border)]" />
+          <div className="dg-filter-panel-header">
+            <SheetTitle className="dg-modal-title">Filters</SheetTitle>
+            {close}
           </div>
-          {content}
+          {body}
         </SheetContent>
       </Sheet>
     );
@@ -102,13 +89,22 @@ export function FilterPanelShell({
           anchor={anchorRef}
           side="bottom"
           align="end"
-          sideOffset={4}
+          sideOffset={6}
+          collisionPadding={COLLISION_PADDING}
+          collisionAvoidance={{ side: "flip", align: "shift", fallbackAxisSide: "none" }}
           className="isolate z-50"
         >
           <PopoverPrimitive.Popup
-            className={`relative flex max-h-[70vh] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--dg-color-border)] bg-[var(--dg-color-surface)] shadow-[var(--shadow-menu)] outline-hidden ${widthClassName}`}
+            aria-labelledby={titleId}
+            className="dg-filter-panel dg-filter-panel--popover"
           >
-            {content}
+            <div className="dg-filter-panel-header">
+              <h2 id={titleId} className="dg-modal-title">
+                Filters
+              </h2>
+              {close}
+            </div>
+            {body}
             <ScrollOverflowCue />
           </PopoverPrimitive.Popup>
         </PopoverPrimitive.Positioner>
@@ -117,46 +113,16 @@ export function FilterPanelShell({
   );
 }
 
-export function FilterSection({ title, children }: { title: string; children: ReactNode }) {
+/** One filter: its name, then the control that answers it. */
+export function FilterField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section className="border-b border-[var(--dg-color-border-light)] py-4 first:pt-1 last:border-b-0">
-      <div className="dg-type-content-group-heading mb-2">{title}</div>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
-    </section>
-  );
-}
-
-export function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="mb-3 w-full last:mb-0">
-      <div className="dg-type-field-title mb-1.5">{label}</div>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
+    <div className="dg-filter-field">
+      <span className="dg-filter-field-label">{label}</span>
+      <div className="dg-filter-field-control">{children}</div>
     </div>
   );
 }
 
-// Interactive sibling of <StatusPill>: same tonal language, but a toggleable button.
-export function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <Button
-      type="button"
-      onClick={onClick}
-      title={typeof children === "string" ? children : undefined}
-      className={`dg-pill-action inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-medium transition-colors duration-150 ${
-        active
-          ? "border-[var(--dg-color-brand-border)] bg-[var(--dg-color-brand-bg)] text-[var(--dg-color-brand)]"
-          : "border-[var(--dg-color-border-light)] bg-[var(--dg-color-bg-secondary)] text-[var(--dg-color-text-secondary)] hover:bg-[var(--dg-color-border-light)]"
-      }`}
-    >
-      <span className="dg-pill-action-label">{children}</span>
-    </Button>
-  );
+export function FilterDivider() {
+  return <div className="dg-filter-divider" aria-hidden="true" />;
 }

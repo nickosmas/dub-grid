@@ -1,19 +1,21 @@
 "use client";
 
 import { ORG_ROLE_LABELS } from "@dubgrid/domain";
-import { FilterChip, FilterPanelShell, FilterSection } from "./FilterPanelShell";
+import { SpanTabs, type SpanTabItem } from "@/components/ui/span-tabs";
+import { FilterField, FilterPanelShell } from "./FilterPanelShell";
 import { MANAGEMENT_ROLE_FILTERS } from "./useManagementFilters";
-import type {
-  ManagementInvitationFilter,
-  ManagementRoleFilter,
-  ManagementSortKey,
-} from "./useManagementFilters";
+import type { ManagementInvitationFilter, ManagementRoleFilter } from "./useManagementFilters";
+
+const ACCESS_ROLE_ITEMS: SpanTabItem<ManagementRoleFilter>[] = [
+  { value: "all", label: "All" },
+  ...MANAGEMENT_ROLE_FILTERS.map((role) => ({ value: role, label: ORG_ROLE_LABELS[role] })),
+];
 
 /**
  * The management roster's filters. Deliberately not the staff panel: focus
  * areas, certifications and employment types describe scheduled staff, and a
- * roster row answers none of them. Management departments stay on the tab
- * strip beside the search box, which is where this view already filters them.
+ * roster row answers none of them. Administrative Teams stay on the toolbar's
+ * segmented control, and sorting is the toolbar's dropdown.
  */
 export function ManagementFilterPopover({
   open,
@@ -23,8 +25,6 @@ export function ManagementFilterPopover({
   onFilterRoleChange,
   filterInvitation,
   onFilterInvitationChange,
-  sortKey,
-  onSortKeyChange,
   pendingCount,
   onClearAll,
   hasActiveFilters,
@@ -36,66 +36,45 @@ export function ManagementFilterPopover({
   onFilterRoleChange: (value: ManagementRoleFilter) => void;
   filterInvitation: ManagementInvitationFilter;
   onFilterInvitationChange: (value: ManagementInvitationFilter) => void;
-  sortKey: ManagementSortKey;
-  onSortKeyChange: (value: ManagementSortKey) => void;
   pendingCount: number;
   onClearAll: () => void;
   hasActiveFilters: boolean;
 }) {
+  const invitationItems: SpanTabItem<ManagementInvitationFilter>[] = [
+    { value: "all", label: "All" },
+    { value: "has_access", label: "Has access" },
+    {
+      value: "pending",
+      label: "Invitation pending",
+      count: pendingCount,
+      countLabel: `${pendingCount} pending`,
+    },
+  ];
+
   return (
     <FilterPanelShell
       anchorRef={anchorRef}
       hasActiveFilters={hasActiveFilters}
       open={open}
-      title="Management filters"
-      widthClassName="w-[420px]"
       onClearAll={onClearAll}
       onClose={onClose}
     >
-      <FilterSection title="Access role">
-        <FilterChip active={filterRole === "all"} onClick={() => onFilterRoleChange("all")}>
-          All
-        </FilterChip>
-        {MANAGEMENT_ROLE_FILTERS.map((role) => (
-          <FilterChip
-            key={role}
-            active={filterRole === role}
-            onClick={() => onFilterRoleChange(role)}
-          >
-            {ORG_ROLE_LABELS[role]}
-          </FilterChip>
-        ))}
-      </FilterSection>
-
-      <FilterSection title="Invitation">
-        <FilterChip
-          active={filterInvitation === "all"}
-          onClick={() => onFilterInvitationChange("all")}
-        >
-          All
-        </FilterChip>
-        <FilterChip
-          active={filterInvitation === "has_access"}
-          onClick={() => onFilterInvitationChange("has_access")}
-        >
-          Has access
-        </FilterChip>
-        <FilterChip
-          active={filterInvitation === "pending"}
-          onClick={() => onFilterInvitationChange("pending")}
-        >
-          Invitation pending{pendingCount > 0 ? ` (${pendingCount})` : ""}
-        </FilterChip>
-      </FilterSection>
-
-      <FilterSection title="Sort by">
-        <FilterChip active={sortKey === "name"} onClick={() => onSortKeyChange("name")}>
-          Alphabetical
-        </FilterChip>
-        <FilterChip active={sortKey === "access"} onClick={() => onSortKeyChange("access")}>
-          Access role
-        </FilterChip>
-      </FilterSection>
+      <FilterField label="Access role">
+        <SpanTabs
+          aria-label="Access role"
+          items={ACCESS_ROLE_ITEMS}
+          value={filterRole}
+          onChange={onFilterRoleChange}
+        />
+      </FilterField>
+      <FilterField label="Invitation">
+        <SpanTabs
+          aria-label="Invitation"
+          items={invitationItems}
+          value={filterInvitation}
+          onChange={onFilterInvitationChange}
+        />
+      </FilterField>
     </FilterPanelShell>
   );
 }
