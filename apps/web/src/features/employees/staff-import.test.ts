@@ -189,10 +189,24 @@ describe("buildStaffImportTemplate", () => {
     ).toBe(true);
     const parsed = parseStaffCsv(template, labels);
     expect(parsed.ok && parsed.rows.map((r) => r.focusAreaNames)).toEqual([
-      "Skilled Nursing",
+      "Skilled Nursing; Memory Care",
       "Memory Care",
     ]);
     expect(parsed.ok && check(parsed.rows).map((r) => r.status)).toEqual(["ready", "ready"]);
+  });
+
+  it("writes two areas and two roles for the first person, read back as lists", () => {
+    const withTwoRoles = {
+      ...references,
+      roles: [...references.roles, { id: 21, name: "Med Tech" }],
+    };
+    const parsed = parseStaffCsv(buildStaffImportTemplate(labels, withTwoRoles), labels);
+    expect(parsed.ok && parsed.rows[0].roleNames).toBe("Charge Nurse; Med Tech");
+    const [first] = parsed.ok
+      ? checkStaffImportRows(parsed.rows, { ...withTwoRoles, labels, existing: [], today: TODAY })
+      : [];
+    expect(first.status === "ready" && first.resolved.focusAreaIds).toEqual([1, 2]);
+    expect(first.status === "ready" && first.resolved.roleIds).toEqual([20, 21]);
   });
 });
 
