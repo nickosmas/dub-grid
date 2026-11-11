@@ -477,13 +477,13 @@ describe("mobile person invitation route", () => {
     );
   });
 
-  it("grants the access role the invite asks for", async () => {
+  it("grants the access role a Super Admin's invite asks for", async () => {
     const serviceClient = makeServiceClient({ existingMemberUserId: null });
     requireMobileAuth.mockResolvedValue({
       currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
-      permissions: { canManageEmployees: true, isSuperAdmin: false, isGridmaster: false },
+      permissions: { canManageEmployees: true, isSuperAdmin: true, isGridmaster: false },
       serviceClient,
-      user: { id: "55555555-5555-4555-8555-555555555555", email: "admin@example.com" },
+      user: { id: "55555555-5555-4555-8555-555555555555", email: "owner@example.com" },
     });
 
     const { POST } = await import("./person-invitation");
@@ -503,6 +503,28 @@ describe("mobile person invitation route", () => {
         details: expect.objectContaining({ roleToAssign: "admin" }),
       }),
     );
+  });
+
+  it("refuses an Admin inviting an Admin and sends nothing (F-238)", async () => {
+    const serviceClient = makeServiceClient({ existingMemberUserId: null });
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+      permissions: { canManageEmployees: true, isSuperAdmin: false, isGridmaster: false },
+      serviceClient,
+      user: { id: "55555555-5555-4555-8555-555555555555", email: "admin@example.com" },
+    });
+
+    const { POST } = await import("./person-invitation");
+    const response = await POST(
+      makeRequest({ email: "mina@example.com", orgRole: "admin" }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Only a Super Admin can invite someone as an Admin.",
+    });
+    expect(createMobileEmployeeInvitationRow).not.toHaveBeenCalled();
   });
 
   it("stores the permissions a Super Admin chose for an Admin invite", async () => {

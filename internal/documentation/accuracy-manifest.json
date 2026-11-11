@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ca2e0de1666c99f097be8c648eaaf15d856c5a2556da782cc3764bf556f77c1e"
+      "evidenceFingerprint": "sha256:3ecca1308a03747d0991721767c4b60198e52905120d97d1690306da23c43609"
     },
     {
       "id": "introduction",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ab6498e8b5e3b17497674015fd6e9dd915d3797a398764de8f4710eec6cb72ef"
+      "evidenceFingerprint": "sha256:a55cf1ea7ed2d352634f6b4ae7f10304bc9bd516bd72a148c70ac6b568ca6b23"
     },
     {
       "id": "quickstart",
@@ -238,7 +238,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5881479f9aa5d6a828b9604b845ff8e3cb52a3bccf10e8866e2c55e5b11a7ead"
+      "evidenceFingerprint": "sha256:781170e94d757b3358c110bb32e9a9e2bc5b341001463bd4e5ffb38ccde1b3b4"
     },
     {
       "id": "onboarding",
@@ -764,7 +764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:444138661a93efa7904b2ba69e013565f83da4e02bef343764b8f72a84458c65"
+      "evidenceFingerprint": "sha256:b1cf36ee95940ff7a04854671cd17a7104bc170bd08f9a9f274f6bab79c972f0"
     },
     {
       "id": "person-detail",
@@ -813,6 +813,7 @@
             "apps/web/src/lib/people-order.ts",
             "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
             "apps/web/src/components/staff-detail/PersonPeriodControl.tsx",
+            "apps/web/src/lib/person-period.ts",
             "apps/web/src/components/staff-detail/tabs/ScheduleTab.tsx",
             "apps/web/src/lib/schedule-rows.ts",
             "apps/web/src/components/staff-detail/tabs/ActivityTab.tsx",
@@ -845,7 +846,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bd8bf624990193bb338e7bdfcd0650097dbe2bf81ba69ba65407326f256bc9fb"
+      "evidenceFingerprint": "sha256:1c04d8b7e1ea796fa8b687898bbdc51bf025e13cacab1321590fefb6530b4624"
     },
     {
       "id": "invitations",
@@ -908,7 +909,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:544d5a64fadf3f56320b82c49d153a1b32f37ddb75f873e8fd108f1f8a91aad9"
+      "evidenceFingerprint": "sha256:8e5ba10d85b79b9b31e7b495177c1caa95cca5643602f3a27d07c59ac0b01aff"
     },
     {
       "id": "organization",
@@ -1121,7 +1122,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:76525a6dd06be15717114fdc26455d4922e3821f73e64c0385a6f2e5bebe6386"
+      "evidenceFingerprint": "sha256:47a6114065cb1f2c1a48c2aa6f9b57fe63df3625fb9d9741daed216bc8faa5f5"
     },
     {
       "id": "admin-permissions",
@@ -1165,7 +1166,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:68036a7c41dc5a22f52adf3263083a5e06684ef403c8c84bb7790bc88e966a31"
+      "evidenceFingerprint": "sha256:412f3b2dad39a94f63f9a2878f28d97c67ccf2f14eb1ac0e3ea083c370bb7212"
     },
     {
       "id": "billing",
@@ -1321,7 +1322,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:c42961a2d98d01dc645b3ee6b2e2bb1f12b0536589d608faf28141229678b7ef"
+      "evidenceFingerprint": "sha256:df45c24c6045ef1c71404dfbb050e352e8bba5cfa085eefcb37098199ef2c19c"
     },
     {
       "id": "alerts",
@@ -1489,6 +1490,9 @@
             "apps/web/src/components/staff-detail/tabs/ScheduleTab.tsx",
             "apps/web/src/components/staff-detail/PersonInfoCards.tsx",
             "apps/web/src/components/profile/CalendarSubscriptionCard.tsx",
+            "apps/web/src/components/staff-detail/PersonPeriodControl.tsx",
+            "apps/web/src/lib/person-period.ts",
+            "apps/web/src/app/api/account/self/shifts/route.ts",
             "apps/web/src/components/account/ProfilePanel.tsx",
             "apps/web/src/components/account/DeleteAccountCard.tsx",
             "apps/web/src/app/api/auth/delete-account/route.ts",
@@ -1514,7 +1518,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e9dc3bb8b9b7ad71ad13fa0a98b457db463337cb810d7a61b2988a72b675a793"
+      "evidenceFingerprint": "sha256:6c76085292a6c4adc7c41829c4314cbf1bb61f5ae59fb8dda7d7a8659db0b5f6"
     },
     {
       "id": "security-sessions",

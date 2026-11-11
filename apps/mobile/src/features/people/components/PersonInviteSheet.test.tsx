@@ -17,11 +17,12 @@ beforeAll(async () => {
   PersonInviteSheet = (await import("./PersonInviteSheet")).PersonInviteSheet;
 });
 
+// As a Super Admin, who can give every role.
 function renderSheet() {
   const onDismiss = vi.fn();
   render(
     <PersonInviteSheet
-      canGrantSuperAdmin={false}
+      canGrantElevatedRoles
       email="mina@dubgrid.com"
       isPending={false}
       onDismiss={onDismiss}

@@ -5,6 +5,8 @@ import {
   OFFBOARD_OUT_OF_REACH_CODE,
   OFFBOARD_OUT_OF_REACH_MESSAGE,
   RESTORE_OUT_OF_REACH_MESSAGE,
+  REINSTATE_OUT_OF_REACH_MESSAGE,
+  SUSPEND_OUT_OF_REACH_MESSAGE,
 } from "@dubgrid/domain";
 
 const requireAuthenticatedUser = vi.fn();
@@ -1336,6 +1338,93 @@ describe("POST /api/employees/status", () => {
         expect(response.status).toBe(403);
         await expect(response.json()).resolves.toEqual({
           error: RESTORE_OUT_OF_REACH_MESSAGE,
+          code: OFFBOARD_OUT_OF_REACH_CODE,
+        });
+      }
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses to suspend, move a suspension's end, reinstate or cancel a planned suspension for a Super Admin (F-240)", async () => {
+      for (const [action, extra, message] of [
+        ["suspend", {}, SUSPEND_OUT_OF_REACH_MESSAGE],
+        [
+          "setSuspendedUntil",
+          { suspended_at: "2026-10-26T00:00:00Z" },
+          SUSPEND_OUT_OF_REACH_MESSAGE,
+        ],
+        ["reinstate", { suspended_at: "2026-10-26T00:00:00Z" }, REINSTATE_OUT_OF_REACH_MESSAGE],
+        [
+          "cancelPlannedChange",
+          { planned_status: "suspended", planned_from: "2026-12-01" },
+          SUSPEND_OUT_OF_REACH_MESSAGE,
+        ],
+      ] as const) {
+        arrange("active", "super_admin");
+        employeeCurrentSingle.mockResolvedValue({
+          data: {
+            id: EMP_ID,
+            org_id: ORG_ID,
+            status: "active",
+            version: 1,
+            user_id: EMPLOYEE_USER_ID,
+            ...extra,
+          },
+          error: null,
+        });
+        const response = await POST(
+          new NextRequest("http://localhost/api/employees/status", {
+            method: "POST",
+            body: JSON.stringify({
+              empId: EMP_ID,
+              orgId: ORG_ID,
+              action,
+              expectedVersion: 1,
+              ...(action === "setSuspendedUntil" ? { returnDate: "2026-12-20" } : {}),
+            }),
+          }),
+        );
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toEqual({
+          error: message,
+          code: OFFBOARD_OUT_OF_REACH_CODE,
+        });
+      }
+      expect(employeeUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses to plan Away over a Super Admin's planned suspension or last day (F-240)", async () => {
+      for (const [planned, message] of [
+        ["suspended", SUSPEND_OUT_OF_REACH_MESSAGE],
+        ["removed", OFFBOARD_OUT_OF_REACH_MESSAGE],
+      ] as const) {
+        arrange("active", "super_admin");
+        employeeCurrentSingle.mockResolvedValue({
+          data: {
+            id: EMP_ID,
+            org_id: ORG_ID,
+            status: "active",
+            version: 1,
+            user_id: EMPLOYEE_USER_ID,
+            planned_status: planned,
+            planned_from: "2026-12-01",
+          },
+          error: null,
+        });
+        const response = await POST(
+          new NextRequest("http://localhost/api/employees/status", {
+            method: "POST",
+            body: JSON.stringify({
+              empId: EMP_ID,
+              orgId: ORG_ID,
+              action: "deactivate",
+              expectedVersion: 1,
+              startDate: "2026-11-20",
+            }),
+          }),
+        );
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toEqual({
+          error: message,
           code: OFFBOARD_OUT_OF_REACH_CODE,
         });
       }

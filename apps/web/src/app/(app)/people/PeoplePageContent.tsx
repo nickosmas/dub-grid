@@ -317,7 +317,7 @@ function PeopleContent() {
               certifications={certifications}
               focusAreaLabel={org?.focusAreaLabel}
               certificationLabel={org?.certificationLabel}
-              canGrantSuperAdmin={isSuperAdmin || isGridmaster}
+              canGrantElevatedRoles={isSuperAdmin || isGridmaster}
               onAdd={async (dataList: NewEmployeeData[], invites: NewStaffInvite[]) => {
                 // A failed add keeps the modal and its typed rows for a retry.
                 const added = await handleAddEmployee(dataList);
