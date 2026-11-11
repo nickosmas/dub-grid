@@ -115,7 +115,11 @@ import { AccessInsignia } from "./AccessInsignia";
 import { StaffEmptyState } from "./StaffEmptyState";
 import { StaffFilterPopover } from "./StaffFilterPopover";
 import { ManagementFilterPopover } from "./ManagementFilterPopover";
-import { isPendingManagementInvite, useManagementFilters } from "./useManagementFilters";
+import {
+  isPendingManagementInvite,
+  MANAGEMENT_SORT_OPTIONS,
+  useManagementFilters,
+} from "./useManagementFilters";
 import { StaffPagination } from "./StaffPagination";
 import { StaffReorderListRow, StaffTableRow } from "./StaffTableRow";
 import { STAFF_SORT_OPTIONS, useStaffFilters, type EmployeeTab } from "./useStaffFilters";
@@ -420,6 +424,7 @@ export function MembersSection({
     roles,
     regularUserMode,
     orgRoleByEmployeeId: effectiveOrgRoleByEmployeeId,
+    pendingInviteEmployeeIds: pendingInviteByEmployeeId,
   });
   const {
     activeTab,
@@ -434,20 +439,16 @@ export function MembersSection({
     setFilterEmploymentType,
     filterDepartment,
     setFilterDepartment,
-    filterDepartmentAdminOnly,
-    setFilterDepartmentAdminOnly,
     filterFocusArea,
     setFilterFocusArea,
     filterCertification,
     setFilterCertification,
     filterRole,
     setFilterRole,
-    filterAccountLink,
-    setFilterAccountLink,
+    filterAccount,
+    setFilterAccount,
     filterOrgRole,
     setFilterOrgRole,
-    filterEmailPresence,
-    setFilterEmailPresence,
     filterPhonePresence,
     setFilterPhonePresence,
     hasActiveFilters,
@@ -461,7 +462,6 @@ export function MembersSection({
     totalPages,
     totalCount,
     pageSize: pageSize,
-    unlinkedCount,
   } = filters;
   const clearFilters = useCallback(() => {
     clearFiltersBase();
@@ -513,11 +513,9 @@ export function MembersSection({
   }, [
     activeTab,
     clearSelection,
-    filterAccountLink,
+    filterAccount,
     filterCertification,
     filterDepartment,
-    filterDepartmentAdminOnly,
-    filterEmailPresence,
     filterEmploymentType,
     filterFocusArea,
     filterOrgRole,
@@ -672,12 +670,6 @@ export function MembersSection({
   const canAddManagement = canManageManagementAccess && managementDepts.length > 0;
 
   const clearManagementFilters = managementFilters.clearFilters;
-  // The hook's count includes a non-default sort, which never empties the list.
-  const managementNarrowingFilterCount = [
-    deptFilterId !== null,
-    managementFilters.filterRole !== "all",
-    managementFilters.filterInvitation !== "all",
-  ].filter(Boolean).length;
   useEffect(() => {
     if (!showManagement) {
       clearManagementFilters();
@@ -855,15 +847,13 @@ export function MembersSection({
     !searchQuery &&
     filterEmploymentType === "all" &&
     !filterDepartment &&
-    !filterDepartmentAdminOnly &&
     !filterFocusArea &&
     !filterCertification &&
     !filterRole &&
-    filterAccountLink === "all" &&
+    filterAccount === "all" &&
     // Reordering writes seniority across the whole roster, so it must never run
     // against a list with rows filtered out of view.
     filterOrgRole === "all" &&
-    filterEmailPresence === "all" &&
     filterPhonePresence === "all" &&
     canManageEmployees &&
     !showManagement;
@@ -1211,6 +1201,19 @@ export function MembersSection({
                 />
               )}
 
+              {showManagement && (
+                <CustomSelect
+                  ariaLabel="Sort people by"
+                  value={managementFilters.sortKey}
+                  options={MANAGEMENT_SORT_OPTIONS}
+                  onChange={managementFilters.setSortKey}
+                  fontSize="var(--dg-fs-navigation-item)"
+                  fontWeight="var(--dg-type-control-weight)"
+                  activeFontWeight="var(--dg-type-control-weight)"
+                  letterSpacing="normal"
+                />
+              )}
+
               {/* A strip with one tab is a label wearing a control's clothes:
                   it invites a choice the viewer does not have. Viewers who
                   can't manage employees only ever get "Active", and its count
@@ -1500,22 +1503,20 @@ export function MembersSection({
             <StaffContextBar
               filterEmploymentType={filterEmploymentType}
               filterDepartment={filterDepartment}
-              filterDepartmentAdminOnly={filterDepartmentAdminOnly}
               filterFocusArea={filterFocusArea}
               filterCertification={filterCertification}
               filterRole={filterRole}
-              filterAccountLink={filterAccountLink}
-              filterEmailPresence={filterEmailPresence}
+              filterAccount={filterAccount}
+              filterOrgRole={showAccessControls ? filterOrgRole : "all"}
               filterPhonePresence={filterPhonePresence}
               hasActiveFilters={hasActiveFilters}
               onClearEmploymentType={() => setFilterEmploymentType("all")}
               onClearDepartment={() => setFilterDepartment(null)}
-              onClearDepartmentAdminOnly={() => setFilterDepartmentAdminOnly(false)}
               onClearFocusArea={() => setFilterFocusArea(null)}
               onClearCertification={() => setFilterCertification(null)}
               onClearRole={() => setFilterRole(null)}
-              onClearAccountLink={() => setFilterAccountLink("all")}
-              onClearEmailPresence={() => setFilterEmailPresence("all")}
+              onClearAccount={() => setFilterAccount("all")}
+              onClearOrgRole={() => setFilterOrgRole("all")}
               onClearPhonePresence={() => setFilterPhonePresence("all")}
               onClearAll={clearFilters}
               focusAreas={focusAreas}
@@ -1562,8 +1563,6 @@ export function MembersSection({
               onFilterEmploymentTypeChange={setFilterEmploymentType}
               filterDepartment={filterDepartment}
               onFilterDepartmentChange={setFilterDepartment}
-              filterDepartmentAdminOnly={filterDepartmentAdminOnly}
-              onFilterDepartmentAdminOnlyChange={setFilterDepartmentAdminOnly}
               filterFocusArea={filterFocusArea}
               onFilterFocusAreaChange={setFilterFocusArea}
               filterCertification={filterCertification}
@@ -1578,14 +1577,11 @@ export function MembersSection({
               certificationLabel={certificationLabel}
               roleLabel={roleLabel}
               departmentLabel={departmentLabel}
-              unlinkedCount={unlinkedCount}
-              filterAccountLink={filterAccountLink}
-              onFilterAccountLinkChange={setFilterAccountLink}
+              filterAccount={filterAccount}
+              onFilterAccountChange={setFilterAccount}
               filterOrgRole={filterOrgRole}
               onFilterOrgRoleChange={setFilterOrgRole}
               showAccessControls={showAccessControls}
-              filterEmailPresence={filterEmailPresence}
-              onFilterEmailPresenceChange={setFilterEmailPresence}
               filterPhonePresence={filterPhonePresence}
               onFilterPhonePresenceChange={setFilterPhonePresence}
               onClearAll={clearFilters}
@@ -1602,12 +1598,10 @@ export function MembersSection({
               hasActiveFilters={managementHasActiveFilters}
               open={filterOpen}
               pendingCount={pendingManagementCount}
-              sortKey={managementFilters.sortKey}
               onClearAll={managementFilters.clearFilters}
               onClose={() => setFilterOpen(false)}
               onFilterInvitationChange={managementFilters.setFilterInvitation}
               onFilterRoleChange={managementFilters.setFilterRole}
-              onSortKeyChange={managementFilters.setSortKey}
             />
           )}
 
@@ -2087,9 +2081,9 @@ export function MembersSection({
                     : "People on an administrative team will show here."
                 }
                 action={
-                  managementNarrowingFilterCount > 0 ? (
+                  managementActiveFilterCount > 0 ? (
                     <ClearFiltersButton
-                      activeFilterCount={managementNarrowingFilterCount}
+                      activeFilterCount={managementActiveFilterCount}
                       onClear={clearManagementFilters}
                     />
                   ) : undefined

@@ -2,6 +2,7 @@
 
 import {
   BULK_STATUS_ACTIONS,
+  ORG_ROLE_LABELS,
   describeStatusAction,
   isSelfAction,
   planBulkStatusChange,
@@ -13,34 +14,35 @@ import { Department, Employee, FocusArea, NamedItem, Invitation } from "@/types"
 import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { ClearFiltersButton } from "@/components/ClearFiltersButton";
 import { useIsInSandbox } from "@/hooks";
+import { STAFF_ACCOUNT_STATE_LABELS } from "./staff-account-state";
 import type {
-  AccountLinkFilter,
+  AccountStateFilter,
   CertificationFilter,
-  ContactPresenceFilter,
   EmploymentTypeFilter,
+  OrgRoleFilter,
+  PhonePresenceFilter,
 } from "./useStaffFilters";
 
 interface StaffContextBarProps {
   // Filter state
   filterEmploymentType: EmploymentTypeFilter;
   filterDepartment: number | null;
-  filterDepartmentAdminOnly: boolean;
   filterFocusArea: number | null;
   filterCertification: CertificationFilter;
   filterRole: number | null;
-  filterAccountLink: AccountLinkFilter;
-  filterEmailPresence: ContactPresenceFilter;
-  filterPhonePresence: ContactPresenceFilter;
+  filterAccount: AccountStateFilter;
+  filterOrgRole: OrgRoleFilter;
+  filterPhonePresence: PhonePresenceFilter;
   hasActiveFilters: boolean;
   onClearEmploymentType: () => void;
   onClearDepartment: () => void;
-  onClearDepartmentAdminOnly: () => void;
   onClearFocusArea: () => void;
   onClearCertification: () => void;
   onClearRole: () => void;
-  onClearAccountLink: () => void;
-  onClearEmailPresence: () => void;
+  onClearAccount: () => void;
+  onClearOrgRole: () => void;
   onClearPhonePresence: () => void;
   onClearAll: () => void;
   // Metadata for labels
@@ -83,22 +85,20 @@ const MODE_BAR_TITLE_CLASS = "text-[13px] font-semibold text-[var(--dg-color-con
 export function StaffContextBar({
   filterEmploymentType,
   filterDepartment,
-  filterDepartmentAdminOnly,
   filterFocusArea,
   filterCertification,
   filterRole,
-  filterAccountLink,
-  filterEmailPresence,
+  filterAccount,
+  filterOrgRole,
   filterPhonePresence,
   hasActiveFilters,
   onClearEmploymentType,
   onClearDepartment,
-  onClearDepartmentAdminOnly,
   onClearFocusArea,
   onClearCertification,
   onClearRole,
-  onClearAccountLink,
-  onClearEmailPresence,
+  onClearAccount,
+  onClearOrgRole,
   onClearPhonePresence,
   onClearAll,
   focusAreas,
@@ -155,24 +155,24 @@ export function StaffContextBar({
           : (certifications.find((certification) => certification.id === filterCertification)
               ?.name ?? null);
   const roleName = filterRole ? roles.find((r) => r.id === filterRole)?.name : null;
-  const accountLinkLabel =
-    filterAccountLink === "linked"
-      ? "Linked account"
-      : filterAccountLink === "unlinked"
-        ? "Unlinked account"
-        : null;
-  const emailPresenceLabel =
-    filterEmailPresence === "present"
-      ? "Has email"
-      : filterEmailPresence === "missing"
-        ? "Missing email"
-        : null;
+  const accountLabel = filterAccount === "all" ? null : STAFF_ACCOUNT_STATE_LABELS[filterAccount];
+  const orgRoleLabel = filterOrgRole === "all" ? null : ORG_ROLE_LABELS[filterOrgRole];
   const phonePresenceLabel =
     filterPhonePresence === "present"
       ? "Has phone"
       : filterPhonePresence === "missing"
         ? "Missing phone"
         : null;
+  const activeFilterCount = [
+    employmentTypeLabel,
+    departmentName,
+    focusAreaName,
+    certificationName,
+    roleName,
+    accountLabel,
+    orgRoleLabel,
+    phonePresenceLabel,
+  ].filter(Boolean).length;
 
   // Bulk action helpers
   const selectedEmployees = showBulk ? displayList.filter((e) => selectedIds.has(e.id)) : [];
@@ -216,12 +216,6 @@ export function StaffContextBar({
               onClear={onClearDepartment}
             />
           )}
-          {filterDepartmentAdminOnly && (
-            <FilterPill
-              label={departmentName ? `Department admin: ${departmentName}` : "Department admins"}
-              onClear={onClearDepartmentAdminOnly}
-            />
-          )}
           {focusAreaName && (
             <FilterPill label={`${focusAreaLabel}: ${focusAreaName}`} onClear={onClearFocusArea} />
           )}
@@ -236,21 +230,16 @@ export function StaffContextBar({
             />
           )}
           {roleName && <FilterPill label={`${roleLabel}: ${roleName}`} onClear={onClearRole} />}
-          {accountLinkLabel && (
-            <FilterPill label={`Account: ${accountLinkLabel}`} onClear={onClearAccountLink} />
+          {accountLabel && (
+            <FilterPill label={`Account: ${accountLabel}`} onClear={onClearAccount} />
           )}
-          {emailPresenceLabel && (
-            <FilterPill label={`Email: ${emailPresenceLabel}`} onClear={onClearEmailPresence} />
+          {orgRoleLabel && (
+            <FilterPill label={`Access role: ${orgRoleLabel}`} onClear={onClearOrgRole} />
           )}
           {phonePresenceLabel && (
             <FilterPill label={`Phone: ${phonePresenceLabel}`} onClear={onClearPhonePresence} />
           )}
-          <Button
-            onClick={onClearAll}
-            className="text-xs font-semibold text-[var(--dg-color-text-muted)] hover:text-[var(--dg-color-text-primary)] transition-colors ml-1"
-          >
-            Clear all
-          </Button>
+          <ClearFiltersButton activeFilterCount={activeFilterCount} onClear={onClearAll} small />
         </div>
       )}
 

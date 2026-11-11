@@ -199,3 +199,49 @@ describe("useStaffFilters suspended tab", () => {
     expect(result.current.activeTab).toBe("active");
   });
 });
+
+describe("useStaffFilters account state", () => {
+  const LINKED = buildEmployee({ id: "li", userId: "user-li", email: "li@example.test" });
+  const INVITED = buildEmployee({ id: "in", email: "in@example.test" });
+  const NOT_INVITED = buildEmployee({ id: "ni", email: "ni@example.test" });
+  const NO_EMAIL = buildEmployee({ id: "ne" });
+
+  function renderAccountFilters() {
+    return renderHook(() =>
+      useStaffFilters({
+        employees: [LINKED, INVITED, NOT_INVITED, NO_EMAIL],
+        focusAreas: [],
+        certifications: [],
+        roles: [],
+        pendingInviteEmployeeIds: new Map([["in", {}]]),
+      }),
+    );
+  }
+
+  it.each([
+    ["linked", "li"],
+    ["invited", "in"],
+    ["not_invited", "ni"],
+    ["no_email", "ne"],
+  ] as const)("keeps only %s people, as the Account column reads them", (state, id) => {
+    const { result } = renderAccountFilters();
+
+    act(() => result.current.setFilterAccount(state));
+
+    expect(result.current.sorted.map((employee) => employee.id)).toEqual([id]);
+    expect(result.current.activeFilterCount).toBe(1);
+  });
+
+  it("leaves the search box alone when filters are cleared", () => {
+    const { result } = renderAccountFilters();
+
+    act(() => {
+      result.current.setSearchQuery("ni@");
+      result.current.setFilterAccount("not_invited");
+    });
+    act(() => result.current.clearFilters());
+
+    expect(result.current.filterAccount).toBe("all");
+    expect(result.current.searchQuery).toBe("ni@");
+  });
+});
