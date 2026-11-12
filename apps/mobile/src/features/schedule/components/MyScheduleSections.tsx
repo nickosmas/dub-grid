@@ -9,7 +9,6 @@ import { AnimatedMeterFill } from "../../../shared/motion/AnimatedMeterFill";
 import { Pressable } from "../../../shared/components/Pressable";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { SectionHeading } from "../../../shared/components/SectionHeading";
-import { LinearGradient } from "expo-linear-gradient";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { NumericBadge } from "../../../shared/components/NumericBadge";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
@@ -48,16 +47,12 @@ import {
 import {
   HERO_CARD_BACKGROUND_DARK,
   HERO_CARD_BACKGROUND_LIGHT,
-  HERO_CARD_GRADIENT_DARK,
-  HERO_CARD_GRADIENT_END,
-  HERO_CARD_GRADIENT_LIGHT,
-  HERO_CARD_GRADIENT_LOCATIONS,
-  HERO_CARD_GRADIENT_START,
   HERO_CARD_SHADOW_DARK,
   HERO_CARD_SHADOW_LIGHT,
   HERO_COLLABORATOR_BACKGROUND_DARK,
   HERO_COLLABORATOR_BACKGROUND_LIGHT,
 } from "../lib/heroCardTheme";
+import { HeroCardBackdrop } from "./HeroCardBackdrop";
 import {
   getSegmentStartTime,
   getSegmentEndTime,
@@ -542,7 +537,14 @@ export function PreviousShiftRow({
   );
 }
 
-function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
+function MeHeroShiftmates({
+  entries,
+  isLast,
+}: {
+  entries: MobileScheduleEntry[];
+  /** Nothing follows it on the card, so it sits on the card's corner curve. */
+  isLast: boolean;
+}) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
@@ -560,7 +562,13 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   };
 
   return (
-    <View style={[styles.meHeroCollaborators, collaboratorBackground]}>
+    <View
+      style={[
+        styles.meHeroCollaborators,
+        collaboratorBackground,
+        isLast && styles.meHeroCollaboratorsLast,
+      ]}
+    >
       <View style={styles.meHeroCollaboratorLabelRow}>
         <Ionicons color={mobileOnAccent.tertiary} name="people-outline" size={22} />
         <Text style={styles.meHeroCollaboratorLabel}>Working with</Text>
@@ -879,7 +887,7 @@ export function MeHeroCard({
           />
         </View>
       ) : null}
-      <MeHeroShiftmates entries={shiftmates} />
+      <MeHeroShiftmates entries={shiftmates} isLast={heroSplitSegments.segments.length === 0} />
       {heroSplitSegments.segments.length > 0 ? (
         <SplitShiftSegmentList
           dashedDividers
@@ -917,16 +925,7 @@ export function MeHeroCard({
     </View>
   );
 
-  const heroGradient = (
-    <LinearGradient
-      colors={isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT}
-      locations={HERO_CARD_GRADIENT_LOCATIONS}
-      start={HERO_CARD_GRADIENT_START}
-      end={HERO_CARD_GRADIENT_END}
-      pointerEvents="none"
-      style={StyleSheet.absoluteFill}
-    />
-  );
+  const heroGradient = <HeroCardBackdrop isDark={isDark} />;
   const heroCardThemeStyle = {
     backgroundColor: isDark ? HERO_CARD_BACKGROUND_DARK : HERO_CARD_BACKGROUND_LIGHT,
     shadowColor: isDark ? HERO_CARD_SHADOW_DARK : HERO_CARD_SHADOW_LIGHT,

@@ -80,7 +80,17 @@ export {
 
 export { bannerIconColor, TOAST_ICON_FILL, type StatusIconTone } from "./status-icon";
 
-export { getHeroGradientCss, heroGradientTokens, type HeroGradientStops } from "./hero-gradient";
+export {
+  getHeroBackgroundCss,
+  getHeroDotInk,
+  getHeroMesh,
+  heroDotTokens,
+  heroGradientTokens,
+  heroMeshTokens,
+  type HeroDotInk,
+  type HeroMesh,
+  type HeroMeshPool,
+} from "./hero-gradient";
 
 export {
   getSoftGradientCss,

@@ -412,7 +412,9 @@ describe("UserDashboard", () => {
       gridRow: "1 / span 2",
       maxWidth: "680px",
     });
+    // The card's corner is concentric with the 14px date tile, 24px in.
     expect(screen.getByTestId("user-dashboard-hero")).toHaveStyle({
+      borderRadius: "38px",
       height: "100%",
     });
     expect(screen.getByText("On duty")).toBeInTheDocument();
@@ -431,6 +433,13 @@ describe("UserDashboard", () => {
       background: "#3A55CB",
       borderRadius: "16px",
       justifyContent: "space-between",
+    });
+    // Last on the card, its 16px corners share the card's curve: 22px from
+    // the sides and the bottom, 2px outside the 24px padding.
+    expect(workingWith).toHaveStyle({
+      marginBottom: "-2px",
+      marginLeft: "-2px",
+      marginRight: "-2px",
     });
     expect(heroBottomStack).toHaveStyle({ marginTop: "auto" });
     expect(shiftmateAvatarFrames[0]).toHaveStyle({
