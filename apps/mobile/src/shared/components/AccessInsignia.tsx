@@ -26,6 +26,10 @@ const SIZES: Record<InsigniaSize, { badge: number; pull: number }> = {
 const EDGE = ACCESS_INSIGNIA_BEVEL.width;
 const BEVEL_GRADIENT_ID = "access-insignia-bevel";
 
+// This ring lights the whole upper arc, where web's inset shadow lights only
+// a thin crescent at the very top, so at web's 30% the ring read too bright.
+const BEVEL_LIGHT_OPACITY = 0.15;
+
 /**
  * The star marking an elevated member, sitting just after their name: gold for
  * a Super Admin, blue for an Admin. Plain users get nothing, so the mark keeps
@@ -61,7 +65,7 @@ export function AccessInsignia({
       <Svg width={badge} height={badge}>
         <Defs>
           <LinearGradient id={BEVEL_GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={ACCESS_INSIGNIA_BEVEL.light} />
+            <Stop offset="0" stopColor="#ffffff" stopOpacity={BEVEL_LIGHT_OPACITY} />
             <Stop offset="0.5" stopColor="#ffffff" stopOpacity={0} />
             <Stop offset="0.5" stopColor="#000000" stopOpacity={0} />
             <Stop offset="1" stopColor={ACCESS_INSIGNIA_BEVEL.shade} />
