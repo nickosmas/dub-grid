@@ -304,7 +304,11 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
-      scheduleVisibility: { showChangeDetails: false, showPublisher: false, showAbsenceNames: true },
+      scheduleVisibility: {
+        showChangeDetails: false,
+        showPublisher: false,
+        showAbsenceNames: true,
+      },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
