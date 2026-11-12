@@ -195,18 +195,18 @@ describe("buildStaffImportTemplate", () => {
     expect(parsed.ok && check(parsed.rows).map((r) => r.status)).toEqual(["ready", "ready"]);
   });
 
-  it("writes two areas and two roles for the first person, read back as lists", () => {
+  it("writes two areas and one role for the first person, the areas read back as a list", () => {
     const withTwoRoles = {
       ...references,
       roles: [...references.roles, { id: 21, name: "Med Tech" }],
     };
     const parsed = parseStaffCsv(buildStaffImportTemplate(labels, withTwoRoles), labels);
-    expect(parsed.ok && parsed.rows[0].roleNames).toBe("Charge Nurse; Med Tech");
+    expect(parsed.ok && parsed.rows[0].roleNames).toBe("Charge Nurse");
     const [first] = parsed.ok
       ? checkStaffImportRows(parsed.rows, { ...withTwoRoles, labels, existing: [], today: TODAY })
       : [];
     expect(first.status === "ready" && first.resolved.focusAreaIds).toEqual([1, 2]);
-    expect(first.status === "ready" && first.resolved.roleIds).toEqual([20, 21]);
+    expect(first.status === "ready" && first.resolved.roleIds).toEqual([20]);
   });
 });
 
