@@ -24,7 +24,12 @@ test.describe("@preflight production login hydration", () => {
   test("loads organization login assets over local HTTP and hydrates the form", async ({
     page,
   }) => {
-    const response = await page.goto("/login");
+    // Wait for the document, not the page's `load` event. The hydration check
+    // below already proves the scripts arrived over local HTTP, while `load`
+    // also waits on every image and font: on a cold server one of them held it
+    // past this test's whole budget with the form already hydrated (WebKit,
+    // release PR #511).
+    const response = await page.goto("/login", { waitUntil: "domcontentloaded" });
 
     expect(response, "organization login response").not.toBeNull();
     expect(response?.headers()["content-security-policy"]).not.toContain(

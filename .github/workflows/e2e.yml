@@ -174,9 +174,11 @@ jobs:
       # login screen (for example, a CSP upgrade redirects HTTP assets to an
       # unavailable local HTTPS origin). This is intentionally separate from
       # the full suite so one infrastructure fault cannot consume every test
-      # timeout and obscure the actual cause.
+      # timeout and obscure the actual cause. The config traces only a retry,
+      # which this step never makes, so keep a failure's trace explicitly: it
+      # names the request that stalled, in the uploaded test results.
       - name: Verify login hydration
-        run: npx playwright test e2e/auth-hydration-preflight.spec.ts --project=${{ matrix.browser }} --retries=0
+        run: npx playwright test e2e/auth-hydration-preflight.spec.ts --project=${{ matrix.browser }} --retries=0 --trace=retain-on-failure
 
       - name: Run Playwright tests
         run: npx playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert=@preflight
