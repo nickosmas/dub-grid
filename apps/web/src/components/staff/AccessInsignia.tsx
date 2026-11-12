@@ -16,14 +16,14 @@ type InsigniaSize = "sm" | "md" | "lg";
 // Sized to the cap height of the name it follows, so the mark reads as part of
 // the name rather than as a chip beside it.
 //
-// `pull` closes most of the row's own gap. The mark belongs to the name, so it
-// should read as attached to it, while the chips that follow ("You", "On
-// Schedule") keep the row's normal rhythm — which a smaller container gap would
-// have tightened along with it.
+// `pull` trims the row's own gap so the mark sits a clear 6 to 8px after the
+// name in every row and header (rows use 6-8px gaps, panels 8px, page titles
+// 10-12px), while the chips that follow ("You", "On Schedule") keep the row's
+// normal rhythm.
 const SIZES: Record<InsigniaSize, { badge: number; pull: number }> = {
-  sm: { badge: 14, pull: -4 },
-  md: { badge: 16, pull: -5 },
-  lg: { badge: 20, pull: -7 },
+  sm: { badge: 14, pull: 0 },
+  md: { badge: 16, pull: -2 },
+  lg: { badge: 20, pull: -2 },
 };
 
 const EDGE = ACCESS_INSIGNIA_BEVEL.width;
