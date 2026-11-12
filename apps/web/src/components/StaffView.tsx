@@ -163,7 +163,6 @@ interface StaffViewProps {
   canManageEmployees?: boolean;
   isSuperAdmin?: boolean;
   isGridmaster?: boolean;
-  isManagementUser?: boolean;
   focusAreaLabel?: string;
   certificationLabel?: string;
   roleLabel?: string;
@@ -209,7 +208,6 @@ export default function StaffView({
   canManageEmployees,
   isSuperAdmin = false,
   isGridmaster = false,
-  isManagementUser = false,
   focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   certificationLabel = "Certifications",
   roleLabel = "Roles",
@@ -405,7 +403,6 @@ export default function StaffView({
             timeZone={timeZone}
             isSuperAdmin={isSuperAdmin}
             isGridmaster={isGridmaster}
-            isManagementUser={isManagementUser}
             departments={departmentsProp}
             departmentLabel={scheduledDepartmentLabel}
             managementDepartmentLabel={managementDepartmentLabel}
