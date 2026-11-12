@@ -1283,6 +1283,58 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("June Patel")).toBeInTheDocument();
   });
 
+  it("takes several choices in a filter, and narrows across filters", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({ id: "emp-1", firstName: "Mina", lastName: "Diaz", orgRole: "admin" }),
+          buildPerson({
+            id: "emp-2",
+            firstName: "June",
+            lastName: "Patel",
+            orgRole: "user",
+            seniority: 2,
+          }),
+          buildPerson({
+            id: "emp-3",
+            firstName: "Rae",
+            lastName: "Cole",
+            orgRole: "super_admin",
+            employmentType: "part_time",
+            seniority: 3,
+          }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText(/^Open people filters and sort/));
+    fireEvent.click(screen.getByText("User"));
+    fireEvent.click(screen.getByText("Super Admin"));
+
+    expect(screen.getByRole("checkbox", { name: /User/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Super Admin/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /^Admin/ })).not.toBeChecked();
+    expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
+    expect(screen.getByText("June Patel")).toBeInTheDocument();
+    expect(screen.getByText("Rae Cole")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Part-time"));
+
+    expect(screen.queryByText("June Patel")).not.toBeInTheDocument();
+    expect(screen.getByText("Rae Cole")).toBeInTheDocument();
+
+    // Unticking the last choice turns the filter off again.
+    fireEvent.click(screen.getByText("Part-time"));
+
+    expect(screen.getByText("June Patel")).toBeInTheDocument();
+  });
+
   it("can sort the staff directory by access role", () => {
     useQuery.mockReturnValue({
       data: {
