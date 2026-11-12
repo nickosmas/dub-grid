@@ -25,7 +25,7 @@ import { usePrefetchAdjacentDashboardWeeks } from "../hooks/usePrefetchAdjacentD
 import { WeekNavigatorHeader } from "../../schedule/components/WeekNavigatorHeader";
 import { DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeroCard } from "../components/DashboardHeroCard";
-import { CoverageWash } from "../components/CoverageWash";
+import { HomeWash } from "../components/HomeWash";
 import { ActionQueueCard } from "../components/ActionQueueCard";
 import { MyHomeSections } from "../components/MyHomeSections";
 import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
@@ -251,8 +251,8 @@ export function AdminHomeScreen() {
         ]
       : teamSections;
 
-  // Home keeps its coverage wash on every platform (owner, 2026-11-04).
-  const wash = <CoverageWash height={windowHeight} pct={data.metrics.coveragePct} />;
+  // Home keeps its wash on every platform (owner, 2026-11-04).
+  const wash = <HomeWash height={windowHeight} />;
 
   return (
     <Screen
