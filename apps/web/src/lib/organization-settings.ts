@@ -22,6 +22,7 @@ export type OrganizationSettingsKey =
   | "useCompactRoleCertificationLabels"
   | "staffSeeShiftChanges"
   | "staffSeePublisher"
+  | "staffSeeAbsenceNames"
   | "enforceConflictPrevention"
   | "defaultShiftEnabled"
   | "coverageRuleConfig"
@@ -117,6 +118,11 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     sensitive: false,
     format: (value) => (value ? "Shown" : "Hidden"),
   },
+  staffSeeAbsenceNames: {
+    label: "Staff See Absence Names",
+    sensitive: false,
+    format: (value) => (value ? "Shown" : "Hidden"),
+  },
   payPeriodStartDate: {
     label: "Pay Period Start date",
     sensitive: true,
@@ -190,6 +196,7 @@ export function pickOrganizationSettings(organization: Organization): Organizati
     useCompactRoleCertificationLabels: organization.useCompactRoleCertificationLabels ?? false,
     staffSeeShiftChanges: organization.staffSeeShiftChanges ?? true,
     staffSeePublisher: organization.staffSeePublisher ?? true,
+    staffSeeAbsenceNames: organization.staffSeeAbsenceNames ?? true,
     enforceConflictPrevention: organization.enforceConflictPrevention,
     defaultShiftEnabled: organization.defaultShiftEnabled,
     coverageRuleConfig: organization.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },

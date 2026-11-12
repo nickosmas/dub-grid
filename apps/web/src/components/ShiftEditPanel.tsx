@@ -10,7 +10,11 @@ import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
 import { FILLED_PILL_BORDER, toDarkPillColors, darkenColor } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
-import { CORRECTION_REASON_MAX_LENGTH, indefiniteArticle } from "@dubgrid/domain";
+import {
+  CORRECTION_REASON_MAX_LENGTH,
+  HIDDEN_ABSENCE_TYPE_ID,
+  indefiniteArticle,
+} from "@dubgrid/domain";
 import type { TimeRange } from "@/lib/schedule-logic";
 import {
   EditModalState,
@@ -585,7 +589,10 @@ export default function ShiftEditPanel({
   >(null);
   const [isSubmittingRequestConfirmation, setIsSubmittingRequestConfirmation] = useState(false);
   const repeatFormRef = useRef<RepeatFormHandle | null>(null);
-  const activeAbsenceTypes = absenceTypes.filter((at) => !at.archivedAt);
+  // Time off stands in for a colleague's absence; nobody calls off with it.
+  const activeAbsenceTypes = absenceTypes.filter(
+    (at) => !at.archivedAt && at.id !== HIDDEN_ABSENCE_TYPE_ID,
+  );
   const requestShiftDate = formatDateKey(modal.date);
   const requestOnlyMode = modal.requestMode ?? null;
   const canRenderCoverage = Boolean(onMakeAvailable || onCallOff);

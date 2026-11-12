@@ -1,9 +1,14 @@
+import { resolveAbsenceNameMask } from "@/lib/server/absence-visibility";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbShiftRequest } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
-import { toShiftRequestDraftCell, type ShiftRequestDraftCellRow } from "@dubgrid/domain";
+import {
+  maskCellStateAbsence,
+  toShiftRequestDraftCell,
+  type ShiftRequestDraftCellRow,
+} from "@dubgrid/domain";
 import {
   settleShiftRequestAfterTransition,
   type ShiftRequestSettlement,
@@ -382,10 +387,15 @@ export async function POST(req: NextRequest) {
         }
 
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
-        const [{ assignmentIdByPair, segmentCompatibility }, hiddenStaffIds] = await Promise.all([
-          fetchSegmentResolutionMaps(auth.serviceClient, data.orgId),
-          fetchHiddenStaffIds(auth),
-        ]);
+        const [{ assignmentIdByPair, segmentCompatibility }, hiddenStaffIds, absenceMask] =
+          await Promise.all([
+            fetchSegmentResolutionMaps(auth.serviceClient, data.orgId),
+            fetchHiddenStaffIds(auth),
+            resolveAbsenceNameMask(auth.serviceClient, data.orgId, {
+              showAbsenceNames: auth.scheduleVisibility.showAbsenceNames,
+              userId: auth.actor.id,
+            }),
+          ]);
         const visibleRows = withoutHiddenRequests(
           (rows ?? []) as Array<
             Record<string, unknown> & { requester_emp_id: string; target_emp_id: string | null }
@@ -410,11 +420,27 @@ export async function POST(req: NextRequest) {
               status: row.status as ShiftRequestStatus,
               requester_emp_id: row.requester_emp_id as string,
               requester_shift_date: row.requester_shift_date as string,
-              requester_state: row.requester_state as DbShiftRequest["requester_state"],
+              requester_state: maskCellStateAbsence(
+                absenceMask,
+                row.requester_emp_id,
+                row.requester_state as DbShiftRequest["requester_state"],
+              ),
               target_emp_id: (row.target_emp_id as string | null) ?? null,
               target_shift_date: (row.target_shift_date as string | null) ?? null,
-              target_state: (row.target_state as DbShiftRequest["target_state"] | null) ?? null,
-              absence_type_id: (row.absence_type_id as number | null) ?? null,
+              target_state:
+                maskCellStateAbsence(
+                  absenceMask,
+                  row.target_emp_id,
+                  row.target_state as DbShiftRequest["target_state"] | null,
+                ) ?? null,
+              // A call-off's absence is the requester's.
+              absence_type_id:
+                absenceMask?.absenceTypeId(
+                  row.requester_emp_id,
+                  row.absence_type_id as number | null,
+                ) ??
+                (row.absence_type_id as number | null) ??
+                null,
               parent_request_id: (row.parent_request_id as string | null) ?? null,
               admin_user_id: (row.admin_user_id as string | null) ?? null,
               admin_note: (row.admin_note as string | null) ?? null,

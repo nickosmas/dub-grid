@@ -38,6 +38,13 @@ const reachable = await probeDb();
 const CONTACT_COLUMNS = ["phone", "email", "contact_notes", "status_note"] as const;
 /** A colleague's status, server-owned since 132. */
 const STATUS_COLUMNS = ["status", "status_changed_at", "archived_at"] as const;
+/** What kind of absence a colleague has, server-owned since 134. */
+const ABSENCE_COLUMNS = [
+  ["schedule_cell_snapshots", "absence_type_id"],
+  ["shift_requests", "absence_type_id"],
+  ["shift_requests", "requester_state"],
+  ["shift_requests", "target_state"],
+] as const;
 
 interface Member {
   email: string;
@@ -137,6 +144,51 @@ describe.runIf(reachable)("employee contact columns are server-owned (live DB)",
           }, /permission denied for table employees/);
         }
       }
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+
+  it("refuses every member tier a colleague's absence (134)", async () => {
+    await db.query("BEGIN");
+    try {
+      for (const member of MEMBERS) {
+        for (const [table, column] of ABSENCE_COLUMNS) {
+          await expectRaise(
+            async () => {
+              await asUser(member);
+              await db.query(`SELECT ${column} FROM public.${table} WHERE org_id = $1 LIMIT 1`, [
+                orgId,
+              ]);
+            },
+            new RegExp(`permission denied for table ${table}`),
+          );
+        }
+      }
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+
+  it("still reads the snapshot and request columns members use (134)", async () => {
+    await db.query("BEGIN");
+    try {
+      await asUser(MEMBERS[2]);
+      // The repeat-overwrites check reads these through the caller's own client.
+      await db.query(
+        `SELECT snapshot_kind, state_kind FROM public.schedule_cell_snapshots WHERE org_id = $1 LIMIT 1`,
+        [orgId],
+      );
+      await db.query(
+        `SELECT id, type, status, requester_emp_id FROM public.shift_requests WHERE org_id = $1 LIMIT 1`,
+        [orgId],
+      );
+      await asSuperuser();
+      const { rows } = await db.query<{ staff_see_absence_names: boolean }>(
+        `SELECT staff_see_absence_names FROM public.organizations WHERE id = $1`,
+        [orgId],
+      );
+      expect(rows[0].staff_see_absence_names).toBe(true);
     } finally {
       await db.query("ROLLBACK");
     }

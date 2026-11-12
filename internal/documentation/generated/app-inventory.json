@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:d39d72b988c92d1982880aaabc5800bb7649ace1114d3ff6299afeb4c09d4a38",
+  "sourceDigest": "sha256:cda3326526bcf35cbd037acf786e4845adae901f5b951fccfb9c4efa1166981f",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5191,6 +5191,16 @@
       "sha256": "36ca17f511354eb9fde1d214897e5b6b4cf7215a6a37c95cf4bc7a24d5645ce6",
       "source": {
         "path": "supabase/migrations/133_colleague_accounts_server_owned.sql"
+      }
+    },
+    {
+      "id": "migration:134_staff_see_absence_names.sql",
+      "version": "134",
+      "name": "staff_see_absence_names",
+      "file": "134_staff_see_absence_names.sql",
+      "sha256": "1338f2bf791495ca351b74eb21a6c1ad73360a966ad5ac930558db190c8332a0",
+      "source": {
+        "path": "supabase/migrations/134_staff_see_absence_names.sql"
       }
     }
   ],

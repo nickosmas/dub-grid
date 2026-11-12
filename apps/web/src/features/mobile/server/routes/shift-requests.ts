@@ -1,3 +1,4 @@
+import { mobileAbsenceViewer } from "@/features/mobile/server/absence-viewer";
 import { NextResponse, type NextRequest } from "next/server";
 import { formatClientErrorMessage, API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
@@ -63,7 +64,11 @@ export async function GET(req: NextRequest) {
         hiddenUserIds: await hiddenUserIds(),
       }),
     fetchMobileShiftRequests: async (serviceClient, input) =>
-      fetchMobileShiftRequests(serviceClient, { ...input, hiddenUserIds: await hiddenUserIds() }),
+      fetchMobileShiftRequests(serviceClient, {
+        ...input,
+        hiddenUserIds: await hiddenUserIds(),
+        absenceViewer: mobileAbsenceViewer(auth),
+      }),
   });
 
   return NextResponse.json(mobileShiftRequestsResponseSchema.parse(payload));
