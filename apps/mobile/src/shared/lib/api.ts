@@ -29,6 +29,7 @@ import {
   mobilePersonCreateResponseSchema,
   mobilePeopleResponseSchema,
   mobilePersonInvitationResponseSchema,
+  mobilePersonMoveEmailResponseSchema,
   mobilePersonOrgRoleResponseSchema,
   mobilePersonPermissionsResponseSchema,
   mobilePersonStatusUpdateResponseSchema,
@@ -63,6 +64,7 @@ import {
   type MobileProfileMfaStatusUpdateBody,
   type MobileProfilePhoneUpdateBody,
   type MobileProfileResponse,
+  type MobilePersonMoveEmailBody,
   type MobilePersonOrgRoleBody,
   type MobilePersonPermissionsBody,
   type MobilePersonStatusUpdateBody,
@@ -1267,6 +1269,23 @@ export function changeMobilePersonOrgRole(
       body: JSON.stringify(body),
     },
     (value) => mobilePersonOrgRoleResponseSchema.parse(value),
+  );
+}
+
+/** Move to a new email: ends their sign-in here and invites the new address. Needs fresh proof. */
+export function moveMobilePersonToNewEmail(
+  accessToken: string,
+  personId: string,
+  body: MobilePersonMoveEmailBody,
+) {
+  return mobileApiRequest(
+    `/api/mobile/v1/people/${personId}/move-email`,
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    (value) => mobilePersonMoveEmailResponseSchema.parse(value),
   );
 }
 

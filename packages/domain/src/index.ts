@@ -10,6 +10,7 @@ export * from "./credential-requirements";
 export * from "./dashboard-activity";
 export * from "./employment-status";
 export * from "./notification-metadata";
+export * from "./move-email";
 export * from "./org-roles";
 export * from "./organization";
 export * from "./organization-labels";

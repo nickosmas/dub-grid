@@ -93,6 +93,8 @@ const DELEGATED_SERVICE_HELPERS: Record<string, string> = {
     "Scopes session operations to the authenticated user ID.",
   "apps/web/src/features/account/server/terms.ts":
     "Scopes acceptance to the authenticated user ID.",
+  "apps/web/src/features/employees/server/move-email.ts":
+    "Runs only after a move-email route's fresh proof and staff permission check, for that route's organization and one employee in it.",
   "apps/web/src/features/employees/server/status-change.ts":
     "Runs only after a status route's live canManageEmployees check, for that route's effective organization and one employee in it.",
   "apps/web/src/features/employees/server/suspension-notice.ts":

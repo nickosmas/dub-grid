@@ -84,11 +84,12 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\bforbidIfSandboxCookie\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bcanManageSuperAdminOnly\s*\([\s\S]*?\bdeleteUserAccountWithCleanup\s*\(/,
     ],
   },
-  // Ends the moved sign-in's access to this organization only, after fresh proof.
+  // Ends the moved sign-in's access to this organization only, after fresh
+  // proof, through the move the app's route shares (SHARED_MOVE_EMAIL).
   "apps/web/src/app/api/employees/move-email/route.ts": {
     policy: "sensitive",
     assertions: [
-      /\bforbidIfSandboxCookie\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bcanManageEmployees\s*\([\s\S]*?\bendAccessInOrganization\s*\(/,
+      /\bforbidIfSandboxCookie\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bcanManageEmployees\s*\([\s\S]*?\bmoveStaffRecordToNewEmail\s*\(/,
     ],
   },
   "apps/web/src/app/api/employees/status/route.ts": {
@@ -365,6 +366,12 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
   "apps/web/src/features/mobile/server/routes/profile-change-requests.ts": [
     /pending\.type === "account_deletion"[\s\S]*?if \(parsed\.data\.action === "approve"\) \{\s*const assurance = await requireMobileSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;/,
   ],
+  // Move to a new email from the app: fresh proof, then the staff permission,
+  // then the same shared move as web, which ends only the moved sign-in's
+  // access to this organization.
+  "apps/web/src/features/mobile/server/routes/person-move-email.ts": [
+    /const auth = await requireMobileSensitiveActionAuth\(req\);\s*if \("response" in auth\) return auth\.response;\s*if \(!auth\.permissions\.canManageEmployees\)[\s\S]*?\bmoveStaffRecordToNewEmail\s*\(/,
+  ],
   "apps/web/src/features/mobile/server/routes/profile-sessions.ts": [
     /export async function DELETE[\s\S]*?\brequireMobileSensitiveActionAuth\s*\(/,
   ],
@@ -385,6 +392,14 @@ const SHARED_STATUS_CHANGE_ASSERTIONS: RegExp[] = [
   // Suspension signs only the suspended person out (51c), and only once
   // it starts: a planned one (51g3) waits for the daily job.
   /if \(action === "suspend" && !planning && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,
+];
+
+// The move both move-email routes run: it refuses the caller's own record and
+// ends access only after the version-guarded write has moved the record.
+const SHARED_MOVE_EMAIL = "apps/web/src/features/employees/server/move-email.ts";
+const SHARED_MOVE_EMAIL_ASSERTIONS: RegExp[] = [
+  /if \(previousUserId === actor\.id\) \{\s*return refuse\("Change your own email on your profile\.", 403\);/,
+  /\.eq\("version", expectedVersion\)[\s\S]*?if \(!movedRow\)[\s\S]*?await endAccessInOrganization\(serviceClient, \{\s*orgId,\s*userId: previousUserId,/,
 ];
 
 // Also catches a file by what it changes, not only by the gate it calls, so a
@@ -440,6 +455,15 @@ describe("sensitive action authorization boundaries", () => {
     const source = readFileSync(path.join(repoRoot, SHARED_STATUS_CHANGE), "utf8");
     expect(
       SHARED_STATUS_CHANGE_ASSERTIONS.filter((assertion) => !assertion.test(source)).map(
+        (assertion) => assertion.source,
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps the shared move's checks ahead of the access it ends", () => {
+    const source = readFileSync(path.join(repoRoot, SHARED_MOVE_EMAIL), "utf8");
+    expect(
+      SHARED_MOVE_EMAIL_ASSERTIONS.filter((assertion) => !assertion.test(source)).map(
         (assertion) => assertion.source,
       ),
     ).toEqual([]);

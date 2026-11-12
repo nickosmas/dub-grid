@@ -130,6 +130,14 @@ vi.mock("../../../shared/lib/api", async (importOriginal) => ({
   updateMobilePerson: (...args: unknown[]) => updateMobilePerson(...args),
 }));
 
+const stepUpRun = vi.fn((action: (accessToken: string) => Promise<unknown>) =>
+  action("fresh-token").then(() => true),
+);
+
+vi.mock("../../profile/hooks/useMobileStepUpAction", () => ({
+  useMobileStepUpAction: () => ({ run: stepUpRun, active: false, sheet: null }),
+}));
+
 vi.mock("../../auth/hooks/useAccessToken", () => ({
   useAccessToken,
 }));
@@ -2732,6 +2740,98 @@ describe("PersonDetailScreen", () => {
         screen.getByText(
           "They sign in with this email, so they'll need to change it from their profile.",
         ),
+      ).toBeInTheDocument();
+    });
+
+    it("offers a manager Move them to a new one under a joined person's email", () => {
+      renderForSchedule({ userId: "user-2", orgRole: "user", email: "old@dubgrid.test" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+      expect(screen.getByText("Lost access to this email?")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Move them to a new one" })).toBeInTheDocument();
+    });
+
+    it("withholds the move for someone who hasn't joined", () => {
+      renderForSchedule({ userId: null, email: "old@dubgrid.test" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+      expect(
+        screen.queryByRole("link", { name: "Move them to a new one" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("withholds moving an Admin from an Admin, as the server does", () => {
+      const bootstrap = useBootstrap.getMockImplementation()?.() ?? useBootstrap();
+      useBootstrap.mockReturnValue({
+        ...bootstrap,
+        data: { ...bootstrap.data, effectiveRole: "admin" },
+      } as never);
+      renderForSchedule({ userId: "user-2", orgRole: "admin", email: "old@dubgrid.test" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+      expect(
+        screen.queryByRole("link", { name: "Move them to a new one" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("moves a joined person to a new email after the identity check", async () => {
+      const mutationCalls = renderForSchedule({
+        userId: "user-2",
+        orgRole: "user",
+        email: "old@dubgrid.test",
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("link", { name: "Move them to a new one" }));
+
+      expect(screen.getByText("Move to a new email")).toBeInTheDocument();
+      expect(
+        screen.getByText("Their current sign-in email loses access to this organization."),
+      ).toBeInTheDocument();
+      const moveButton = screen.getByRole("button", { name: "Move and invite" });
+      expect(moveButton).toBeDisabled();
+
+      fireEvent.change(screen.getByLabelText("New email"), {
+        target: { value: "not-an-email" },
+      });
+      expect(screen.getByRole("button", { name: "Move and invite" })).toBeDisabled();
+
+      fireEvent.change(screen.getByLabelText("New email"), {
+        target: { value: "new@dubgrid.test" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Move and invite" }));
+
+      await waitFor(() => expect(stepUpRun).toHaveBeenCalled());
+      expect(
+        mutationCalls.flatMap((call) => call.mutateAsync.mock.calls.map(([p]) => p)),
+      ).toContainEqual({ accessToken: "fresh-token", email: "new@dubgrid.test" });
+    });
+
+    it("shows why a move was refused in the sheet", async () => {
+      renderForSchedule({ userId: "user-2", orgRole: "user", email: "old@dubgrid.test" });
+      const refusal = new ApiResponseError("They're this organization's only Super Admin.", 409, {
+        error: "They're this organization's only Super Admin.",
+      });
+      // Every render builds fresh mutations, so the refusal has to come from each.
+      useMutation.mockImplementation(() => ({
+        error: null,
+        isPending: false,
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(refusal),
+      }));
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("link", { name: "Move them to a new one" }));
+      fireEvent.change(screen.getByLabelText("New email"), {
+        target: { value: "new@dubgrid.test" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Move and invite" }));
+
+      expect(
+        await screen.findByText("They're this organization's only Super Admin."),
       ).toBeInTheDocument();
     });
 

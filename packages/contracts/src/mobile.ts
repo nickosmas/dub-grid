@@ -1228,6 +1228,22 @@ export const mobilePersonOrgRoleResponseSchema = z.object({
   person: mobilePersonSchema,
 });
 
+/**
+ * Move to a new email: for a joined person who lost their mailbox. The record
+ * leaves its sign-in and an invite goes to the new address at the same role.
+ */
+export const mobilePersonMoveEmailBodySchema = z.object({
+  email: z.string().trim().min(1),
+  expectedVersion: z.number().int().nonnegative(),
+});
+
+export const mobilePersonMoveEmailResponseSchema = z.object({
+  success: z.literal(true),
+  person: mobilePersonSchema,
+  /** False when the move stood but the invite email didn't send. */
+  invited: z.boolean(),
+});
+
 /** An Admin's permissions, set from the app's Permissions screen. */
 export const mobilePersonPermissionsBodySchema = z.object({
   adminPermissions: z.record(z.string(), z.boolean()),
@@ -1512,6 +1528,8 @@ export type MobileManagementAccessRemoveBody = z.infer<
 export type MobileManagementAccessResponse = z.infer<typeof mobileManagementAccessResponseSchema>;
 export type MobilePersonOrgRoleBody = z.infer<typeof mobilePersonOrgRoleBodySchema>;
 export type MobilePersonOrgRoleResponse = z.infer<typeof mobilePersonOrgRoleResponseSchema>;
+export type MobilePersonMoveEmailBody = z.infer<typeof mobilePersonMoveEmailBodySchema>;
+export type MobilePersonMoveEmailResponse = z.infer<typeof mobilePersonMoveEmailResponseSchema>;
 export type MobilePersonPermissionsBody = z.infer<typeof mobilePersonPermissionsBodySchema>;
 export type MobileManagementUser = z.infer<typeof mobileManagementUserSchema>;
 export type MobileManagementUsersResponse = z.infer<typeof mobileManagementUsersResponseSchema>;

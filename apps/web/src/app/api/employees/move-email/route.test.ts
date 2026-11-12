@@ -91,7 +91,7 @@ vi.mock("@/features/mobile/server/invitation-email", () => ({
     NextResponse.json({ error: "email" }, { status: 503 }),
 }));
 vi.mock("@/features/mobile/server/management-roster", () => ({ getRequestIp: () => null }));
-vi.mock("@/features/notifications/server/events", () => ({ dispatchNotificationEvent: vi.fn() }));
+vi.mock("@/features/notifications/server", () => ({ dispatchNotificationEvent: vi.fn() }));
 vi.mock("@/features/organization/server/invitation-delivery", () => ({
   sendPendingInvitationEmail: (...args: unknown[]) => sendPendingInvitationEmail(...args),
 }));
