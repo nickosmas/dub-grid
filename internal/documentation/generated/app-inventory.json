@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:755b3126b08f0179aea5a37cf029a6d6e40f046bd791d123744de3f8a8090894",
+  "sourceDigest": "sha256:d39d72b988c92d1982880aaabc5800bb7649ace1114d3ff6299afeb4c09d4a38",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5188,7 +5188,7 @@
       "version": "133",
       "name": "colleague_accounts_server_owned",
       "file": "133_colleague_accounts_server_owned.sql",
-      "sha256": "c6aa8bad895e399a5d330b4c158b808614f0d8c9bf3c5d9f9401f965fda4833e",
+      "sha256": "36ca17f511354eb9fde1d214897e5b6b4cf7215a6a37c95cf4bc7a24d5645ce6",
       "source": {
         "path": "supabase/migrations/133_colleague_accounts_server_owned.sql"
       }
