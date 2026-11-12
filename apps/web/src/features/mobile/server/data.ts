@@ -1,3 +1,5 @@
+import { HIDDEN_ABSENCE_TYPE, maskCellStateAbsence, type AbsenceNameMask } from "@dubgrid/domain";
+import { resolveAbsenceNameMask } from "@/lib/server/absence-visibility";
 import {
   rowToCoverageRequirement,
   rowToEmployee,
@@ -962,6 +964,53 @@ export async function fetchMobileScheduleNotes(
   }));
 }
 
+/**
+ * The schedule as a viewer shown colleagues' absences as Time off sees it:
+ * every state rewritten before any label, presentation or change text is
+ * built from it, so none of them can name the absence.
+ */
+function withMobileAbsenceMask(
+  mask: AbsenceNameMask | null,
+  input: {
+    absenceMap: Map<number, MobileAbsenceDetails>;
+    publishHistory: MobilePublishHistoryEntry[];
+    shiftChangeResolvers: ShiftChangeResolvers;
+    rows: MobileScheduleComparisonRow[];
+  },
+) {
+  if (!mask) return input;
+  input.absenceMap.set(HIDDEN_ABSENCE_TYPE.id, {
+    label: HIDDEN_ABSENCE_TYPE.label,
+    name: HIDDEN_ABSENCE_TYPE.name,
+    color: HIDDEN_ABSENCE_TYPE.color,
+    borderColor: HIDDEN_ABSENCE_TYPE.borderColor,
+    textColor: HIDDEN_ABSENCE_TYPE.textColor,
+  });
+  return {
+    absenceMap: input.absenceMap,
+    publishHistory: input.publishHistory.map((entry) => ({
+      ...entry,
+      changes: entry.changes.map((change) => ({
+        ...change,
+        fromState: maskCellStateAbsence(mask, change.empId, change.fromState),
+        toState: maskCellStateAbsence(mask, change.empId, change.toState),
+      })),
+    })),
+    shiftChangeResolvers: {
+      ...input.shiftChangeResolvers,
+      absenceType: (absenceTypeId: number) =>
+        absenceTypeId === HIDDEN_ABSENCE_TYPE.id
+          ? { name: HIDDEN_ABSENCE_TYPE.name, archived: false }
+          : input.shiftChangeResolvers.absenceType(absenceTypeId),
+    },
+    rows: input.rows.map((row) => ({
+      ...row,
+      draftState: maskCellStateAbsence(mask, row.emp_id, row.draftState),
+      publishedState: maskCellStateAbsence(mask, row.emp_id, row.publishedState),
+    })),
+  };
+}
+
 export async function fetchMobileScheduleEntries(
   serviceClient: SupabaseClient,
   input: {
@@ -971,6 +1020,8 @@ export async function fetchMobileScheduleEntries(
     employeeId?: string;
     /** People whose shifts the viewer must not be shown. */
     hiddenUserIds?: readonly string[];
+    /** Who is looking, when the organization may hide absence names from them. */
+    absenceViewer?: { userId: string; showAbsenceNames: boolean };
   },
 ): Promise<MobileScheduleEntry[]> {
   const [
@@ -978,9 +1029,10 @@ export async function fetchMobileScheduleEntries(
     absenceMap,
     focusAreaNameMap,
     jobNameMap,
-    publishHistory,
-    shiftChangeResolvers,
-    data,
+    unmaskedPublishHistory,
+    unmaskedShiftChangeResolvers,
+    unmaskedData,
+    absenceMask,
   ] = await Promise.all([
     fetchAssignmentDetailsMap(serviceClient, input.orgId),
     fetchAbsenceLabelMap(serviceClient, input.orgId),
@@ -992,7 +1044,20 @@ export async function fetchMobileScheduleEntries(
     }),
     fetchShiftChangeResolvers(serviceClient, input.orgId),
     fetchMobileScheduleComparisonRowsData(serviceClient, input),
+    input.absenceViewer
+      ? resolveAbsenceNameMask(serviceClient, input.orgId, input.absenceViewer)
+      : Promise.resolve(null),
   ]);
+  const {
+    publishHistory,
+    shiftChangeResolvers,
+    rows: data,
+  } = withMobileAbsenceMask(absenceMask, {
+    absenceMap,
+    publishHistory: unmaskedPublishHistory,
+    shiftChangeResolvers: unmaskedShiftChangeResolvers,
+    rows: unmaskedData,
+  });
   const missingDeletedChanges = getMissingDeletedPublishedChanges(publishHistory, data, input);
   const missingDeletedEmployees = await fetchMobileEmployeeRowsByIds(
     serviceClient,
@@ -2022,6 +2087,26 @@ async function loadMobileShiftRequestMappingContext(serviceClient: SupabaseClien
 }
 
 /** Drops requests made by, or aimed at, a person the viewer must not see. */
+/** Request rows with each person's absence as this viewer may see it. */
+async function withMaskedRequestAbsences(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  rows: MobileShiftRequestQueryRow[],
+  absenceViewer: { userId: string; showAbsenceNames: boolean } | undefined,
+): Promise<MobileShiftRequestQueryRow[]> {
+  const mask = absenceViewer
+    ? await resolveAbsenceNameMask(serviceClient, orgId, absenceViewer)
+    : null;
+  if (!mask) return rows;
+  return rows.map((row) => ({
+    ...row,
+    requester_state: maskCellStateAbsence(mask, row.requester_emp_id, row.requester_state),
+    target_state: maskCellStateAbsence(mask, row.target_emp_id, row.target_state) ?? null,
+    // A call-off's absence is the requester's.
+    absence_type_id: mask.absenceTypeId(row.requester_emp_id, row.absence_type_id ?? null),
+  }));
+}
+
 async function withoutHiddenRequestRows(
   serviceClient: SupabaseClient,
   orgId: string,
@@ -2043,13 +2128,19 @@ export async function fetchMobileShiftRequests(
     endDate?: string;
     /** People whose requests the viewer must not be shown. */
     hiddenUserIds?: readonly string[];
+    /** Who is looking, when the organization may hide absence names from them. */
+    absenceViewer?: { userId: string; showAbsenceNames: boolean };
   },
 ): Promise<MobileShiftRequest[]> {
   const [mappingContext, rows] = await Promise.all([
     loadMobileShiftRequestMappingContext(serviceClient, input.orgId),
-    fetchMobileShiftRequestRowsData(serviceClient, input).then((found) =>
-      withoutHiddenRequestRows(serviceClient, input.orgId, found, input.hiddenUserIds),
-    ),
+    fetchMobileShiftRequestRowsData(serviceClient, input)
+      .then((found) =>
+        withoutHiddenRequestRows(serviceClient, input.orgId, found, input.hiddenUserIds),
+      )
+      .then((found) =>
+        withMaskedRequestAbsences(serviceClient, input.orgId, found, input.absenceViewer),
+      ),
   ]);
 
   return mapMobileShiftRequestRows(rows, mappingContext);
@@ -2059,6 +2150,7 @@ export async function fetchMobileShiftRequestHistory(
   serviceClient: SupabaseClient,
   input: Parameters<typeof fetchMobileShiftRequestHistoryRowsData>[1] & {
     hiddenUserIds?: readonly string[];
+    absenceViewer?: { userId: string; showAbsenceNames: boolean };
   },
 ) {
   const [mappingContext, page] = await Promise.all([
@@ -2066,11 +2158,11 @@ export async function fetchMobileShiftRequestHistory(
     fetchMobileShiftRequestHistoryRowsData(serviceClient, input),
   ]);
   // The cursor still comes from the full page, so a hidden row never skips the next one.
-  const rows = await withoutHiddenRequestRows(
+  const rows = await withMaskedRequestAbsences(
     serviceClient,
     input.orgId,
-    page.rows,
-    input.hiddenUserIds,
+    await withoutHiddenRequestRows(serviceClient, input.orgId, page.rows, input.hiddenUserIds),
+    input.absenceViewer,
   );
 
   return {

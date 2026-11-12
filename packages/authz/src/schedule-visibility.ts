@@ -4,12 +4,17 @@ export interface ScheduleVisibilityViewer {
   canPublishSchedule: boolean;
   isSuperAdmin: boolean;
   isGridmaster: boolean;
+  /** Settling call-offs and staffing them needs to know what the absence is. */
+  canApproveShiftRequests?: boolean;
+  /** Staff managers set the absence a person's time away holds. */
+  canManageEmployees?: boolean;
 }
 
 /** The organization's choices for everyone else (item 46f); missing means shown. */
 export interface ScheduleVisibilitySettings {
   staffSeeShiftChanges?: boolean | null;
   staffSeePublisher?: boolean | null;
+  staffSeeAbsenceNames?: boolean | null;
 }
 
 export interface ScheduleVisibility {
@@ -17,6 +22,11 @@ export interface ScheduleVisibility {
   showChangeDetails: boolean;
   /** The viewer may see who published and who edited each cell. */
   showPublisher: boolean;
+  /**
+   * The viewer may see what kind of absence a colleague has. Off, it reads
+   * "Time off"; their own and the day off absence always keep their names.
+   */
+  showAbsenceNames: boolean;
 }
 
 /**
@@ -33,5 +43,10 @@ export function scheduleViewerVisibility(
   return {
     showChangeDetails: runsSchedule || settings.staffSeeShiftChanges !== false,
     showPublisher: runsSchedule || settings.staffSeePublisher !== false,
+    showAbsenceNames:
+      runsSchedule ||
+      viewer.canApproveShiftRequests === true ||
+      viewer.canManageEmployees === true ||
+      settings.staffSeeAbsenceNames !== false,
   };
 }

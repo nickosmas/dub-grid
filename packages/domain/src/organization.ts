@@ -86,6 +86,8 @@ export interface Organization {
   staffSeeShiftChanges?: boolean;
   /** Staff see who published and who edited each cell (item 46f). */
   staffSeePublisher?: boolean;
+  /** Staff see what kind of absence a colleague has; off, "Time off". */
+  staffSeeAbsenceNames?: boolean;
   timezone: string | null;
   payPeriodStartDate: string | null;
   archivedAt?: string | null;

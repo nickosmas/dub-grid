@@ -384,13 +384,17 @@ export default function DisplayMode({
   const [staffSeePublisher, setStaffSeePublisher] = useState(
     organization.staffSeePublisher ?? true,
   );
+  const [staffSeeAbsenceNames, setStaffSeeAbsenceNames] = useState(
+    organization.staffSeeAbsenceNames ?? true,
+  );
   const [saving, setSaving] = useState(false);
   const isModified =
     selected !== organization.shiftDisplayMode ||
     showShiftDetailHoverCards !== (organization.showShiftDetailHoverCards ?? true) ||
     useCompactLabels !== (organization.useCompactRoleCertificationLabels ?? false) ||
     staffSeeShiftChanges !== (organization.staffSeeShiftChanges ?? true) ||
-    staffSeePublisher !== (organization.staffSeePublisher ?? true);
+    staffSeePublisher !== (organization.staffSeePublisher ?? true) ||
+    staffSeeAbsenceNames !== (organization.staffSeeAbsenceNames ?? true);
 
   const handleSave = useCallback(async (): Promise<boolean> => {
     if (!organization.updatedAt) {
@@ -409,6 +413,7 @@ export default function DisplayMode({
           useCompactRoleCertificationLabels: useCompactLabels,
           staffSeeShiftChanges,
           staffSeePublisher,
+          staffSeeAbsenceNames,
         },
       });
       onSave(result.organization);
@@ -421,6 +426,7 @@ export default function DisplayMode({
         setUseCompactLabels(result.organization.useCompactRoleCertificationLabels ?? false);
         setStaffSeeShiftChanges(result.organization.staffSeeShiftChanges ?? true);
         setStaffSeePublisher(result.organization.staffSeePublisher ?? true);
+        setStaffSeeAbsenceNames(result.organization.staffSeeAbsenceNames ?? true);
         toast.info("Display settings were refreshed to the latest saved value.");
         return false;
       }
@@ -438,6 +444,7 @@ export default function DisplayMode({
     useCompactLabels,
     staffSeeShiftChanges,
     staffSeePublisher,
+    staffSeeAbsenceNames,
     onSave,
   ]);
 
@@ -447,12 +454,14 @@ export default function DisplayMode({
     setUseCompactLabels(organization.useCompactRoleCertificationLabels ?? false);
     setStaffSeeShiftChanges(organization.staffSeeShiftChanges ?? true);
     setStaffSeePublisher(organization.staffSeePublisher ?? true);
+    setStaffSeeAbsenceNames(organization.staffSeeAbsenceNames ?? true);
   }, [
     organization.shiftDisplayMode,
     organization.showShiftDetailHoverCards,
     organization.useCompactRoleCertificationLabels,
     organization.staffSeeShiftChanges,
     organization.staffSeePublisher,
+    organization.staffSeeAbsenceNames,
   ]);
 
   const modes = DISPLAY_MODES;
@@ -689,6 +698,28 @@ export default function DisplayMode({
           disabled={saving}
           ariaLabel="Show staff who published"
         />
+
+        <div
+          className="dg-card-title"
+          style={{
+            padding: "16px 18px 0",
+            borderTop: "1px solid var(--dg-color-border-light)",
+          }}
+        >
+          What staff see about time off
+        </div>
+        <StaffVisibilityRow
+          title="Absence names"
+          description={
+            staffSeeAbsenceNames
+              ? "Staff see the name of each colleague's absence, such as Vacation or Sick."
+              : "Staff see a colleague's absence as Time off. Their own absences and the day off keep their names."
+          }
+          checked={staffSeeAbsenceNames}
+          onChange={setStaffSeeAbsenceNames}
+          disabled={saving}
+          ariaLabel="Show staff absence names"
+        />
       </div>
       <UnsavedChangesBar
         dirty={isModified}
@@ -701,7 +732,7 @@ export default function DisplayMode({
   );
 }
 
-/** One "What staff see" switch. People who edit or publish the schedule always see both. */
+/** One "What staff see" switch. People who edit or publish the schedule always see everything. */
 function StaffVisibilityRow({
   title,
   description,

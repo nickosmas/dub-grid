@@ -1,3 +1,7 @@
+import {
+  maskPublishChangeRowAbsences,
+  resolveAbsenceNameMask,
+} from "@/lib/server/absence-visibility";
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -170,10 +174,18 @@ export async function GET(req: NextRequest) {
     }
 
     const { showChangeDetails, showPublisher } = auth.scheduleVisibility;
-    const hiddenStaffIds = await fetchHiddenStaffIds(auth);
+    const [hiddenStaffIds, absenceMask] = await Promise.all([
+      fetchHiddenStaffIds(auth),
+      resolveAbsenceNameMask(auth.serviceClient, auth.orgId, {
+        showAbsenceNames: auth.scheduleVisibility.showAbsenceNames,
+        userId: auth.actor.id,
+      }),
+    ]);
     const entries = (data ?? []).map((row: Record<string, unknown>) => {
       const allChanges = row.schedule_publish_changes as ScheduleChangeRow[];
-      const changes = withoutHiddenStaffRows(allChanges, hiddenStaffIds);
+      const changes = withoutHiddenStaffRows(allChanges, hiddenStaffIds).map((change) =>
+        maskPublishChangeRowAbsences(absenceMask, change),
+      );
       return {
         id: row.id as string,
         publishedBy: showPublisher ? (row.published_by as string) : null,

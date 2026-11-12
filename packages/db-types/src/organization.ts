@@ -22,6 +22,7 @@ export interface DbOrganization {
   use_compact_role_certification_labels?: boolean | null;
   staff_see_shift_changes?: boolean | null;
   staff_see_publisher?: boolean | null;
+  staff_see_absence_names?: boolean | null;
   timezone: string | null;
   pay_period_start_date: string | null;
   archived_at: string | null;

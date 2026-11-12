@@ -41,6 +41,7 @@ vi.mock("@dubgrid/data-access", () => ({
 
 function mockAuth(overrides: { role: string; canEditShifts?: boolean }) {
   requireMobileAuth.mockResolvedValue({
+    user: { id: "viewer-user" },
     currentOrg: { id: "org-1", timezone: "America/Los_Angeles" },
     permissions: { role: overrides.role, canEditShifts: overrides.canEditShifts ?? false },
     serviceClient: {},

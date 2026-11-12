@@ -79,7 +79,7 @@ describe("POST /api/schedule/actor-names", () => {
       actor: { id: VIEWER_ID, email: "viewer@example.com" },
       orgId: ORG_ID,
       serviceClient: { from: serviceFrom },
-      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
     });
   });
 
@@ -149,7 +149,7 @@ describe("POST /api/schedule/actor-names", () => {
       actor: { id: VIEWER_ID, email: "viewer@example.com" },
       orgId: ORG_ID,
       serviceClient: { from: serviceFrom },
-      scheduleVisibility: { showChangeDetails: true, showPublisher: false },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: false, showAbsenceNames: true },
     });
 
     const response = await POST(makeRequest([SAME_ORG_USER_ID]));
@@ -165,7 +165,7 @@ describe("POST /api/schedule/actor-names", () => {
       actor: { id: VIEWER_ID, email: "viewer@example.com" },
       orgId: SANDBOX_ORG_ID,
       serviceClient: { from: serviceFrom },
-      scheduleVisibility: { showChangeDetails: true, showPublisher: true },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
     });
     enqueue("organization_memberships", { data: [] });
     enqueue("employees", { data: [] });

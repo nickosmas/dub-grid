@@ -19,7 +19,7 @@ vi.mock("@/app/api/shared/permissions", async (importOriginal) => ({
 import { GET } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
-const ALL_VISIBLE = { showChangeDetails: true, showPublisher: true };
+const ALL_VISIBLE = { showChangeDetails: true, showPublisher: true, showAbsenceNames: true };
 
 function makeRequest(query: Record<string, string>) {
   const url = new URL("http://localhost/api/schedule/publish-history/recent");
@@ -185,7 +185,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
-      scheduleVisibility: { showChangeDetails: true, showPublisher: false },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: false, showAbsenceNames: true },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
@@ -304,7 +304,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
-      scheduleVisibility: { showChangeDetails: false, showPublisher: false },
+      scheduleVisibility: { showChangeDetails: false, showPublisher: false, showAbsenceNames: true },
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));

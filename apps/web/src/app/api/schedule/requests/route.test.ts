@@ -79,6 +79,7 @@ describe("POST /api/schedule/requests", () => {
         from: (table: string) => (table === "employees" ? employeesQuery : requestsQuery),
       },
       actor: { id: "actor-user" },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
       orgId: ORG_ID,
       permissions,
     }));
@@ -188,6 +189,7 @@ describe("POST /api/schedule/requests", () => {
         from: (table: string) => (table === "employees" ? employeesQuery : requestsQuery),
       },
       actor: { id: "actor-user" },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
       orgId: ORG_ID,
       permissions: { canViewSchedule: true },
     }));
@@ -219,6 +221,7 @@ describe("POST /api/schedule/requests", () => {
       },
       userClient: { rpc },
       actor: { id: "admin-user" },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
       orgId: ORG_ID,
       permissions: { canApproveShiftRequests: true },
     }));
@@ -278,6 +281,11 @@ describe("POST /api/schedule/requests", () => {
       requireOrgPermissions.mockImplementation(async () => ({
         userClient: { rpc },
         actor: { id: "admin-user" },
+        scheduleVisibility: {
+          showChangeDetails: true,
+          showPublisher: true,
+          showAbsenceNames: true,
+        },
         orgId: ORG_ID,
         permissions: { canApproveShiftRequests: true },
       }));
@@ -321,6 +329,11 @@ describe("POST /api/schedule/requests", () => {
       requireOrgPermissions.mockImplementation(async () => ({
         userClient: { rpc },
         actor: { id: "admin-user" },
+        scheduleVisibility: {
+          showChangeDetails: true,
+          showPublisher: true,
+          showAbsenceNames: true,
+        },
         orgId: ORG_ID,
         permissions: { canApproveShiftRequests: true },
       }));
@@ -341,6 +354,11 @@ describe("POST /api/schedule/requests", () => {
         serviceClient: { from: () => employeesQuery },
         userClient: { rpc },
         actor: { id: "actor-user" },
+        scheduleVisibility: {
+          showChangeDetails: true,
+          showPublisher: true,
+          showAbsenceNames: true,
+        },
         orgId: ORG_ID,
         permissions: { canViewSchedule: true, ...permissions },
       };

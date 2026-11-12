@@ -47,6 +47,7 @@ const bodySchema = z.object({
   useCompactRoleCertificationLabels: z.boolean().optional(),
   staffSeeShiftChanges: z.boolean().optional(),
   staffSeePublisher: z.boolean().optional(),
+  staffSeeAbsenceNames: z.boolean().optional(),
   timezone: z.string().trim().optional(),
   payPeriodStartDate: z
     .string()
@@ -374,6 +375,7 @@ export async function PUT(req: NextRequest) {
         fields.useCompactRoleCertificationLabels ?? currentOrg.useCompactRoleCertificationLabels,
       staffSeeShiftChanges: fields.staffSeeShiftChanges ?? currentOrg.staffSeeShiftChanges,
       staffSeePublisher: fields.staffSeePublisher ?? currentOrg.staffSeePublisher,
+      staffSeeAbsenceNames: fields.staffSeeAbsenceNames ?? currentOrg.staffSeeAbsenceNames,
       timezone: fields.timezone !== undefined ? fields.timezone || null : currentOrg.timezone,
       payPeriodStartDate:
         fields.payPeriodStartDate !== undefined
@@ -449,6 +451,9 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("staffSeePublisher")) {
       update.staff_see_publisher = nextOrg.staffSeePublisher;
+    }
+    if (changeKeys.has("staffSeeAbsenceNames")) {
+      update.staff_see_absence_names = nextOrg.staffSeeAbsenceNames;
     }
     if (changeKeys.has("timezone")) {
       update.timezone = nextOrg.timezone;

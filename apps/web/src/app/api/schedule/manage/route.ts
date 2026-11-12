@@ -1,3 +1,4 @@
+import { maskCellRowAbsences, resolveAbsenceNameMask } from "@/lib/server/absence-visibility";
 import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
@@ -1194,9 +1195,13 @@ export async function POST(req: NextRequest) {
         const isScheduler = auth.permissions.canEditShifts;
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
         const absenceTypeMap = new Map<number, string>(data.absenceTypeLabels ?? []);
-        const [assignmentIdByPair, hiddenStaffIds] = await Promise.all([
+        const [assignmentIdByPair, hiddenStaffIds, absenceMask] = await Promise.all([
           fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId),
           fetchHiddenStaffIds(auth),
+          resolveAbsenceNameMask(auth.serviceClient, data.orgId, {
+            showAbsenceNames: auth.scheduleVisibility.showAbsenceNames,
+            userId: auth.actor.id,
+          }),
         ]);
 
         const buildPage = (from: number, to: number) => {
@@ -1225,12 +1230,15 @@ export async function POST(req: NextRequest) {
         const shifts: Record<string, unknown> = {};
         for (const row of rows) {
           if (hiddenStaffIds.has(row.emp_id)) continue;
-          const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
-            isScheduler,
-            assignmentLabelMap,
-            assignmentIdByPair,
-            absenceTypeMap,
-          });
+          const entry = mapNormalizedScheduleCellRowToScheduleEntry(
+            maskCellRowAbsences(absenceMask, row),
+            {
+              isScheduler,
+              assignmentLabelMap,
+              assignmentIdByPair,
+              absenceTypeMap,
+            },
+          );
           if (entry) {
             shifts[`${row.emp_id}_${row.date}`] = isScheduler ? entry : redactDraftForViewer(entry);
           }

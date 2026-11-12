@@ -148,6 +148,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     showShiftDetailHoverCards: row.show_shift_detail_hover_cards ?? true,
     staffSeeShiftChanges: row.staff_see_shift_changes ?? true,
     staffSeePublisher: row.staff_see_publisher ?? true,
+    staffSeeAbsenceNames: row.staff_see_absence_names ?? true,
     useCompactRoleCertificationLabels: row.use_compact_role_certification_labels ?? false,
     timezone: row.timezone ?? null,
     payPeriodStartDate: row.pay_period_start_date ?? null,

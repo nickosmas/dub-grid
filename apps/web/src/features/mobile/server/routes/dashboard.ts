@@ -1,3 +1,4 @@
+import { mobileAbsenceViewer } from "@/features/mobile/server/absence-viewer";
 import { scheduleViewerVisibility } from "@dubgrid/authz";
 import { NextResponse, type NextRequest } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -106,6 +107,7 @@ export async function GET(req: NextRequest) {
           fetchMobileShiftRequests(serviceClient, {
             ...input,
             hiddenUserIds: await hiddenUserIds(),
+            absenceViewer: mobileAbsenceViewer(auth),
           }),
         fetchMobileDashboardDraftComparisons: async (serviceClient, input) =>
           fetchMobileScheduleComparisonRows(serviceClient, {

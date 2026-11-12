@@ -482,7 +482,7 @@ export async function requireOrgPermissions(
       serviceClient
         .from("organizations")
         .select(
-          `archived_at, suspended_at, workspace_kind, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, ${BILLING_ACCESS_SELECT}`,
+          `archived_at, suspended_at, workspace_kind, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, staff_see_absence_names, ${BILLING_ACCESS_SELECT}`,
         )
         .eq("id", orgId)
         .maybeSingle(),
@@ -594,6 +594,7 @@ export async function requireOrgPermissions(
     scheduleVisibility: scheduleViewerVisibility(permissions, {
       staffSeeShiftChanges: organization?.staff_see_shift_changes as boolean | null | undefined,
       staffSeePublisher: organization?.staff_see_publisher as boolean | null | undefined,
+      staffSeeAbsenceNames: organization?.staff_see_absence_names as boolean | null | undefined,
     }),
   };
 }
