@@ -625,10 +625,10 @@ export async function POST(req: NextRequest) {
           if (data.statuses && data.statuses.length > 0) {
             query = query.in("status", data.statuses);
           }
-          // View-only callers see active staff only, matching the mobile
-          // /people endpoint.
+          // View-only callers see everyone on staff, Away included (shown to
+          // them as Active), matching the mobile /people endpoint.
           if (!isManager) {
-            query = query.eq("status", "active");
+            query = query.in("status", ["active", "inactive"]);
           }
           return withoutHiddenStaff(query, hiddenUserIds).order("seniority").range(from, to);
         };
@@ -1118,22 +1118,19 @@ export async function POST(req: NextRequest) {
           ? await attachJoinedDate(auth.serviceClient, data.orgId, latest)
           : null;
 
-        if (
-          employee &&
-          employee.userId !== auth.actor.id &&
-          !canViewManagementProfiles(auth.permissions) &&
-          (await isManagementEmployee(auth.serviceClient, data.orgId, employee))
-        ) {
-          return NextResponse.json(
-            { error: API_ERRORS.CANNOT_VIEW_MANAGEMENT_PROFILE },
-            { status: 403 },
-          );
-        }
+        // An Admin's basic profile is anyone's to see; their full record
+        // stays with staff managers.
+        const basicProfileOnly =
+          !isEmployeeDetailViewer(auth.permissions) ||
+          (employee != null &&
+            employee.userId !== auth.actor.id &&
+            !canViewManagementProfiles(auth.permissions) &&
+            (await isManagementEmployee(auth.serviceClient, data.orgId, employee)));
 
-        if (!isEmployeeDetailViewer(auth.permissions)) {
-          // Mirror the mobile person endpoint: view-only callers only see
-          // active staff, with sensitive fields stripped.
-          if (!employee || employee.status !== "active") {
+        if (basicProfileOnly) {
+          // Mirror the mobile person endpoint: view-only callers see anyone
+          // still on staff, with sensitive fields stripped.
+          if (!employee || employee.status === "removed") {
             return NextResponse.json({ employee: null });
           }
           return NextResponse.json({
@@ -1180,10 +1177,11 @@ export async function POST(req: NextRequest) {
           !canViewManagementProfiles(auth.permissions) &&
           (await isManagementEmployee(auth.serviceClient, data.orgId, employee))
         ) {
-          return NextResponse.json(
-            { error: API_ERRORS.CANNOT_VIEW_MANAGEMENT_PROFILE },
-            { status: 403 },
-          );
+          // An Admin's basic profile, as fetchEmployeeById gives it.
+          return NextResponse.json({
+            employee:
+              employee.status === "removed" ? null : maskEmployeeForViewer(employee, auth.actor.id),
+          });
         }
 
         return NextResponse.json({ employee });

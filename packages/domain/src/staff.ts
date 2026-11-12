@@ -77,9 +77,14 @@ export const COLLEAGUE_STATUS_BLANKS = {
   firstDay: null,
 } as const;
 
-/** A colleague's record with its status details blanked, for a regular member. */
+/**
+ * A colleague's record with its status details blanked, for a regular member.
+ * Someone Away reads as Active: to a colleague they are on staff like anyone
+ * else, and their time off shows on the schedule as their absences.
+ */
 export function withoutColleagueStatus<T extends object>(person: T): T {
-  return { ...person, ...COLLEAGUE_STATUS_BLANKS };
+  const away = (person as { status?: unknown }).status === "inactive";
+  return { ...person, ...COLLEAGUE_STATUS_BLANKS, ...(away ? { status: "active" } : {}) };
 }
 
 export interface StaffCredentialSummary {

@@ -169,6 +169,7 @@ describe("loadMobilePeoplePayload", () => {
       suspendedAt: "2026-11-02T00:00:00.000Z",
     });
     const inactive = makePerson({ id: "employee-inactive", status: "inactive" });
+    const offboarded = makePerson({ id: "employee-removed", status: "removed" });
 
     const payload = await loadMobilePeoplePayload(
       {
@@ -182,12 +183,17 @@ describe("loadMobilePeoplePayload", () => {
         },
       } as never,
       {
-        fetchMobilePeople: vi.fn(async () => [self, coworker, inactive]),
+        fetchMobilePeople: vi.fn(async () => [self, coworker, inactive, offboarded]),
         mapEmployeeToMobilePerson: vi.fn((person) => person),
       } as never,
     );
 
-    expect(payload.people).toHaveLength(1);
+    // Someone Away is still a colleague, shown to them as Active.
+    expect(payload.people.map((person) => person.id)).toEqual([
+      "employee-coworker",
+      "employee-inactive",
+    ]);
+    expect(payload.people[1]).toMatchObject({ status: "active" });
     expect(payload.people[0]).toMatchObject({
       id: "employee-coworker",
       certificationId: 7,
@@ -196,7 +202,7 @@ describe("loadMobilePeoplePayload", () => {
       email: "",
       phone: "",
       contactNotes: "",
-      departmentIds: [],
+      departmentIds: [4],
       deptAdminIds: [],
       statusNote: "",
       userId: null,

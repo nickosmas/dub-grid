@@ -276,9 +276,9 @@ describe("POST /api/employees/manage", () => {
   });
 
   describe("fetchEmployeeById", () => {
-    it("blocks management profiles for viewers without manage rights", async () => {
-      // Even canViewEmployeeDetails isn't enough — management profiles are
-      // reserved for staff managers / super admins / gridmasters.
+    it("gives an Admin's basic profile, not their full record, to viewers without manage rights", async () => {
+      // Even canViewEmployeeDetails doesn't open a management profile's full
+      // record — that stays with staff managers / super admins / gridmasters.
       mockAuth({ canViewEmployeeDetails: true });
       fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([
         { user_id: PERSON_USER_ID, department_ids: [4], dept_admin_ids: [] },
@@ -286,13 +286,18 @@ describe("POST /api/employees/manage", () => {
 
       const response = await POST(fetchEmployeeByIdRequest());
 
-      expect(response.status).toBe(403);
-      expect(await response.json()).toEqual({
-        error: API_ERRORS.CANNOT_VIEW_MANAGEMENT_PROFILE,
+      expect(response.status).toBe(200);
+      expect((await response.json()).employee).toMatchObject({
+        id: EMPLOYEE_ID,
+        firstName: "Mina",
+        email: "",
+        phone: "",
+        contactNotes: "",
+        userId: null,
       });
     });
 
-    it("blocks profiles with a pending management invitation the same way", async () => {
+    it("treats a pending management invitation the same way", async () => {
       mockAuth({ canViewEmployeeDetails: true });
       rowToEmployee.mockReturnValue(makeEmployee({ userId: null }));
       fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue({
@@ -302,7 +307,26 @@ describe("POST /api/employees/manage", () => {
 
       const response = await POST(fetchEmployeeByIdRequest());
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(200);
+      expect((await response.json()).employee).toMatchObject({ email: "", phone: "" });
+    });
+
+    it("shows a view-only caller a colleague who is Away, as Active", async () => {
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee({ status: "inactive", awayUntil: "2026-12-01" }));
+
+      const payload = await (await POST(fetchEmployeeByIdRequest())).json();
+
+      expect(payload.employee).toMatchObject({ status: "active", awayUntil: null });
+    });
+
+    it("still gives a view-only caller nothing for someone Offboarded", async () => {
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee({ status: "removed" }));
+
+      const payload = await (await POST(fetchEmployeeByIdRequest())).json();
+
+      expect(payload.employee).toBeNull();
     });
 
     it("returns management profiles to staff managers", async () => {

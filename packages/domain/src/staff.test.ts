@@ -161,4 +161,9 @@ describe("withoutColleagueStatus", () => {
       ...COLLEAGUE_STATUS_BLANKS,
     });
   });
+
+  it("shows someone Away as Active, and leaves Offboarded alone", () => {
+    expect(withoutColleagueStatus({ status: "inactive" as const }).status).toBe("active");
+    expect(withoutColleagueStatus({ status: "removed" as const }).status).toBe("removed");
+  });
 });

@@ -554,7 +554,8 @@ export async function loadMobilePeoplePayload(
   const people = await deps.fetchMobilePeople(auth.serviceClient, auth.currentOrg.id);
   const visiblePeople = auth.permissions.canManageEmployees
     ? people
-    : people.filter((person) => person.status === "active" && person.userId !== auth.user.id);
+    : // Someone Away is still a colleague; only the Offboarded leave the list.
+      people.filter((person) => person.status !== "removed" && person.userId !== auth.user.id);
 
   return {
     people: visiblePeople.map((person) => {
@@ -577,7 +578,6 @@ export async function loadMobilePeoplePayload(
         adminPermissionCount: null,
         contactNotes: "",
         deptAdminIds: [],
-        departmentIds: [],
         email: "",
         managementDeptAdminIds: [],
         pendingInvitation: null,

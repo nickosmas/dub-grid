@@ -291,7 +291,7 @@ describe("mobile people route", () => {
     ]);
   });
 
-  it("excludes self and returns only visible active directory data for regular users", async () => {
+  it("excludes self and returns the directory, Away colleagues as Active, to regular users", async () => {
     requireMobileAuth.mockResolvedValue({
       currentOrg: {
         id: "org-1",
@@ -410,11 +410,11 @@ describe("mobile people route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload.people).toHaveLength(2);
+    expect(payload.people).toHaveLength(3);
     expect(payload.people[0]).toMatchObject({
       id: "00000000-0000-0000-0000-000000000001",
       contactNotes: "",
-      departmentIds: [],
+      departmentIds: [4],
       deptAdminIds: [],
       email: "",
       managementDepartmentIds: [],
@@ -426,10 +426,15 @@ describe("mobile people route", () => {
       statusNote: "",
       userId: null,
     });
-    // Management users stay listed for everyone, sanitized like any other
-    // row but with managementDepartmentIds intact so the app can gate their
-    // profile view.
+    // Someone Away is still a colleague; their status is not theirs to see.
     expect(payload.people[1]).toMatchObject({
+      id: "00000000-0000-0000-0000-000000000002",
+      status: "active",
+      statusChangedAt: null,
+    });
+    // Management users stay listed for everyone, sanitized like any other
+    // row but with managementDepartmentIds intact for their teams.
+    expect(payload.people[2]).toMatchObject({
       id: "00000000-0000-0000-0000-000000000003",
       contactNotes: "",
       departmentIds: [],

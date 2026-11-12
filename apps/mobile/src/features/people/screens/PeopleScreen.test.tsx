@@ -914,7 +914,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
   });
 
-  it("shows management users to regular users without opening their profile", () => {
+  it("shows management users to regular users and opens their basic profile", () => {
     useBootstrap.mockReturnValue({
       data: {
         currentOrg: { labels: { department: "Departments" } },
@@ -989,7 +989,10 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Ava Cole")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Ava Cole"));
-    expect(routerPush).not.toHaveBeenCalled();
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/person/[id]",
+      params: { id: "emp-2" },
+    });
 
     fireEvent.click(screen.getByText("Mina Diaz"));
     expect(routerPush).toHaveBeenCalledWith({
