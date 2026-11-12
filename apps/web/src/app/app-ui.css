@@ -25,6 +25,20 @@
 .dg-tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+/* iOS-style continuous corners. The element sets its round radius in
+   --dg-corner-radius. Where the browser can shape corners, the curve starts
+   1.528 radii along each edge, as UIKit's continuous corner does, and
+   superellipse(1.7) passes the round corner's 45-degree point. Elsewhere the
+   corner stays round. */
+.dg-continuous-corners {
+  border-radius: var(--dg-corner-radius);
+}
+@supports (corner-shape: superellipse(1.7)) {
+  .dg-continuous-corners {
+    border-radius: calc(var(--dg-corner-radius) * 1.528);
+    corner-shape: superellipse(1.7);
+  }
+}
 .dg-type-attention-primary {
   color: var(--dg-type-attention-primary-color);
 }
