@@ -1,0 +1,11 @@
+-- 133: A colleague's account is server-owned.
+--
+-- org_member_profiles_select let any member read every profile in their
+-- organization through the data API: a colleague's last sign-in, whether
+-- their account is deactivated or set for deletion, and whether they use
+-- two-step verification. Those are account statuses, for the people who act
+-- on them. Names reach members through the server routes, and no client,
+-- policy, function that runs as the caller, or Realtime filter reads another
+-- member's profile; Realtime on profiles filters on the caller's own id.
+-- own_profile_select keeps the caller's own row, and Gridmasters keep theirs.
+DROP POLICY IF EXISTS org_member_profiles_select ON public.profiles;
