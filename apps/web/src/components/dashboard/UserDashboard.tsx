@@ -184,9 +184,14 @@ const DASHBOARD_HERO_BG_DARK = getHeroBackgroundCss(true);
 // The card's corners curve around the same centres as the date tile's and the
 // Working with pill's: card radius = padding + tile radius, and the pill sits
 // (pill radius - tile radius) further out than the padding.
-const HERO_DATE_TILE_RADIUS = 14;
-const HERO_WORKING_WITH_RADIUS = 16;
+const HERO_DATE_TILE_RADIUS = 10;
+const HERO_WORKING_WITH_RADIUS = 12;
 const HERO_WORKING_WITH_EDGE = HERO_DATE_TILE_RADIUS - HERO_WORKING_WITH_RADIUS;
+// The hero's rounded parts take iOS-style continuous corners
+// (`.dg-continuous-corners`), which read their round radius from this variable.
+function continuousCorners(radius: number): CSSProperties {
+  return { "--dg-corner-radius": `${radius}px` } as CSSProperties;
+}
 // Matches the mobile hero card's "Working with" pill (ScheduleScreen.tsx
 // ME_HERO_COLLABORATOR_BACKGROUND_LIGHT/_DARK) — a solid navy fill, not a
 // translucent white overlay, so the pill reads as a distinct block on the gradient.
@@ -1930,10 +1935,11 @@ function MeHeroCard({
 
   return (
     <section
+      className="dg-continuous-corners"
       data-testid="user-dashboard-hero"
       style={{
         ...(isDarkTheme ? DASHBOARD_HERO_BG_DARK : DASHBOARD_HERO_BG_LIGHT),
-        borderRadius: padding + HERO_DATE_TILE_RADIUS,
+        ...continuousCorners(padding + HERO_DATE_TILE_RADIUS),
         boxShadow: "var(--shadow-md)",
         color: "var(--dg-color-text-inverse)",
         boxSizing: "border-box",
@@ -2011,11 +2017,12 @@ function MeHeroCard({
 
         <div
           aria-label={dateParts.fullLabel}
+          className="dg-continuous-corners"
           style={{
+            ...continuousCorners(HERO_DATE_TILE_RADIUS),
             alignItems: "center",
             background: "rgba(255,255,255,0.14)",
             border: "1px solid rgba(255,255,255,0.22)",
-            borderRadius: HERO_DATE_TILE_RADIUS,
             display: "flex",
             flexDirection: "column",
             flexShrink: 0,
@@ -2498,14 +2505,15 @@ function ShiftmatesRow({
 
   return (
     <div
+      className="dg-continuous-corners"
       data-testid="user-dashboard-working-with"
       style={{
+        ...continuousCorners(HERO_WORKING_WITH_RADIUS),
         alignItems: "center",
         background: collaboratorBackground,
         border: inverse
           ? "1px solid rgba(255,255,255,0.14)"
           : "1px solid var(--dg-color-border-light)",
-        borderRadius: HERO_WORKING_WITH_RADIUS,
         color: inverse ? "rgba(255,255,255,0.84)" : "var(--dg-color-text-secondary)",
         display: "flex",
         gap: 10,

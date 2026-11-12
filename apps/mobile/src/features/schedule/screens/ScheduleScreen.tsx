@@ -22,7 +22,7 @@ import Reanimated, {
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { emptySceneDayFromIso } from "../../../shared/components/empty-scene/day-scene";
 import { Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
-import { buildCoverageWash } from "../../dashboard/lib/coverage-wash";
+import { buildHomeWash } from "../../dashboard/lib/home-wash";
 import { useScrollToTopOnChange } from "../../../shared/hooks/useScrollToTopOnChange";
 import { PageWash } from "../../../shared/components/PageWash";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
@@ -1393,7 +1393,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // The staff home carries Home's wash, the same blue the admin Home shows at
   // normal coverage (owner, 2026-11-04); the team schedule stays plain.
   const homeWash = isTeamScope ? undefined : (
-    <PageWash colors={buildCoverageWash(null, isDark)} height={viewportHeight} />
+    <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />
   );
 
   return (
