@@ -9,32 +9,10 @@ import { requireCredentialAssurance } from "@/features/account/client";
 import { moveEmployeeToNewEmail } from "@/features/employees/client";
 import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { isSelfAction } from "@dubgrid/domain";
-import type { Employee, OrganizationRole } from "@/types";
+import type { Employee } from "@/types";
 
-/**
- * Whether the viewer is offered Move to a new email for this person. The server
- * applies the same limits: an Admin can't choose who holds another Admin's
- * access, and a person changes their own email on their profile.
- */
-export function canOfferMoveToNewEmail({
-  employee,
-  orgRole,
-  currentUserId,
-  canGrantElevatedRoles,
-}: {
-  employee: Pick<Employee, "userId" | "status">;
-  orgRole: OrganizationRole | null | undefined;
-  currentUserId: string | null | undefined;
-  canGrantElevatedRoles: boolean;
-}): boolean {
-  return (
-    Boolean(employee.userId) &&
-    employee.status !== "removed" &&
-    !isSelfAction(currentUserId, employee.userId) &&
-    (orgRole === "user" || orgRole == null || canGrantElevatedRoles)
-  );
-}
+/** Shared with the app, so both offer the move to the same people. */
+export { canOfferMoveToNewEmail } from "@dubgrid/domain";
 
 interface MoveEmailDialogProps {
   employee: Employee;

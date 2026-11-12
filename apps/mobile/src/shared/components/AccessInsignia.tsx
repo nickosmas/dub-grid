@@ -16,16 +16,19 @@ type InsigniaSize = "sm" | "lg";
 // 28pt beside a display title), so the mark reads as part of the name rather
 // than as a chip the same height as the text.
 //
-// `pull` closes most of the row's own gap. The mark belongs to the name, so it
-// should read as attached to it, while the pill that follows keeps the row's
-// normal rhythm — which a smaller container gap would have tightened too.
+// `pull` trims the row's own 8pt gap so the mark sits a clear 6 to 7pt after
+// the name, while the pill that follows keeps the row's normal rhythm.
 const SIZES: Record<InsigniaSize, { badge: number; pull: number }> = {
-  sm: { badge: 16, pull: -5 },
-  lg: { badge: 20, pull: -5 },
+  sm: { badge: 16, pull: -2 },
+  lg: { badge: 20, pull: -1 },
 };
 
 const EDGE = ACCESS_INSIGNIA_BEVEL.width;
 const BEVEL_GRADIENT_ID = "access-insignia-bevel";
+
+// This ring lights the whole upper arc, where web's inset shadow lights only
+// a thin crescent at the very top, so at web's 30% the ring read too bright.
+const BEVEL_LIGHT_OPACITY = 0.15;
 
 /**
  * The star marking an elevated member, sitting just after their name: gold for
@@ -62,7 +65,7 @@ export function AccessInsignia({
       <Svg width={badge} height={badge}>
         <Defs>
           <LinearGradient id={BEVEL_GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={ACCESS_INSIGNIA_BEVEL.light} />
+            <Stop offset="0" stopColor="#ffffff" stopOpacity={BEVEL_LIGHT_OPACITY} />
             <Stop offset="0.5" stopColor="#ffffff" stopOpacity={0} />
             <Stop offset="0.5" stopColor="#000000" stopOpacity={0} />
             <Stop offset="1" stopColor={ACCESS_INSIGNIA_BEVEL.shade} />

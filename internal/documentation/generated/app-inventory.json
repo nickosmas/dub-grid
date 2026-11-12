@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:e8422b9dc7468287eb7da60e108ebfd4538581e73619107b991c7486d6d51728",
+  "sourceDigest": "sha256:397ffa6807a611cb20b6ce2131b1ade7b5e8d159129bd14d3392c6157f424b02",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2806,6 +2806,18 @@
       },
       "implementationSource": {
         "path": "apps/web/src/features/mobile/server/routes/person-invitation.ts"
+      }
+    },
+    {
+      "id": "http:POST:/api/mobile/v1/people/[id]/move-email",
+      "method": "POST",
+      "path": "/api/mobile/v1/people/[id]/move-email",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/mobile/v1/people/[id]/move-email/route.ts"
+      },
+      "implementationSource": {
+        "path": "apps/web/src/features/mobile/server/routes/person-move-email.ts"
       }
     },
     {

@@ -297,18 +297,19 @@ The mobile app (Expo) communicates exclusively with these endpoints. All routes 
 
 ### People
 
-| Method              | Path                                           | Purpose                                                     |
-| ------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
-| GET                 | `/api/mobile/v1/people`                        | Paginated people directory                                  |
-| POST                | `/api/mobile/v1/people`                        | Add a staff member (`canManageEmployees`)                   |
-| POST                | `/api/mobile/v1/people/contact-check`          | Pre-flight duplicate email/phone check for the person forms |
-| GET                 | `/api/mobile/v1/people/[id]`                   | Person detail (fields redacted by the caller's permissions) |
-| PATCH               | `/api/mobile/v1/people/[id]`                   | Update a person record                                      |
-| PATCH               | `/api/mobile/v1/people/[id]/status`            | Update employee status                                      |
-| PATCH               | `/api/mobile/v1/people/[id]/access`            | Change the person's org role (member or pending invitation) |
-| POST, PATCH, DELETE | `/api/mobile/v1/people/[id]/invitation`        | Send, resend, or revoke an invitation for a person          |
-| PUT, DELETE         | `/api/mobile/v1/people/[id]/management-access` | Grant or revoke management access (departments only)        |
-| PATCH               | `/api/mobile/v1/people/[id]/permissions`       | An Admin's permissions (Super Admin only)                   |
+| Method              | Path                                           | Purpose                                                           |
+| ------------------- | ---------------------------------------------- | ----------------------------------------------------------------- |
+| GET                 | `/api/mobile/v1/people`                        | Paginated people directory                                        |
+| POST                | `/api/mobile/v1/people`                        | Add a staff member (`canManageEmployees`)                         |
+| POST                | `/api/mobile/v1/people/contact-check`          | Pre-flight duplicate email/phone check for the person forms       |
+| GET                 | `/api/mobile/v1/people/[id]`                   | Person detail (fields redacted by the caller's permissions)       |
+| PATCH               | `/api/mobile/v1/people/[id]`                   | Update a person record                                            |
+| PATCH               | `/api/mobile/v1/people/[id]/status`            | Update employee status                                            |
+| PATCH               | `/api/mobile/v1/people/[id]/access`            | Change the person's org role (member or pending invitation)       |
+| POST, PATCH, DELETE | `/api/mobile/v1/people/[id]/invitation`        | Send, resend, or revoke an invitation for a person                |
+| PUT, DELETE         | `/api/mobile/v1/people/[id]/management-access` | Grant or revoke management access (departments only)              |
+| PATCH               | `/api/mobile/v1/people/[id]/permissions`       | An Admin's permissions (Super Admin only)                         |
+| POST                | `/api/mobile/v1/people/[id]/move-email`        | Move to a new email, as web's route (fresh sensitive-action auth) |
 
 ### Management Users
 
