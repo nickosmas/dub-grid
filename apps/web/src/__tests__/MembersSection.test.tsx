@@ -257,7 +257,7 @@ function makePerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
   };
 }
 
-const baseProps: Omit<MembersSectionProps, "canManageEmployees" | "isManagementUser"> = {
+const baseProps: Omit<MembersSectionProps, "canManageEmployees"> = {
   employees: [],
   inactiveEmployees: [],
   removedEmployees: [],
@@ -290,12 +290,7 @@ function renderMembersSection(props: Partial<MembersSectionProps> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MembersSection
-        {...baseProps}
-        canManageEmployees={false}
-        isManagementUser={false}
-        {...props}
-      />
+      <MembersSection {...baseProps} canManageEmployees={false} {...props} />
     </QueryClientProvider>,
   );
 }
@@ -325,14 +320,14 @@ describe("MembersSection - People search autofill isolation", () => {
 });
 
 describe("MembersSection — management-only view access", () => {
-  it("lets a self-management-only, non-admin viewer see (but not edit) other management users", async () => {
+  it("lets a regular viewer see (but not edit) management users, without their status", async () => {
     const user = userEvent.setup();
     mockDirectory = [
       makePerson({ personId: "person-1", firstName: "Jamie", lastName: "Rivera" }),
       makePerson({ personId: "person-2", firstName: "Sam", lastName: "Lee", userId: "user-2" }),
     ];
 
-    renderMembersSection({ canManageEmployees: false, isManagementUser: true });
+    renderMembersSection({ canManageEmployees: false });
 
     // Toggle to reach the Management view is visible for this viewer.
     const toggle = screen.getByRole("button", { name: /On Schedule/i });
@@ -342,6 +337,9 @@ describe("MembersSection — management-only view access", () => {
     // Sees other management-only peers.
     expect(screen.getByText("Jamie Rivera")).toBeInTheDocument();
     expect(screen.getByText("Sam Lee")).toBeInTheDocument();
+
+    // A colleague's status is for the people who act on it.
+    expect(screen.queryByText("Staff status")).not.toBeInTheDocument();
 
     // No edit affordances: no "Add" (invite to management) button.
     expect(screen.queryByRole("button", { name: /^\+? ?Add$/ })).not.toBeInTheDocument();
@@ -359,16 +357,9 @@ describe("MembersSection — management-only view access", () => {
 
   it("does not show the Export button to a self-management-only viewer on the scheduled tab", () => {
     mockDirectory = [];
-    renderMembersSection({ canManageEmployees: false, isManagementUser: true });
+    renderMembersSection({ canManageEmployees: false });
 
     expect(screen.queryByRole("button", { name: /Export/i })).not.toBeInTheDocument();
-  });
-
-  it("hides the Management toggle entirely for a viewer with no management access at all", () => {
-    mockDirectory = [];
-    renderMembersSection({ canManageEmployees: false, isManagementUser: false });
-
-    expect(screen.queryByRole("button", { name: /On Schedule/i })).not.toBeInTheDocument();
   });
 
   it("still lets super_admins manage (not just view) management users", async () => {
@@ -381,7 +372,6 @@ describe("MembersSection — management-only view access", () => {
     renderMembersSection({
       canManageEmployees: false,
       isSuperAdmin: true,
-      isManagementUser: false,
     });
 
     const toggle = screen.getByRole("button", { name: /On Schedule/i });
@@ -1442,7 +1432,6 @@ describe("MembersSection - bulk status changes (51h)", () => {
             {...baseProps}
             canManageEmployees
             canViewEmployeeDetails
-            isManagementUser={false}
             isSuperAdmin
             employees={[jamie, alex, pat]}
             onBulkStatusChange={onBulkStatusChange}

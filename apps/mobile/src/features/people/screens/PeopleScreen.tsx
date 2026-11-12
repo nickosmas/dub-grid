@@ -709,9 +709,6 @@ export default function PeopleScreen() {
     const isSelf =
       (currentEmployeeId !== null && person.id === currentEmployeeId) ||
       (currentUserId !== null && person.userId !== null && person.userId === currentUserId);
-    // Management users' profile view is manager-only; their rows stay visible
-    // but don't navigate for everyone else.
-    const navigable = isSelf || canManageEmployees || !person.managementDepartmentIds?.length;
     return (
       <View style={styles.rosterRow}>
         <PersonRow
@@ -719,7 +716,7 @@ export default function PeopleScreen() {
           avatarSeed={resolveAvatarSeed(person)}
           isLast={isLast}
           name={getFullName(person)}
-          navigable={navigable}
+          navigable
           orgRole={person.orgRole}
           staffStatus={statusForViewer(person, canManageEmployees) ?? undefined}
           onPress={() => {

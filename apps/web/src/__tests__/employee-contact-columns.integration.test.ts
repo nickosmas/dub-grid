@@ -36,6 +36,8 @@ async function probeDb(): Promise<boolean> {
 const reachable = await probeDb();
 
 const CONTACT_COLUMNS = ["phone", "email", "contact_notes", "status_note"] as const;
+/** A colleague's status, server-owned since 132. */
+const STATUS_COLUMNS = ["status", "status_changed_at", "archived_at"] as const;
 
 interface Member {
   email: string;
@@ -122,12 +124,30 @@ describe.runIf(reachable)("employee contact columns are server-owned (live DB)",
     }
   });
 
+  it("refuses every member tier a colleague's status (132)", async () => {
+    await db.query("BEGIN");
+    try {
+      for (const member of MEMBERS) {
+        for (const column of STATUS_COLUMNS) {
+          await expectRaise(async () => {
+            await asUser(member);
+            await db.query(`SELECT ${column} FROM public.employees WHERE org_id = $1 LIMIT 1`, [
+              orgId,
+            ]);
+          }, /permission denied for table employees/);
+        }
+      }
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+
   it("still reads the roster columns the directory needs", async () => {
     await db.query("BEGIN");
     try {
       await asUser(MEMBERS[2]);
       const { rows } = await db.query<{ first_name: string }>(
-        `SELECT id, first_name, last_name, status, focus_area_ids, role_ids, certification_id
+        `SELECT id, first_name, last_name, focus_area_ids, role_ids, certification_id
            FROM public.employees WHERE org_id = $1 ORDER BY seniority LIMIT 1`,
         [orgId],
       );

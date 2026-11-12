@@ -1,0 +1,18 @@
+-- 132: A colleague's status is server-owned, like their contact details (036).
+--
+-- members_select_employees lets any member read every row in their
+-- organization, and 036 granted back status, status_changed_at and
+-- archived_at with the readable columns. So a regular member could read
+-- through the data API, and in the Realtime payload, who is Away
+-- (status 'inactive'), who was offboarded and when anyone's status last
+-- changed, although every application path now withholds a colleague's
+-- status from them (packages/domain withoutColleagueStatus). The columns
+-- added since 036 for Away, suspension, planned changes and first days were
+-- never granted, so they stay unreadable.
+--
+-- Every path that reads these three columns does so through the service
+-- role: no function that runs as the caller, no policy on another table and
+-- no client query or Realtime filter reads them. The employees policies still
+-- may, since a policy expression can reference a column the caller cannot
+-- select.
+REVOKE SELECT (status, status_changed_at, archived_at) ON public.employees FROM authenticated;

@@ -465,7 +465,8 @@ describe("StaffView", () => {
       expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Import" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Add/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /On Schedule/i })).not.toBeInTheDocument();
+      // The administrative teams are anyone's to see, read-only.
+      expect(screen.getByRole("button", { name: /On Schedule/i })).toBeInTheDocument();
       expect(screen.queryByText("Recurring Shifts")).not.toBeInTheDocument();
       expect(screen.queryByRole("gridcell")).not.toBeInTheDocument();
       expect(vi.mocked(fetchOrganizationInvitations)).not.toHaveBeenCalled();
