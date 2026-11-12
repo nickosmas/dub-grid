@@ -16,4 +16,6 @@ export const Text = stub("Text");
 export const Polygon = stub("Polygon");
 export const Defs = stub("Defs");
 export const LinearGradient = stub("LinearGradient");
+export const RadialGradient = stub("RadialGradient");
+export const Pattern = stub("Pattern");
 export const Stop = stub("Stop");

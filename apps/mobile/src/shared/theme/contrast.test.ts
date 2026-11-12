@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getSoftGradientStops } from "@dubgrid/design-tokens";
+import { getHeroMesh, getSoftGradientStops } from "@dubgrid/design-tokens";
 import {
-  HERO_CARD_GRADIENT_DARK,
-  HERO_CARD_GRADIENT_LIGHT,
   HERO_COLLABORATOR_BACKGROUND_DARK,
   HERO_COLLABORATOR_BACKGROUND_LIGHT,
   HERO_INVERSE_CHIP_FILL,
@@ -248,22 +246,23 @@ describe("brand-tinted ground contrast", () => {
     });
 
     it(`lifts the inverse chip off every ${theme} hero surface`, () => {
-      const gradient = isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT;
+      const mesh = getHeroMesh(isDark);
       const collaborators = isDark
         ? HERO_COLLABORATOR_BACKGROUND_DARK
         : HERO_COLLABORATOR_BACKGROUND_LIGHT;
-      for (const ground of [...gradient, collaborators]) {
+      for (const ground of [mesh.base, ...mesh.pools.map((pool) => pool.color), collaborators]) {
         expect(
           contrastRatio(composite(HERO_INVERSE_CHIP_FILL, ground), ground),
         ).toBeGreaterThanOrEqual(PERCEIVABLE_FILL);
       }
     });
 
-    // The chips sit in the title row over the gradient's dark start; the pale
-    // top-right corner carries no chip label.
+    // The chips sit in the title row, over the mesh's base and its top-left
+    // pool; the bright top-right corner carries no chip label.
     it(`keeps a white chip label at AA where ${theme} hero chips are placed`, () => {
-      const gradient = isDark ? HERO_CARD_GRADIENT_DARK : HERO_CARD_GRADIENT_LIGHT;
-      for (const ground of [gradient[0], gradient[1]]) {
+      const mesh = getHeroMesh(isDark);
+      const topLeft = mesh.pools.find((pool) => pool.x < 0.5 && pool.y < 0.5)!;
+      for (const ground of [mesh.base, topLeft.color]) {
         const chip = composite(HERO_INVERSE_CHIP_FILL, ground);
         expect(contrastRatio(colors.textInverse, chip), ground).toBeGreaterThanOrEqual(AA_TEXT);
       }

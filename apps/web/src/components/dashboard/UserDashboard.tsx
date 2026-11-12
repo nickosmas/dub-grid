@@ -46,7 +46,7 @@ import type { OpenShiftVisibility } from "@dubgrid/domain";
 import {
   getAvatarTypography,
   getAvatarTone,
-  getHeroGradientCss,
+  getHeroBackgroundCss,
   heroGradientTokens,
   resolveAvatarSeed,
 } from "@dubgrid/design-tokens";
@@ -178,12 +178,15 @@ const PANE_SCROLL_PADDING = 32;
 // container's clipping edge (a vertical scroll container also clips the x-axis).
 const PANE_SCROLL_GUTTER = 16;
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-// Matches the mobile hero gradient (apps/mobile ScheduleScreen.tsx
-// ME_HERO_CARD_GRADIENT_LIGHT/_DARK): dark mode keeps the same dark-navy
-// start but ends in the app's vivid dark-mode brand blue instead of a pale
-// periwinkle, which would read as a washed-out pastel blob on a near-black page.
-const DASHBOARD_HERO_BG_LIGHT = getHeroGradientCss(false);
-const DASHBOARD_HERO_BG_DARK = getHeroGradientCss(true);
+// The mesh gradient and dot screen the mobile hero card draws with SVG.
+const DASHBOARD_HERO_BG_LIGHT = getHeroBackgroundCss(false);
+const DASHBOARD_HERO_BG_DARK = getHeroBackgroundCss(true);
+// The card's corners curve around the same centres as the date tile's and the
+// Working with pill's: card radius = padding + tile radius, and the pill sits
+// (pill radius - tile radius) further out than the padding.
+const HERO_DATE_TILE_RADIUS = 14;
+const HERO_WORKING_WITH_RADIUS = 16;
+const HERO_WORKING_WITH_EDGE = HERO_DATE_TILE_RADIUS - HERO_WORKING_WITH_RADIUS;
 // Matches the mobile hero card's "Working with" pill (ScheduleScreen.tsx
 // ME_HERO_COLLABORATOR_BACKGROUND_LIGHT/_DARK) — a solid navy fill, not a
 // translucent white overlay, so the pill reads as a distinct block on the gradient.
@@ -1923,13 +1926,14 @@ function MeHeroCard({
 }) {
   const dateParts = getDateParts(item.date);
   const badgeLabel = getHeroStatusLabel(status);
+  const padding = isCompact ? 20 : 24;
 
   return (
     <section
       data-testid="user-dashboard-hero"
       style={{
-        background: isDarkTheme ? DASHBOARD_HERO_BG_DARK : DASHBOARD_HERO_BG_LIGHT,
-        borderRadius: "var(--dg-radius-xl)",
+        ...(isDarkTheme ? DASHBOARD_HERO_BG_DARK : DASHBOARD_HERO_BG_LIGHT),
+        borderRadius: padding + HERO_DATE_TILE_RADIUS,
         boxShadow: "var(--shadow-md)",
         color: "var(--dg-color-text-inverse)",
         boxSizing: "border-box",
@@ -1937,7 +1941,7 @@ function MeHeroCard({
         flexDirection: "column",
         height: stretch ? "100%" : undefined,
         overflow: "hidden",
-        padding: isCompact ? "20px" : "24px",
+        padding,
       }}
     >
       <div
@@ -2011,7 +2015,7 @@ function MeHeroCard({
             alignItems: "center",
             background: "rgba(255,255,255,0.14)",
             border: "1px solid rgba(255,255,255,0.22)",
-            borderRadius: 14,
+            borderRadius: HERO_DATE_TILE_RADIUS,
             display: "flex",
             flexDirection: "column",
             flexShrink: 0,
@@ -2136,7 +2140,15 @@ function MeHeroCard({
             marginTop: followUpItems.length > 0 ? 0 : "auto",
           }}
         >
-          <ShiftmatesRow items={shiftmates} inverse />
+          <ShiftmatesRow
+            items={shiftmates}
+            inverse
+            style={{
+              marginLeft: HERO_WORKING_WITH_EDGE,
+              marginRight: HERO_WORKING_WITH_EDGE,
+              ...(followUpItems.length === 0 ? { marginBottom: HERO_WORKING_WITH_EDGE } : {}),
+            }}
+          />
           {followUpItems.map((followUpItem, index) => (
             <HeroSplitShiftSegment
               item={followUpItem}
@@ -2463,9 +2475,11 @@ function HeroSplitShiftSegment({
 function ShiftmatesRow({
   inverse = false,
   items,
+  style,
 }: {
   inverse?: boolean;
   items: DashboardScheduleItem[];
+  style?: CSSProperties;
 }) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -2491,7 +2505,7 @@ function ShiftmatesRow({
         border: inverse
           ? "1px solid rgba(255,255,255,0.14)"
           : "1px solid var(--dg-color-border-light)",
-        borderRadius: 16,
+        borderRadius: HERO_WORKING_WITH_RADIUS,
         color: inverse ? "rgba(255,255,255,0.84)" : "var(--dg-color-text-secondary)",
         display: "flex",
         gap: 10,
@@ -2499,6 +2513,7 @@ function ShiftmatesRow({
         marginBottom: 6,
         marginTop: 6,
         padding: "9px 14px",
+        ...style,
       }}
     >
       <div

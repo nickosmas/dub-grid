@@ -46,6 +46,12 @@ export const ME_HERO_AVATAR_SIZE = 38;
 export const ME_HERO_AVATAR_RING = 3;
 export const ME_HERO_AVATAR_FRAME_SIZE = ME_HERO_AVATAR_SIZE + ME_HERO_AVATAR_RING * 2;
 export const ME_HERO_AVATAR_FRAME_OVERLAP = -12;
+// The hero's corners curve around the same centres as the date tile's: card
+// radius = padding + tile radius. The Working with block shares the tile's
+// radius, so when it is last it sits on the padding with no margin below.
+const ME_HERO_PADDING = mobileSpace.lg;
+const ME_HERO_DATE_TILE_RADIUS = mobileRadii.control;
+const ME_HERO_CARD_RADIUS = ME_HERO_PADDING + ME_HERO_DATE_TILE_RADIUS;
 /**
  * Height of every control in the header row — the week chevrons, Today and the
  * alerts bell. One constant because they sit side by side and read as one set:
@@ -140,7 +146,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // straight line across the page's wash.
     meHeroCard: {
       position: "relative",
-      borderRadius: mobileRadii.card,
+      borderRadius: ME_HERO_CARD_RADIUS,
       shadowOffset: {
         width: 0,
         height: 16,
@@ -151,9 +157,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroCardClip: {
       overflow: "hidden",
-      borderRadius: mobileRadii.card,
-      paddingHorizontal: mobileSpace.lg,
-      paddingVertical: mobileSpace.lg,
+      borderRadius: ME_HERO_CARD_RADIUS,
+      paddingHorizontal: ME_HERO_PADDING,
+      paddingVertical: ME_HERO_PADDING,
     },
     meHeroCardPressed: {
       opacity: 0.94,
@@ -207,7 +213,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroDateTile: {
       minWidth: 58,
-      borderRadius: mobileRadii.control,
+      borderRadius: ME_HERO_DATE_TILE_RADIUS,
       borderWidth: 1,
       borderColor: mobileOnAccent.hairline,
       backgroundColor: mobileOnAccent.fill,
@@ -355,6 +361,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: mobileSpace.sm,
       marginTop: mobileSpace.sm,
       marginBottom: mobileSpace.sm,
+    },
+    meHeroCollaboratorsLast: {
+      marginBottom: ME_HERO_CARD_RADIUS - mobileRadii.control - ME_HERO_PADDING,
     },
     meHeroCollaboratorLabelRow: {
       flex: 1,
