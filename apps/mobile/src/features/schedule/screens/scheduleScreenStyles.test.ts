@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 import { describe, expect, it } from "vitest";
-import { mobileRadii, mobileSpace, mobileColors } from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadius, mobileSpace } from "../../../shared/theme/tokens";
 import { createStyles } from "./scheduleScreenStyles";
 
 describe("hero card corners", () => {
@@ -8,11 +8,13 @@ describe("hero card corners", () => {
   const flat = (style: unknown) => StyleSheet.flatten(style as never) as Record<string, unknown>;
 
   it("curves the card around the date tile's corner centre", () => {
-    const radius = mobileSpace.lg + mobileRadii.control;
+    const radius = mobileSpace.lg + mobileRadius.md;
     expect(flat(styles.meHeroCard).borderRadius).toBe(radius);
     expect(flat(styles.meHeroCardClip).borderRadius).toBe(radius);
     expect(flat(styles.meHeroCardClip).paddingHorizontal).toBe(mobileSpace.lg);
-    expect(flat(styles.meHeroDateTile).borderRadius).toBe(mobileRadii.control);
+    expect(flat(styles.meHeroDateTile).borderRadius).toBe(mobileRadius.md);
+    expect(flat(styles.meHeroCollaborators).borderRadius).toBe(mobileRadius.md);
+    expect(radius).toBe(24);
   });
 
   it("draws every rounded part with the continuous (iOS) curve", () => {

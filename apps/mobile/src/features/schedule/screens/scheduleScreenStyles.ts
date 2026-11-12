@@ -51,7 +51,7 @@ export const ME_HERO_AVATAR_FRAME_OVERLAP = -12;
 // radius, so when it is last it sits on the padding with no margin below.
 // All of them take iOS's continuous corner curve (Android draws round ones).
 const ME_HERO_PADDING = mobileSpace.lg;
-const ME_HERO_DATE_TILE_RADIUS = mobileRadii.control;
+const ME_HERO_DATE_TILE_RADIUS = mobileRadius.md;
 const ME_HERO_CARD_RADIUS = ME_HERO_PADDING + ME_HERO_DATE_TILE_RADIUS;
 /**
  * Height of every control in the header row — the week chevrons, Today and the
@@ -354,7 +354,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: "#42E878",
     },
     meHeroCollaborators: {
-      borderRadius: mobileRadii.control,
+      borderRadius: ME_HERO_DATE_TILE_RADIUS,
       borderCurve: "continuous",
       borderWidth: 1,
       borderColor: mobileOnAccent.hairline,
@@ -368,7 +368,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       marginBottom: mobileSpace.sm,
     },
     meHeroCollaboratorsLast: {
-      marginBottom: ME_HERO_CARD_RADIUS - mobileRadii.control - ME_HERO_PADDING,
+      marginBottom: ME_HERO_CARD_RADIUS - ME_HERO_DATE_TILE_RADIUS - ME_HERO_PADDING,
     },
     meHeroCollaboratorLabelRow: {
       flex: 1,

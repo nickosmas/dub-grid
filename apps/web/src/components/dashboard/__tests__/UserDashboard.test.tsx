@@ -412,12 +412,12 @@ describe("UserDashboard", () => {
       gridRow: "1 / span 2",
       maxWidth: "680px",
     });
-    // The card's corner is concentric with the 14px date tile, 24px in, and
+    // The card's corner is concentric with the 10px date tile, 24px in, and
     // takes the continuous (iOS-style) curve.
     const hero = screen.getByTestId("user-dashboard-hero");
     expect(hero).toHaveStyle({ height: "100%" });
     expect(hero).toHaveClass("dg-continuous-corners");
-    expect(hero.style.getPropertyValue("--dg-corner-radius")).toBe("38px");
+    expect(hero.style.getPropertyValue("--dg-corner-radius")).toBe("34px");
     expect(screen.getByText("On duty")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("user-dashboard-hero")).queryByText("Avery Stone"),
@@ -435,8 +435,8 @@ describe("UserDashboard", () => {
       justifyContent: "space-between",
     });
     expect(workingWith).toHaveClass("dg-continuous-corners");
-    expect(workingWith.style.getPropertyValue("--dg-corner-radius")).toBe("16px");
-    // Last on the card, its 16px corners share the card's curve: 22px from
+    expect(workingWith.style.getPropertyValue("--dg-corner-radius")).toBe("12px");
+    // Last on the card, its 12px corners share the card's curve: 22px from
     // the sides and the bottom, 2px outside the 24px padding.
     expect(workingWith).toHaveStyle({
       marginBottom: "-2px",

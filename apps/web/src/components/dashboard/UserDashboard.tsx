@@ -184,8 +184,8 @@ const DASHBOARD_HERO_BG_DARK = getHeroBackgroundCss(true);
 // The card's corners curve around the same centres as the date tile's and the
 // Working with pill's: card radius = padding + tile radius, and the pill sits
 // (pill radius - tile radius) further out than the padding.
-const HERO_DATE_TILE_RADIUS = 14;
-const HERO_WORKING_WITH_RADIUS = 16;
+const HERO_DATE_TILE_RADIUS = 10;
+const HERO_WORKING_WITH_RADIUS = 12;
 const HERO_WORKING_WITH_EDGE = HERO_DATE_TILE_RADIUS - HERO_WORKING_WITH_RADIUS;
 // The hero's rounded parts take iOS-style continuous corners
 // (`.dg-continuous-corners`), which read their round radius from this variable.
