@@ -1,7 +1,7 @@
 /**
  * Soft gradient washes.
  *
- * Distinct from `heroGradientTokens`, which is a saturated card *fill* — a
+ * Distinct from `heroMeshTokens`, which is a saturated card *fill* — a
  * self-contained blue block you read as an object. These are washes: every one
  * of them resolves to a colour the page already has (the background, the card's
  * own surface, or full transparency), so they add depth without adding a shape.
