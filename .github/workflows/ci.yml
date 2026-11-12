@@ -144,9 +144,20 @@ jobs:
       - run: npm run build:packages
 
       # The CLI is the `supabase` dev dependency, so CI runs the version local
-      # and production commands do.
+      # and production commands do. This job pulls the stack's images in the
+      # same burst as every Playwright shard, and the registry can answer with
+      # "Rate exceeded"; the CLI then trips over its own half-started database
+      # ("port 54322 already in use"). As in e2e.yml, a failed start is cleared
+      # and retried after a growing pause instead of failing the job.
       - name: Start Supabase
-        run: npx supabase start
+        run: |
+          for attempt in 1 2 3 4; do
+            npx supabase start && exit 0
+            echo "supabase start failed (attempt $attempt of 4)" >&2
+            npx supabase stop --no-backup || true
+            sleep $((attempt * 30))
+          done
+          exit 1
 
       - name: Seed database
         run: npx tsx seed.ts
