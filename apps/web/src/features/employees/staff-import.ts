@@ -305,7 +305,8 @@ export function buildStaffImportTemplate(
   references: StaffImportReferences,
 ): string {
   const headers = staffCsvHeaders(labels);
-  // The first person lists two of each so the template shows how a list is written.
+  // The first person works in two areas so the template shows how a list is written.
+  // One role only: in most organizations a role is a post, such as a director.
   const firstTwo = (items: readonly NamedRef[]) =>
     items
       .slice(0, 2)
@@ -320,7 +321,7 @@ export function buildStaffImportTemplate(
       "(555) 201-0100",
       firstTwo(references.focusAreas),
       references.certifications[0]?.name ?? "",
-      firstTwo(references.roles),
+      references.roles[0]?.name ?? "",
       "Full-time",
       "",
       "",

@@ -14,6 +14,7 @@ import { Button } from "./Button";
 import { NumericBadge } from "./NumericBadge";
 import { PressableRow } from "./PressableRow";
 import { SelectionCheck } from "./SelectionCheck";
+import { SelectionCheckbox } from "./SelectionCheckbox";
 import { IS_NATIVE_LIST } from "../lib/native-list";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
@@ -77,7 +78,11 @@ export function FilterSheet({
   );
 }
 
-type SelectionRowElement = ReactElement<{ selected: boolean; showDivider?: boolean }>;
+type SelectionRowElement = ReactElement<{
+  selected: boolean;
+  multiple?: boolean;
+  showDivider?: boolean;
+}>;
 
 /** Whether an arbitrary child is a `SelectionRow` we can read `selected` off. */
 function isSelectionRow(child: ReactNode): child is SelectionRowElement {
@@ -116,14 +121,15 @@ export function SelectionSection({
         {rows.map((child, index) => {
           if (!isSelectionRow(child)) return child;
           const next = rows[index + 1];
+          const lifted = (row: SelectionRowElement) => row.props.selected && !row.props.multiple;
           return cloneElement(child, {
             // No rule below the last row (it used to draw one straight onto the
             // group's own bottom edge), and none on either side of a selected
-            // row, which has lifted out of the group as its own card.
+            // single-choice row, which has lifted out of the group as its own
+            // card. A ticked pick-many row stays in the group.
             showDivider:
               index < rows.length - 1 &&
-              (IS_NATIVE_LIST ||
-                (!child.props.selected && !(isSelectionRow(next) && next.props.selected))),
+              (IS_NATIVE_LIST || (!lifted(child) && !(isSelectionRow(next) && lifted(next)))),
           });
         })}
       </View>
@@ -135,6 +141,7 @@ export function SelectionRow({
   label,
   detail,
   selected,
+  multiple = false,
   showDivider = true,
   disabled = false,
   onPress,
@@ -142,6 +149,11 @@ export function SelectionRow({
   label: string;
   detail?: string;
   selected: boolean;
+  /**
+   * A choice in a filter that takes several: a checkbox on every row, ticked
+   * when chosen, in place of the one chosen row's check and fill.
+   */
+  multiple?: boolean;
   /** Injected by `SelectionSection`; call sites don't set this. */
   showDivider?: boolean;
   disabled?: boolean;
@@ -158,22 +170,29 @@ export function SelectionRow({
   return (
     <View style={[styles.selectionSlot, showDivider && styles.selectionDivider]}>
       <PressableRow
+        accessibilityRole={multiple ? "checkbox" : undefined}
+        checked={multiple ? selected : undefined}
         disabled={disabled}
         onPress={onPress}
-        selected={selected}
+        selected={multiple ? undefined : selected}
         style={[
           styles.selectionRow,
           IS_NATIVE_LIST && styles.selectionRowNative,
-          selected && !IS_NATIVE_LIST && styles.selectionRowSelected,
+          selected && !multiple && !IS_NATIVE_LIST && styles.selectionRowSelected,
         ]}
       >
         <View style={styles.selectionRowCopy}>
-          <Text style={[styles.selectionRowTitle, selected && styles.selectionRowTitleSelected]}>
+          <Text
+            style={[
+              styles.selectionRowTitle,
+              selected && !multiple && styles.selectionRowTitleSelected,
+            ]}
+          >
             {label}
           </Text>
           {detail ? <Text style={styles.selectionRowDetail}>{detail}</Text> : null}
         </View>
-        {selected ? <SelectionCheck /> : null}
+        {multiple ? <SelectionCheckbox checked={selected} /> : selected ? <SelectionCheck /> : null}
       </PressableRow>
     </View>
   );
