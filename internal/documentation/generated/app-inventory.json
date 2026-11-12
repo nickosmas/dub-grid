@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:397ffa6807a611cb20b6ce2131b1ade7b5e8d159129bd14d3392c6157f424b02",
+  "sourceDigest": "sha256:755b3126b08f0179aea5a37cf029a6d6e40f046bd791d123744de3f8a8090894",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5171,6 +5171,26 @@
       "sha256": "1bbb8c8dc6c73425cec31563485ef93b7b4a322d2d7096bbf295c92d7e9f75b7",
       "source": {
         "path": "supabase/migrations/131_admin_permissions_complete.sql"
+      }
+    },
+    {
+      "id": "migration:132_colleague_status_server_owned.sql",
+      "version": "132",
+      "name": "colleague_status_server_owned",
+      "file": "132_colleague_status_server_owned.sql",
+      "sha256": "2fa1f39bb07bef68b3a370b0905309375423fb89af446fdebd7d797f7796217f",
+      "source": {
+        "path": "supabase/migrations/132_colleague_status_server_owned.sql"
+      }
+    },
+    {
+      "id": "migration:133_colleague_accounts_server_owned.sql",
+      "version": "133",
+      "name": "colleague_accounts_server_owned",
+      "file": "133_colleague_accounts_server_owned.sql",
+      "sha256": "c6aa8bad895e399a5d330b4c158b808614f0d8c9bf3c5d9f9401f965fda4833e",
+      "source": {
+        "path": "supabase/migrations/133_colleague_accounts_server_owned.sql"
       }
     }
   ],
