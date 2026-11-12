@@ -1427,7 +1427,7 @@ describe("PersonDetailScreen", () => {
       ]);
     });
 
-    it("shows only a planned away to someone who can't change it", () => {
+    it("shows no status, a planned away included, to someone who can't change it", () => {
       const manager = useBootstrap();
       useBootstrap.mockReturnValue({
         ...manager,
@@ -1436,11 +1436,10 @@ describe("PersonDetailScreen", () => {
           permissions: { canManageEmployees: false, canViewEmployeeDetails: true },
         },
       });
-      // A planned away says something to them, without Active or a way to change it.
+      // A colleague's status is for the people who act on it.
       renderWithStatusMutation({ plannedStatus: "away", plannedFrom: day(5) });
       expect(screen.queryByTestId("status-card")).not.toBeInTheDocument();
-      expect(screen.getByText("Status")).toBeInTheDocument();
-      expect(screen.getByText(/^Away from /)).toBeInTheDocument();
+      expect(screen.queryByText(/^Away from /)).not.toBeInTheDocument();
     });
 
     it("leaves Active unsaid for someone who can't change it", () => {

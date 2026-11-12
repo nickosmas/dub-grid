@@ -160,7 +160,14 @@ describe("loadMobilePeoplePayload", () => {
 
   it("excludes self before returning a redacted regular-user directory", async () => {
     const self = makePerson({ id: "employee-self", userId: USER_ID });
-    const coworker = makePerson({ id: "employee-coworker", userId: "another-user" });
+    const coworker = makePerson({
+      id: "employee-coworker",
+      userId: "another-user",
+      statusChangedAt: "2026-11-01T00:00:00.000Z",
+      plannedStatus: "away",
+      plannedFrom: "2026-11-15",
+      suspendedAt: "2026-11-02T00:00:00.000Z",
+    });
     const inactive = makePerson({ id: "employee-inactive", status: "inactive" });
 
     const payload = await loadMobilePeoplePayload(
@@ -193,6 +200,11 @@ describe("loadMobilePeoplePayload", () => {
       deptAdminIds: [],
       statusNote: "",
       userId: null,
+      // A colleague's status is for the people who act on it.
+      statusChangedAt: null,
+      plannedStatus: null,
+      plannedFrom: null,
+      suspendedAt: null,
     });
   });
 

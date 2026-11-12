@@ -58,6 +58,30 @@ export interface Employee {
   joinedAt?: string | null;
 }
 
+/**
+ * The status details a regular member never receives about a colleague:
+ * whether they are Away, suspended, leaving, returning or yet to start, and
+ * when their status last changed. Status is for the people who act on it.
+ * Each is blanked, not dropped, so the payload keeps its shape.
+ */
+export const COLLEAGUE_STATUS_BLANKS = {
+  statusChangedAt: null,
+  awayUntil: null,
+  awayAbsenceTypeId: null,
+  suspendedAt: null,
+  suspendedUntil: null,
+  plannedStatus: null,
+  plannedFrom: null,
+  plannedUntil: null,
+  plannedAbsenceTypeId: null,
+  firstDay: null,
+} as const;
+
+/** A colleague's record with its status details blanked, for a regular member. */
+export function withoutColleagueStatus<T extends object>(person: T): T {
+  return { ...person, ...COLLEAGUE_STATUS_BLANKS };
+}
+
 export interface StaffCredentialSummary {
   /** Holds a certification. In a care or medical facility these are the nurses. */
   certified: number;

@@ -15,7 +15,7 @@ import type {
   MobileScheduleIndicator,
   MobileScheduleRange,
 } from "@dubgrid/contracts";
-import { hasAcceptedCurrentTerms } from "@dubgrid/domain";
+import { hasAcceptedCurrentTerms, withoutColleagueStatus } from "@dubgrid/domain";
 import {
   canSeeDraftScheduleNotes,
   scheduleNotesForViewer,
@@ -572,7 +572,7 @@ export async function loadMobilePeoplePayload(
       // export. Keep the visible scheduling qualifications used by the list
       // while removing hidden fields and auth-account links.
       return {
-        ...mobilePerson,
+        ...withoutColleagueStatus(mobilePerson),
         adminPermissions: null,
         adminPermissionCount: null,
         contactNotes: "",

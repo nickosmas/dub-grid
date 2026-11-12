@@ -23,7 +23,7 @@ import {
   getStaffFieldErrorsFromZod,
   validateStaffOrgReferences,
 } from "@/lib/staff-validation";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, withoutColleagueStatus } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -174,7 +174,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     return NextResponse.json(
       mobilePersonResponseSchema.parse({
         person: {
-          ...person,
+          ...withoutColleagueStatus(person),
           contactNotes: "",
           departmentIds: [],
           // The people list already withholds these from a non-manager

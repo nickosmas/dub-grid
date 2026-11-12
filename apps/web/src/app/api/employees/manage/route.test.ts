@@ -397,6 +397,37 @@ describe("POST /api/employees/manage", () => {
       expect(own.employee.joinedAt).toBe("2026-03-05T14:00:00.000Z");
     });
 
+    it("withholds a coworker's status from a view-only caller, but not their own", async () => {
+      const statusDetails = {
+        statusChangedAt: "2026-11-01T00:00:00.000Z",
+        suspendedAt: "2026-11-02T00:00:00.000Z",
+        suspendedUntil: "2026-11-20",
+        plannedStatus: "away",
+        plannedFrom: "2026-11-15",
+        plannedUntil: "2026-11-22",
+        plannedAbsenceTypeId: 4,
+        firstDay: "2026-11-30",
+      };
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee(statusDetails));
+      const coworker = await (await POST(fetchEmployeeByIdRequest())).json();
+      expect(coworker.employee).toMatchObject({
+        statusChangedAt: null,
+        suspendedAt: null,
+        suspendedUntil: null,
+        plannedStatus: null,
+        plannedFrom: null,
+        plannedUntil: null,
+        plannedAbsenceTypeId: null,
+        firstDay: null,
+      });
+
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee({ ...statusDetails, userId: VIEWER_USER_ID }));
+      const own = await (await POST(fetchEmployeeByIdRequest())).json();
+      expect(own.employee).toMatchObject(statusDetails);
+    });
+
     it("hands contact details to a viewer granted canViewEmployeeDetails", async () => {
       mockAuth({ canViewEmployeeDetails: true });
 

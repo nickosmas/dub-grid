@@ -9,6 +9,7 @@ import {
   isValidFirstDay,
   NOT_ON_SCHEDULE_CODE,
   NOT_ON_SCHEDULE_MESSAGE,
+  withoutColleagueStatus,
 } from "@dubgrid/domain";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -333,7 +334,9 @@ function maskEmployeeForViewer(employee: Employee, callerUserId: string): Employ
   // view-only callers can't map an employee → an auth account.
   const isSelf = employee.userId === callerUserId;
   return {
-    ...employee,
+    // A colleague's status (Away, suspended, leaving, starting) is for the
+    // people who act on it; your own row keeps yours.
+    ...(isSelf ? employee : withoutColleagueStatus(employee)),
     contactNotes: "",
     statusNote: "",
     deptAdminIds: [],

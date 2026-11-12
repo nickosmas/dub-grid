@@ -234,6 +234,15 @@ describe("mobile person route", () => {
     requireMobileAuth.mockResolvedValue(
       makeAuth({ canManageEmployees: false, canViewStaff: true }),
     );
+    rowToEmployee.mockReturnValue(
+      makeEmployee({
+        suspendedAt: "2026-04-20T00:00:00.000Z",
+        plannedStatus: "away",
+        plannedFrom: "2026-05-04",
+        plannedUntil: "2026-05-11",
+        firstDay: "2026-04-01",
+      }),
+    );
     mockManagementMemberships([]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue({
       id: "11111111-1111-4111-8111-111111111111",
@@ -271,6 +280,12 @@ describe("mobile person route", () => {
       // already withholds them.
       email: "",
       phone: "",
+      // A colleague's status is for the people who act on it.
+      suspendedAt: null,
+      plannedStatus: null,
+      plannedFrom: null,
+      plannedUntil: null,
+      firstDay: null,
     });
   });
 

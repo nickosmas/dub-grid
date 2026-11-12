@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { countStaffByCertification, summarizeStaffByCredential } from "./staff";
+import {
+  COLLEAGUE_STATUS_BLANKS,
+  countStaffByCertification,
+  summarizeStaffByCredential,
+  withoutColleagueStatus,
+} from "./staff";
 
 const staff = (...certificationIds: (number | null)[]) =>
   certificationIds.map((certificationId) => ({ certificationId, status: "active" as const }));
@@ -129,5 +134,31 @@ describe("countStaffByCertification", () => {
 
   it("returns nothing when the org has no certifications and nobody holds one", () => {
     expect(countStaffByCertification(staff(null), [])).toEqual([]);
+  });
+});
+
+describe("withoutColleagueStatus", () => {
+  it("blanks every status detail and keeps the rest", () => {
+    const person = {
+      id: "e1",
+      firstName: "Ana",
+      status: "active" as const,
+      statusChangedAt: "2026-11-01T00:00:00Z",
+      awayUntil: "2026-12-01",
+      awayAbsenceTypeId: 3,
+      suspendedAt: "2026-11-02T00:00:00Z",
+      suspendedUntil: "2026-11-20",
+      plannedStatus: "away" as const,
+      plannedFrom: "2026-11-15",
+      plannedUntil: "2026-11-22",
+      plannedAbsenceTypeId: 4,
+      firstDay: "2026-11-30",
+    };
+    expect(withoutColleagueStatus(person)).toEqual({
+      id: "e1",
+      firstName: "Ana",
+      status: "active",
+      ...COLLEAGUE_STATUS_BLANKS,
+    });
   });
 });
