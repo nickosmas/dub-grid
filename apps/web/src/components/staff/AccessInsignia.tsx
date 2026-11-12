@@ -27,18 +27,7 @@ const SIZES: Record<InsigniaSize, { badge: number; pull: number }> = {
 };
 
 const EDGE = ACCESS_INSIGNIA_BEVEL.width;
-
-// The highlight sits one pixel inside the top edge: a white line on the outer
-// pixel blends into a light page, so the circle looked flattened on top. The
-// first shadow, in the badge's own color, covers the outer pixel and keeps the
-// outline round; the shade stays on the bottom edge.
-function bevelShadow(fill: string): string {
-  return [
-    `inset 0 ${EDGE}px 0 ${fill}`,
-    `inset 0 ${2 * EDGE}px 0 ${ACCESS_INSIGNIA_BEVEL.light}`,
-    `inset 0 -${EDGE}px 0 ${ACCESS_INSIGNIA_BEVEL.shade}`,
-  ].join(", ");
-}
+const BEVEL_SHADOW = `inset 0 ${EDGE}px 0 ${ACCESS_INSIGNIA_BEVEL.light}, inset 0 -${EDGE}px 0 ${ACCESS_INSIGNIA_BEVEL.shade}`;
 const STAR_VIEW_BOX = `0 0 ${ACCESS_INSIGNIA_STAR_BOX} ${ACCESS_INSIGNIA_STAR_BOX}`;
 
 interface AccessInsigniaProps {
@@ -62,7 +51,6 @@ export function AccessInsignia({ orgRole, size = "sm" }: AccessInsigniaProps) {
 
   const { badge, pull } = SIZES[size];
   const label = ORG_ROLE_LABELS[highlightedRole];
-  const fill = insignia === "gold" ? "var(--dg-color-insignia-gold)" : "var(--dg-color-brand)";
 
   return (
     <Hint content={hint(label)}>
@@ -74,9 +62,10 @@ export function AccessInsignia({ orgRole, size = "sm" }: AccessInsigniaProps) {
           marginLeft: pull,
           width: badge,
           height: badge,
-          background: fill,
+          background:
+            insignia === "gold" ? "var(--dg-color-insignia-gold)" : "var(--dg-color-brand)",
           color: "var(--dg-color-text-inverse)",
-          boxShadow: bevelShadow(fill),
+          boxShadow: BEVEL_SHADOW,
         }}
       >
         <svg
