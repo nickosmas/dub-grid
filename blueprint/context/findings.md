@@ -39,21 +39,21 @@
 **Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
 **Resolution:** Fixed in f3eb3fe0 (fix/mobile-login-orphan-session), taking the first option. The mobile login handler is `apps/web/src/features/mobile/server/routes/auth-login.ts`, not the web route the finding names. Past `MOBILE_LOGIN_SERVER_DEADLINE_MS` (the client timeout less one second), or once `req.signal` reports the client gone, it ends the session it just created and answers 504 rather than returning tokens nobody is waiting for; returning them is what leaves the orphan, so the two are decided together. The ending is `endUserSession` with the user and session ids read back from the token just minted, never a `signOut` on the ephemeral client, whose default global scope would sign the person out on every device. Cleanup is best effort and its outcome is recorded as `sessionDiscarded`, since a sign-in already too slow to use must not also fail on tidying up. `MOBILE_REQUEST_TIMEOUT_MS` moved into `@dubgrid/contracts` because the server has to stay under the client's value and two copies would drift. The handler now changes a session, so `MOBILE_DELEGATES` classifies it with assertions pinning that the only session it can end is the one it just created for that request; a sensitive-action gate would be circular on the endpoint that mints the caller's first token (the findings session agreed). Three route tests cover the abandoned sign-in, a cleanup failure still answering 504, and a normal sign-in ending nothing. Not verified against a real slow server: the 18.6 s case came from a loaded Android rehearsal and was not reproduced.
 
-### F-121 [P3] unverified - Latent inventory parser traps
+### F-121 [P3] fixed - Latent inventory parser traps
 
 **File:** `scripts/documentation/inventory.ts:531` (`resolveSourceModule`), walk helpers; `scripts/documentation/check.ts:84`
 **Found:** 2026-09-28 by `/audit` (scope: current, 1b86aad5..1cc2be3e; all lenses)
 **Why it matters:** each needs a real source to trigger it: an `@/` import in Settings would make the digest read a nonexistent path and crash; a `page.tsx` or `route.ts` under a Next private (`_x`) or `@slot` folder would count as a route; `statSync` follows symlinks, so a loop recurses; untracked local files feed the inventory, so `docs:check` can fail locally but pass in CI; with no `.gitattributes`, a CRLF checkout fails frontmatter parsing and the byte compare.
 **Suggested fix:** resolve aliases through tsconfig paths, skip private and slot folders, walk with `lstat` and skip links, and add `* text=auto eol=lf` for the generated and docs files.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `walkFiles` uses `lstat` and skips links, so a link to an ancestor can no longer recurse; web pages and Route Handlers skip private (`_name`) and `@slot` folders; and `resolveSourceModule` and the Route Handler re-export resolver resolve an aliased specifier (`@/x`) through the nearest tsconfig's `paths`, bounded by the repository root, instead of the digest reading a path that doesn't exist. `.gitattributes` keeps the docs pages and the generated files LF (every one already was, so nothing renormalized). Tests in `docs-inventory.test.ts` fail on the old parser (the link test with ELOOP). The regenerated inventory is unchanged and `docs:check` passes. Not done: untracked local files still feed the inventory, so `docs:check` can still differ between a working tree and CI.
 
-### F-122 [P3] unverified - The env-module declaration pattern could count any uppercase object key
+### F-122 [P3] fixed - The env-module declaration pattern could count any uppercase object key
 
 **File:** `scripts/documentation/inventory.ts` (`discoverEnvironmentKeys`, schema-property match)
 **Found:** 2026-09-28 by `/audit` (re-review of F-115 on feature/40a-docs-inventory)
 **Why it matters:** in an `env.*` module every indented `UPPER_CASE:` key is recorded as a declared environment key, not only properties of the Zod schema. Every current match is a real schema key, so nothing is wrong today; a lookup table with uppercase keys in an env module would add phantom keys that then fail classification.
 **Suggested fix:** read keys only from the object literal passed to `z.object(...)` (the TypeScript AST the route parser already uses), or accept the unclassified-key failure as the guard.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): an env module's declarations come from the TypeScript AST, only from the property names of object literals passed to `z.object(...)`, so an uppercase lookup table beside the schema adds nothing. `docs-inventory.test.ts` covers it and fails on the old pattern; the regenerated inventory is unchanged.
 
 ### F-123 [P3] fixed - Metro's image-size copies stay vulnerable until the Expo SDK upgrade
 

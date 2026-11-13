@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -75,6 +75,22 @@ describe("documentation source inventory", () => {
         source: { path: "apps/web/src/app/(app)/people/[id]/page.tsx" },
       },
     ]);
+  });
+
+  it("counts no route under a private or slot folder and never follows a link (F-121)", () => {
+    const root = fixture();
+    write(root, "apps/web/src/app/(app)/people/page.tsx");
+    write(root, "apps/web/src/app/(app)/people/_lib/page.tsx");
+    write(root, "apps/web/src/app/(app)/people/@modal/page.tsx");
+    write(root, "apps/web/src/app/api/_shared/route.ts", "export async function GET() {}");
+    write(root, "apps/web/src/app/api/items/route.ts", "export async function GET() {}");
+    symlinkSync(
+      path.join(root, "apps/web/src/app"),
+      path.join(root, "apps/web/src/app/(app)/people/loop"),
+    );
+
+    expect(collectWebRoutes(root).map((route) => route.id)).toEqual(["web:/people"]);
+    expect(collectHttpMethods(root).map((method) => method.id)).toEqual(["http:GET:/api/items"]);
   });
 
   it("rejects web URL collisions hidden by route groups", () => {
@@ -214,6 +230,41 @@ describe("documentation source inventory", () => {
         group: "Staff designations",
         defaultLabel: "Roles",
         panelSource: { path: "apps/web/src/components/settings/StringListSettings.tsx" },
+      }),
+    ]);
+  });
+
+  it("resolves a Settings panel imported through the tsconfig alias (F-121)", () => {
+    const root = fixture();
+    write(
+      root,
+      "apps/web/tsconfig.json",
+      JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "@/*": ["./src/*"] } } }),
+    );
+    write(
+      root,
+      "apps/web/src/components/settings/nav-config.tsx",
+      `export const VALID_SECTIONS = ["org-general"];
+       export function buildNavGroups() {
+         const groups = [];
+         groups.push({ id: "general", label: "General", items: [{ id: "org-general", label: "Organization Details" }] });
+         return groups;
+       }`,
+    );
+    write(
+      root,
+      "apps/web/src/components/settings/SettingsPage.tsx",
+      `const OrganizationGeneral = dynamic(() => import("@/components/settings/panels/General"));
+       export function SettingsPage({ activeSection }) {
+         return <>{activeSection === "org-general" && <OrganizationGeneral />}</>;
+       }`,
+    );
+    write(root, "apps/web/src/components/settings/panels/General.tsx");
+
+    expect(collectSettingsSections(root)).toEqual([
+      expect.objectContaining({
+        id: "settings:org-general",
+        panelSource: { path: "apps/web/src/components/settings/panels/General.tsx" },
       }),
     ]);
   });
@@ -484,6 +535,25 @@ describe("documentation source inventory", () => {
     ]);
     expect([...found.get("SCHEMA_KEY")!.declarations]).toEqual(["apps/web/src/lib/env.server.ts"]);
     expect([...found.get("COMMENTED_KEY")!.examples]).toEqual([".env.example"]);
+  });
+
+  it("reads an env module's declarations only from its schema (F-122)", () => {
+    const root = fixture();
+    write(
+      root,
+      "apps/web/src/lib/env.ts",
+      [
+        "const schema = z.object({",
+        "  SCHEMA_KEY: z.string(),",
+        '  "QUOTED_KEY": z.string().optional(),',
+        "});",
+        "const LOOKUP = {",
+        "  NOT_A_KEY: 1,",
+        "};",
+      ].join("\n"),
+    );
+
+    expect([...discoverEnvironmentKeys(root).keys()].sort()).toEqual(["QUOTED_KEY", "SCHEMA_KEY"]);
   });
 
   it("classifies environment names without reading values", () => {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import {
@@ -185,15 +185,26 @@ function repositoryPath(repoRoot: string, filePath: string): string {
   return posixPath(relative);
 }
 
-function walkFiles(root: string, predicate: (file: string) => boolean): string[] {
+/** Links are skipped: one pointing at an ancestor would recurse forever. */
+function walkFiles(
+  root: string,
+  predicate: (file: string) => boolean,
+  enterDirectory: (name: string) => boolean = () => true,
+): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(root).sort((left, right) => left.localeCompare(right, "en"))) {
     const entryPath = path.join(root, entry);
-    const stats = statSync(entryPath);
-    if (stats.isDirectory()) files.push(...walkFiles(entryPath, predicate));
-    else if (stats.isFile() && predicate(entryPath)) files.push(entryPath);
+    const stats = lstatSync(entryPath);
+    if (stats.isDirectory()) {
+      if (enterDirectory(entry)) files.push(...walkFiles(entryPath, predicate, enterDirectory));
+    } else if (stats.isFile() && predicate(entryPath)) files.push(entryPath);
   }
   return files;
+}
+
+/** Next never routes a private (`_name`) folder, and a `@slot` renders inside its parent's URL. */
+function isRoutableAppFolder(name: string): boolean {
+  return !name.startsWith("_") && !name.startsWith("@");
 }
 
 function routeGroups(segments: readonly string[]): string[] {
@@ -307,10 +318,14 @@ function stringArray(node: ts.Expression, label: string): string[] {
 
 export function collectWebRoutes(repoRoot: string): WebRouteItem[] {
   const appRoot = path.join(repoRoot, "apps/web/src/app");
-  const pages = walkFiles(appRoot, (file) => {
-    const extension = path.extname(file);
-    return CODE_EXTENSIONS.has(extension) && path.basename(file, extension) === "page";
-  });
+  const pages = walkFiles(
+    appRoot,
+    (file) => {
+      const extension = path.extname(file);
+      return CODE_EXTENSIONS.has(extension) && path.basename(file, extension) === "page";
+    },
+    isRoutableAppFolder,
+  );
 
   const routes = pages.map((file) => {
     const segments = posixPath(path.relative(appRoot, path.dirname(file)))
@@ -437,16 +452,39 @@ function exportedHttpMethods(sourceText: string, filePath: string): ExportedMeth
   return asciiSort(methods, (method) => method.method);
 }
 
+/**
+ * Where a relative or tsconfig-aliased (`@/x`) specifier points, from the
+ * nearest tsconfig's `paths`. A package specifier answers undefined.
+ */
+function moduleBase(repoRoot: string, fromFile: string, specifier: string): string | undefined {
+  if (specifier.startsWith(".")) return path.resolve(path.dirname(fromFile), specifier);
+  const top = path.resolve(repoRoot);
+  for (let directory = path.dirname(fromFile); ; directory = path.dirname(directory)) {
+    const configPath = path.join(directory, "tsconfig.json");
+    if (existsSync(configPath)) {
+      const options = (ts.readConfigFile(configPath, ts.sys.readFile).config?.compilerOptions ??
+        {}) as { baseUrl?: string; paths?: Record<string, unknown> };
+      const baseUrl = path.resolve(directory, options.baseUrl ?? ".");
+      for (const [pattern, targets] of Object.entries(options.paths ?? {})) {
+        const target = Array.isArray(targets) ? targets[0] : undefined;
+        if (!pattern.endsWith("*") || typeof target !== "string" || !target.endsWith("*")) continue;
+        const prefix = pattern.slice(0, -1);
+        if (specifier.startsWith(prefix)) {
+          return path.resolve(baseUrl, target.slice(0, -1), specifier.slice(prefix.length));
+        }
+      }
+      return undefined;
+    }
+    if (directory === top || path.dirname(directory) === directory) return undefined;
+  }
+}
+
 function resolveImplementationSource(
   repoRoot: string,
   routeFile: string,
   specifier: string,
 ): SourceRef | undefined {
-  const absoluteBase = specifier.startsWith(".")
-    ? path.resolve(path.dirname(routeFile), specifier)
-    : specifier.startsWith("@/")
-      ? path.join(repoRoot, "apps/web/src", specifier.slice(2))
-      : undefined;
+  const absoluteBase = moduleBase(repoRoot, routeFile, specifier);
   if (!absoluteBase) return undefined;
   const candidates = [
     absoluteBase,
@@ -470,7 +508,11 @@ function resolveImplementationSource(
 
 export function collectHttpMethods(repoRoot: string): HttpMethodItem[] {
   const appRoot = path.join(repoRoot, "apps/web/src/app");
-  const routeFiles = walkFiles(appRoot, (file) => path.basename(file) === "route.ts");
+  const routeFiles = walkFiles(
+    appRoot,
+    (file) => path.basename(file) === "route.ts",
+    isRoutableAppFolder,
+  );
   const methods = routeFiles.flatMap((file) => {
     const segments = posixPath(path.relative(appRoot, path.dirname(file)))
       .split("/")
@@ -529,8 +571,8 @@ function dynamicImports(sourceFile: ts.SourceFile): Map<string, string> {
 }
 
 function resolveSourceModule(repoRoot: string, fromFile: string, specifier: string): SourceRef {
-  if (!specifier.startsWith(".")) return { path: specifier };
-  const base = path.resolve(path.dirname(fromFile), specifier);
+  const base = moduleBase(repoRoot, fromFile, specifier);
+  if (!base) return { path: specifier };
   const candidates = [
     ...[".ts", ".tsx", ".js", ".jsx"].map((extension) => `${base}${extension}`),
     ...[".ts", ".tsx", ".js", ".jsx"].map((extension) => path.join(base, `index${extension}`)),
@@ -1169,6 +1211,34 @@ export function environmentReadsIn(source: string): string[] {
   return [...names];
 }
 
+/** Uppercase property names of every object literal passed to `z.object(...)`. */
+function zodObjectKeysIn(file: string, source: string): string[] {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  const keyPattern = new RegExp(`^${ENV_NAME}$`);
+  const names: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      node.expression.expression.text === "z" &&
+      node.expression.name.text === "object" &&
+      node.arguments[0] &&
+      ts.isObjectLiteralExpression(node.arguments[0])
+    ) {
+      for (const property of node.arguments[0].properties) {
+        const name = property.name;
+        const text =
+          name && (ts.isIdentifier(name) || ts.isStringLiteral(name)) ? name.text : undefined;
+        if (text && keyPattern.test(text)) names.push(text);
+      }
+    }
+    node.forEachChild(visit);
+  };
+  visit(sourceFile);
+  return names;
+}
+
 export function discoverEnvironmentKeys(repoRoot: string): Map<string, EnvironmentDiscovery> {
   const entries = new Map<string, EnvironmentDiscovery>();
   const roots = [
@@ -1211,8 +1281,8 @@ export function discoverEnvironmentKeys(repoRoot: string): Map<string, Environme
     }
     // The env modules declare keys as schema properties read through `safeParse(process.env)`.
     if (declares) {
-      for (const match of source.matchAll(new RegExp(`^\\s+(${ENV_NAME})\\s*:`, "gm"))) {
-        addEnvironmentReference(entries, match[1], relative, "declaration");
+      for (const name of zodObjectKeysIn(file, source)) {
+        addEnvironmentReference(entries, name, relative, "declaration");
       }
     }
     for (const match of source.matchAll(
