@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React, { memo, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
@@ -278,7 +278,7 @@ function DayPopover({
   );
 }
 
-export default function MonthView({
+function MonthView({
   monthStart,
   filteredEmployees,
   highlightEmpIds,
@@ -729,3 +729,5 @@ export default function MonthView({
     </div>
   );
 }
+
+export default memo(MonthView);

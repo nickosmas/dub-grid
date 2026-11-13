@@ -85,6 +85,7 @@ import {
 } from "@/types";
 import { buildScheduleGridModel } from "./schedule-grid/model";
 import { orderAwayAllPeriod } from "./schedule-grid/awayAllPeriod";
+import { sameSearchHighlight } from "./schedule-grid/searchHighlight";
 import type {
   CorrectionMark,
   ScheduleGridHandlers,
@@ -1130,8 +1131,8 @@ function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
 /**
  * SectionBlock's memo comparison. Props compare by identity, as React's default
  * does, except the per-cell accessors and sets, which compare by what each of
- * the section's cells reads from them, and the arrays the grid rebuilds with the
- * same contents. A section only ever calls its accessors for its own employees
+ * the section's cells reads from them, the arrays the grid rebuilds with the
+ * same contents, and the search highlight, by its own people's matches. A section only ever calls its accessors for its own employees
  * and dates (and the note marks for its own focus area and its cells' shifts),
  * so equal reads mean an identical render.
  */
@@ -1146,6 +1147,9 @@ function sectionBlockPropsAreEqual(prev: SectionBlockProps, next: SectionBlockPr
       accessorsChanged = true;
     } else if (key === "employees") {
       if (!sameItems(prev.employees, next.employees)) return false;
+    } else if (key === "highlightEmpIds") {
+      const ids = next.employees.map((emp) => emp.id);
+      if (!sameSearchHighlight(prev.highlightEmpIds, next.highlightEmpIds, ids)) return false;
     } else if (!CONTENT_COMPARED_KEYS.has(key) || !isDeepEqual(prev[key], next[key])) {
       return false;
     }
