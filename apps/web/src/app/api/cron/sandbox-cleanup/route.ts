@@ -7,6 +7,7 @@ import { serverEnv } from "@/lib/env.server";
 import { bearerMatchesSecret } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 // Runs daily via the vercel.json crons block. Garbage-collects abandoned Test
 // Sandbox organizations. The sandbox cookie's maxAge is 7 days

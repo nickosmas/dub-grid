@@ -329,6 +329,58 @@ describe("fetchMobilePublishHistoryRows", () => {
     expect(rows[0].changes).toHaveLength(1);
     expect(rows[0].changes[0].empId).toBe("emp-2");
   });
+
+  function makeFilterRecordingClient() {
+    const calls: Array<[string, string, unknown]> = [];
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn((column: string, value: unknown) => {
+        calls.push(["eq", column, value]);
+        return chain;
+      }),
+      gte: vi.fn((column: string, value: unknown) => {
+        calls.push(["gte", column, value]);
+        return chain;
+      }),
+      lte: vi.fn((column: string, value: unknown) => {
+        calls.push(["lte", column, value]);
+        return chain;
+      }),
+      order: vi.fn(() => chain),
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve({ data: [], error: null }).then(resolve),
+    };
+    return { client: { from: vi.fn(() => chain) } as unknown as SupabaseClient, calls };
+  }
+
+  it("narrows the embedded changes to the range and person when asked", async () => {
+    const { client, calls } = makeFilterRecordingClient();
+
+    await fetchMobilePublishHistoryRows(client, "org-1", {
+      startDate: "2026-05-04",
+      endDate: "2026-05-10",
+      changesInRange: { employeeId: "emp-1" },
+    });
+
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        ["gte", "schedule_publish_changes.date", "2026-05-04"],
+        ["lte", "schedule_publish_changes.date", "2026-05-10"],
+        ["eq", "schedule_publish_changes.emp_id", "emp-1"],
+      ]),
+    );
+  });
+
+  it("keeps every change of a publish otherwise, for whole-publish counts", async () => {
+    const { client, calls } = makeFilterRecordingClient();
+
+    await fetchMobilePublishHistoryRows(client, "org-1", {
+      startDate: "2026-05-04",
+      endDate: "2026-05-10",
+    });
+
+    expect(calls.filter(([, column]) => column.startsWith("schedule_publish_changes"))).toEqual([]);
+  });
 });
 
 describe("fetchScheduleCellQueryRows", () => {

@@ -8,6 +8,7 @@ import { serverEnv } from "@/lib/env.server";
 import { bearerMatchesSecret } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 // Hourly sweeper. Two passes:
 //   1. shift_requests where expires_at < now AND status IN ('open','pending_approval')
@@ -17,11 +18,15 @@ export const dynamic = "force-dynamic";
 //
 // Status transition is the deduplication mechanism for shift_requests (next run
 // won't pick the row up again). Invitations have no expired status column, so
-// the dispatcher's hasExistingNotification guard prevents double-fires.
+// the dispatcher's hasExistingNotification guard prevents double-fires, and
+// only invitations that lapsed within INVITATION_LOOKBACK_MS are read again.
 //
 // Auth: Vercel cron sends `Authorization: Bearer ${CRON_SECRET}`.
 
 const BATCH_LIMIT = 500;
+// The run is hourly from GitHub Actions, whose schedules can be late or
+// skipped; six hours covers several missed runs, and dedupe makes repeats free.
+const INVITATION_LOOKBACK_MS = 6 * 60 * 60 * 1000;
 
 export async function GET(req: NextRequest) {
   const secret = serverEnv?.CRON_SECRET;
@@ -39,7 +44,8 @@ export async function GET(req: NextRequest) {
   }
 
   const db = getServiceClient();
-  const now = new Date().toISOString();
+  const nowMs = Date.now();
+  const now = new Date(nowMs).toISOString();
 
   // ── Pass 1: shift_requests ─────────────────────────────────────────────
   // Fetch first so we have request_id + type + org_id for dispatch; then UPDATE
@@ -82,13 +88,16 @@ export async function GET(req: NextRequest) {
 
   // ── Pass 2: invitations ────────────────────────────────────────────────
   // No status column — pending = neither accepted nor revoked. Re-dispatch is
-  // idempotent because the dispatcher dedupes on invitationId metadata.
+  // idempotent because the dispatcher dedupes on invitationId metadata, and the
+  // lookback keeps long-lapsed invitations out of every later run.
   const { data: staleInvites, error: invSelectError } = await db
     .from("invitations")
     .select("id, org_id, email")
     .lt("expires_at", now)
+    .gt("expires_at", new Date(nowMs - INVITATION_LOOKBACK_MS).toISOString())
     .is("accepted_at", null)
     .is("revoked_at", null)
+    .order("expires_at", { ascending: true })
     .limit(BATCH_LIMIT);
   if (invSelectError) {
     logger.error({ error: invSelectError }, "expire-requests: invitations select failed");

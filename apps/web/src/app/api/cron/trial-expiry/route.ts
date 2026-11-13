@@ -16,6 +16,7 @@ import { serverEnv } from "@/lib/env.server";
 import { bearerMatchesSecret } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const DAY_MS = 86_400_000;
 // The cron runs daily, so a lock is alerted on the first run after it; the
