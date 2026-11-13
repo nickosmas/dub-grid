@@ -9,13 +9,19 @@ import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
 import InactiveAccountBanner from "@/components/InactiveAccountBanner";
+import SandboxBanner from "@/components/test-sandbox/SandboxBanner";
 import InactivityGuard from "@/components/InactivityGuard";
 import { organizationBillingQueryOptions } from "@/features/billing/queries";
 import {
   getOrganizationBootstrapQueryPolicy,
   type OrganizationBootstrap,
 } from "@/features/organization/client/api";
-import { useOrganizationData, usePermissions } from "@/hooks";
+import {
+  useIsInSandbox,
+  useOrganizationData,
+  usePermissions,
+  useSandboxSourceOrgId,
+} from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -38,10 +44,15 @@ function isAppRoute(pathname: string): boolean {
 
 function AppHeader() {
   const perms = usePermissions();
+  // A sandbox's permissions name the sandbox copy, which /api/billing refuses:
+  // billing is the source organization's, as Billing settings already shows.
+  // Asking for the copy's id held the header (and everything in it) behind a
+  // refused request on every sandbox page load.
+  const billingOrgId = useSandboxSourceOrgId() ?? perms.orgId;
   const { data: billing, isLoading: billingLoading } = useQuery({
-    ...organizationBillingQueryOptions(perms.orgId!),
+    ...organizationBillingQueryOptions(billingOrgId!),
     enabled:
-      Boolean(perms.orgId) && perms.isSuperAdmin && !perms.isGridmaster && !perms.isImpersonating,
+      Boolean(billingOrgId) && perms.isSuperAdmin && !perms.isGridmaster && !perms.isImpersonating,
   });
   const shouldLoadOrgHeader =
     !perms.isSuperAdmin ||
@@ -72,8 +83,15 @@ function AppHeader() {
     !perms.isImpersonating &&
     entryGate?.onboardingCompleted !== true &&
     (setupLoading || !isOrgSetupComplete);
+  // In a sandbox the billing read is the source organization's, which an
+  // Admin there may not be allowed to see (sandbox permissions say Super
+  // Admin; billing checks the real role). Don't hold the header on it: a
+  // confirmed lock still hides it, a pending or refused read does not.
+  const inSandbox = useIsInSandbox();
   const hideForBillingLock =
-    !perms.isGridmaster && !perms.isImpersonating && (billingLoading || billingLocked);
+    !perms.isGridmaster &&
+    !perms.isImpersonating &&
+    ((billingLoading && !inSandbox) || billingLocked);
 
   if (hideForSetupLock || hideForBillingLock) {
     // Still loading: hold the header's height so the page does not jump down
@@ -165,6 +183,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {isAppRoute(pathname) && (
           <>
             <ImpersonationBanner />
+            {!isGridmaster && <SandboxBanner />}
             <UserViewBanner />
             <InactiveAccountBanner />
           </>

@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt } from "jose";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
+import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
+import { clearEndedSandboxCookies } from "@/lib/sandbox-ended";
 import { endImpersonationOnEscape, verifyImpersonationSession } from "@/lib/impersonation-server";
 import {
   evaluateOrgBillingAccess,
@@ -621,14 +622,21 @@ export async function proxy(req: NextRequest) {
   // The user stays signed in on their real organization subdomain while every
   // org_id-scoped read/write is routed to the sandbox copy.
   if (!isImpersonating && session?.user?.id) {
-    const sandboxCookie = getSandboxFromCookie(req.headers.get("cookie") ?? "");
+    // Read through req.cookies, which decodes the value once as every other
+    // reader does. The raw Cookie header carries it percent-encoded twice (the
+    // route encodes the JSON, Set-Cookie encodes it again), so parsing the
+    // header directly never matched and this override silently never ran.
+    const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
+    const sandboxCookie = sandboxCookieValue
+      ? getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`)
+      : null;
     if (sandboxCookie) {
       if (
         sandboxCookie.userId !== session?.user?.id ||
         sandboxCookie.sessionId !== claims.session_id
       ) {
-        // Cookie was set for a different user — clear it.
-        res.cookies.set("dubgrid-sandbox", "", { path: "/", maxAge: 0 });
+        // Cookie was set for another user or an earlier session: clear it.
+        clearEndedSandboxCookies(res);
       } else {
         try {
           const supabaseUrl2 = getSupabaseUrl();
@@ -637,7 +645,7 @@ export async function proxy(req: NextRequest) {
             const svc = createClient(supabaseUrl2, serviceKey, {
               auth: { autoRefreshToken: false, persistSession: false },
             });
-            const { data } = await timer.time("mw_sandbox", async () =>
+            const { data, error } = await timer.time("mw_sandbox", async () =>
               svc
                 .from("organizations")
                 .select("id, slug")
@@ -655,14 +663,14 @@ export async function proxy(req: NextRequest) {
                 // Keep claims.org_slug so the user stays on their real
                 // organization subdomain.
               };
+            } else if (!error) {
+              // A definite "no such sandbox" (exited in another tab, removed
+              // by a new sign-in or the cleanup cron). Every API refuses this
+              // cookie, and the browser cannot remove it (HttpOnly), so drop
+              // it here and the page loads the real organization. A failed
+              // lookup keeps it: the APIs answer 503 and nothing is lost.
+              clearEndedSandboxCookies(res);
             }
-            // No row → either the sandbox was deleted server-side or the
-            // verification query transiently failed. Either way, fail open:
-            // do not override here. The /api/organization/bootstrap and
-            // /api/test-sandbox handlers do their own ownership checks via
-            // the service client, so a stale cookie cannot leak data even
-            // if middleware doesn't override. The user clears the cookie
-            // explicitly by clicking Exit, not by us guessing.
           }
         } catch (e) {
           Sentry.captureException(e, {

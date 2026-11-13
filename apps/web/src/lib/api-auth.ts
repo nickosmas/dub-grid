@@ -12,6 +12,7 @@ import type { JwtPayload, Session, User } from "@supabase/supabase-js";
 import { getServiceClient } from "@/lib/supabase-service";
 import { findUsableSandbox } from "@/lib/sandbox-access";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
+import { sandboxEndedResponse } from "@/lib/sandbox-ended";
 import { requireSupabasePublishableKey, requireSupabaseUrl } from "@/lib/supabase-keys";
 import { extractBearerToken, verifyAccessToken } from "@/lib/auth/verify-token";
 import type { VerifiedClaims, VerifiedToken } from "@/lib/auth/verify-token";
@@ -374,22 +375,37 @@ export function forbidIfSandboxCookie(req: NextRequest): NextResponse | null {
 /** Type guard re-export so callers can use Claims directly. */
 export type AuthenticatedClaims = Claims;
 
-export async function requireAuthenticatedUserWithClaims(
+/**
+ * The verified token's own claims, never rewritten for a sandbox. For the
+ * sandbox entry/exit route, which must keep working when the sandbox cookie is
+ * stale and must take its source organization from the real session.
+ */
+export async function requireAuthenticatedUserWithTokenClaims(
   req: NextRequest,
 ): Promise<ClaimsAuthResult> {
   const result = await authenticateRequest(req);
   if ("response" in result) {
     return result;
   }
-
-  // The verified JWT payload IS the claims — `getClaims()` used to re-derive
-  // them over a second round trip, which local verification makes redundant.
-  const auth = {
+  return {
     session: result.session,
     user: result.user,
     sessionId: result.verified.sessionId,
+    claims: result.verified.claims as VerifiedClaims & Claims,
   };
-  const claims = result.verified.claims as VerifiedClaims & Claims;
+}
+
+export async function requireAuthenticatedUserWithClaims(
+  req: NextRequest,
+): Promise<ClaimsAuthResult> {
+  const result = await requireAuthenticatedUserWithTokenClaims(req);
+  if ("response" in result) {
+    return result;
+  }
+
+  // The verified JWT payload IS the claims: `getClaims()` used to re-derive
+  // them over a second round trip, which local verification makes redundant.
+  const { claims, ...auth } = result;
 
   // ── Sandbox claim override ─────────────────────────────────────────────
   // When the caller has a valid sandbox cookie, rewrite claims.org_id to
@@ -406,7 +422,7 @@ export async function requireAuthenticatedUserWithClaims(
   if (sandboxCookieValue) {
     const sb = getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`);
     if (!sb || sb.userId !== auth.user.id || sb.sessionId !== auth.sessionId) {
-      return { response: NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 }) };
+      return { response: sandboxEndedResponse() };
     }
     try {
       const serviceClient = getServiceClient();
@@ -416,7 +432,7 @@ export async function requireAuthenticatedUserWithClaims(
         sessionId: auth.sessionId,
       });
       if (!ownedSandbox) {
-        return { response: NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 }) };
+        return { response: sandboxEndedResponse() };
       }
       return {
         ...auth,

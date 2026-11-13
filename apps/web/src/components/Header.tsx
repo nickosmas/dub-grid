@@ -25,6 +25,7 @@ import {
   MOBILE,
   TABLET,
   HEADER_NARROW,
+  useSandboxSourceOrgId,
 } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAccountIdentity } from "@/features/account/client";
@@ -38,7 +39,6 @@ import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { MaybeHint } from "@/components/ui/hint";
-import SandboxBanner from "@/components/test-sandbox/SandboxBanner";
 import CreateSandboxDialog from "@/components/test-sandbox/CreateSandboxDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { exitSandbox } from "@/features/account/client";
@@ -164,6 +164,10 @@ export default function Header({ orgName }: HeaderProps) {
     isOnSchedule,
     isManagementUser,
   } = usePermissions();
+  // In a sandbox, permissions name the sandbox copy, whose billing is not real
+  // and which /api/billing refuses (it reads the source organization only).
+  const sandboxSourceOrgId = useSandboxSourceOrgId();
+  const billingOrgId = sandboxSourceOrgId ?? orgId;
   // Management-only, non-admin accounts (management department access, no
   // scheduled focus area) only get Schedule + People — see DashboardPageContent
   // for the matching redirect if they land on /dashboard directly.
@@ -350,7 +354,6 @@ export default function Header({ orgName }: HeaderProps) {
   if (isMobile) {
     return (
       <>
-        <SandboxBanner />
         {sandboxDialogOpen ? (
           <CreateSandboxDialog orgName={orgName} onClose={() => setSandboxDialogOpen(false)} />
         ) : null}
@@ -400,7 +403,9 @@ export default function Header({ orgName }: HeaderProps) {
             )}
           </div>
 
-          {canShowBillingNotice && orgId && <HeaderBillingNotice orgId={orgId} compact />}
+          {canShowBillingNotice && billingOrgId && (
+            <HeaderBillingNotice orgId={billingOrgId} compact />
+          )}
 
           <ThemeToggleButton appearance="header" />
 
@@ -456,7 +461,6 @@ export default function Header({ orgName }: HeaderProps) {
   /* ── Desktop / Tablet Header ───────────────────────────── */
   return (
     <>
-      <SandboxBanner />
       {sandboxDialogOpen ? (
         <CreateSandboxDialog orgName={orgName} onClose={() => setSandboxDialogOpen(false)} />
       ) : null}
@@ -590,8 +594,8 @@ export default function Header({ orgName }: HeaderProps) {
 
         {/* Billing notice, theme, alerts */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {canShowBillingNotice && orgId && !isHeaderNarrow && (
-            <HeaderBillingNotice orgId={orgId} compact={isTablet} />
+          {canShowBillingNotice && billingOrgId && !isHeaderNarrow && (
+            <HeaderBillingNotice orgId={billingOrgId} compact={isTablet} />
           )}
           <ThemeToggleButton appearance="header" />
           {!isGridmaster && <NotificationBell hidden={onAlertsPage} />}

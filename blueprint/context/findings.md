@@ -820,13 +820,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-07 (review):** `account/profile` (`route.ts:44-58`, `profile-change-requests.ts:833`) reads the role from the client's organization, so someone with a surviving Super Admin membership elsewhere renames their global profile directly, skipping the review their own organization requires. The rule that a manager edits directly should use the session's organization. Traced, not run.
 
-### F-219 [P2] open - Losing sandbox rights locks the session out, and Exit can't fix it
+### F-219 [P2] fixed - Losing sandbox rights locks the session out, and Exit can't fix it
 
 **File:** `apps/web/src/app/api/test-sandbox/route.ts:45`; `apps/web/src/lib/api-auth.ts:414`; `apps/web/src/app/api/shared/permissions.ts:453`
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: quality)
 **Why it matters:** A regression from F-198's repair. On the stack, after a demotion, `POST /api/test-sandbox { action: "exit" }` answered 403, and so did a read of the source organization, because the HttpOnly cookie stays and refuses every request. Only signing out clears it. The route's own comment says someone must always be able to leave. The exit test mocks this path. Another session's Enter deleting the sandbox should do the same, traced only.
 **Suggested fix:** Authenticate `exit` without the sandbox rewrite, and clear the cookie when `findUsableSandbox` refuses it.
-**Resolution:**
+**Resolution:** Fixed on claude/sandbox-recovery (2026-11-12), as suggested: `/api/test-sandbox` authenticates every action with the token's own claims (`requireAuthenticatedUserWithTokenClaims`), so Exit always works, and a cookie that names no usable sandbox is refused with 403 `SANDBOX_ENDED` from `api-auth.ts` and `requireOrgPermissions`, a response that also clears it (`lib/sandbox-ended.ts`). The proxy clears it on a page load when the row is definitely gone; it had read the raw Cookie header, which carries the value encoded twice, so its sandbox check had never matched. The client reloads once into the real organization on that code and shows why, and the banner moved out of the header into the app shell so a billing or setup lock can't hide it. Enter reuses this session's sandbox only when it was cloned from the session's organization, and asks (409 `SANDBOX_OPEN_ELSEWHERE`) before replacing one open in another session. Route, auth and client tests cover a stale cookie, Exit with one, the reload, the ask and the cross-organization reuse; not run against a live stack.
 **Update 2026-11-07 (review):** this got wider. Refusal now covers a person suspended in the source organization and a source that is archived or suspended, and `api-auth.ts:418` answers 403 on every claims route, bootstrap included, while `proxy.ts:624` doesn't re-check. Enter also checks rights on the session's organization but reuses `existing`, which can be another organization's clone (`test-sandbox/route.ts:99,112,128`), so after a switch it answers 200 and then everything answers 403. Sign-out and `POST /api/auth/organizations` still clear the cookie.
 
 ### F-220 [P3] open - Smaller regressions and fail-open checks from the session binding
@@ -841,6 +841,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 - `employees/identity/route.ts:120-126` writes `email` on a linked row without `employees/manage`'s guard, so the staff row drifts until the daily repair job.
 
 **Suggested fix:** Treat the sandbox as the session organization for billing, and fail closed on both reads.
+**Update 2026-11-12 (claude/sandbox-recovery):** the sandbox billing item is fixed differently: the header and its billing notice ask `/api/billing` for the sandbox's source organization, as Billing settings already did, and a pending or refused billing read no longer holds the header inside a sandbox. The other items stay open.
 **Resolution:**
 **Update 2026-11-07 (review):** `permissions.ts:468` ignores every read error, not only the `employees` one: an `organizations` error skips the sandbox, archived and lock checks, and a `profiles` error skips deactivated. An attacker can't cause these reads to fail. Traced, not run.
 
