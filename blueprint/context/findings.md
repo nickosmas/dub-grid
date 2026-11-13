@@ -163,13 +163,13 @@
   **Resolution:**
   **Update 2026-11-13 (re-check against dev):** still open. Don't use `lazyLoadIntegration`: it loads from Sentry's CDN, which the CSP doesn't allow. Import the SDK on idle or `load` and add `bundleSizeOptimizations`; Replay stays in the one SDK chunk on purpose.
 
-### F-135 [P2] open - Each staff-search keystroke re-renders every Schedule grid section
+### F-135 [P2] fixed - Each staff-search keystroke re-renders every Schedule grid section
 
 **File:** `apps/web/src/components/ScheduleGrid.tsx:1076-1090` (`sectionBlockPropsAreEqual`); `apps/web/src/app/(app)/schedule/SchedulePageClient.tsx:2920-2930`; `Toolbar.tsx:636`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** `searchMatchedEmployeeIds` is a new Set per keystroke and reaches every section as `highlightEmpIds`. The comparator returns false for any changed prop outside `CELL_READ_KEYS` and `CONTENT_COMPARED_KEYS`, and this one is in neither. Rows and cells are not memoized, and React Compiler is off, so every cell re-renders while typing. `MonthView` is not memoized either. This is a likely part of the 360ms p75 INP.
 **Suggested fix:** Pass `useDeferredValue(staffSearch)` (or a 150ms debounce) to the grid. Compare `highlightEmpIds` by membership for the section's own employees. Wrap `MonthView` in `memo`.
-**Resolution:**
+**Resolution:** Fixed on fix/performance-quick-wins (2026-11-13), as suggested: the grid and Month view highlight from `useDeferredValue(staffSearch)`, so the field updates at once and the grid follows in a render React can interrupt. `sectionBlockPropsAreEqual` compares the highlight with `sameSearchHighlight` (whether anyone matched, and which of the section's own people did), and `MonthView` is memoized. Tested in `schedule-grid/searchHighlight.test.ts`; the INP change is not measured.
 
 ### F-136 [P2] open - The Schedule Builder's suggestion engine re-runs synchronously in render every 30s and on every edit
 
@@ -247,7 +247,7 @@
 **Suggested fix:** EXPLAIN ANALYZE a grid read on a seeded large org. If the helpers appear per row, add a migration recreating the hot policies with `(SELECT public.caller_org_id())` and the like.
 **Resolution:**
 
-### F-142 [P2] open - The hourly expiry cron re-dispatches every lapsed invitation, forever
+### F-142 [P2] fixed - The hourly expiry cron re-dispatches every lapsed invitation, forever
 
 **File:** `apps/web/src/app/api/cron/expire-requests/route.ts:85-105`; `apps/web/src/app/api/cron/trial-expiry/route.ts:111-145` (pass 2, daily)
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
@@ -259,7 +259,7 @@
 - The cron routes set no `maxDuration`.
 - Trial-expiry pass 2 re-dispatches every expired, never-paid organization daily.
   **Suggested fix:** Bound the window (`expires_at > now() - interval '2 hours'`) or add an `expiry_notified_at`. Add an ORDER BY. Dedupe before the lookups. Set `maxDuration`.
-  **Resolution:**
+  **Resolution:** Fixed on fix/performance-quick-wins (2026-11-13): the invitation pass reads only invitations that lapsed in the last six hours, oldest first. Six hours rather than two because the hourly run comes from GitHub Actions, whose schedules can run late or be skipped, and the dedupe makes the repeats harmless. Every cron route sets `maxDuration = 60`, which the Hobby plan allows with or without Fluid compute. Tested in `expire-requests/route.test.ts`, which fails on the old query. Left alone: dedupe before the lookups, and trial-expiry pass 2, which needs organizations whose trial ended up to the longest grace before it to raise lock alerts, so bounding it is a separate change.
 
 ### F-143 [P2] unverified - The notification dedupe has no index to use, and notifications are never pruned
 
@@ -270,13 +270,13 @@
 **Resolution:** Re-examined 2026-10-30 (second /audit pass): no notifications index leads with `org_id` (`001:1432-1436`), so the dedupe can only filter after reading across organizations; five overlapping `user_id` indexes also slow every insert. Still needs EXPLAIN.
 **Update 2026-11-13 (re-check against dev):** still open. Add the `(org_id, type)` index; don't dedupe per recipient, which would send a duplicate to someone added after the first alert.
 
-### F-144 [P2] open - Creating or answering a shift request waits for every approver's alert to send
+### F-144 [P2] fixed - Creating or answering a shift request waits for every approver's alert to send
 
 **File:** `apps/web/src/app/api/schedule/requests/route.ts:238, 256, 562, 606, 663`; `packages/mobile-api-core/src/shift-requests.ts:168, 180, 550, 573, 594`; `apps/web/src/features/notifications/server/sender.ts:152-300`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** These handlers `await` the dispatch. Per recipient, `sendNotification` makes 6-8 sequential calls (facts, insert, Expo push, preferences, throttle, dedupe, `getUserById`, org name, Resend, insert) before the requester gets a response.
 **Suggested fix:** `after(() => dispatchNotificationEvent(...))`, as `shifts/publish/route.ts:149` already does.
-**Resolution:**
+**Resolution:** Fixed on fix/performance-quick-wins (2026-11-13): `dispatchNotificationEventAfterResponse` (`features/notifications/server/after-response.ts`) hands the send to `after()`. The web requests route uses it for every action, and the mobile routes pass it to `mobile-api-core` as the injected dispatcher, so the package stays free of Next. `settleOrNotify` still settles and picks the alert before answering, since the response reports the settlement. Route tests show the response comes back before the alert is sent.
 **Update 2026-11-13 (re-check against dev):** still open: #286 moved other routes to `after()` but not these. Keep `settleOrNotify`'s choice of event synchronous and defer only the dispatch.
 
 ### F-146 [P2] open - Publish alerts fan out with no concurrency limit and a query chain per recipient
@@ -357,13 +357,13 @@
   **Resolution:**
   **Update 2026-11-13 (re-check against dev):** one invalidation per flush with `cancelRefetch: false` is fixed. Draft tables for every user, the fixed 150ms window, no `publish_history` keying for non-editors and the `audit_log` subscription are still open. Plan with F-199.
 
-### F-151 [P2] open - Mobile schedule endpoints load every publish change in the organization and scan it per entry
+### F-151 [P2] fixed - Mobile schedule endpoints load every publish change in the organization and scan it per entry
 
 **File:** `packages/data-access/src/mobile.ts:917-918` (unfiltered `schedule_publish_changes` embed); `apps/web/src/features/mobile/server/data.ts:1012` (`findPublishedChangeForCell` per row), `:867`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** One person's week on `/me/schedule`, `/org/schedule` or `/shift-requests` pays for every employee's changes in every overlapping publish. That is O(rows × changes), with two Zod parses per change. F-150 makes these calls frequent.
 **Suggested fix:** Filter the embed by `emp_id` (when scoped) and date, and index changes in a `Map` keyed `emp:date` before the loop.
-**Resolution:**
+**Resolution:** Fixed on fix/performance-quick-wins (2026-11-13): `fetchMobilePublishHistoryRows` takes `changesInRange`, which filters the embedded changes to the range's dates and, when set, one person. The schedule entries pass it with their person, the coverage inputs (which read only published dates) pass it too, and the dashboard leaves it out because its activity line counts a publish's whole set of changes. `fetchMobileScheduleEntries` builds one `emp:date` map (`indexPublishedChangesByCell`) and both per-cell lookups read it. Tests show the map returns the same change as the old scan, and that the filters apply only when asked.
 
 ### F-152 [P2] open - Mobile fetches the same data under several keys and refetches more than it needs
 
@@ -590,6 +590,7 @@
 **Suggested fix:** A partial index on `profiles (id) WHERE is_internal`, plus a 30s in-process memo, since the list is platform-wide.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** half fixed: the 30-second memo shipped with F-185. The partial index on `profiles (id) WHERE is_internal` is still missing.
+**Update 2026-11-13 (fix/performance-quick-wins):** the index is written as `138_internal_profiles_index.sql` (`CREATE INDEX IF NOT EXISTS idx_profiles_internal ON public.profiles (id) WHERE is_internal`), and in a rolled-back transaction the lookup used it (Index Only Scan). It isn't committed yet: migration 137 is on another branch, and the migration and documentation checks refuse a gap in the numbering. Commit it once 137 is on `dev`.
 
 ### F-178 [P3] open - Gridmaster oversight reads whole platform tables with unordered offset paging
 
