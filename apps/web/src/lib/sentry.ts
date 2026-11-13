@@ -70,6 +70,38 @@ let _sdk: Record<string, any> | undefined;
 let _pending: Array<() => void> | null = null;
 let _resolveReady: () => void = () => {};
 
+/**
+ * Starts the SDK download once the page has loaded and the main thread is
+ * free. Fetched at module load, its 184 KB gzip chunk competed with the page's
+ * own chunks and its parse landed during hydration (F-134). requestIdleCallback
+ * is missing in Safari, hence the timer.
+ */
+export function whenPageSettled(run: () => void): void {
+  const afterIdle = () => {
+    const idle = (window as { requestIdleCallback?: (cb: () => void, o?: object) => void })
+      .requestIdleCallback;
+    if (idle) idle(run, { timeout: 3_000 });
+    else setTimeout(run, 500);
+  };
+  if (document.readyState === "complete") afterIdle();
+  else window.addEventListener("load", afterIdle, { once: true });
+}
+
+/**
+ * Until the SDK installs its own handlers, an uncaught error or rejection is
+ * queued for it, so deferring the download loses nothing thrown at startup.
+ */
+export function bufferEarlyErrors(): () => void {
+  const onError = (event: ErrorEvent) => captureException(event.error ?? event.message);
+  const onRejection = (event: PromiseRejectionEvent) => captureException(event.reason);
+  window.addEventListener("error", onError);
+  window.addEventListener("unhandledrejection", onRejection);
+  return () => {
+    window.removeEventListener("error", onError);
+    window.removeEventListener("unhandledrejection", onRejection);
+  };
+}
+
 /** Resolves once the SDK is usable — immediately wherever it loads synchronously. */
 export const sentryReady: Promise<void> = new Promise((resolve) => {
   _resolveReady = resolve;
@@ -81,19 +113,25 @@ if (process.env.NODE_ENV !== "development") {
     _resolveReady();
   } else {
     _pending = [];
-    void import("@sentry/nextjs")
-      .then((mod) => {
-        _sdk = mod as unknown as Record<string, unknown>;
-        const queued = _pending ?? [];
-        _pending = null;
-        for (const run of queued) run();
-      })
-      .catch(() => {
-        // Monitoring must never take the app down with it. Drop the queue and
-        // let every call fall through to a no-op from here on.
-        _pending = null;
-      })
-      .finally(() => _resolveReady());
+    const stopBuffering = bufferEarlyErrors();
+    whenPageSettled(() => {
+      void import("@sentry/nextjs")
+        .then((mod) => {
+          _sdk = mod as unknown as Record<string, unknown>;
+          const queued = _pending ?? [];
+          _pending = null;
+          for (const run of queued) run();
+        })
+        .catch(() => {
+          // Monitoring must never take the app down with it. Drop the queue and
+          // let every call fall through to a no-op from here on.
+          _pending = null;
+        })
+        .finally(() => {
+          stopBuffering();
+          _resolveReady();
+        });
+    });
   }
 } else {
   _resolveReady();

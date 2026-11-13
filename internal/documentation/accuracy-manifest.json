@@ -965,7 +965,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a5dd4bce7b80177267eefd3c85613c4c32dea02ea6cd18bac4db9e592f1ee055"
+      "evidenceFingerprint": "sha256:c542cb7c89835c57e4a48642720d977e579733acb912323a055c0396f57303f5"
     },
     {
       "id": "coverage",
@@ -1068,7 +1068,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a30e91cefa5a17b01f2b20fb2f6ed1c0ce6afcc8b7e672cd7154de8b1bfcabf7"
+      "evidenceFingerprint": "sha256:c0321cda7a02bfcc9071a77483a09b1e38812c3ef100a02721b51bcad6080607"
     },
     {
       "id": "roles",
@@ -1825,7 +1825,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:836a4137a0f806e18e678e1f99c3b150d7af39b2e71f86fd8b621f3442ec4a39"
+      "evidenceFingerprint": "sha256:08dd83c4e02375fb9fa433895870c311154388f6ec01c640f0d990e19a284eb4"
     },
     {
       "id": "departments-focus-areas",
