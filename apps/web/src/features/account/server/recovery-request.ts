@@ -7,6 +7,7 @@ import {
   checkRateLimit,
   hashEmail,
   passwordResetLimiter,
+  peekRateLimit,
   recoverySurgeLimiter,
 } from "@/lib/rate-limit";
 import { writeSecurityAuditEvent } from "@/lib/auth/security-audit";
@@ -42,7 +43,7 @@ export async function handleRecoveryRequest(request: Request): Promise<Response>
   const limits = await Promise.all([
     checkRateLimit(apiLimiter, `recovery:source:${sourceKey(request)}`),
     checkRateLimit(passwordResetLimiter, `recovery:target:${targetHash}`),
-    checkRateLimit(recoverySurgeLimiter, "recovery:global"),
+    peekRateLimit(recoverySurgeLimiter, "recovery:global"),
   ]);
 
   if (limits.some((limit) => limit.misconfigured)) {
@@ -73,6 +74,7 @@ export async function handleRecoveryRequest(request: Request): Promise<Response>
       { "Retry-After": String(retryAfter) },
     );
   }
+  after(() => checkRateLimit(recoverySurgeLimiter, "recovery:global"));
 
   // Answered before Supabase Auth is asked. It returns at once for an unknown
   // address but sends mail for a real one, and only a real account can hit its

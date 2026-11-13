@@ -5,6 +5,7 @@
 // so the dev early-return is respected.
 
 import * as Sentry from "@sentry/nextjs";
+import { scrubServerEvent } from "@/lib/sentry-server-scrub";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
@@ -17,4 +18,6 @@ Sentry.init({
 
   // Enable Sentry structured logs
   enableLogs: true,
+
+  beforeSend: scrubServerEvent,
 });

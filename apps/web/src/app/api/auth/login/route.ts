@@ -10,7 +10,13 @@ import {
   isAccountSuspendedMessage,
   suspendedUntilFromMessage,
 } from "@dubgrid/domain";
-import { checkRateLimit, loginIpLimiter, loginLimiter, loginSurgeLimiter } from "@/lib/rate-limit";
+import {
+  checkRateLimit,
+  loginIpLimiter,
+  loginLimiter,
+  loginSurgeLimiter,
+  peekRateLimit,
+} from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { createAnonClient, createTokenScopedClient } from "@/lib/api-auth";
@@ -452,7 +458,7 @@ export async function POST(req: NextRequest) {
     Promise.all([
       checkRateLimit(loginLimiter, `login:email:${emailHash}`),
       checkRateLimit(loginIpLimiter, `login:ip:${clientIp}`),
-      checkRateLimit(loginSurgeLimiter, "login:global"),
+      peekRateLimit(loginSurgeLimiter, "login:global"),
     ]),
   );
 
@@ -492,6 +498,7 @@ export async function POST(req: NextRequest) {
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
   }
+  after(() => checkRateLimit(loginSurgeLimiter, "login:global"));
 
   // ── Authenticate via Supabase ─────────────────────────────────────
   const supabaseUrl = getSupabaseUrl();

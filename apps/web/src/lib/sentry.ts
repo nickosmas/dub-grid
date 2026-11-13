@@ -252,14 +252,10 @@ export const init: (options: Record<string, unknown>) => void = (...args) => {
  * Set Sentry user context so errors are associated with a specific user.
  * Call on auth state changes (login/logout).
  */
-export function setSentryUser(
-  user: { id: string; email?: string; orgId?: string; role?: string } | null,
-) {
-  if (user) {
-    setUser({ id: user.id, email: user.email });
-    if (user.orgId) setTag("org_id", user.orgId);
-    if (user.role) setTag("role", user.role);
-  } else {
-    setUser(null);
-  }
+export function setSentryUser(user: { id: string; orgId?: string | null } | null) {
+  // The id only: error monitoring runs without analytics consent, so it never
+  // carries an email (F-207). The organization is tagged so one customer's
+  // events can be found and removed, and reset on sign-out or a switch.
+  setUser(user ? { id: user.id } : null);
+  setTag("org_id", user?.orgId ?? "none");
 }

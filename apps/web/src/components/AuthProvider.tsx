@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import { decodeJwt } from "jose";
 import { setSentryUser } from "@/lib/sentry";
 import { AuthContext } from "@/lib/auth-context";
 export { useAuth } from "@/lib/auth-context";
@@ -22,6 +23,16 @@ import {
   wasSessionReportedRecently,
 } from "@/features/account/client/session-registration";
 import { listenForBrowserSignOut } from "@/lib/auth-boundary-broadcast";
+
+function tokenOrgId(token: string | undefined): string | null {
+  if (!token) return null;
+  try {
+    const orgId = decodeJwt(token).org_id;
+    return typeof orgId === "string" && orgId ? orgId : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Track session via API route so the server can capture the client IP address.
@@ -105,7 +116,9 @@ export default function AuthProvider({
       setSession(nextUser ? nextSession : null);
       setUser(nextUser);
       setIsLoading(false);
-      setSentryUser(nextUser ? { id: nextUser.id, email: nextUser.email } : null);
+      setSentryUser(
+        nextUser ? { id: nextUser.id, orgId: tokenOrgId(nextSession?.access_token) } : null,
+      );
       return true;
     };
 
