@@ -87,3 +87,52 @@ describe("checkRateLimit fail-closed alerting", () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 });
+
+describe("peekRateLimit", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    vi.stubEnv("NODE_ENV", "production");
+  });
+
+  afterEach(() => {
+    vi.stubEnv("NODE_ENV", ORIGINAL_NODE_ENV ?? "test");
+  });
+
+  async function loadPeek() {
+    return (await import("./rate-limit")).peekRateLimit;
+  }
+
+  it("reads what is left without spending any of it", async () => {
+    const peekRateLimit = await loadPeek();
+    const limiter = {
+      limit: vi.fn(),
+      getRemaining: vi.fn().mockResolvedValue({ remaining: 4, reset: 99, limit: 500 }),
+    } as unknown as Ratelimit;
+
+    expect(await peekRateLimit(limiter, "login:global")).toEqual({ limited: false, reset: 99 });
+    expect(limiter.limit).not.toHaveBeenCalled();
+  });
+
+  it("reports a used-up limit as limited", async () => {
+    const peekRateLimit = await loadPeek();
+    const limiter = {
+      getRemaining: vi.fn().mockResolvedValue({ remaining: 0, reset: 99, limit: 500 }),
+    } as unknown as Ratelimit;
+
+    expect(await peekRateLimit(limiter, "login:global")).toEqual({ limited: true, reset: 99 });
+  });
+
+  it("fails closed in production when the read throws, like a check", async () => {
+    const peekRateLimit = await loadPeek();
+    const limiter = {
+      getRemaining: vi.fn().mockRejectedValue(new Error("Upstash unreachable")),
+    } as unknown as Ratelimit;
+
+    expect(await peekRateLimit(limiter, "login:global")).toEqual({
+      limited: true,
+      misconfigured: true,
+    });
+    expect(captureException).toHaveBeenCalledOnce();
+  });
+});

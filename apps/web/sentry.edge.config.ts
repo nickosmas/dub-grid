@@ -4,6 +4,7 @@
 // Do NOT import this file directly; always go through src/instrumentation.ts.
 
 import * as Sentry from "@sentry/nextjs";
+import { scrubServerEvent } from "@/lib/sentry-server-scrub";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
@@ -16,4 +17,6 @@ Sentry.init({
 
   // Enable Sentry structured logs
   enableLogs: true,
+
+  beforeSend: scrubServerEvent,
 });

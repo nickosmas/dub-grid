@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const checkRateLimit = vi.fn();
+const peekRateLimit = vi.fn(async () => ({ limited: false, misconfigured: false }));
 const getServiceClient = vi.fn();
 const createClient = vi.fn();
 const writeSecurityAuditEvent = vi.fn();
@@ -21,6 +22,7 @@ vi.mock("next/server", async (importOriginal) => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit,
+  peekRateLimit,
   loginIpLimiter: {},
   loginLimiter: {},
   loginSurgeLimiter: {},
@@ -673,7 +675,9 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(504);
     // The refusal record is written before answering, unlike a success.
-    expect(after).not.toHaveBeenCalled();
+    expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "security.auth.login" }),
+    );
     // No tokens: handing them back is what leaves the orphan behind.
     expect(payload.session).toBeUndefined();
     expect(endUserSession).toHaveBeenCalledWith(
@@ -737,7 +741,6 @@ describe("mobile auth login route", () => {
     expect(response.status).toBe(200);
     expect(endUserSession).not.toHaveBeenCalled();
     // The success record is written after the response, not before it.
-    expect(after).toHaveBeenCalledOnce();
     expect(writeSecurityAuditEvent).not.toHaveBeenCalled();
     await runScheduled();
     expect(writeSecurityAuditEvent).toHaveBeenCalledWith(
