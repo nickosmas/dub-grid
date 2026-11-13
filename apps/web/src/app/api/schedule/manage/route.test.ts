@@ -218,6 +218,7 @@ describe("POST /api/schedule/manage", () => {
       userClient: { rpc: userRpc },
       serviceClient: { from: serviceFrom, rpc: serviceRpc },
       actor: { id: "actor-user" },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
       orgId,
       permissions: { canEditShifts: true },
     }));
@@ -1015,6 +1016,7 @@ describe("POST /api/schedule/manage", () => {
       userClient: { rpc: userRpc },
       serviceClient: { from: serviceFrom, rpc: serviceRpc },
       actor: { id: "actor-user" },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
       orgId: id,
       permissions: { canEditShifts: false },
     }));
@@ -1144,6 +1146,7 @@ describe("POST /api/schedule/manage", () => {
       userClient: { rpc: userRpc },
       serviceClient: { from: serviceFrom, rpc: serviceRpc },
       actor: { id: "actor-user" },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
       orgId: id,
       permissions: { canEditShifts: false, canEditNotes: false },
     }));
@@ -1159,6 +1162,7 @@ describe("POST /api/schedule/manage", () => {
       userClient: { rpc: userRpc },
       serviceClient: { from: serviceFrom, rpc: serviceRpc },
       actor: { id: "actor-user" },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
       orgId: id,
       permissions: { canEditShifts: false, canEditNotes: true },
     }));
@@ -1545,6 +1549,11 @@ describe("POST /api/schedule/manage permission gates", () => {
               userClient: { rpc: userRpc },
               serviceClient: { from: serviceFrom, rpc: serviceRpc },
               actor: { id: "actor-user" },
+              scheduleVisibility: {
+                showChangeDetails: true,
+                showPublisher: true,
+                showAbsenceNames: true,
+              },
               orgId: requestedOrgId,
               permissions,
             }
@@ -2234,6 +2243,7 @@ describe("POST /api/schedule/manage upsertShifts", () => {
       userClient: { rpc: userRpc, from: serviceFrom },
       serviceClient: { from: serviceFrom, rpc: serviceRpc },
       actor: { id: "actor-user" },
+      scheduleVisibility: { showChangeDetails: true, showPublisher: true, showAbsenceNames: true },
       orgId: requestedOrgId,
       permissions: { canEditShifts: true },
     }));

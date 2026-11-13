@@ -1101,10 +1101,9 @@ export default function PersonDetailScreen() {
     !isSelf &&
     Boolean(person.userId) &&
     person.status !== "removed";
+  // Their administrative teams are a basic detail, shown to everyone.
   const managesDepartments =
-    canViewEmployeeDetails &&
-    person.status !== "removed" &&
-    person.managementDepartmentIds.length > 0;
+    person.status !== "removed" && person.managementDepartmentIds.length > 0;
   const canChangeManagement = managesDepartments && canManageManagementAccess && !isSelf;
   // A manager reads "None" as a gap to fill; a colleague reads it as noise.
   // The rows that can be empty drop out for viewers without details, and the

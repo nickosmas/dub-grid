@@ -280,6 +280,34 @@ describe.runIf(reachable)("profile lifecycle columns (F-05, live DB)", () => {
     }
   });
 
+  it("shows a regular member their own profile, never a colleague's account (133)", async () => {
+    await db.query("BEGIN");
+    try {
+      const fx = await loadFixture();
+
+      await asUser(fx.member, fx.orgId);
+      const colleague = await db.query(
+        `SELECT last_sign_in_at, deactivated_at FROM public.profiles WHERE id = $1`,
+        [fx.admin.userId],
+      );
+      const own = await db.query(`SELECT id FROM public.profiles WHERE id = $1`, [
+        fx.member.userId,
+      ]);
+      await asSuperuser();
+      expect(colleague.rows).toEqual([]);
+      expect(own.rows).toEqual([{ id: fx.member.userId }]);
+
+      await asUser(fx.admin, fx.orgId);
+      const managed = await db.query(`SELECT id FROM public.profiles WHERE id = $1`, [
+        fx.member.userId,
+      ]);
+      await asSuperuser();
+      expect(managed.rows).toEqual([{ id: fx.member.userId }]);
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  });
+
   it("keeps the platform paths that own those columns working", async () => {
     await db.query("BEGIN");
     try {

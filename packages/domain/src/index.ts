@@ -9,6 +9,7 @@ export * from "./consent-record";
 export * from "./credential-requirements";
 export * from "./dashboard-activity";
 export * from "./employment-status";
+export * from "./absence-visibility";
 export * from "./notification-metadata";
 export * from "./move-email";
 export * from "./org-roles";

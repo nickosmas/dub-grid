@@ -208,10 +208,6 @@ export interface MembersSectionProps {
   timeZone?: string | null;
   isSuperAdmin?: boolean;
   isGridmaster?: boolean;
-  // Self signal: the viewer's own employees row has management department
-  // access. Widens visibility (view-only) of the Members/Management list to
-  // non-admin management-only users — see canSeeManagementUsers below.
-  isManagementUser?: boolean;
   departments?: Department[];
   departmentLabel?: string;
   managementDepartmentLabel?: string;
@@ -249,7 +245,6 @@ export function MembersSection({
   timeZone = null,
   isSuperAdmin,
   isGridmaster,
-  isManagementUser,
   departments: departmentItems = [],
   departmentLabel = DEFAULT_ORGANIZATION_LABELS.department,
   managementDepartmentLabel = ADMINISTRATIVE_TEAM_LABELS.plural,
@@ -316,10 +311,11 @@ export function MembersSection({
   );
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
-  // Broader, view-only gate: lets a non-admin management-only user see the
-  // Members/Management list and open a (read-only) detail panel, without
-  // granting any of the edit affordances that stay on canViewManagementUsers.
-  const canSeeManagementUsers = canViewManagementUsers || !!isManagementUser;
+  // Broader, view-only gate: everyone who can see the directory sees the
+  // administrative teams and opens an Admin's basic (read-only) profile,
+  // without any of the edit affordances that stay on canViewManagementUsers.
+  // The directory API masks the list for them as it does staff records.
+  const canSeeManagementUsers = true;
   const directoryOrgId = canSeeManagementUsers ? (orgId ?? null) : null;
   // Access is admin-only information, and the tier map behind it only loads for
   // viewers who can read the directory. Without both, the access filter and the
@@ -1865,7 +1861,7 @@ export function MembersSection({
                       <TableHead className="border-r border-[var(--dg-color-border-light)]">
                         Role
                       </TableHead>
-                      <TableHead>Staff status</TableHead>
+                      {!regularUserMode && <TableHead>Staff status</TableHead>}
                       <TableHead className="w-[40px] pr-6" />
                     </UITableRow>
                   </TableHeader>
@@ -2065,9 +2061,12 @@ export function MembersSection({
                             />
                           </TableCell>
 
-                          <TableCell className="py-4">
-                            <StatusPill tone={statusTone}>{statusLabel}</StatusPill>
-                          </TableCell>
+                          {/* A colleague's status is for the people who act on it. */}
+                          {!regularUserMode && (
+                            <TableCell className="py-4">
+                              <StatusPill tone={statusTone}>{statusLabel}</StatusPill>
+                            </TableCell>
+                          )}
 
                           <TableCell className="w-[40px] py-4 pr-6 text-right">
                             <div

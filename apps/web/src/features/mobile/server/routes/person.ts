@@ -23,7 +23,7 @@ import {
   getStaffFieldErrorsFromZod,
   validateStaffOrgReferences,
 } from "@/lib/staff-validation";
-import { changedElsewhereMessage } from "@dubgrid/domain";
+import { changedElsewhereMessage, withoutColleagueStatus } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -158,35 +158,26 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }
 
-    if (person.status !== "active") {
+    // Someone Away is still a colleague; only the Offboarded are gone.
+    if (person.status === "removed") {
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }
 
-    // Management users appear in everyone's directory, but their profile
-    // view stays manager-only.
-    if (person.managementDepartmentIds.length > 0) {
-      return NextResponse.json(
-        { error: "You don't have permission to view that staff profile." },
-        { status: 403 },
-      );
-    }
-
+    // A colleague's basic profile, an Admin's included: name, access role,
+    // qualifications, where they work and their administrative teams.
     return NextResponse.json(
       mobilePersonResponseSchema.parse({
         person: {
-          ...person,
+          ...withoutColleagueStatus(person),
           contactNotes: "",
-          departmentIds: [],
           // The people list already withholds these from a non-manager
           // (packages/mobile-api-core/src/read.ts); the detail screen was
           // handing back the same coworker's address and mobile anyway.
           email: "",
           phone: "",
           deptAdminIds: [],
-          managementDepartmentIds: [],
           managementDeptAdminIds: [],
           pendingInvitation: null,
-          roleIds: [],
           statusNote: "",
           userId: null,
         },

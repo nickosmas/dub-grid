@@ -112,17 +112,35 @@ async function writeDraft(
   );
 }
 
+/**
+ * Reads a check as the database owner: since 134 a member can't select a
+ * snapshot's absence, and the check is the test's, not the caller's.
+ */
+async function asOwner<T>(read: () => Promise<T>): Promise<T> {
+  const {
+    rows: [{ role }],
+  } = await db.query<{ role: string }>("SELECT current_user AS role");
+  await db.query("RESET ROLE");
+  try {
+    return await read();
+  } finally {
+    if (role === "authenticated") await db.query("SET LOCAL ROLE authenticated");
+  }
+}
+
 async function snapshot(fixture: Fixture, date: string, kind: "draft" | "published") {
   const {
     rows: [row],
-  } = await db.query<{ state_kind: string; absence_type_id: number | null; segments: number }>(
-    `SELECT s.state_kind, s.absence_type_id::integer AS absence_type_id,
+  } = await asOwner(() =>
+    db.query<{ state_kind: string; absence_type_id: number | null; segments: number }>(
+      `SELECT s.state_kind, s.absence_type_id::integer AS absence_type_id,
        (SELECT count(*)::integer FROM public.schedule_cell_segments seg
          WHERE seg.snapshot_id = s.id) AS segments
      FROM public.schedule_cells c
      JOIN public.schedule_cell_snapshots s ON s.cell_id = c.id AND s.snapshot_kind = $3
      WHERE c.emp_id = $1 AND c.date = $2::date`,
-    [fixture.emp_id, date, kind],
+      [fixture.emp_id, date, kind],
+    ),
   );
   return row;
 }

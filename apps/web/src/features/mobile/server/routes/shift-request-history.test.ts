@@ -84,6 +84,7 @@ describe("mobile shift-request history route", () => {
       {},
       {
         orgId: "org-1",
+        absenceViewer: expect.objectContaining({ showAbsenceNames: true }),
         employeeId: "emp-1",
         limit: 20,
         cursor: {
@@ -109,6 +110,7 @@ describe("mobile shift-request history route", () => {
       {},
       {
         orgId: "org-1",
+        absenceViewer: expect.objectContaining({ showAbsenceNames: true }),
         limit: 25,
         hiddenUserIds: [],
       },

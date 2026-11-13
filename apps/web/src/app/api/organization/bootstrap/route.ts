@@ -1,3 +1,4 @@
+import { hiddenAbsenceTypeFor } from "@/lib/server/absence-visibility";
 import { NextRequest, NextResponse } from "next/server";
 import { Timer, withTiming } from "@/lib/server-timing";
 import type {
@@ -382,6 +383,10 @@ async function handleGET(req: NextRequest, timer: Timer) {
     const allAbsenceTypes = ((absenceTypeResult.data ?? []) as DbAbsenceType[]).map(
       rowToAbsenceType,
     );
+    // A viewer shown colleagues' absences as Time off needs it to draw them.
+    if (!orgAuth.scheduleVisibility.showAbsenceNames) {
+      allAbsenceTypes.push(hiddenAbsenceTypeFor(orgId));
+    }
     // Always built. It is a pure derivation over focusAreas/shiftCategories/jobs
     // that this handler already has in hand, so the old `includeAssignments=0`
     // opt-out saved no queries — it only split the client cache in two.

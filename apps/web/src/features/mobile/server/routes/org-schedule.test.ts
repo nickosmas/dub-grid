@@ -25,6 +25,7 @@ describe("mobile org-schedule route", () => {
 
   it("rejects users who cannot view the org schedule", async () => {
     requireMobileAuth.mockResolvedValue({
+      user: { id: "viewer-user" },
       currentOrg: {
         id: "org-1",
       },
@@ -52,6 +53,7 @@ describe("mobile org-schedule route", () => {
 
   it("reads the schedule without the shifts of people the viewer must not see", async () => {
     requireMobileAuth.mockResolvedValue({
+      user: { id: "viewer-user" },
       currentOrg: { id: "org-1" },
       permissions: {
         level: 0,
@@ -76,6 +78,7 @@ describe("mobile org-schedule route", () => {
 
   it("returns published entries for users with schedule view access", async () => {
     requireMobileAuth.mockResolvedValue({
+      user: { id: "viewer-user" },
       currentOrg: {
         id: "org-1",
       },
@@ -127,6 +130,7 @@ describe("mobile org-schedule route", () => {
       {},
       {
         orgId: "org-1",
+        absenceViewer: expect.objectContaining({ showAbsenceNames: true }),
         startDate: "2026-04-16",
         endDate: "2026-04-22",
         hiddenUserIds: [],
@@ -150,6 +154,7 @@ describe("mobile org-schedule route", () => {
 
   it("allows schedule editors to view the team schedule without approval permission", async () => {
     requireMobileAuth.mockResolvedValue({
+      user: { id: "viewer-user" },
       currentOrg: {
         id: "org-1",
       },
@@ -174,6 +179,7 @@ describe("mobile org-schedule route", () => {
       {},
       {
         orgId: "org-1",
+        absenceViewer: expect.objectContaining({ showAbsenceNames: true }),
         startDate: "2026-04-16",
         endDate: "2026-04-22",
         hiddenUserIds: [],

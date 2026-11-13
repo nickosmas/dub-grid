@@ -96,6 +96,66 @@ describe("GET /api/organization/directory", () => {
     });
   });
 
+  describe("a regular member", () => {
+    async function directoryForMember(rows: Record<string, unknown>[]) {
+      requireOrgPermissions.mockResolvedValue({
+        orgId: ORG_ID,
+        actor: { id: "viewer-1" },
+        serviceClient: { rpc, from: internalProfilesFrom([]) },
+        permissions: {
+          isGridmaster: false,
+          isSuperAdmin: false,
+          canViewStaff: true,
+          canViewEmployeeDetails: false,
+          canManageEmployees: false,
+        },
+      });
+      rpc.mockResolvedValue({ data: rows, error: null });
+      const body = await (await GET(makeRequest({ orgId: ORG_ID }))).json();
+      return body.directory as Array<Record<string, unknown>>;
+    }
+
+    it("sees no one's status, invitation or account", async () => {
+      const directory = await directoryForMember([
+        {
+          ...makeRow("away-1"),
+          source: "employee",
+          employee_status: "inactive",
+          management_department_ids: [4],
+          management_dept_admin_ids: [4],
+          membership_updated_at: "2026-11-01T00:00:00.000Z",
+        },
+        {
+          ...makeRow("invite-1"),
+          source: "pending_invite",
+          user_id: null,
+          has_app_access: false,
+          invitation_status: "pending",
+        },
+      ]);
+
+      expect(directory).toHaveLength(1);
+      expect(directory[0]).toMatchObject({
+        personId: "away-1",
+        employeeStatus: "active",
+        userId: null,
+        hasAppAccess: false,
+        invitationStatus: null,
+        email: "",
+        managementDepartmentIds: [4],
+        managementDeptAdminIds: [],
+        membershipUpdatedAt: null,
+        // Their administrative teams still make them an Admin to see.
+        isManagementUser: true,
+      });
+    });
+
+    it("keeps their own account on their own row", async () => {
+      const directory = await directoryForMember([makeRow("viewer-1")]);
+      expect(directory[0]).toMatchObject({ userId: "viewer-1", hasAppAccess: true });
+    });
+  });
+
   it("defaults to a 50-row page and requests it from the RPC", async () => {
     rpc.mockResolvedValue({ data: [], error: null });
 

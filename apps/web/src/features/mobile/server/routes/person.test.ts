@@ -207,7 +207,7 @@ describe("mobile person route", () => {
     );
   });
 
-  it("rejects management profiles for viewers without manage rights", async () => {
+  it("gives regular users an Admin's basic profile, with their administrative teams", async () => {
     requireMobileAuth.mockResolvedValue(
       makeAuth({ canManageEmployees: false, canViewStaff: true }),
     );
@@ -224,15 +224,47 @@ describe("mobile person route", () => {
       },
     );
 
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({
-      error: "You don't have permission to view that staff profile.",
+    expect(response.status).toBe(200);
+    expect((await response.json()).person).toMatchObject({
+      managementDepartmentIds: [8],
+      managementDeptAdminIds: [],
+      email: "",
+      phone: "",
+      userId: null,
     });
+  });
+
+  it("gives regular users a colleague who is Away, as Active", async () => {
+    requireMobileAuth.mockResolvedValue(
+      makeAuth({ canManageEmployees: false, canViewStaff: true }),
+    );
+    rowToEmployee.mockReturnValue(makeEmployee({ status: "inactive", awayUntil: "2026-05-01" }));
+    mockManagementMemberships([]);
+
+    const { GET } = await import("./person");
+    const response = await GET(
+      new Request(
+        "http://localhost/api/mobile/v1/people/d660d308-4e0d-4daf-84fd-6753405e6740",
+      ) as never,
+      { params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).person).toMatchObject({ status: "active", awayUntil: null });
   });
 
   it("sanitizes the person payload for regular users", async () => {
     requireMobileAuth.mockResolvedValue(
       makeAuth({ canManageEmployees: false, canViewStaff: true }),
+    );
+    rowToEmployee.mockReturnValue(
+      makeEmployee({
+        suspendedAt: "2026-04-20T00:00:00.000Z",
+        plannedStatus: "away",
+        plannedFrom: "2026-05-04",
+        plannedUntil: "2026-05-11",
+        firstDay: "2026-04-01",
+      }),
     );
     mockManagementMemberships([]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue({
@@ -259,18 +291,25 @@ describe("mobile person route", () => {
     expect(payload.person).toMatchObject({
       id: "d660d308-4e0d-4daf-84fd-6753405e6740",
       contactNotes: "",
-      departmentIds: [],
+      // Where they work and what they do are basic details, as on the web.
+      departmentIds: [4],
       deptAdminIds: [],
       managementDepartmentIds: [],
       managementDeptAdminIds: [],
       pendingInvitation: null,
-      roleIds: [],
+      roleIds: [3],
       statusNote: "",
       userId: null,
       // Personal contact details, withheld here exactly as the people list
       // already withholds them.
       email: "",
       phone: "",
+      // A colleague's status is for the people who act on it.
+      suspendedAt: null,
+      plannedStatus: null,
+      plannedFrom: null,
+      plannedUntil: null,
+      firstDay: null,
     });
   });
 

@@ -276,9 +276,9 @@ describe("POST /api/employees/manage", () => {
   });
 
   describe("fetchEmployeeById", () => {
-    it("blocks management profiles for viewers without manage rights", async () => {
-      // Even canViewEmployeeDetails isn't enough — management profiles are
-      // reserved for staff managers / super admins / gridmasters.
+    it("gives an Admin's basic profile, not their full record, to viewers without manage rights", async () => {
+      // Even canViewEmployeeDetails doesn't open a management profile's full
+      // record — that stays with staff managers / super admins / gridmasters.
       mockAuth({ canViewEmployeeDetails: true });
       fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([
         { user_id: PERSON_USER_ID, department_ids: [4], dept_admin_ids: [] },
@@ -286,13 +286,18 @@ describe("POST /api/employees/manage", () => {
 
       const response = await POST(fetchEmployeeByIdRequest());
 
-      expect(response.status).toBe(403);
-      expect(await response.json()).toEqual({
-        error: API_ERRORS.CANNOT_VIEW_MANAGEMENT_PROFILE,
+      expect(response.status).toBe(200);
+      expect((await response.json()).employee).toMatchObject({
+        id: EMPLOYEE_ID,
+        firstName: "Mina",
+        email: "",
+        phone: "",
+        contactNotes: "",
+        userId: null,
       });
     });
 
-    it("blocks profiles with a pending management invitation the same way", async () => {
+    it("treats a pending management invitation the same way", async () => {
       mockAuth({ canViewEmployeeDetails: true });
       rowToEmployee.mockReturnValue(makeEmployee({ userId: null }));
       fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue({
@@ -302,7 +307,26 @@ describe("POST /api/employees/manage", () => {
 
       const response = await POST(fetchEmployeeByIdRequest());
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(200);
+      expect((await response.json()).employee).toMatchObject({ email: "", phone: "" });
+    });
+
+    it("shows a view-only caller a colleague who is Away, as Active", async () => {
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee({ status: "inactive", awayUntil: "2026-12-01" }));
+
+      const payload = await (await POST(fetchEmployeeByIdRequest())).json();
+
+      expect(payload.employee).toMatchObject({ status: "active", awayUntil: null });
+    });
+
+    it("still gives a view-only caller nothing for someone Offboarded", async () => {
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee({ status: "removed" }));
+
+      const payload = await (await POST(fetchEmployeeByIdRequest())).json();
+
+      expect(payload.employee).toBeNull();
     });
 
     it("returns management profiles to staff managers", async () => {
@@ -395,6 +419,37 @@ describe("POST /api/employees/manage", () => {
       rowToEmployee.mockReturnValue(makeEmployee({ userId: VIEWER_USER_ID }));
       const own = await (await POST(fetchEmployeeByIdRequest())).json();
       expect(own.employee.joinedAt).toBe("2026-03-05T14:00:00.000Z");
+    });
+
+    it("withholds a coworker's status from a view-only caller, but not their own", async () => {
+      const statusDetails = {
+        statusChangedAt: "2026-11-01T00:00:00.000Z",
+        suspendedAt: "2026-11-02T00:00:00.000Z",
+        suspendedUntil: "2026-11-20",
+        plannedStatus: "away",
+        plannedFrom: "2026-11-15",
+        plannedUntil: "2026-11-22",
+        plannedAbsenceTypeId: 4,
+        firstDay: "2026-11-30",
+      };
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee(statusDetails));
+      const coworker = await (await POST(fetchEmployeeByIdRequest())).json();
+      expect(coworker.employee).toMatchObject({
+        statusChangedAt: null,
+        suspendedAt: null,
+        suspendedUntil: null,
+        plannedStatus: null,
+        plannedFrom: null,
+        plannedUntil: null,
+        plannedAbsenceTypeId: null,
+        firstDay: null,
+      });
+
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee({ ...statusDetails, userId: VIEWER_USER_ID }));
+      const own = await (await POST(fetchEmployeeByIdRequest())).json();
+      expect(own.employee).toMatchObject(statusDetails);
     });
 
     it("hands contact details to a viewer granted canViewEmployeeDetails", async () => {

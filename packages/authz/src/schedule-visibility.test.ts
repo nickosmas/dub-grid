@@ -7,13 +7,18 @@ const staff = {
   isSuperAdmin: false,
   isGridmaster: false,
 };
-const hidden = { staffSeeShiftChanges: false, staffSeePublisher: false };
+const hidden = {
+  staffSeeShiftChanges: false,
+  staffSeePublisher: false,
+  staffSeeAbsenceNames: false,
+};
 
 describe("scheduleViewerVisibility", () => {
   it("shows staff both by default", () => {
     expect(scheduleViewerVisibility(staff, {})).toEqual({
       showChangeDetails: true,
       showPublisher: true,
+      showAbsenceNames: true,
     });
   });
 
@@ -21,10 +26,12 @@ describe("scheduleViewerVisibility", () => {
     expect(scheduleViewerVisibility(staff, hidden)).toEqual({
       showChangeDetails: false,
       showPublisher: false,
+      showAbsenceNames: false,
     });
     expect(scheduleViewerVisibility(staff, { staffSeePublisher: false })).toEqual({
       showChangeDetails: true,
       showPublisher: false,
+      showAbsenceNames: true,
     });
   });
 
@@ -37,6 +44,18 @@ describe("scheduleViewerVisibility", () => {
     expect(scheduleViewerVisibility({ ...staff, ...grant }, hidden)).toEqual({
       showChangeDetails: true,
       showPublisher: true,
+      showAbsenceNames: true,
+    });
+  });
+
+  it.each([
+    ["an approver", { canApproveShiftRequests: true }],
+    ["a staff manager", { canManageEmployees: true }],
+  ])("shows %s absence names, keeping the rest hidden", (_label, grant) => {
+    expect(scheduleViewerVisibility({ ...staff, ...grant }, hidden)).toEqual({
+      showChangeDetails: false,
+      showPublisher: false,
+      showAbsenceNames: true,
     });
   });
 });

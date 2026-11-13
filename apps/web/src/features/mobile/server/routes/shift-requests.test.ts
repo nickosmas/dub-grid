@@ -183,6 +183,7 @@ describe("mobile shift-requests route", () => {
       {},
       {
         orgId: "org-1",
+        absenceViewer: expect.objectContaining({ showAbsenceNames: true }),
         employeeId: "emp-1",
         includeOpenPickupRequests: true,
         startDate: "2026-04-18",
@@ -247,6 +248,7 @@ describe("mobile shift-requests route", () => {
       {},
       {
         orgId: "org-1",
+        absenceViewer: expect.objectContaining({ showAbsenceNames: true }),
         employeeId: "emp-1",
         includeOpenPickupRequests: true,
         startDate: "2026-04-19",
@@ -669,6 +671,7 @@ describe("mobile shift-requests route", () => {
       {},
       {
         orgId: "org-1",
+        absenceViewer: expect.objectContaining({ showAbsenceNames: true }),
         employeeId: undefined,
         includeOpenPickupRequests: false,
         startDate: "2026-04-18",
@@ -904,6 +907,7 @@ describe("mobile shift-requests route", () => {
     expect(response.status).toBe(200);
     expect(fetchMobileScheduleEntries).toHaveBeenCalledWith(expect.anything(), {
       orgId: "org-1",
+      absenceViewer: expect.objectContaining({ showAbsenceNames: true }),
       startDate: "2026-04-19",
       endDate: "2026-04-25",
     });

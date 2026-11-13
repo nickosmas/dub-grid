@@ -1,3 +1,4 @@
+import { mobileAbsenceViewer } from "@/features/mobile/server/absence-viewer";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -207,6 +208,7 @@ export async function GET(req: NextRequest) {
     fetchMobileScheduleEntries(auth.serviceClient, {
       orgId: auth.currentOrg.id,
       ...range,
+      absenceViewer: mobileAbsenceViewer(auth),
     }),
     fetchMobileHiddenPeople(auth).then((hiddenUserIds) =>
       fetchActiveEmployeeIds(auth.serviceClient, auth.currentOrg.id, hiddenUserIds),

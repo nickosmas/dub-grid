@@ -161,13 +161,31 @@ async function seriesDates(seriesId: string): Promise<string[]> {
   return rows.map((row) => row.date);
 }
 
+/**
+ * Reads a check as the database owner: since 134 a member can't select a
+ * snapshot's absence, and the check is the test's, not the caller's.
+ */
+async function asOwner<T>(read: () => Promise<T>): Promise<T> {
+  const {
+    rows: [{ role }],
+  } = await db.query<{ role: string }>("SELECT current_user AS role");
+  await db.query("RESET ROLE");
+  try {
+    return await read();
+  } finally {
+    if (role === "authenticated") await db.query("SET LOCAL ROLE authenticated");
+  }
+}
+
 async function draftAbsences(fixture: Fixture): Promise<Record<string, number | null>> {
-  const { rows } = await db.query<{ date: string; absence_type_id: number | null }>(
-    `SELECT to_char(c.date, 'YYYY-MM-DD') AS date, s.absence_type_id::integer AS absence_type_id
+  const { rows } = await asOwner(() =>
+    db.query<{ date: string; absence_type_id: number | null }>(
+      `SELECT to_char(c.date, 'YYYY-MM-DD') AS date, s.absence_type_id::integer AS absence_type_id
      FROM public.schedule_cells c
      JOIN public.schedule_cell_snapshots s ON s.cell_id = c.id AND s.snapshot_kind = 'draft'
      WHERE c.emp_id = $1 AND c.date = ANY($2::date[])`,
-    [fixture.emp_id, DAYS],
+      [fixture.emp_id, DAYS],
+    ),
   );
   return Object.fromEntries(rows.map((row) => [row.date, row.absence_type_id]));
 }
