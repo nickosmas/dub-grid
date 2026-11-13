@@ -650,6 +650,7 @@ async function removeFocusAreaRow(
 
   const { error: employeeError } = await serviceClient.rpc("remove_focus_area_from_employees", {
     p_focus_area_id: focusAreaId,
+    p_org_id: orgId,
   });
   if (employeeError) throw employeeError;
 

@@ -466,11 +466,13 @@ describe("batch saves", () => {
         };
         return chain;
       },
-      rpc: async (fn: string, args: Record<string, unknown>) =>
-        fn === "remove_focus_area_from_employees" &&
-        args.p_focus_area_id === failures.rpcFocusAreaId
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        writes.push({ table: fn, op: "rpc", payload: args });
+        return fn === "remove_focus_area_from_employees" &&
+          args.p_focus_area_id === failures.rpcFocusAreaId
           ? { data: null, error: { message: "boom" } }
-          : { data: null, error: null },
+          : { data: null, error: null };
+      },
     };
     return { client, audits, writes };
   }
@@ -544,6 +546,13 @@ describe("batch saves", () => {
         undefined,
         SANDBOX_ORG,
         SANDBOX_ORG,
+      ]);
+      expect(writes.filter((write) => write.table === "remove_focus_area_from_employees")).toEqual([
+        {
+          table: "remove_focus_area_from_employees",
+          op: "rpc",
+          payload: { p_focus_area_id: 9, p_org_id: SANDBOX_ORG },
+        },
       ]);
       expect(audits.map((audit) => [audit.action, audit.org_id])).toEqual([
         ["focus_area.archived", SANDBOX_ORG],
