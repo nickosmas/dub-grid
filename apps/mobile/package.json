@@ -28,7 +28,7 @@
     "@babel/generator": "^7.29.0",
     "@babel/traverse": "^7.29.0",
     "@babel/types": "^7.29.0",
-    "babel-preset-expo": "~57.0.16"
+    "babel-preset-expo": "~58.0.22"
   },
   "dependencies": {
     "@dubgrid/api-client": "*",
