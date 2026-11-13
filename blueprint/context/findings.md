@@ -463,13 +463,13 @@
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. Narrow the fix: since F-156 the same component primes hard loads from the layout, so lazy-load it only on `/login` and the submit path.
 
-### F-162 [P3] unverified - The background `getUser` on a hard load holds the auth lock that browser queries wait on
+### F-162 [P3] fixed - The background `getUser` on a hard load holds the auth lock that browser queries wait on
 
 **File:** `apps/web/src/components/AuthProvider.tsx:138`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** auth-js keeps its lock across the `getUser` network call, and every browser-direct query (schedule cells and notes in `lib/db/shifts.ts`, realtime `setAuth`) calls `getSession`, which queues behind it. Probably hidden behind the bootstrap wave; unmeasured.
 **Suggested fix:** Call `getUser(session.access_token)`, which skips the lock.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13) in `lib/browser-auth.ts`, since `AuthProvider.tsx` calls it: `getVerifiedBrowserUser` reads the session (or takes the token it is handed) and calls `getUser(accessToken)`, which asks the auth server without taking the lock, and `getVerifiedBrowserAuth` passes the token it already read. No session now answers no user without a request. `browser-auth.test.ts` checks the token is passed and fails on the old code; not measured in a browser.
 
 ### F-163 [P2] open - One realtime event is invalidated once per table and re-broadcast to tabs that already received it
 
