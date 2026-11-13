@@ -784,21 +784,21 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** partly fixed: #515 blanks colleague status in the list and detail and drops admin permissions from the list. Still open: the detail route returns `adminPermissions`, has no internal-account filter, swap options skip `withScheduleVisibility`, and open shifts come from draft rows. An allowed-fields list must keep `orgRole`, roles and departments (#515, 56e).
 
-### F-207 [P2] open - Telemetry sends staff emails to third parties and can't be tied to an organization
+### F-207 [P2] fixed - Telemetry sends staff emails to third parties and can't be tied to an organization
 
 **File:** `apps/web/src/components/AuthProvider.tsx:100`; `apps/web/src/components/PostHogProvider.tsx:44`; `apps/web/src/lib/sentry.ts:260`; `apps/web/sentry.server.config.ts`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** `setSentryUser` sends the email with no consent gate, despite `sendDefaultPii: false`. `orgId` is never passed, so the `org_id` tag is never set and one customer's events can't be found or removed. PostHog identifies by email (consent-gated) with no organization group. The server config has no `beforeSend`, and `redactSecurityValue` removes secrets, not names or emails.
 **Suggested fix:** Send the user id only, set the `org_id` tag, add a server `beforeSend` that drops bodies and emails, and identify in PostHog by id with an organization group.
-**Resolution:**
+**Resolution:** Fixed on fix/route-permission-gaps (2026-11-13): Sentry receives the user's id and an `org_id` tag (reset on sign-out), never the email, and server and edge events go through `scrubServerEvent`, which keeps only the user's id and drops request bodies. PostHog already identifies by id and sends the email only with analytics consent, so it is unchanged.
 
-### F-208 [P2] open - One attacker can trip the shared login limit for every organization
+### F-208 [P2] fixed - One attacker can trip the shared login limit for every organization
 
 **File:** `apps/web/src/app/api/auth/login/route.ts:413`; `apps/web/src/lib/rate-limit.ts:134`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** The email, IP and `login:global` limiters run together in `Promise.all`, so a request the IP limiter refuses may still count against the global 500 per 10 seconds, which is about 50 requests a second from one address. Mobile shares the key, and recovery has the same shape at 100 per 10 seconds. Upstash's counting wasn't run, so this needs a test.
 **Suggested fix:** Check the IP limiter first and only then consume the global one.
-**Resolution:**
+**Resolution:** Fixed on fix/route-permission-gaps (2026-11-13), keeping one Redis round trip: web sign-in, mobile sign-in and recovery read the global ceiling with `peekRateLimit` (Upstash `getRemaining`, same fail-closed policy) alongside the email and IP limits, and spend it in `after()` only for a request those limits admit. A source the IP limit refuses no longer counts against everyone. A burst inside one round trip can pass the ceiling slightly. Route and unit tests cover the read, the spend only on admission, and the refusal when the ceiling is used up.
 **Update 2026-11-13 (re-check against dev):** still open, in three places: web login, mobile login and recovery.
 
 ### F-209 [P3] open - Smaller multi-tenancy gaps
@@ -919,13 +919,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Update 2026-11-07 (review):** `shift-request-settlement.ts:47` swallows `auto_approve_shift_request`'s refusal as `reason: "error"`. Migration 126's `refuse_caller_outside_org` comment also says a Gridmaster is held by `refuse_gridmaster_outside_org`, which `change_user_role` doesn't call; that is F-201's gap, not a new one.
 **Resolution:** Fixed on claude/sandbox-followups (2026-11-12), as suggested: migration 135 copies `resolve_shift_request_unchecked` (from 117) and `auto_approve_shift_request` (from 030) unchanged apart from their organization check, which now calls `is_authorized_org` (the session's organization or its own sandbox, NULL-safe). Every caller runs as the signed-in user, so no tokenless path loses access. The live test in `session-bound-functions.integration.test.ts` has the owner reject a sandbox request and another session refused.
 
-### F-225 [P2] open - A Super Admin keeps managing staff in a suspended organization
+### F-225 [P2] fixed - A Super Admin keeps managing staff in a suspended organization
 
 **File:** `apps/web/src/app/api/employees/shared.ts:130`; `packages/domain/src/billing.ts:99`
 **Found:** 2026-11-07 by /audit (scope: repairs #397, #399, #401; lens: security)
 **Why it matters:** `canManageEmployees` exempts Super Admins from `isLocked`, which is right for a billing lock but also covers an organization a Gridmaster suspended. Run through real HTTP: with the organization suspended, a live token created an invitation (200), while a route on `requireOrgPermissions` answered 403 for the same token. It predates this work.
 **Suggested fix:** Refuse on `organization.suspended_at` in `canManageEmployees`, and keep the Super Admin exemption for billing only.
-**Resolution:**
+**Resolution:** Fixed on fix/route-permission-gaps (2026-11-13): `canManageEmployees` lets a Super Admin through a billing lock (to bring seats down) but not a suspension, matching `requireOrgPermissions`. Tested in `employees/shared.test.ts`: a suspended organization refuses its Super Admin, an `unpaid` one still admits them.
 
 ### F-226 [P3] open - `escapeLikePattern` leaves `*`, which PostgREST reads as `%`
 

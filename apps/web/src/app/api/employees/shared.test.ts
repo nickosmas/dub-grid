@@ -153,6 +153,30 @@ describe("canManageEmployees", () => {
     await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
   });
 
+  it("refuses a super_admin once a Gridmaster has suspended the organization (F-225)", async () => {
+    const serviceClient = makeServiceClient({
+      membership: { org_role: "super_admin", admin_permissions: null },
+      profile: { platform_role: "none" },
+      organization: {
+        suspended_at: "2026-11-01T00:00:00Z",
+        subscription_status: "active",
+        trial_ends_at: null,
+      },
+    });
+
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(false);
+  });
+
+  it("lets a super_admin manage staff through a billing lock", async () => {
+    const serviceClient = makeServiceClient({
+      membership: { org_role: "super_admin", admin_permissions: null },
+      profile: { platform_role: "none" },
+      organization: { suspended_at: null, subscription_status: "unpaid", trial_ends_at: null },
+    });
+
+    await expect(canManageEmployees(req, serviceClient, ACTOR_ID, ORG_ID)).resolves.toBe(true);
+  });
+
   it("allows a gridmaster", async () => {
     const serviceClient = makeServiceClient({
       membership: null,

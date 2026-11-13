@@ -180,15 +180,12 @@ export function getRateLimitConfigStatus(): {
   };
 }
 
-/**
- * Check rate limit. In production, fails closed (blocks) when Redis is not
- * configured, signalling `misconfigured` so callers can return 503 instead of 429.
- * In development, allows through for convenience.
- */
-export async function checkRateLimit(
+type RateLimitResult = { limited: boolean; reset?: number; misconfigured?: boolean };
+
+async function runLimiter(
   limiter: Ratelimit | null,
-  key: string,
-): Promise<{ limited: boolean; reset?: number; misconfigured?: boolean }> {
+  check: (limiter: Ratelimit) => Promise<{ limited: boolean; reset?: number }>,
+): Promise<RateLimitResult> {
   // Outside production, allow through without the round trip. This used to be
   // true only when Redis was unconfigured, so a developer who had Upstash
   // configured locally paid a full network hop on every rate-limited request —
@@ -209,7 +206,7 @@ export async function checkRateLimit(
     return { limited: false };
   }
   try {
-    // Bounded: `limiter.limit` is a Redis round trip with no timeout of its own,
+    // Bounded: a limiter call is a Redis round trip with no timeout of its own,
     // and this runs before anything else on public endpoints like
     // /api/validate-domain. Unbounded, a half-open connection holds the request
     // open forever and the caller's spinner never stops — a hang is worse than
@@ -217,12 +214,7 @@ export async function checkRateLimit(
     //
     // A timeout throws into the same catch as an unreachable Redis, so it
     // inherits the same policy below rather than inventing a second one.
-    const { success, reset } = await withTimeoutOrThrow(
-      limiter.limit(key),
-      RATE_LIMIT_TIMEOUT_MS,
-      "rate limiter",
-    );
-    return { limited: !success, reset };
+    return await withTimeoutOrThrow(check(limiter), RATE_LIMIT_TIMEOUT_MS, "rate limiter");
   } catch (err) {
     // Redis/Upstash unreachable or too slow. Don't let it escape as a framework
     // 500 from whatever callsite invoked us (some call before their try block).
@@ -238,4 +230,37 @@ export async function checkRateLimit(
     }
     return { limited: false };
   }
+}
+
+/**
+ * Check rate limit. In production, fails closed (blocks) when Redis is not
+ * configured, signalling `misconfigured` so callers can return 503 instead of 429.
+ * In development, allows through for convenience.
+ */
+export async function checkRateLimit(
+  limiter: Ratelimit | null,
+  key: string,
+): Promise<RateLimitResult> {
+  return runLimiter(limiter, async (active) => {
+    const { success, reset } = await active.limit(key);
+    return { limited: !success, reset };
+  });
+}
+
+/**
+ * Reads whether a limit is used up without spending any of it, failing the
+ * same way as `checkRateLimit`. A shared ceiling such as `login:global` is read
+ * alongside the per-source limits and spent only for a request they admit, so
+ * one source the IP limit is refusing can't use the ceiling up for everyone
+ * (F-208). Spending it afterwards keeps sign-in at one Redis round trip; a
+ * burst inside that round trip can pass the ceiling slightly.
+ */
+export async function peekRateLimit(
+  limiter: Ratelimit | null,
+  key: string,
+): Promise<RateLimitResult> {
+  return runLimiter(limiter, async (active) => {
+    const { remaining, reset } = await active.getRemaining(key);
+    return { limited: remaining <= 0, reset };
+  });
 }
