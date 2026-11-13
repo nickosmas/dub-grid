@@ -581,6 +581,7 @@
 **Suggested fix:** Bounded concurrency (keep Super Admin offboards serial for the last-Super-Admin check) and a `maxDuration`.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open, with less to gain: Offboard and Away with no return take the organization publish lock (114/116), so they run one at a time anyway. Cap concurrency for the rest and add `maxDuration`.
+**Update 2026-11-13 (fix/p3-quick-wins):** the route sets `maxDuration = 300`, Vercel's default with fluid compute and the Pro ceiling without it (no other route set one to match; a Hobby project without fluid compute would refuse the deploy, which the preview deployment would show). Still open: bounded concurrency for the actions that don't take the publish lock.
 
 ### F-176 [P2] open - The hidden-people filter scans every profile on the platform, unindexed, before most schedule and people reads
 

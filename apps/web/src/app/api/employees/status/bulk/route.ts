@@ -29,6 +29,10 @@ import {
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
+// Up to BULK_STATUS_MAX_PEOPLE changes run one after another, each several
+// round trips. 300 seconds is Vercel's default with fluid compute and the Pro
+// ceiling without it; naming it keeps a large batch from a shorter default.
+export const maxDuration = 300;
 
 const ROUTE_ACTIONS: Readonly<Record<BulkStatusAction, StatusChangeAction>> = {
   markActive: "activate",
