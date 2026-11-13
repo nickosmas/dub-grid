@@ -50,46 +50,6 @@ const ALLOWLIST = [
       "generator API it was never built against. Revisit when copycat publishes on a patched faker.",
   },
   {
-    ids: [
-      "GHSA-86w9-cpqp-85rv",
-      "GHSA-4642-5mcj-2rqw",
-      "GHSA-6wvx-3r32-xmcg",
-      "GHSA-525v-9gp9-w22h",
-      "GHSA-7wch-p9px-956x",
-      "GHSA-h6cr-wjv9-3cpp",
-      "GHSA-4487-j8r4-4g2f",
-      "GHSA-5cwg-6vw7-rj6p",
-      "GHSA-jc66-7q78-782g",
-      "GHSA-8hrf-8g6f-7xwp",
-      "GHSA-hqq3-7jhf-c5jx",
-      "GHSA-5x38-2vff-x55p",
-    ],
-    package: "node-forge",
-    reviewBy: "2026-11-10",
-    reason:
-      "Twelve advisories in signature verification, PEM and PKCS#12 parsing, TLS record handling, " +
-      "certificate chains, AES-GCM and forge.http cookies. The only copy is node-forge 1.4.0 under " +
-      "@expo/cli, which uses it through @expo/code-signing-certificates to sign and verify " +
-      "expo-updates manifests. The mobile app does not configure code signing (no " +
-      "codeSigningCertificate in apps/mobile/app.json), the CLI makes no TLS connections or cookie " +
-      "requests with forge, and it runs on developer machines and in CI, not in the app. The fix, " +
-      "1.4.1, was published on 2026-10-27, inside the 7-day freshness window, so it cannot be " +
-      "taken yet. Point @expo/cli's node-forge entry at 1.4.2 once that release is a week old " +
-      "(2026-11-03) and delete this entry.",
-  },
-  {
-    ids: ["GHSA-q3jh-wrc6-jgq8", "GHSA-8r9p-f939-6h3c", "GHSA-mrwp-f3q8-3g9p"],
-    package: "follow-redirects",
-    reviewBy: "2026-11-08",
-    reason:
-      "Credential headers can survive a cross-origin redirect. The only copy, follow-redirects " +
-      "1.16.0, sits under axios under posthog-node under @snaplet/seed, which sends the seed CLI's " +
-      "own telemetry from developer machines; no request it makes carries our credentials, and " +
-      "nothing in the web server or the mobile app uses it. The fix, 1.16.2, was published on " +
-      "2026-10-25, inside the 7-day freshness window. Raise the follow-redirects override to 1.16.2 " +
-      "after 2026-11-01 and delete this entry.",
-  },
-  {
     ids: ["GHSA-vcc3-ghjq-m6fr", "GHSA-qr28-fpjm-wq7f"],
     package: "decode-uri-component",
     reviewBy: "2026-12-01",
