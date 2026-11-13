@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:ccdbd6d027059c0c5d59742980ac290225d6bcd4bfa620c294fc2370a5117952",
+  "sourceDigest": "sha256:643f767d1ad6cbe09f98b22794803856c900e7f031785f22e1ab9b949e385946",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5232,6 +5232,16 @@
       "source": {
         "path": "supabase/migrations/137_leftover_direct_writes_server_only.sql"
       }
+    },
+    {
+      "id": "migration:138_internal_profiles_index.sql",
+      "version": "138",
+      "name": "internal_profiles_index",
+      "file": "138_internal_profiles_index.sql",
+      "sha256": "bc19047dd2a1806ba6685d49e658b641889ec3056101416ace6fb6bf7bf8234d",
+      "source": {
+        "path": "supabase/migrations/138_internal_profiles_index.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -6906,6 +6916,9 @@
         },
         {
           "path": "apps/web/src/lib/sentry.ts"
+        },
+        {
+          "path": "apps/web/src/lib/supabase-service.ts"
         },
         {
           "path": "apps/web/src/proxy.ts"

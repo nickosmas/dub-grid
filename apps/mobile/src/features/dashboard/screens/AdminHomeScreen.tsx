@@ -99,14 +99,14 @@ export function AdminHomeScreen() {
   // a background refetch of the week already shown, from a pull or a realtime
   // nudge, is not.
   const isRefetching = dashboardQuery.isPlaceholderData || mine.isPlaceholderData;
-  // The weeks either side are fetched alongside this one, so the stepper
+  // The weeks either side are fetched shortly after this one, so the stepper
   // usually finds them in cache and moves without a spinner.
   usePrefetchAdjacentDashboardWeeks({
     accessToken,
     range,
     includeSchedule: !managementOnly,
     ready: bootstrapQuery.data !== undefined,
-    currentUpdatedAt: dashboardQuery.dataUpdatedAt,
+    currentLoaded: dashboardQuery.data !== undefined && !dashboardQuery.isPlaceholderData,
   });
   // The web build keeps the login page's aurora in the period's coverage
   // colour behind everything; on device the page is the plain grouped gray.

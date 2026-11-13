@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
+import { createServiceReadCache } from "@/lib/service-read-cache";
 
 /**
  * Supabase client authenticated with the service role key, for Route Handlers
@@ -20,6 +21,21 @@ export function getServiceClient(): SupabaseClient {
   if (!url || !key) throw new Error("Supabase env vars not configured");
   cached = createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
+    // Integration tests write through SQL and other clients, which this
+    // instance never sees; under test every read goes to the database.
+    ...(process.env.NODE_ENV === "test" ? {} : { global: { fetch: getServiceReadCache().fetch } }),
   });
   return cached;
+}
+
+let readCache: ReturnType<typeof createServiceReadCache> | null = null;
+
+function getServiceReadCache(): ReturnType<typeof createServiceReadCache> {
+  readCache ??= createServiceReadCache((input, init) => fetch(input, init));
+  return readCache;
+}
+
+/** Test seam: forgets every cached settings read. */
+export function clearServiceReadCache(): void {
+  readCache?.clear();
 }

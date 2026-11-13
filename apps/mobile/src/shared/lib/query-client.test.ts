@@ -21,4 +21,10 @@ describe("shouldRetryMobileQuery", () => {
     expect(shouldRetryMobileQuery(1, dropped)).toBe(true);
     expect(shouldRetryMobileQuery(2, dropped)).toBe(false);
   });
+
+  it("does not retry a request that ran out its deadline", () => {
+    const timedOut = new Error("This is taking longer than it should. Try again in a moment.");
+    timedOut.name = "MobileRequestTimeoutError";
+    expect(shouldRetryMobileQuery(0, timedOut)).toBe(false);
+  });
 });

@@ -16,6 +16,8 @@ import {
   fetchMobilePeople,
   fetchMobileScheduleEntries,
   fetchMobileShiftRequests,
+  findPublishedChangeForCell,
+  indexPublishedChangesByCell,
 } from "./data";
 
 function createThenableQuery(result: { data: unknown; error: unknown }) {
@@ -2509,5 +2511,82 @@ describe("fetchMobileCoverageSummary", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("findPublishedChangeForCell", () => {
+  type History = Parameters<typeof indexPublishedChangesByCell>[0];
+  type Change = History[number]["changes"][number];
+
+  function change(empId: string, date: string, kind: Change["kind"]): Change {
+    return { empId, date, kind, fromState: null, toState: null };
+  }
+
+  // The scan the index replaced, kept as the reference the index must match.
+  function scanForCell(history: History, empId: string, date: string) {
+    for (let entryIndex = 0; entryIndex < history.length; entryIndex += 1) {
+      const entry = history[entryIndex]!;
+      const found = entry.changes.find((c) => c.empId === empId && c.date === date);
+      if (found) {
+        const isNewAddition =
+          found.kind === "new" &&
+          history
+            .slice(entryIndex + 1)
+            .some((older) => older.startDate <= date && older.endDate >= date);
+        return { ...found, isNewAddition, publishedAt: entry.publishedAt };
+      }
+    }
+    return null;
+  }
+
+  const history: History = [
+    {
+      startDate: "2026-04-20",
+      endDate: "2026-04-26",
+      publishedAt: "2026-04-19T18:00:00.000Z",
+      publishedByName: null,
+      changes: [
+        change("a", "2026-04-20", "modified"),
+        change("b", "2026-04-21", "new"),
+        change("a", "2026-04-20", "deleted"),
+      ],
+    },
+    {
+      startDate: "2026-04-13",
+      endDate: "2026-04-26",
+      publishedAt: "2026-04-12T18:00:00.000Z",
+      publishedByName: null,
+      changes: [
+        change("a", "2026-04-20", "new"),
+        change("b", "2026-04-14", "new"),
+        change("c", "2026-04-22", "deleted"),
+      ],
+    },
+    {
+      startDate: "2026-04-06",
+      endDate: "2026-04-12",
+      publishedAt: "2026-04-05T18:00:00.000Z",
+      publishedByName: null,
+      changes: [change("b", "2026-04-14", "modified")],
+    },
+  ];
+
+  it("returns the same change as scanning every publish, for every cell", () => {
+    const index = indexPublishedChangesByCell(history);
+    const cells = [
+      ["a", "2026-04-20"],
+      ["b", "2026-04-21"],
+      ["b", "2026-04-14"],
+      ["c", "2026-04-22"],
+      ["d", "2026-04-20"],
+    ] as const;
+
+    for (const [empId, date] of cells) {
+      expect(findPublishedChangeForCell(history, index, empId, date)).toEqual(
+        scanForCell(history, empId, date),
+      );
+    }
+    expect(findPublishedChangeForCell(history, index, "b", "2026-04-21")?.isNewAddition).toBe(true);
+    expect(findPublishedChangeForCell(history, index, "a", "2026-04-20")?.kind).toBe("modified");
   });
 });
