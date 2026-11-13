@@ -175,6 +175,18 @@ scratch stack and sign in as the seeded QA super admin from a seeded copy, or
 disclose that this evidence is unavailable. Additive migrations that touch
 neither need no app smoke beyond the inspector.
 
+Two traps in that smoke. A dev server run from a worktree whose `node_modules`
+is one symlink to the main checkout loads the main checkout's `@dubgrid/*`
+builds, so a package export the candidate added answers HTTP 500 that the
+migrations did not cause: relink `@dubgrid` to the worktree's own packages and
+run `npm run build:packages` first. A freshly seeded organization also opens
+at "Setup in progress" until its memberships are marked onboarded on the
+scratch database; say so in the smoke result when you do it.
+
+After an apply, bring the shared local stack to the same version
+(`npx supabase migration up --local`). Otherwise the next pre-push gate runs
+the new migrations' integration tests against the old schema and fails.
+
 Stop the scratch stack afterwards: `npx supabase stop --workdir <scratch>`.
 
 Recorded rehearsals live in `internal/operations/migration-rehearsals/`. The
