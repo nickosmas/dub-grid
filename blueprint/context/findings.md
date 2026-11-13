@@ -1053,13 +1053,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** the mobile sheet now asks before discarding (#469). The hidden Recurring note, notes on mobile and Select all granting Staff: Edit remain.
 
-### F-248 [P3] open - Permission alerts and the activity log use a second, hardcoded vocabulary
+### F-248 [P3] fixed - Permission alerts and the activity log use a second, hardcoded vocabulary
 
 **File:** `permission-labels.ts:18-23` (`PERMISSION_LABELS`)
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: quality, UX)
 **Why it matters:** Alerts, email and the activity log say "Manage schedule areas" and "Manage repeating shifts", which match neither the editor's rows nor the organization's own term for focus areas (a standards rule).
 **Suggested fix:** Derive these labels from `PERMISSION_MODULES` and the organization's labels.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `PERMISSION_LABELS` is built from `PERMISSION_MODULES`, naming each flag by the editor row and level that sets it ("Staff: Edit", "Departments & labels: View"), with the three flags no row shows named the same way (Schedule: View, Staff: View, Organization settings: Edit). Several flags share a level, so the alert, email, activity log, access summary and Gridmaster card list each level once, and the alert reads "turned on Reports: View, and turned off Schedule: Edit". The row titles name no organization term (the focus-area term appears only in a row's description), and these callers don't hold the organization's labels, so nothing is customized per organization. Tested in `permission-labels.test.ts` and `audit-registry.test.ts`.
 
 ### F-249 [P3] open - Super Admins grant Super Admin and change permissions without fresh proof
 

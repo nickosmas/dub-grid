@@ -396,8 +396,8 @@ describe("access change rows", () => {
     });
 
     expect(rows).toEqual([
-      { label: "Allowed", value: "Edit shifts" },
-      { label: "Not allowed", value: "View reports" },
+      { label: "Allowed", value: "Schedule: Edit" },
+      { label: "Not allowed", value: "Reports: View" },
     ]);
   });
 
@@ -416,7 +416,7 @@ describe("access change rows", () => {
       },
     });
 
-    expect(rows).toEqual([{ label: "Not allowed", value: "Edit schedule notes" }]);
+    expect(rows).toEqual([{ label: "Not allowed", value: "Schedule: Edit" }]);
   });
 
   it("lists only what a first grant allowed", () => {
@@ -434,7 +434,7 @@ describe("access change rows", () => {
       },
     });
 
-    expect(rows).toEqual([{ label: "Allowed", value: "Edit shifts" }]);
+    expect(rows).toEqual([{ label: "Allowed", value: "Schedule: Edit" }]);
   });
 
   it("says so when a permission edit changed nothing effective", () => {

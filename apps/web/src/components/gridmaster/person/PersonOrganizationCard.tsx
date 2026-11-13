@@ -17,7 +17,7 @@ import type {
   GridmasterStaffRecord,
 } from "@/features/gridmaster/person-record";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
-import { permissionLabel } from "@/lib/permission-labels";
+import { permissionLabel, uniqueLabels } from "@/lib/permission-labels";
 import type { Invitation } from "@/types";
 import { PersonField, PersonFieldGrid, PersonSection, PersonSubheading } from "./PersonField";
 import { formatActor, formatDay, formatMoment } from "./person-format";
@@ -68,9 +68,11 @@ function MembershipFacts({
       />
     );
   }
-  const granted = Object.entries(membership.adminPermissions ?? {})
-    .filter(([, allowed]) => allowed === true)
-    .map(([key]) => permissionLabel(key));
+  const granted = uniqueLabels(
+    Object.entries(membership.adminPermissions ?? {})
+      .filter(([, allowed]) => allowed === true)
+      .map(([key]) => permissionLabel(key)),
+  );
   const tours = Object.entries(membership.tooltipToursCompleted)
     .filter(([, done]) => Boolean(done))
     .map(([tour]) => tour);
