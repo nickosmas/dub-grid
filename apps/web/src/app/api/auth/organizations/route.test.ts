@@ -74,7 +74,26 @@ describe("POST /api/auth/organizations", () => {
     const res = await POST(makeRequest({ targetOrgId: TARGET_ORG }));
 
     expect(res.status).toBe(403);
-    expect((await res.json()).code).toBe("ACCOUNT_SUSPENDED");
+    const payload = await res.json();
+    expect(payload.code).toBe("ACCOUNT_SUSPENDED");
+    expect(payload).not.toHaveProperty("suspendedUntil");
+  });
+
+  it("names the day that organization's suspension ends (F-236)", async () => {
+    rpc.mockResolvedValueOnce({
+      error: {
+        message:
+          "Your access has been suspended. Contact your organization admin. Until 2026-11-20.",
+      },
+    });
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest({ targetOrgId: TARGET_ORG }));
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      code: "ACCOUNT_SUSPENDED",
+      suspendedUntil: "2026-11-20",
+    });
   });
 
   it("rejects a non-uuid target", async () => {

@@ -24,6 +24,7 @@ import { findUsableSandbox } from "@/lib/sandbox-access";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { cacheGet, cacheSet, CacheKey, TTL } from "@/lib/cache";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 
 // True when the caller's employees row in the effective org is inactive (Away).
 // Reported to the client for the Away banner; it grants and removes nothing.
@@ -119,6 +120,10 @@ export interface AuthorizedOrgRequest {
 
 function forbiddenResponse(message: string = API_ERRORS.FORBIDDEN) {
   return NextResponse.json({ error: message }, { status: 403 });
+}
+
+function unavailableResponse() {
+  return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
 }
 
 function lockedOrganizationResponse() {
@@ -466,34 +471,45 @@ export async function requireOrgPermissions(
     ? null
     : isOrganizationSetupCompleteCached(serviceClient, orgId);
   setupCompleteAnswer?.catch(() => {});
-  const [{ data: membership }, { data: profile }, { data: organization }, { data: employee }] =
-    await Promise.all([
-      serviceClient
-        .from("organization_memberships")
-        .select("org_role, admin_permissions")
-        .eq("user_id", auth.user.id)
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .maybeSingle(),
-      serviceClient
-        .from("profiles")
-        .select("platform_role, deactivated_at, terminated_at")
-        .eq("id", auth.user.id)
-        .maybeSingle(),
-      serviceClient
-        .from("organizations")
-        .select(
-          `archived_at, suspended_at, workspace_kind, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, staff_see_absence_names, ${BILLING_ACCESS_SELECT}`,
-        )
-        .eq("id", orgId)
-        .maybeSingle(),
-      serviceClient
-        .from("employees")
-        .select("suspended_at")
-        .eq("user_id", auth.user.id)
-        .eq("org_id", orgId)
-        .maybeSingle(),
-    ]);
+  const [membershipRead, profileRead, organizationRead, employeeRead] = await Promise.all([
+    serviceClient
+      .from("organization_memberships")
+      .select("org_role, admin_permissions")
+      .eq("user_id", auth.user.id)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .maybeSingle(),
+    serviceClient
+      .from("profiles")
+      .select("platform_role, deactivated_at, terminated_at")
+      .eq("id", auth.user.id)
+      .maybeSingle(),
+    serviceClient
+      .from("organizations")
+      .select(
+        `archived_at, suspended_at, workspace_kind, subscription_status, trial_ends_at, staff_see_shift_changes, staff_see_publisher, staff_see_absence_names, ${BILLING_ACCESS_SELECT}`,
+      )
+      .eq("id", orgId)
+      .maybeSingle(),
+    serviceClient
+      .from("employees")
+      .select("suspended_at")
+      .eq("user_id", auth.user.id)
+      .eq("org_id", orgId)
+      .maybeSingle(),
+  ]);
+  // Each read below refuses someone (deactivated, suspended, archived, locked),
+  // so a failed one must not pass for a row that isn't there.
+  const readError =
+    membershipRead.error ?? profileRead.error ?? organizationRead.error ?? employeeRead.error;
+  if (readError) {
+    logger.error({ error: readError, orgId }, "requireOrgPermissions: access read failed");
+    return { response: unavailableResponse() };
+  }
+  const membership = membershipRead.data;
+  const profile = profileRead.data;
+  const organization = organizationRead.data;
+  const employee = employeeRead.data;
 
   // The JWT hook refuses these accounts at the next token issue; this covers
   // the token they already hold. Without it a deactivated user kept every
@@ -515,7 +531,12 @@ export async function requireOrgPermissions(
   // A membership alone isn't enough: `orgId` comes from the client, and only
   // the session's own organization has passed the token hook's checks (F-194).
   if (!isGridmaster) {
-    const sessionOrgId = options?.actor ? await readSessionOrgId(req) : auth.sessionOrgId;
+    let sessionOrgId = auth.sessionOrgId;
+    if (options?.actor) {
+      const session = await readSessionOrgId(req);
+      if ("response" in session) return { response: session.response };
+      sessionOrgId = session.sessionOrgId;
+    }
     if (!redirectedToSandbox && sessionOrgId && sessionOrgId !== orgId) {
       return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
     }
