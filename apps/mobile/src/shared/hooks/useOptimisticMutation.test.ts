@@ -6,6 +6,7 @@ import {
   type OptimisticMutationOptions,
 } from "./useOptimisticMutation";
 import { mobileQueryKeys } from "../lib/mobile-query-keys";
+import type { MockFn } from "../../test/mock-fn";
 
 type Counter = { value: number };
 type Variables = { by: number };
@@ -19,9 +20,9 @@ function tokenFor(version: string) {
 
 describe("createOptimisticMutationLifecycle", () => {
   let queryClient: QueryClient;
-  let pushToast: ReturnType<typeof vi.fn>;
-  let notify: ReturnType<typeof vi.fn>;
-  let announce: ReturnType<typeof vi.fn>;
+  let pushToast: MockFn;
+  let notify: MockFn;
+  let announce: MockFn;
 
   beforeEach(() => {
     pushToast = vi.fn();

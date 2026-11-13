@@ -10,6 +10,7 @@ import {
   EDITING_CELL_REANNOUNCE_MS,
   EDITING_CELL_STALE_MS,
 } from "@/hooks/useSchedulePresence";
+import type { MockFn } from "./helpers/mock-fn";
 
 const MINE = "session-1";
 const THEIRS = "session-2";
@@ -36,13 +37,13 @@ function createChannel() {
     },
   } as unknown as RealtimeChannel & {
     setPresenceState: (next: Record<string, PresenceRecord[]>) => void;
-    track: ReturnType<typeof vi.fn>;
-    untrack: ReturnType<typeof vi.fn>;
-    send: ReturnType<typeof vi.fn>;
+    track: MockFn;
+    untrack: MockFn;
+    send: MockFn;
   };
 }
 
-function render(channel: RealtimeChannel, send?: ReturnType<typeof vi.fn>) {
+function render(channel: RealtimeChannel, send?: MockFn) {
   const channelRef: MutableRefObject<RealtimeChannel | null> = { current: channel };
   return renderHook(() =>
     useSchedulePresence(channelRef, { id: "user-1", name: "Alex Admin" }, MINE, true, true, send),

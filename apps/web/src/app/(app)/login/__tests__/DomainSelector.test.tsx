@@ -8,6 +8,7 @@ import { act, render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import DomainSelector from "@/app/(app)/login/DomainSelector";
 import { RequestTimeoutError } from "@/lib/fetch-with-timeout";
+import type { MockFn } from "@/__tests__/helpers/mock-fn";
 
 vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -34,7 +35,7 @@ function submitSlug(slug: string) {
 }
 
 describe("DomainSelector", () => {
-  let hrefSetter: ReturnType<typeof vi.fn>;
+  let hrefSetter: MockFn;
 
   beforeEach(() => {
     // Vitest 4 hands back the same fetch spy, so restore it between tests.
