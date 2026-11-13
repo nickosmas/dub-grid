@@ -77,14 +77,17 @@ let _resolveReady: () => void = () => {};
  * is missing in Safari, hence the timer.
  */
 export function whenPageSettled(run: () => void): void {
+  // Held from the start: in tests the environment, and its global `window`,
+  // can be torn down before these callbacks fire.
+  const target = window;
   const afterIdle = () => {
-    const idle = (window as { requestIdleCallback?: (cb: () => void, o?: object) => void })
+    const idle = (target as { requestIdleCallback?: (cb: () => void, o?: object) => void })
       .requestIdleCallback;
-    if (idle) idle(run, { timeout: 3_000 });
+    if (idle) idle.call(target, run, { timeout: 3_000 });
     else setTimeout(run, 500);
   };
   if (document.readyState === "complete") afterIdle();
-  else window.addEventListener("load", afterIdle, { once: true });
+  else target.addEventListener("load", afterIdle, { once: true });
 }
 
 /**
@@ -94,11 +97,12 @@ export function whenPageSettled(run: () => void): void {
 export function bufferEarlyErrors(): () => void {
   const onError = (event: ErrorEvent) => captureException(event.error ?? event.message);
   const onRejection = (event: PromiseRejectionEvent) => captureException(event.reason);
-  window.addEventListener("error", onError);
-  window.addEventListener("unhandledrejection", onRejection);
+  const target = window;
+  target.addEventListener("error", onError);
+  target.addEventListener("unhandledrejection", onRejection);
   return () => {
-    window.removeEventListener("error", onError);
-    window.removeEventListener("unhandledrejection", onRejection);
+    target.removeEventListener("error", onError);
+    target.removeEventListener("unhandledrejection", onRejection);
   };
 }
 

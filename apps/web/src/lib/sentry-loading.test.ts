@@ -50,4 +50,14 @@ describe("bufferEarlyErrors", () => {
     add.mockRestore();
     remove.mockRestore();
   });
+
+  it("stops cleanly after the global window is gone", () => {
+    const stop = bufferEarlyErrors();
+    vi.stubGlobal("window", undefined);
+    try {
+      expect(() => stop()).not.toThrow();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
