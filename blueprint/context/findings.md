@@ -927,13 +927,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Refuse on `organization.suspended_at` in `canManageEmployees`, and keep the Super Admin exemption for billing only.
 **Resolution:**
 
-### F-226 [P3] open - `escapeLikePattern` leaves `*`, which PostgREST reads as `%`
+### F-226 [P3] fixed - `escapeLikePattern` leaves `*`, which PostgREST reads as `%`
 
 **File:** `apps/web/src/features/employees/server/contact-conflicts.ts:16`; `apps/web/src/features/mobile/server/routes/people-contact-check.ts:14`; `features/employees/server/linked-email-repair.ts:126`
 **Found:** 2026-11-07 by /audit (scope: repairs #397, #399, #401; lens: security, multi-tenancy)
 **Why it matters:** Confirmed on the stack: `ilike.*a*` matched as a wildcard. The invitation route is safe because validation refuses `*`, but the mobile contact check doesn't validate its email, so a manager's `*@x.org` gets a false conflict and another employee's id, in their own organization only. Whether the repair job can see a `*` address depends on what Auth accepts, which wasn't checked.
 **Suggested fix:** Escape `*` too, or compare `lower(email)` with `.eq`. Validate the email in the mobile check.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `escapeLikePattern` escapes `*` too, so the contact check and the repair job can no longer send a wildcard. PostgREST maps every `*` to `%` without regard to the backslash, so an escaped `*` reaches Postgres as a literal `%`: an address that really contains `*` finds no match in the pre-flight (the unique index still refuses the save) rather than matching every address. The mobile contact check now applies the web check's rule (`z.string().trim().email()`) and skips the email lookup for an address it refuses, still answering the phone check. Tests in `contact-conflicts.test.ts` and `people-contact-check.test.ts` fail on the old code. The PostgREST mapping is from its source, not run on the stack.
 
 ### F-229 [P3] open - Someone suspended in their only organization can't accept an invitation to another
 
