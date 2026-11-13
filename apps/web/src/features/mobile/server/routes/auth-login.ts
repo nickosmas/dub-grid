@@ -11,7 +11,13 @@ import {
   MobileApiRequestError,
   normalizeMobileOrgSlug,
 } from "@dubgrid/mobile-api-core";
-import { checkRateLimit, loginIpLimiter, loginLimiter, loginSurgeLimiter } from "@/lib/rate-limit";
+import {
+  checkRateLimit,
+  loginIpLimiter,
+  loginLimiter,
+  loginSurgeLimiter,
+  peekRateLimit,
+} from "@/lib/rate-limit";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getServiceClient } from "@/lib/supabase-service";
 import { getPlatformBillingPolicy } from "@/lib/billing-policy";
@@ -140,7 +146,7 @@ async function handlePOST(req: NextRequest, timer: Timer) {
     Promise.all([
       checkRateLimit(loginLimiter, `login:email:${emailHash}`),
       checkRateLimit(loginIpLimiter, `login:ip:${sourceIp}`),
-      checkRateLimit(loginSurgeLimiter, "login:global"),
+      peekRateLimit(loginSurgeLimiter, "login:global"),
     ]),
   );
 
@@ -174,6 +180,7 @@ async function handlePOST(req: NextRequest, timer: Timer) {
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
   }
+  after(() => checkRateLimit(loginSurgeLimiter, "login:global"));
 
   const serviceClient = getServiceClient();
   const supabaseUrl = getSupabaseUrl();
