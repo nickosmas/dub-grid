@@ -54,7 +54,19 @@ function stubSeriesCells(cells: Array<{ emp_id: string; date: string; snapshots?
  * Records the note writes a request makes, filters included, so a test can
  * assert which notes were touched without a real query builder.
  */
-function captureNoteClearing() {
+/** A stored note's status, as the route reads it before saving or deleting. */
+function noteStatusRead(status: "published" | "draft" | "draft_deleted" | null) {
+  const builder = {
+    eq: () => builder,
+    is: () => builder,
+    maybeSingle: async () => ({ data: status ? { status } : null, error: null }),
+  };
+  return () => builder;
+}
+
+function captureNoteClearing(
+  storedStatus: "published" | "draft" | "draft_deleted" | null = "published",
+) {
   const deleted: Array<Record<string, unknown>> = [];
   const softDeleted: Array<Record<string, unknown>> = [];
 
@@ -79,6 +91,7 @@ function captureNoteClearing() {
   serviceFrom.mockImplementation((table: string) =>
     table === "schedule_notes"
       ? {
+          select: noteStatusRead(storedStatus),
           delete: () => chain({}, deleted),
           update: (payload: Record<string, unknown>) => chain({ ...payload }, softDeleted),
         }
@@ -1668,7 +1681,9 @@ describe("POST /api/schedule/manage permission gates", () => {
     stubCellSnapshot("worked");
     const upsert = vi.fn(async () => ({ error: null }));
     serviceFrom.mockImplementation((table: string) =>
-      table === "schedule_notes" ? { upsert } : { insert: vi.fn(async () => ({ error: null })) },
+      table === "schedule_notes"
+        ? { upsert, select: noteStatusRead(null) }
+        : { insert: vi.fn(async () => ({ error: null })) },
     );
 
     const response = await POST(
@@ -1783,7 +1798,9 @@ describe("POST /api/schedule/manage permission gates", () => {
     stubCellSnapshot("worked");
     const upsert = vi.fn(async () => ({ error: null }));
     serviceFrom.mockImplementation((table: string) =>
-      table === "schedule_notes" ? { upsert } : { insert: vi.fn(async () => ({ error: null })) },
+      table === "schedule_notes"
+        ? { upsert, select: noteStatusRead(null) }
+        : { insert: vi.fn(async () => ({ error: null })) },
     );
 
     const response = await POST(
@@ -1816,7 +1833,10 @@ describe("POST /api/schedule/manage permission gates", () => {
     stubCellSnapshot("worked");
     serviceFrom.mockImplementation((table: string) =>
       table === "schedule_notes"
-        ? { upsert: vi.fn(async () => ({ error: { code: "23514", message: "refused" } })) }
+        ? {
+            upsert: vi.fn(async () => ({ error: { code: "23514", message: "refused" } })),
+            select: noteStatusRead(null),
+          }
         : { insert: vi.fn(async () => ({ error: null })) },
     );
 
@@ -1858,6 +1878,106 @@ describe("POST /api/schedule/manage permission gates", () => {
     ]);
   });
 
+  it("marks a published note for removal even when the client calls it a draft", async () => {
+    grant({ canEditNotes: true });
+    const { deleted, softDeleted } = captureNoteClearing("published");
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+        shift: { shiftId: 35, jobId: 18 },
+        existingStatus: "draft",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(deleted).toEqual([]);
+    expect(softDeleted).toEqual([expect.objectContaining({ status: "draft_deleted" })]);
+  });
+
+  it("writes nothing when the note is already gone", async () => {
+    grant({ canEditNotes: true });
+    const { deleted, softDeleted } = captureNoteClearing(null);
+
+    const response = await POST(
+      makeRequest({
+        action: "deleteScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+        shift: { shiftId: 35, jobId: 18 },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(deleted).toEqual([]);
+    expect(softDeleted).toEqual([]);
+  });
+
+  it("saves a new note as a draft even when the client claims it was draft_deleted", async () => {
+    grant({ canEditNotes: true });
+    stubCellSnapshot("worked");
+    const upsert = vi.fn(async () => ({ error: null }));
+    serviceFrom.mockImplementation((table: string) =>
+      table === "schedule_notes"
+        ? { upsert, select: noteStatusRead(null) }
+        : { insert: vi.fn(async () => ({ error: null })) },
+    );
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+        shift: { shiftId: 35, jobId: 18 },
+        existingStatus: "draft_deleted",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ status: "draft" }), {
+      onConflict: "emp_id,date,indicator_type_id,focus_area_id,shift_id,job_id",
+    });
+  });
+
+  it("restores a note marked for removal as published", async () => {
+    grant({ canEditNotes: true });
+    stubCellSnapshot("worked");
+    const upsert = vi.fn(async () => ({ error: null }));
+    serviceFrom.mockImplementation((table: string) =>
+      table === "schedule_notes"
+        ? { upsert, select: noteStatusRead("draft_deleted") }
+        : { insert: vi.fn(async () => ({ error: null })) },
+    );
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertScheduleNote",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        indicatorTypeId: 1,
+        focusAreaId: 1,
+        shift: { shiftId: 35, jobId: 18 },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ status: "published" }), {
+      onConflict: "emp_id,date,indicator_type_id,focus_area_id,shift_id,job_id",
+    });
+  });
+
   it("removes only the named shift's note", async () => {
     const body = {
       action: "deleteScheduleNote",
@@ -1870,7 +1990,7 @@ describe("POST /api/schedule/manage permission gates", () => {
     };
 
     grant({ canEditNotes: true });
-    const shiftless = captureNoteClearing();
+    const shiftless = captureNoteClearing("draft");
     expect((await POST(makeRequest({ ...body, shift: { shiftId: null, jobId: 16 } }))).status).toBe(
       200,
     );
@@ -1879,7 +1999,7 @@ describe("POST /api/schedule/manage permission gates", () => {
     ]);
 
     grant({ canEditNotes: true });
-    const evening = captureNoteClearing();
+    const evening = captureNoteClearing("draft");
     expect((await POST(makeRequest({ ...body, shift: { shiftId: 35, jobId: 18 } }))).status).toBe(
       200,
     );
