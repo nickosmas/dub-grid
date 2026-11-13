@@ -9,7 +9,7 @@ import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
-import { withoutHiddenStaff } from "@dubgrid/data-access";
+import { hiddenStaffFilter, withoutHiddenStaff } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ScheduleCellState } from "@dubgrid/contracts";
 import { formatScheduleTimeRange, formatScheduleTimeValue } from "@dubgrid/schedule-core";
@@ -2541,19 +2541,20 @@ export async function loadOperationsReport(
         .range(from, to),
     ),
     optionSource.employees,
-    fetchTableRows<EmployeeReportRow>((from, to) =>
-      withoutHiddenStaff(
-        serviceClient
-          .from("employees")
-          .select(EMPLOYEE_REPORT_COLUMNS)
-          .eq("org_id", input.orgId)
-          .not("archived_at", "is", null),
-        input.hiddenUserIds,
-      )
+    fetchTableRows<EmployeeReportRow>((from, to) => {
+      // Filtered in place: inferring this builder through withoutHiddenStaff's
+      // generic passed the compiler's depth limit (supabase-js 2.119).
+      const query = serviceClient
+        .from("employees")
+        .select(EMPLOYEE_REPORT_COLUMNS)
+        .eq("org_id", input.orgId)
+        .not("archived_at", "is", null);
+      const hidden = hiddenStaffFilter(input.hiddenUserIds);
+      return (hidden ? query.or(hidden) : query)
         .order("seniority", { ascending: true })
         .order("id", { ascending: true })
-        .range(from, to),
-    ),
+        .range(from, to);
+    }),
     optionSource.focusAreas,
     fetchTableRows<NamedRow>((from, to) =>
       serviceClient
