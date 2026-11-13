@@ -257,10 +257,15 @@ function tokenOrgId(claims: { org_id?: unknown }): string | null {
 /**
  * The organization this request's session is in, for a caller that has already
  * authenticated it. A token names none when its session's organization is gone.
+ * A token that no longer verifies answers its refusal, never "no organization",
+ * which a caller would read as nothing to compare.
  */
-export async function readSessionOrgId(req: NextRequest): Promise<string | null> {
+export async function readSessionOrgId(
+  req: NextRequest,
+): Promise<{ sessionOrgId: string | null } | { response: NextResponse }> {
   const token = await verifyRequestToken(req);
-  return "response" in token ? null : tokenOrgId(token.verified.claims);
+  if ("response" in token) return token;
+  return { sessionOrgId: tokenOrgId(token.verified.claims) };
 }
 
 export async function requireLiveAuthenticatedSession(

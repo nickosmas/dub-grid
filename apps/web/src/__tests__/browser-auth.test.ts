@@ -27,7 +27,8 @@ import {
 
 describe("browser auth helpers", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mockGetSession.mockResolvedValue({ data: { session: { access_token: "tok" } }, error: null });
     window.localStorage.clear();
     window.sessionStorage.clear();
     document.cookie = "sb-test-auth-token=; Max-Age=0; path=/";
@@ -181,23 +182,26 @@ describe("browser auth helpers", () => {
     expect(mockGetUser).toHaveBeenCalledTimes(1);
   });
 
-  it("recovers from 'Lock broken with steal option' AbortError on getUser", async () => {
-    mockGetUser
-      .mockResolvedValueOnce({
-        data: { user: null },
-        error: {
-          name: "AbortError",
-          message: "Lock broken by another request with the 'steal' option.",
-        },
-      })
-      .mockResolvedValueOnce({
-        data: { user: { id: "u-1" } },
-        error: null,
-      });
+  it("asks the auth server with the session's token, so getUser never takes the auth lock", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } }, error: null });
 
-    const result = await getVerifiedBrowserUser();
-    expect(result).toEqual({ id: "u-1" });
-    expect(mockGetUser).toHaveBeenCalledTimes(2);
+    await expect(getVerifiedBrowserUser()).resolves.toEqual({ id: "u-1" });
+    expect(mockGetUser).toHaveBeenCalledWith("tok");
+  });
+
+  it("uses a token it is handed without reading the session again", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } }, error: null });
+
+    await expect(getVerifiedBrowserUser("handed")).resolves.toEqual({ id: "u-1" });
+    expect(mockGetUser).toHaveBeenCalledWith("handed");
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
+  it("answers no user without a request when there is no session", async () => {
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+
+    await expect(getVerifiedBrowserUser()).resolves.toBeNull();
+    expect(mockGetUser).not.toHaveBeenCalled();
   });
 
   it("dedupes concurrent getBrowserSession callers onto a single underlying call", async () => {

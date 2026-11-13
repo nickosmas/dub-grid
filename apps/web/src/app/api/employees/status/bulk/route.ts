@@ -29,6 +29,11 @@ import {
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
+// Up to BULK_STATUS_MAX_PEOPLE changes run one after another, each several
+// round trips. 60 seconds is the most the Hobby plan allows without fluid
+// compute, as the cron routes use; naming it keeps a large batch from a
+// shorter default.
+export const maxDuration = 60;
 
 const ROUTE_ACTIONS: Readonly<Record<BulkStatusAction, StatusChangeAction>> = {
   markActive: "activate",

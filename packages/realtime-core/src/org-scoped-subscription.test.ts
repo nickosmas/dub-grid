@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { subscribeOrgScopedRealtime } from "./org-scoped-subscription";
 
+type Handler = (payload?: Record<string, unknown>) => void;
+
 function createMockChannel() {
-  const onCalls: Array<{ filter: Record<string, unknown>; handler: () => void }> = [];
+  const onCalls: Array<{ filter: Record<string, unknown>; handler: Handler }> = [];
   const channel = {
-    on: vi.fn((_type: string, filter: Record<string, unknown>, handler: () => void) => {
+    on: vi.fn((_type: string, filter: Record<string, unknown>, handler: Handler) => {
       onCalls.push({ filter, handler });
       return channel;
     }),
@@ -74,6 +76,32 @@ describe("subscribeOrgScopedRealtime", () => {
 
     expect(onFlush).toHaveBeenCalledTimes(1);
     expect(onFlush).toHaveBeenCalledWith(["employees", "jobs"]);
+  });
+
+  it("leaves out the events skipEvent answers true for", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onFlush = vi.fn();
+    const skipEvent = vi.fn(
+      (_table: string, payload: { new?: Record<string, unknown> }) => payload.new?.skip === true,
+    );
+
+    subscribeOrgScopedRealtime({
+      client,
+      orgId: "org-1",
+      tables: ["employees", "jobs"] as const,
+      debounceMs: 150,
+      onFlush,
+      skipEvent,
+      channelNamePrefix: "org-freshness",
+    });
+
+    mock.onCalls[0]?.handler({ new: { skip: true } });
+    mock.onCalls[1]?.handler({ new: { skip: false } });
+    vi.advanceTimersByTime(150);
+
+    expect(skipEvent).toHaveBeenCalledWith("employees", { new: { skip: true } });
+    expect(onFlush).toHaveBeenCalledWith(["jobs"]);
   });
 
   it("cleanup disposes the debounce timer and removes the channel", () => {

@@ -29,6 +29,15 @@ describe("checkEmployeeEmailConflict", () => {
     expect(chain.ilike).toHaveBeenCalledWith("email", "john\\_doe\\%1\\\\x@example.com");
   });
 
+  // PostgREST reads `*` as `%`, so a bare one matched every address.
+  it("escapes an asterisk so it can't act as a wildcard", async () => {
+    const { client, chain } = clientReturningMatch();
+
+    await checkEmployeeEmailConflict(client, { orgId: "org-1", email: "*@example.com" });
+
+    expect(chain.ilike).toHaveBeenCalledWith("email", "\\*@example.com");
+  });
+
   it("reports another active person's matching email as a conflict", async () => {
     const { client } = clientReturningMatch();
 

@@ -133,8 +133,8 @@ export async function getBrowserAuthSession() {
   return getBrowserSession();
 }
 
-export async function getVerifiedBrowserAuthUser() {
-  return getVerifiedBrowserUser();
+export async function getVerifiedBrowserAuthUser(accessToken?: string) {
+  return getVerifiedBrowserUser(accessToken);
 }
 
 export function clearBrowserAuthState(): void {
@@ -151,7 +151,7 @@ export async function getVerifiedBrowserAuth() {
   // "Lock stolen" errors in production.
   const session = await getBrowserAuthSession();
   if (!session?.access_token) return { session: null, user: null };
-  const user = await getVerifiedBrowserAuthUser();
+  const user = await getVerifiedBrowserAuthUser(session.access_token);
   if (!user) return { session: null, user: null };
   return { session, user };
 }

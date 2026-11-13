@@ -1,5 +1,5 @@
 import type { AdminPermissions, Invitation, OrganizationUser } from "@/types";
-import { PERMISSION_LABELS } from "@/lib/permission-labels";
+import { PERMISSION_LABELS, uniqueLabels } from "@/lib/permission-labels";
 import type { ReviewChange } from "@/components/review/ChangeReviewModal";
 import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
@@ -53,9 +53,11 @@ export function formatAdminPermissionsSummary(
   permissions: AdminPermissions | null | undefined,
 ): string {
   const normalized = normalizePermissions(permissions);
-  const granted = Object.keys(normalized)
-    .filter((key) => normalized[key])
-    .map((key) => PERMISSION_LABELS[key as keyof AdminPermissions] ?? key);
+  const granted = uniqueLabels(
+    Object.keys(normalized)
+      .filter((key) => normalized[key])
+      .map((key) => PERMISSION_LABELS[key as keyof AdminPermissions] ?? key),
+  );
 
   if (granted.length === 0) return "No extra permissions";
   if (granted.length <= 3) return granted.join(", ");

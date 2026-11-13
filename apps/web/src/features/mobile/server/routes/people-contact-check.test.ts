@@ -117,6 +117,17 @@ describe("mobile people contact-check route", () => {
     expect(payload.phone).toEqual({ conflict: false, conflictingEmployeeId: null });
   });
 
+  it("checks no address the web check would refuse, such as a bare wildcard", async () => {
+    const { POST } = await import("./people-contact-check");
+    const response = await POST(makeRequest({ email: "*@x.org", phone: "5550100" }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(checkEmployeeEmailConflict).not.toHaveBeenCalled();
+    expect(payload.email).toBeNull();
+    expect(payload.phone).toEqual({ conflict: false, conflictingEmployeeId: null });
+  });
+
   it("answers 500 when a lookup fails rather than leaking the query error", async () => {
     const { EmployeeContactLookupError } =
       await import("@/features/employees/server/contact-conflicts");

@@ -39,21 +39,21 @@
 **Suggested fix:** End the created session when the client has gone (for example, a short server-side deadline that signs the new session out), or let the next successful sign-in on that device replace the orphan.
 **Resolution:** Fixed in f3eb3fe0 (fix/mobile-login-orphan-session), taking the first option. The mobile login handler is `apps/web/src/features/mobile/server/routes/auth-login.ts`, not the web route the finding names. Past `MOBILE_LOGIN_SERVER_DEADLINE_MS` (the client timeout less one second), or once `req.signal` reports the client gone, it ends the session it just created and answers 504 rather than returning tokens nobody is waiting for; returning them is what leaves the orphan, so the two are decided together. The ending is `endUserSession` with the user and session ids read back from the token just minted, never a `signOut` on the ephemeral client, whose default global scope would sign the person out on every device. Cleanup is best effort and its outcome is recorded as `sessionDiscarded`, since a sign-in already too slow to use must not also fail on tidying up. `MOBILE_REQUEST_TIMEOUT_MS` moved into `@dubgrid/contracts` because the server has to stay under the client's value and two copies would drift. The handler now changes a session, so `MOBILE_DELEGATES` classifies it with assertions pinning that the only session it can end is the one it just created for that request; a sensitive-action gate would be circular on the endpoint that mints the caller's first token (the findings session agreed). Three route tests cover the abandoned sign-in, a cleanup failure still answering 504, and a normal sign-in ending nothing. Not verified against a real slow server: the 18.6 s case came from a loaded Android rehearsal and was not reproduced.
 
-### F-121 [P3] unverified - Latent inventory parser traps
+### F-121 [P3] fixed - Latent inventory parser traps
 
 **File:** `scripts/documentation/inventory.ts:531` (`resolveSourceModule`), walk helpers; `scripts/documentation/check.ts:84`
 **Found:** 2026-09-28 by `/audit` (scope: current, 1b86aad5..1cc2be3e; all lenses)
 **Why it matters:** each needs a real source to trigger it: an `@/` import in Settings would make the digest read a nonexistent path and crash; a `page.tsx` or `route.ts` under a Next private (`_x`) or `@slot` folder would count as a route; `statSync` follows symlinks, so a loop recurses; untracked local files feed the inventory, so `docs:check` can fail locally but pass in CI; with no `.gitattributes`, a CRLF checkout fails frontmatter parsing and the byte compare.
 **Suggested fix:** resolve aliases through tsconfig paths, skip private and slot folders, walk with `lstat` and skip links, and add `* text=auto eol=lf` for the generated and docs files.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `walkFiles` uses `lstat` and skips links, so a link to an ancestor can no longer recurse; web pages and Route Handlers skip private (`_name`) and `@slot` folders; and `resolveSourceModule` and the Route Handler re-export resolver resolve an aliased specifier (`@/x`) through the nearest tsconfig's `paths`, bounded by the repository root, instead of the digest reading a path that doesn't exist. `.gitattributes` keeps the docs pages and the generated files LF (every one already was, so nothing renormalized). Tests in `docs-inventory.test.ts` fail on the old parser (the link test with ELOOP). The regenerated inventory is unchanged and `docs:check` passes. Not done: untracked local files still feed the inventory, so `docs:check` can still differ between a working tree and CI.
 
-### F-122 [P3] unverified - The env-module declaration pattern could count any uppercase object key
+### F-122 [P3] fixed - The env-module declaration pattern could count any uppercase object key
 
 **File:** `scripts/documentation/inventory.ts` (`discoverEnvironmentKeys`, schema-property match)
 **Found:** 2026-09-28 by `/audit` (re-review of F-115 on feature/40a-docs-inventory)
 **Why it matters:** in an `env.*` module every indented `UPPER_CASE:` key is recorded as a declared environment key, not only properties of the Zod schema. Every current match is a real schema key, so nothing is wrong today; a lookup table with uppercase keys in an env module would add phantom keys that then fail classification.
 **Suggested fix:** read keys only from the object literal passed to `z.object(...)` (the TypeScript AST the route parser already uses), or accept the unclassified-key failure as the guard.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): an env module's declarations come from the TypeScript AST, only from the property names of object literals passed to `z.object(...)`, so an uppercase lookup table beside the schema adds nothing. `docs-inventory.test.ts` covers it and fails on the old pattern; the regenerated inventory is unchanged.
 
 ### F-123 [P3] fixed - Metro's image-size copies stay vulnerable until the Expo SDK upgrade
 
@@ -465,13 +465,13 @@
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. Narrow the fix: since F-156 the same component primes hard loads from the layout, so lazy-load it only on `/login` and the submit path.
 
-### F-162 [P3] unverified - The background `getUser` on a hard load holds the auth lock that browser queries wait on
+### F-162 [P3] fixed - The background `getUser` on a hard load holds the auth lock that browser queries wait on
 
 **File:** `apps/web/src/components/AuthProvider.tsx:138`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** auth-js keeps its lock across the `getUser` network call, and every browser-direct query (schedule cells and notes in `lib/db/shifts.ts`, realtime `setAuth`) calls `getSession`, which queues behind it. Probably hidden behind the bootstrap wave; unmeasured.
 **Suggested fix:** Call `getUser(session.access_token)`, which skips the lock.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13) in `lib/browser-auth.ts`, since `AuthProvider.tsx` calls it: `getVerifiedBrowserUser` reads the session (or takes the token it is handed) and calls `getUser(accessToken)`, which asks the auth server without taking the lock, and `getVerifiedBrowserAuth` passes the token it already read. No session now answers no user without a request. `browser-auth.test.ts` checks the token is passed and fails on the old code; not measured in a browser.
 
 ### F-163 [P2] open - One realtime event is invalidated once per table and re-broadcast to tabs that already received it
 
@@ -498,13 +498,13 @@
 **Suggested fix:** Use `useEmployeeCount` (already keyed under `org.employeeCount`), or enable the roster only while onboarding is incomplete.
 **Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the header reads the bootstrap's `activeEmployeeCount`, as `SetupGuard` does; in the browser `/alerts` loads no roster.
 
-### F-166 [P3] open - Opening Schedule refetches the directory in every other tab in the organization
+### F-166 [P3] fixed - Opening Schedule refetches the directory in every other tab in the organization
 
 **File:** `apps/web/src/app/(app)/schedule/SchedulePageClient.tsx:1656, 6518, 8975` (`updateScheduleLastViewed`); `apps/web/src/hooks/useOrgRealtimeInvalidation.ts:134-135`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** Writing `organization_memberships.schedule_last_viewed_at` makes the org channel invalidate `org.users` and `org.directory` everywhere that can see the row. `permissionsRealtime.ts:110-113` already ignores that column; the org channel doesn't.
 **Suggested fix:** Ignore membership updates that change only `schedule_last_viewed_at`, as the permissions path does.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `subscribeOrgScopedRealtime` takes a `skipEvent`, and the org channel uses it to absorb a membership UPDATE whose new row matches the cached directory entry in every field the directory takes from the membership (role, permissions, management departments and their admin subset, phone, not archived). Since the stamp also moves `updated_at`, the cached `membershipUpdatedAt` moves forward in place, so the next role or permission edit still passes its conflict check. Anything it can't compare refetches as before: no cached directory, a person whose account the viewer can't see (a regular member's directory has no `userId`), or a timestamp without an offset. Tested in `useOrgRealtimeInvalidation.test.ts` and `org-scoped-subscription.test.ts`; not run against live Realtime, so the payload's timestamp format is assumed to carry an offset (one without refetches).
 **Update 2026-11-13 (re-check against dev):** still open. The org channel has no old values to compare, so compare the new row with the cached one, as the permissions path does.
 
 ### F-167 [P2] open - Bulk alert actions cause a request storm on the Alerts page
@@ -583,6 +583,7 @@
 **Suggested fix:** Bounded concurrency (keep Super Admin offboards serial for the last-Super-Admin check) and a `maxDuration`.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open, with less to gain: Offboard and Away with no return take the organization publish lock (114/116), so they run one at a time anyway. Cap concurrency for the rest and add `maxDuration`.
+**Update 2026-11-13 (fix/p3-quick-wins):** the route sets `maxDuration = 60`, the Hobby plan's ceiling without fluid compute, matching the cron routes. Still open: bounded concurrency for the actions that don't take the publish lock.
 
 ### F-176 [P2] fixed - The hidden-people filter scans every profile on the platform, unindexed, before most schedule and people reads
 
@@ -673,13 +674,13 @@
 **Suggested fix:** Send challenge and verify with the bearer token directly; drop the refresh if the verified token already carries the hook claims (check this first).
 **Resolution:**
 
-### F-187 [P3] unverified - The mobile session is re-read from SecureStore on every `getSession`, including each realtime heartbeat
+### F-187 [P3] fixed - The mobile session is re-read from SecureStore on every `getSession`, including each realtime heartbeat
 
 **File:** `apps/mobile/src/shared/lib/local-storage.ts:32`; `apps/mobile/src/shared/lib/supabase.ts:28-31`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** auth-js re-reads storage on each `getSession`: about five reads of the over-2KB value at launch (initialize, warm, provider, auto-refresh, realtime connect), then one per 25s heartbeat. The comment claiming the work is shared is inaccurate. Cost on the Android keystore unmeasured. Related to F-128.
 **Suggested fix:** An in-memory read-through cache in `local-storage.ts`, written through on set and remove.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `local-storage.ts` keeps each SecureStore value in memory once read or written, shares one read between callers that ask together, writes through on set, and holds `null` after a remove, so sign-out leaves nothing cached. A per-key version stops a read that began before a write from putting the old value back, and a failed write caches nothing. The web path still reads `localStorage` directly. `local-storage.test.ts` covers each case and fails on the old code; not measured on a device.
 **Update 2026-11-13 (re-check against dev):** still open; the inaccurate comment is gone. A write-through cache must also clear on remove.
 
 ### F-188 [P3] open - Smaller mobile startup and sign-in costs
@@ -887,6 +888,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-07 (review):** `permissions.ts:468` ignores every read error, not only the `employees` one: an `organizations` error skips the sandbox, archived and lock checks, and a `profiles` error skips deactivated. An attacker can't cause these reads to fail. Traced, not run.
 **Update 2026-11-13 (re-check against dev):** (1) is fixed (the header asks billing for the source organization). (2), (3) and (4) are still open.
+**Update 2026-11-13 (fix/p3-quick-wins):** (2) and (3) are fixed. `requireOrgPermissions` answers 503 (`SERVICE_UNAVAILABLE`, as `api-auth.ts` does for a failed read) and logs when the membership, profile, organization or employees read errors, instead of reading it as no row. `readSessionOrgId` returns the token's refusal when the re-verify fails, and `requireOrgPermissions` passes it on rather than skipping the session comparison. Tests in `permissions.test.ts` fail on the old code. (4), the identity route writing `email` on a linked row, is still open.
 
 ### F-221 [P3] open - Smaller gaps left around the repairs
 
@@ -930,13 +932,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Refuse on `organization.suspended_at` in `canManageEmployees`, and keep the Super Admin exemption for billing only.
 **Resolution:** Fixed on fix/route-permission-gaps (2026-11-13): `canManageEmployees` lets a Super Admin through a billing lock (to bring seats down) but not a suspension, matching `requireOrgPermissions`. Tested in `employees/shared.test.ts`: a suspended organization refuses its Super Admin, an `unpaid` one still admits them.
 
-### F-226 [P3] open - `escapeLikePattern` leaves `*`, which PostgREST reads as `%`
+### F-226 [P3] fixed - `escapeLikePattern` leaves `*`, which PostgREST reads as `%`
 
 **File:** `apps/web/src/features/employees/server/contact-conflicts.ts:16`; `apps/web/src/features/mobile/server/routes/people-contact-check.ts:14`; `features/employees/server/linked-email-repair.ts:126`
 **Found:** 2026-11-07 by /audit (scope: repairs #397, #399, #401; lens: security, multi-tenancy)
 **Why it matters:** Confirmed on the stack: `ilike.*a*` matched as a wildcard. The invitation route is safe because validation refuses `*`, but the mobile contact check doesn't validate its email, so a manager's `*@x.org` gets a false conflict and another employee's id, in their own organization only. Whether the repair job can see a `*` address depends on what Auth accepts, which wasn't checked.
 **Suggested fix:** Escape `*` too, or compare `lower(email)` with `.eq`. Validate the email in the mobile check.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `escapeLikePattern` escapes `*` too, so the contact check and the repair job can no longer send a wildcard. PostgREST maps every `*` to `%` without regard to the backslash, so an escaped `*` reaches Postgres as a literal `%`: an address that really contains `*` finds no match in the pre-flight (the unique index still refuses the save) rather than matching every address. The mobile contact check now applies the web check's rule (`z.string().trim().email()`) and skips the email lookup for an address it refuses, still answering the phone check. Tests in `contact-conflicts.test.ts` and `people-contact-check.test.ts` fail on the old code. The PostgREST mapping is from its source, not run on the stack.
 
 ### F-229 [P3] open - Someone suspended in their only organization can't accept an invitation to another
 
@@ -1002,6 +1004,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Return `suspendedUntil` from the switch route as the login route does, and have the hook name the date of the organization it refused for.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. The hook can't know which organization the person asked for, so the login route should look up that organization's `suspended_until` itself.
+**Update 2026-11-13 (fix/p3-quick-wins):** the switch half is fixed: `POST /api/auth/organizations` answers `suspendedUntil` for the organization being switched into, read from `switch_org`'s refusal, which since 127 names that organization's end date (the way the login route reads it); no extra query. `route.test.ts` covers it and fails on the old code. The web switcher doesn't show the date yet. Still open: the sign-in half, where the hook names the default organization's date; the login route, which should look up the requested organization's `suspended_until` itself, was out of this batch's reach.
 
 ### F-237 [P2] open - The People filter sheet doesn't open on Android
 
@@ -1055,13 +1058,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** the mobile sheet now asks before discarding (#469). The hidden Recurring note, notes on mobile and Select all granting Staff: Edit remain.
 
-### F-248 [P3] open - Permission alerts and the activity log use a second, hardcoded vocabulary
+### F-248 [P3] fixed - Permission alerts and the activity log use a second, hardcoded vocabulary
 
 **File:** `permission-labels.ts:18-23` (`PERMISSION_LABELS`)
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: quality, UX)
 **Why it matters:** Alerts, email and the activity log say "Manage schedule areas" and "Manage repeating shifts", which match neither the editor's rows nor the organization's own term for focus areas (a standards rule).
 **Suggested fix:** Derive these labels from `PERMISSION_MODULES` and the organization's labels.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `PERMISSION_LABELS` is built from `PERMISSION_MODULES`, naming each flag by the editor row and level that sets it ("Staff: Edit", "Departments & labels: View"), with the three flags no row shows named the same way (Schedule: View, Staff: View, Organization settings: Edit). Several flags share a level, so the alert, email, activity log, access summary and Gridmaster card list each level once, and the alert reads "turned on Reports: View, and turned off Schedule: Edit". The row titles name no organization term (the focus-area term appears only in a row's description), and these callers don't hold the organization's labels, so nothing is customized per organization. Tested in `permission-labels.test.ts` and `audit-registry.test.ts`.
 
 ### F-249 [P3] open - Super Admins grant Super Admin and change permissions without fresh proof
 

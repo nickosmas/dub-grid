@@ -62,7 +62,7 @@ export function isRecoverableBrowserAuthError(error: unknown): boolean {
   return isMissingSessionError(error) || isStaleRefreshTokenError(error);
 }
 
-function reportLockContention(call: "getSession" | "getUser"): void {
+function reportLockContention(call: "getSession"): void {
   setTag("auth_lock_contention", "true");
   captureMessage(`Supabase auth lock contention on ${call}`, "warning");
 }
@@ -188,35 +188,29 @@ function isAuthNetworkError(error: unknown): boolean {
   return (error as { name?: string }).name === "AuthRetryableFetchError";
 }
 
-async function getUserRetryingNetworkFailures() {
-  let result = await supabase.auth.getUser();
+async function getUserRetryingNetworkFailures(accessToken: string) {
+  let result = await supabase.auth.getUser(accessToken);
   for (const delayMs of NETWORK_RETRY_DELAYS_MS) {
     if (!isAuthNetworkError(result.error)) break;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
-    result = await supabase.auth.getUser();
+    result = await supabase.auth.getUser(accessToken);
   }
   return result;
 }
 
-async function readUserOnce(): Promise<User | null> {
+// getUser() without a token holds auth-js's lock across the network call, and
+// every browser query's getSession() queues behind it. With the token in hand
+// it asks the auth server directly and the lock is never taken.
+async function readUserOnce(accessToken?: string): Promise<User | null> {
+  const token = accessToken ?? (await getBrowserSession())?.access_token;
+  if (!token) return null;
+
   const {
     data: { user },
     error,
-  } = await getUserRetryingNetworkFailures();
+  } = await getUserRetryingNetworkFailures(token);
 
   if (error) {
-    if (isAuthLockContentionError(error)) {
-      reportLockContention("getUser");
-      // A concurrent caller stole the auth lock; wait a tick and re-read
-      // (the winner's getUser() will have populated session state).
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      const retry = await supabase.auth.getUser();
-      if (retry.error) {
-        if (isRecoverableBrowserAuthError(retry.error)) return null;
-        throw retry.error;
-      }
-      return retry.data.user;
-    }
     if (isRecoverableBrowserAuthError(error)) return null;
     throw error;
   }
@@ -235,9 +229,9 @@ export function getBrowserSession(): Promise<Session | null> {
   return promise;
 }
 
-export function getVerifiedBrowserUser(): Promise<User | null> {
+export function getVerifiedBrowserUser(accessToken?: string): Promise<User | null> {
   if (inFlightUser) return inFlightUser;
-  const promise: Promise<User | null> = readUserOnce().finally(() => {
+  const promise: Promise<User | null> = readUserOnce(accessToken).finally(() => {
     if (inFlightUser === promise) inFlightUser = null;
   });
   inFlightUser = promise;
@@ -255,7 +249,7 @@ export async function getVerifiedBrowserAuth(): Promise<{
 }> {
   const session = await getBrowserSession();
   if (!session?.access_token) return { session: null, user: null };
-  const user = await getVerifiedBrowserUser();
+  const user = await getVerifiedBrowserUser(session.access_token);
   if (!user) return { session: null, user: null };
   return { session, user };
 }
