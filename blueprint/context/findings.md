@@ -999,6 +999,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Return `suspendedUntil` from the switch route as the login route does, and have the hook name the date of the organization it refused for.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. The hook can't know which organization the person asked for, so the login route should look up that organization's `suspended_until` itself.
+**Update 2026-11-13 (fix/p3-quick-wins):** the switch half is fixed: `POST /api/auth/organizations` answers `suspendedUntil` for the organization being switched into, read from `switch_org`'s refusal, which since 127 names that organization's end date (the way the login route reads it); no extra query. `route.test.ts` covers it and fails on the old code. The web switcher doesn't show the date yet. Still open: the sign-in half, where the hook names the default organization's date; the login route, which should look up the requested organization's `suspended_until` itself, was out of this batch's reach.
 
 ### F-237 [P2] open - The People filter sheet doesn't open on Android
 
