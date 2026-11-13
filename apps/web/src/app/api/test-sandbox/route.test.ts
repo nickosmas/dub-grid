@@ -195,6 +195,24 @@ describe("POST /api/test-sandbox", () => {
     );
   });
 
+  it("marks the sandbox cookie Secure over https only, as the auth cookies", async () => {
+    // WebKit refuses a Secure cookie set over plain http, even on localhost.
+    getServiceClient.mockReturnValue(buildServiceClient({ role: "super_admin" }));
+    const { POST } = await import("./route");
+
+    const overHttps = await POST(makeRequest("enter"));
+    expect(overHttps.headers.get("set-cookie")).toMatch(/dubgrid-sandbox=.*; Secure/i);
+
+    const overHttp = await POST(
+      new NextRequest("http://calmhaven.localhost:3000/api/test-sandbox", {
+        method: "POST",
+        body: JSON.stringify({ action: "enter" }),
+      }),
+    );
+    expect(overHttp.status).toBe(200);
+    expect(overHttp.headers.get("set-cookie")).not.toMatch(/Secure/i);
+  });
+
   it("exits without consulting the sandbox cookie's validity", async () => {
     // Exit authenticates with the token's own claims; a stale cookie must not
     // be able to refuse the one action that clears it.

@@ -289,7 +289,7 @@ Enables per-user Test Sandbox mode, where a Super Admin, or an Admin who can man
 ### Cookie Details
 
 - **Name:** `dubgrid-sandbox`
-- **Flags:** `HttpOnly`, `SameSite=Lax`, `Secure` (production only), `path=/`
+- **Flags:** `HttpOnly`, `SameSite=Lax`, `Secure` (over HTTPS, as the auth cookies), `path=/`
 - **Duration:** 7 days (`maxAge: 60 * 60 * 24 * 7`); cleared immediately on exit
 - **Set by:** Server Route Handler at `apps/web/src/app/api/test-sandbox/route.ts`
 - **Read by:** `apps/web/src/lib/sandbox-cookie.ts` (middleware, `api-auth.ts`, `permissions.ts`)
@@ -404,16 +404,16 @@ between `localhost` and `sub.localhost`, it has **no effect in local development
 
 ### Security Flags Matrix
 
-| Cookie                   | Secure           | HttpOnly                     | SameSite                      |
-| ------------------------ | ---------------- | ---------------------------- | ----------------------------- |
-| `dubgrid-cookie-consent` | Yes (HTTPS)      | No                           | Lax                           |
-| `sb-*-auth-token`        | Yes (HTTPS)      | No (`@supabase/ssr` default) | Lax (`@supabase/ssr` default) |
-| `dubgrid-sandbox`        | Yes (production) | **Yes**                      | Lax                           |
-| `dg-sandbox-ended`       | Yes (production) | No                           | Lax                           |
-| `dubgrid-impersonation`  | Yes (HTTPS)      | No                           | Lax                           |
-| `sidebar_state`          | Yes (HTTPS)      | No                           | Lax                           |
-| `dg-theme`               | Yes (HTTPS)      | No                           | Lax                           |
-| `dg_device`              | Yes (HTTPS)      | **Yes**                      | Lax                           |
+| Cookie                   | Secure      | HttpOnly                     | SameSite                      |
+| ------------------------ | ----------- | ---------------------------- | ----------------------------- |
+| `dubgrid-cookie-consent` | Yes (HTTPS) | No                           | Lax                           |
+| `sb-*-auth-token`        | Yes (HTTPS) | No (`@supabase/ssr` default) | Lax (`@supabase/ssr` default) |
+| `dubgrid-sandbox`        | Yes (HTTPS) | **Yes**                      | Lax                           |
+| `dg-sandbox-ended`       | Yes (HTTPS) | No                           | Lax                           |
+| `dubgrid-impersonation`  | Yes (HTTPS) | No                           | Lax                           |
+| `sidebar_state`          | Yes (HTTPS) | No                           | Lax                           |
+| `dg-theme`               | Yes (HTTPS) | No                           | Lax                           |
+| `dg_device`              | Yes (HTTPS) | **Yes**                      | Lax                           |
 
 ### Notes
 
