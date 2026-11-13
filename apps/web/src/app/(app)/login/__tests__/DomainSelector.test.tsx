@@ -37,6 +37,8 @@ describe("DomainSelector", () => {
   let hrefSetter: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    // Vitest 4 hands back the same fetch spy, so restore it between tests.
+    vi.restoreAllMocks();
     hrefSetter = vi.fn();
     mockTheme = undefined;
     mockToastError.mockReset();
