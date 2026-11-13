@@ -5,6 +5,7 @@ const dispatchNotificationEvent = vi.fn();
 const shiftRequestsSelect = vi.fn();
 const shiftRequestsUpdate = vi.fn();
 const invitationsSelect = vi.fn();
+const invitationCalls: Array<[string, unknown[]]> = [];
 
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
@@ -35,9 +36,12 @@ vi.mock("@/lib/supabase-service", () => ({
       }
       if (table === "invitations") {
         const builder: Record<string, unknown> = {};
-        builder.select = vi.fn(() => builder);
-        builder.lt = vi.fn(() => builder);
-        builder.is = vi.fn(() => builder);
+        for (const method of ["select", "lt", "gt", "is", "order"]) {
+          builder[method] = vi.fn((...args: unknown[]) => {
+            invitationCalls.push([method, args]);
+            return builder;
+          });
+        }
         builder.limit = vi.fn(() => invitationsSelect());
         return builder;
       }
@@ -69,6 +73,7 @@ describe("GET /api/cron/expire-requests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fromCallIndex = 0;
+    invitationCalls.length = 0;
     process.env.CRON_SECRET = SECRET;
     isFeatureEnabled.mockResolvedValue(true);
     dispatchNotificationEvent.mockResolvedValue({ success: true });
@@ -143,6 +148,20 @@ describe("GET /api/cron/expire-requests", () => {
         inviteeEmail: "alex@example.com",
       }),
     );
+  });
+
+  it("reads only invitations that lapsed in the last six hours, oldest first", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-13T12:00:00.000Z"));
+    try {
+      const res = await GET(makeReq({ authorization: `Bearer ${SECRET}` }));
+      expect(res.status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(invitationCalls).toContainEqual(["lt", ["expires_at", "2026-11-13T12:00:00.000Z"]]);
+    expect(invitationCalls).toContainEqual(["gt", ["expires_at", "2026-11-13T06:00:00.000Z"]]);
+    expect(invitationCalls).toContainEqual(["order", ["expires_at", { ascending: true }]]);
   });
 
   it("skips shift_requests with unknown types (defensive)", async () => {
