@@ -4,13 +4,17 @@ import { useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import SettingsPage from "@/components/settings/SettingsPage";
-import BillingSettings from "@/components/settings/BillingSettings";
+import dynamic from "next/dynamic";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { fetchOrganizationBilling } from "@/features/billing/client";
 import { queryKeys } from "@/lib/query-keys";
 import { useOrganizationData, usePermissions } from "@/hooks";
 import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
+
+// Shown only on the billing-locked screen. A static import here also put it in
+// every Settings load, defeating SettingsPage's own lazy load (F-140).
+const BillingSettings = dynamic(() => import("@/components/settings/BillingSettings"));
 
 function SettingsPageSkeleton() {
   return (
