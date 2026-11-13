@@ -3,3 +3,10 @@
 internal/documentation/accuracy-manifest.json merge=dubgrid-generated
 internal/documentation/generated/app-inventory.json merge=dubgrid-generated
 internal/documentation/generated/app-inventory.md merge=dubgrid-generated
+
+# The docs check parses these and compares the generated files byte for byte,
+# so a CRLF checkout would fail it (F-121).
+docs/**/*.mdx text eol=lf
+docs/**/*.json text eol=lf
+internal/documentation/**/*.json text eol=lf
+internal/documentation/**/*.md text eol=lf

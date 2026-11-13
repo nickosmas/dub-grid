@@ -10,6 +10,10 @@ import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
+// The web check's rule. An address it refuses can't be saved, so it has no
+// conflict to report, and it never reaches the lookup as a pattern.
+const checkableEmail = z.string().trim().email();
+
 const bodySchema = z.object({
   email: z.string().trim().optional(),
   phone: z.string().trim().optional(),
@@ -41,7 +45,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Check the request and try again." }, { status: 400 });
   }
 
-  const email = parsed.data.email?.trim() ?? "";
+  const emailInput = checkableEmail.safeParse(parsed.data.email);
+  const email = emailInput.success ? emailInput.data : "";
   const phone = parsed.data.phone?.trim() ?? "";
 
   try {

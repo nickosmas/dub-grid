@@ -11,10 +11,12 @@ export type EmployeeContactConflict = {
 
 /**
  * `ilike` reads `_` and `%` as wildcards, so `john_doe@x.com` would match
- * `john.doe@x.com`, which the case-insensitive unique index accepts.
+ * `john.doe@x.com`, which the case-insensitive unique index accepts. PostgREST
+ * also turns every `*` into `%`, so an escaped `*` arrives as a literal `%`:
+ * an address with `*` in it finds no match here rather than matching anything.
  */
 export function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
+  return value.replace(/[\\%_*]/g, (character) => `\\${character}`);
 }
 
 /** Thrown so callers can answer with their own "we couldn't check that" copy. */

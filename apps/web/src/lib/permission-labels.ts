@@ -1,39 +1,38 @@
+import { PERMISSION_MODULES } from "@dubgrid/authz";
 import type { AdminPermissions } from "@/types";
 
+// No editor row shows these: two are always on, one belongs to Super Admins.
+const UNLISTED_PERMISSION_LABELS = {
+  canViewSchedule: "Schedule: View",
+  canViewStaff: "Staff: View",
+  canManageOrgSettings: "Organization settings: Edit",
+} as const;
+
+function buildPermissionLabels(): Record<keyof AdminPermissions, string> {
+  const labels: Partial<Record<keyof AdminPermissions, string>> = {
+    ...UNLISTED_PERMISSION_LABELS,
+  };
+  for (const mod of PERMISSION_MODULES) {
+    for (const key of mod.viewKeys) labels[key] = `${mod.title}: View`;
+    for (const key of mod.editKeys) labels[key] = `${mod.title}: Edit`;
+  }
+  return labels as Record<keyof AdminPermissions, string>;
+}
+
 /**
- * Human names for the admin permission flags.
+ * Each admin permission flag named by the editor row and level that sets it
+ * ("Staff: Edit"), so alerts, email and the activity log use the editor's words.
+ * Several flags share a level, so lists of labels go through `uniqueLabels`.
  *
  * Its own module so both server code (notification copy) and the audit-log
  * registry can read it without pulling in `access-management.ts`, which types
  * itself against a React component.
  */
-export const PERMISSION_LABELS: Record<keyof AdminPermissions, string> = {
-  canViewSchedule: "View the schedule",
-  canEditShifts: "Edit shifts",
-  canPublishSchedule: "Publish the schedule",
-  canApplyRecurringSchedule: "Fill from recurring schedules",
-  canEditNotes: "Edit schedule notes",
-  canViewRecurringShifts: "View recurring shifts",
-  canManageRecurringShifts: "Manage recurring shifts",
-  canManageShiftSeries: "Manage repeating shifts",
-  canViewStaff: "View staff",
-  canViewEmployeeDetails: "View staff details",
-  canManageEmployees: "Manage staff",
-  canViewFocusAreas: "View schedule areas",
-  canManageFocusAreas: "Manage schedule areas",
-  canViewScheduleDefinitions: "View shifts and jobs",
-  canManageScheduleDefinitions: "Manage shifts and jobs",
-  canViewIndicatorTypes: "View schedule note types",
-  canManageIndicatorTypes: "Manage schedule note types",
-  canManageOrgSettings: "Manage organization settings",
-  canViewOrgLabels: "View organization labels",
-  canManageOrgLabels: "Manage organization labels",
-  canViewCoverageRequirements: "View coverage requirements",
-  canManageCoverageRequirements: "Manage coverage requirements",
-  canApproveShiftRequests: "Approve shift requests",
-  canViewDashboardAnalytics: "View dashboard analytics",
-  canViewReports: "View reports",
-};
+export const PERMISSION_LABELS = buildPermissionLabels();
+
+export function uniqueLabels(labels: string[]): string[] {
+  return [...new Set(labels)];
+}
 
 /** Keys migration 061 retired, still named in permission history written before it. */
 const RETIRED_PERMISSION_LABELS: Record<string, string> = {
@@ -59,11 +58,6 @@ export function diffPermissions(
   return diff;
 }
 
-/** Lowercase form for mid-sentence use ("can now edit shifts"). */
-function inSentence(label: string): string {
-  return label.charAt(0).toLowerCase() + label.slice(1);
-}
-
 function joinWithAnd(items: string[]): string {
   if (items.length === 0) return "";
   if (items.length === 1) return items[0];
@@ -81,7 +75,7 @@ function summarizeList(items: string[]): string {
   return `${shown.join(", ")}, and ${remaining} more`;
 }
 
-/** Every permission a change gave or took away, by its full label. */
+/** Every editor level a change turned on or off, by its label. */
 export function listPermissionChanges(
   before: Record<string, boolean> | null | undefined,
   after: Record<string, boolean> | null | undefined,
@@ -91,12 +85,12 @@ export function listPermissionChanges(
   for (const [key, now] of Object.entries(diffPermissions(before, after))) {
     (now ? granted : revoked).push(permissionLabel(key));
   }
-  return { granted, revoked };
+  return { granted: uniqueLabels(granted), revoked: uniqueLabels(revoked) };
 }
 
 /**
  * Describe what a permission change actually did, as a sentence fragment:
- * "gave you access to publish the schedule" / "removed your access to edit shifts".
+ * "turned on Publish schedule: Edit" / "turned off Staff: Edit".
  * Returns null when nothing meaningful changed, so the caller can fall back.
  *
  * Only meant for a permission-only edit on someone who stays an admin. A role
@@ -107,21 +101,11 @@ export function summarizePermissionChanges(
   before: Record<string, boolean> | null | undefined,
   after: Record<string, boolean> | null | undefined,
 ): string | null {
-  const keys = [...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])];
-
-  const granted: string[] = [];
-  const revoked: string[] = [];
-  for (const key of keys) {
-    const was = Boolean(before?.[key]);
-    const now = Boolean(after?.[key]);
-    if (was === now) continue;
-    (now ? granted : revoked).push(inSentence(permissionLabel(key)));
-  }
-
+  const { granted, revoked } = listPermissionChanges(before, after);
   if (granted.length === 0 && revoked.length === 0) return null;
 
   const parts: string[] = [];
-  if (granted.length > 0) parts.push(`gave you access to ${summarizeList(granted)}`);
-  if (revoked.length > 0) parts.push(`removed your access to ${summarizeList(revoked)}`);
+  if (granted.length > 0) parts.push(`turned on ${summarizeList(granted)}`);
+  if (revoked.length > 0) parts.push(`turned off ${summarizeList(revoked)}`);
   return parts.join(", and ");
 }

@@ -9,6 +9,7 @@ import {
   ACCOUNT_SUSPENDED_CODE,
   ACCOUNT_SUSPENDED_MESSAGE,
   isAccountSuspendedMessage,
+  suspendedUntilFromMessage,
 } from "@dubgrid/domain";
 
 const switchOrganizationSchema = z.object({
@@ -73,8 +74,14 @@ export async function POST(req: NextRequest) {
     });
 
     if (isAccountSuspendedMessage(result.error?.message)) {
+      // switch_org names the end date of the organization being switched into.
+      const suspendedUntil = suspendedUntilFromMessage(result.error?.message);
       return NextResponse.json(
-        { error: ACCOUNT_SUSPENDED_MESSAGE, code: ACCOUNT_SUSPENDED_CODE },
+        {
+          error: ACCOUNT_SUSPENDED_MESSAGE,
+          code: ACCOUNT_SUSPENDED_CODE,
+          ...(suspendedUntil ? { suspendedUntil } : {}),
+        },
         { status: 403 },
       );
     }
