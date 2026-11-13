@@ -947,6 +947,11 @@ export async function fetchMobilePublishHistoryRows(
   input?: {
     startDate?: string;
     endDate?: string;
+    /**
+     * Keep only the changes to cells inside the range, and this person's when
+     * set. A caller that counts a whole publish's changes leaves it out.
+     */
+    changesInRange?: { employeeId?: string };
   },
 ): Promise<MobilePublishHistoryRow[]> {
   let query = serviceClient
@@ -962,6 +967,13 @@ export async function fetchMobilePublishHistoryRows(
   }
   if (input?.endDate) {
     query = query.lte("start_date", input.endDate);
+  }
+  if (input?.changesInRange) {
+    if (input.startDate) query = query.gte("schedule_publish_changes.date", input.startDate);
+    if (input.endDate) query = query.lte("schedule_publish_changes.date", input.endDate);
+    if (input.changesInRange.employeeId) {
+      query = query.eq("schedule_publish_changes.emp_id", input.changesInRange.employeeId);
+    }
   }
 
   const { data, error } = await query;

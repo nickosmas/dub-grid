@@ -130,7 +130,10 @@ export async function canManageEmployees(
     return false;
   }
   const billingAccess = await evaluateOrgBillingAccess(serviceClient, organization);
-  if (billingAccess.isLocked && !isGridmaster && !isSuperAdmin) {
+  // A Super Admin keeps managing staff through a billing lock (to bring seats
+  // down, say), but not once a Gridmaster has suspended the organization (F-225).
+  const superAdminPassesLock = isSuperAdmin && billingAccess.reason !== "suspended";
+  if (billingAccess.isLocked && !isGridmaster && !superAdminPassesLock) {
     return false;
   }
 

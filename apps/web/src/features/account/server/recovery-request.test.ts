@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   checkRateLimit: vi.fn(),
+  peekRateLimit: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   writeSecurityAuditEvent: vi.fn(),
   afterTasks: [] as Array<() => unknown>,
@@ -20,6 +21,7 @@ vi.mock("@/lib/rate-limit", () => ({
   recoverySurgeLimiter: { kind: "surge" },
   hashEmail: (value: string) => `hash:${value.trim().toLowerCase()}`,
   checkRateLimit: (...args: unknown[]) => mocks.checkRateLimit(...args),
+  peekRateLimit: (...args: unknown[]) => mocks.peekRateLimit(...args),
 }));
 
 vi.mock("@/lib/api-auth", () => ({
@@ -51,6 +53,7 @@ describe("handleRecoveryRequest", () => {
     vi.clearAllMocks();
     mocks.afterTasks.length = 0;
     mocks.checkRateLimit.mockResolvedValue({ limited: false });
+    mocks.peekRateLimit.mockResolvedValue({ limited: false });
     mocks.resetPasswordForEmail.mockResolvedValue({ error: null });
     mocks.writeSecurityAuditEvent.mockResolvedValue(undefined);
   });
@@ -60,6 +63,7 @@ describe("handleRecoveryRequest", () => {
     await runAfterTasks();
 
     expect(result.status).toBe(200);
+    expect(mocks.peekRateLimit.mock.calls.map((call) => call[1])).toEqual(["recovery:global"]);
     expect(mocks.checkRateLimit.mock.calls.map((call) => call[1])).toEqual([
       "recovery:source:203.0.113.8",
       "recovery:target:hash:nurse@example.com",
@@ -68,6 +72,25 @@ describe("handleRecoveryRequest", () => {
     expect(mocks.resetPasswordForEmail).toHaveBeenCalledWith("Nurse@Example.com", {
       redirectTo: "https://calmhaven.example.com/reset-password",
     });
+  });
+
+  it("doesn't spend the shared ceiling on a request its source limit refuses (F-208)", async () => {
+    mocks.checkRateLimit.mockResolvedValueOnce({ limited: true, reset: Date.now() + 5_000 });
+
+    const result = await handleRecoveryRequest(request());
+    await runAfterTasks();
+
+    expect(result.status).toBe(429);
+    expect(mocks.checkRateLimit.mock.calls.map((call) => call[1])).not.toContain("recovery:global");
+  });
+
+  it("refuses when the shared ceiling is used up", async () => {
+    mocks.peekRateLimit.mockResolvedValueOnce({ limited: true, reset: Date.now() + 3_000 });
+
+    const result = await handleRecoveryRequest(request());
+
+    expect(result.status).toBe(429);
+    expect(mocks.resetPasswordForEmail).not.toHaveBeenCalled();
   });
 
   it("fails closed before provider work when distributed limiting is unavailable", async () => {
@@ -107,7 +130,8 @@ describe("handleRecoveryRequest", () => {
 
     expect(result.status).toBe(200);
     expect(mocks.resetPasswordForEmail).not.toHaveBeenCalled();
-    expect(mocks.afterTasks).toHaveLength(1);
+    await runAfterTasks();
+    expect(mocks.resetPasswordForEmail).toHaveBeenCalledOnce();
   });
 
   it.each([

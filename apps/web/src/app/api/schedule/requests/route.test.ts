@@ -5,6 +5,11 @@ const validateCsrfOrigin = vi.fn();
 const requireOrgPermissions = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 const settleShiftRequestAfterTransition = vi.fn();
+const afterResponse: Array<() => unknown> = [];
+
+async function runAfterResponse() {
+  for (const callback of afterResponse.splice(0)) await callback();
+}
 
 const fetchHiddenStaffIds = vi.fn(async (..._args: unknown[]) => new Set<string>());
 vi.mock("@/lib/csrf", () => ({
@@ -24,7 +29,9 @@ vi.mock("@/app/api/shared/schedule", () => ({
 }));
 
 vi.mock("@/features/notifications/server", () => ({
-  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
+  dispatchNotificationEventAfterResponse: (...args: unknown[]) => {
+    afterResponse.push(() => dispatchNotificationEvent(...args));
+  },
 }));
 
 vi.mock("@dubgrid/data-access", async (importOriginal) => ({
@@ -38,6 +45,7 @@ import { POST } from "./route";
 describe("POST /api/schedule/requests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    afterResponse.length = 0;
     validateCsrfOrigin.mockReturnValue(null);
   });
 
@@ -244,6 +252,7 @@ describe("POST /api/schedule/requests", () => {
       "resolve_shift_request",
       expect.objectContaining({ p_request_id: REQUEST_ID, p_approved: false }),
     );
+    await runAfterResponse();
     expect(dispatchNotificationEvent).toHaveBeenCalledWith(
       "admin-user",
       expect.objectContaining({
@@ -397,6 +406,7 @@ describe("POST /api/schedule/requests", () => {
         requestId: REQUEST_ID,
         skip: undefined,
       });
+      await runAfterResponse();
       expect(dispatchNotificationEvent).toHaveBeenCalledTimes(1);
       expect(dispatchNotificationEvent).toHaveBeenCalledWith("actor-user", {
         action: "shift_request_resolved",
@@ -419,6 +429,26 @@ describe("POST /api/schedule/requests", () => {
       const response = await POST(claimRequest());
 
       await expect(response.json()).resolves.toEqual({ success: true, autoApproved: false });
+      await runAfterResponse();
+      expect(dispatchNotificationEvent).toHaveBeenCalledWith(
+        "actor-user",
+        expect.objectContaining({ action: "shift_request_claimed", requestId: REQUEST_ID }),
+      );
+    });
+
+    it("answers before the approvers' alert is sent", async () => {
+      mockActorContext({});
+      settleShiftRequestAfterTransition.mockResolvedValueOnce({
+        autoApproved: false,
+        reason: "no_approver",
+      });
+
+      const response = await POST(claimRequest());
+
+      expect(response.status).toBe(200);
+      expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+      expect(afterResponse).toHaveLength(1);
+      await runAfterResponse();
       expect(dispatchNotificationEvent).toHaveBeenCalledWith(
         "actor-user",
         expect.objectContaining({ action: "shift_request_claimed", requestId: REQUEST_ID }),
@@ -437,6 +467,7 @@ describe("POST /api/schedule/requests", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ success: true, autoApproved: false });
+      await runAfterResponse();
       expect(dispatchNotificationEvent).toHaveBeenCalledWith(
         "actor-user",
         expect.objectContaining({ action: "shift_request_claimed" }),
@@ -476,6 +507,7 @@ describe("POST /api/schedule/requests", () => {
 
       await expect(response.json()).resolves.toEqual({ success: true, autoApproved: false });
       expect(settleShiftRequestAfterTransition).not.toHaveBeenCalled();
+      await runAfterResponse();
       expect(dispatchNotificationEvent).toHaveBeenCalledWith(
         "actor-user",
         expect.objectContaining({ action: "shift_request_responded", accepted: false }),

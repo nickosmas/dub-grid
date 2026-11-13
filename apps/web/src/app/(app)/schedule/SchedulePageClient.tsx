@@ -9,7 +9,15 @@ import {
 import * as Sentry from "@/lib/sentry";
 import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from "react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useDeferredValue,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -2951,7 +2959,10 @@ function SchedulerContent({
     () => filterAndSortEmployees(scheduleEmployees, activeFocusArea, scheduleSortBy),
     [scheduleEmployees, activeFocusArea, scheduleSortBy],
   );
-  const normalizedStaffSearch = staffSearch.trim().toLowerCase();
+  // The field updates on each keystroke; the grid's highlight follows in a
+  // render React can interrupt, so typing never waits on every section.
+  const deferredStaffSearch = useDeferredValue(staffSearch);
+  const normalizedStaffSearch = deferredStaffSearch.trim().toLowerCase();
   const searchMatchedEmployeeIds = useMemo(() => {
     if (!normalizedStaffSearch) return undefined;
     return new Set(

@@ -21,6 +21,7 @@ import {
   type CoverageDailyEntry,
   type CoverageTotals,
 } from "@dubgrid/schedule-core";
+import type { AdminPermissions } from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MobileApiAuthorizationError } from "./read";
 
@@ -46,14 +47,44 @@ export type DashboardDraftComparisonRow = {
   publishedState: ScheduleCellState | null;
 };
 
+/** The viewer's resolved permissions (authz's PermissionContext), never the stored keys. */
+export type MobileDashboardViewerPermissions = Pick<
+  AdminPermissions,
+  "canEditShifts" | "canApproveShiftRequests" | "canManageEmployees" | "canViewDashboardAnalytics"
+>;
+
 export type MobileDashboardContext = {
   currentOrg: { id: string; timezone?: string | null };
+  userId: string;
   effectiveRole: string;
-  canEditSchedule?: boolean;
+  permissions: MobileDashboardViewerPermissions;
   /** False when the organization hides who published from this viewer (item 46f). */
   canSeePublisher?: boolean;
   serviceClient: SupabaseClient;
 };
+
+/**
+ * Which parts of the dashboard this viewer may see, by the rule web's
+ * dashboard applies to the same card. Coverage, open shifts and staff hours
+ * come from the schedule every Admin can read, counting drafts only for an
+ * editor.
+ */
+export function resolveDashboardSections(
+  auth: Pick<MobileDashboardContext, "effectiveRole" | "permissions">,
+) {
+  const isSuperAdmin = auth.effectiveRole === "super_admin";
+  const can = (key: keyof MobileDashboardViewerPermissions) =>
+    isSuperAdmin || auth.permissions[key] === true;
+  return {
+    drafts: can("canEditShifts"),
+    approvals: can("canApproveShiftRequests"),
+    publishHistory: can("canViewDashboardAnalytics"),
+    signups: can("canManageEmployees"),
+    // The same rule as web's request list: anyone else sees only their own.
+    everyRequest:
+      can("canApproveShiftRequests") || can("canEditShifts") || can("canManageEmployees"),
+  };
+}
 
 /**
  * Counts the same draft classifications that web assigns after comparing a
@@ -166,6 +197,8 @@ type FetchMobileCoverageSummary = (
     timeZone: string | null;
     startDate: string;
     endDate: string;
+    /** False reads published cells only, as web does for anyone who can't edit shifts. */
+    includeDrafts: boolean;
   },
 ) => Promise<MobileCoverageSummary>;
 
@@ -173,11 +206,18 @@ type FetchMobileShiftRequests = (
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
+    employeeId?: string;
     includeOpenPickupRequests: boolean;
     startDate: string;
     endDate: string;
   },
 ) => Promise<MobileShiftRequest[]>;
+
+type FetchLinkedEmployeeForUser = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+  userId: string,
+) => Promise<{ id: string } | null>;
 
 type FetchMobileDashboardDraftComparisons = (
   serviceClient: SupabaseClient,
@@ -596,6 +636,7 @@ export async function loadMobileDashboardPayload(
     fetchMobilePublishHistoryRows: FetchMobilePublishHistoryRows;
     fetchMobileAcceptedInvitationRows: FetchMobileAcceptedInvitationRows;
     fetchProfileNameRowsByIds: FetchProfileNameRowsByIds;
+    fetchLinkedEmployeeForUser: FetchLinkedEmployeeForUser;
   },
 ): Promise<MobileDashboardResponse> {
   // This dashboard is admin/super_admin-only — plain users and management-only
@@ -604,6 +645,38 @@ export async function loadMobileDashboardPayload(
   if (auth.effectiveRole !== "admin" && auth.effectiveRole !== "super_admin") {
     throw new MobileApiAuthorizationError();
   }
+
+  const sections = resolveDashboardSections(auth);
+  const orgId = auth.currentOrg.id;
+  const dateRange = { startDate: range.startDate, endDate: range.endDate };
+
+  const loadShiftRequests = async (): Promise<MobileShiftRequest[]> => {
+    if (sections.everyRequest) {
+      return deps.fetchMobileShiftRequests(auth.serviceClient, {
+        orgId,
+        includeOpenPickupRequests: false,
+        ...dateRange,
+      });
+    }
+    const linkedEmployee = await deps.fetchLinkedEmployeeForUser(
+      auth.serviceClient,
+      orgId,
+      auth.userId,
+    );
+    if (!linkedEmployee) return [];
+    const requests = await deps.fetchMobileShiftRequests(auth.serviceClient, {
+      orgId,
+      employeeId: linkedEmployee.id,
+      includeOpenPickupRequests: true,
+      ...dateRange,
+    });
+    // The open pickups that query adds include ones offered to someone else.
+    const id = linkedEmployee.id;
+    return requests.filter(
+      (request) =>
+        request.requesterEmpId === id || request.targetEmpId === id || request.targetEmpId == null,
+    );
+  };
 
   const [
     coverageSummary,
@@ -614,38 +687,23 @@ export async function loadMobileDashboardPayload(
     draftComparisonRows,
   ] = await Promise.all([
     deps.fetchMobileCoverageSummary(auth.serviceClient, {
-      orgId: auth.currentOrg.id,
+      orgId,
       showAll: true,
       timeZone: auth.currentOrg.timezone ?? null,
-      startDate: range.startDate,
-      endDate: range.endDate,
+      ...dateRange,
+      includeDrafts: sections.drafts,
     }),
-    // Both admin and super_admin can approve requests (canApproveShiftRequests
-    // is true for both by default), so both get the pending-approvals count
-    // and the queue itself on the app's Home. This also doubles as the activity feed's "request" events (no employeeId
-    // set here, so the underlying query is unfiltered by status/type —
-    // matches web's unfiltered shift-request fetch for its own feed).
-    deps.fetchMobileShiftRequests(auth.serviceClient, {
-      orgId: auth.currentOrg.id,
-      includeOpenPickupRequests: false,
-      startDate: range.startDate,
-      endDate: range.endDate,
-    }),
-    deps.fetchMobileOpenShiftContext(auth.serviceClient, auth.currentOrg.id),
-    deps.fetchMobilePublishHistoryRows(auth.serviceClient, auth.currentOrg.id, {
-      startDate: range.startDate,
-      endDate: range.endDate,
-    }),
-    deps.fetchMobileAcceptedInvitationRows(auth.serviceClient, auth.currentOrg.id, {
-      startDate: range.startDate,
-      endDate: range.endDate,
-    }),
-    auth.canEditSchedule && deps.fetchMobileDashboardDraftComparisons
-      ? deps.fetchMobileDashboardDraftComparisons(auth.serviceClient, {
-          orgId: auth.currentOrg.id,
-          startDate: range.startDate,
-          endDate: range.endDate,
-        })
+    // Feeds the approvals queue and the activity feed's "request" events.
+    loadShiftRequests(),
+    deps.fetchMobileOpenShiftContext(auth.serviceClient, orgId),
+    sections.publishHistory
+      ? deps.fetchMobilePublishHistoryRows(auth.serviceClient, orgId, dateRange)
+      : Promise.resolve([]),
+    sections.signups
+      ? deps.fetchMobileAcceptedInvitationRows(auth.serviceClient, orgId, dateRange)
+      : Promise.resolve([]),
+    sections.drafts && deps.fetchMobileDashboardDraftComparisons
+      ? deps.fetchMobileDashboardDraftComparisons(auth.serviceClient, { orgId, ...dateRange })
       : Promise.resolve([]),
   ]);
 
@@ -697,9 +755,9 @@ export async function loadMobileDashboardPayload(
     new Date(),
     auth.currentOrg.timezone ?? null,
   );
-  const pendingApprovalRequests = activeShiftRequests.filter(
-    (request) => request.status === "pending_approval",
-  );
+  const pendingApprovalRequests = sections.approvals
+    ? activeShiftRequests.filter((request) => request.status === "pending_approval")
+    : [];
   const {
     openShifts,
     totals,
@@ -734,7 +792,7 @@ export async function loadMobileDashboardPayload(
       openGapCount,
       pendingApprovalsCount: pendingApprovalRequests.length,
       draftSummary: deps.fetchMobileDashboardDraftComparisons
-        ? summarizeDashboardDraftComparisons(draftComparisonRows, Boolean(auth.canEditSchedule))
+        ? summarizeDashboardDraftComparisons(draftComparisonRows, sections.drafts)
         : null,
     },
     coverageBySection: buildCoverageSectionsResponse(byFocusArea, dailyByFocusArea),

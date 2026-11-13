@@ -26,6 +26,7 @@ import {
   fetchMobileDepartmentRows as fetchMobileDepartmentRowsData,
   fetchMobileEffectiveScheduleRows,
   fetchMobileEmployeeRowsByIds,
+  fetchPublishedMobileScheduleRows,
   fetchMobileFocusAreaRows as fetchMobileFocusAreaRowsData,
   fetchMobileFocusAreaRowsInDepartmentOrder,
   fetchMobileJobNameRows,
@@ -454,7 +455,7 @@ async function fetchFocusAreaNameMap(
 async function fetchMobilePublishHistory(
   serviceClient: SupabaseClient,
   orgId: string,
-  input?: { startDate?: string; endDate?: string },
+  input?: Parameters<typeof fetchMobilePublishHistoryRows>[2],
 ): Promise<MobilePublishHistoryEntry[]> {
   const rows = await fetchMobilePublishHistoryRows(serviceClient, orgId, input);
   if (rows.length === 0) {
@@ -855,8 +856,30 @@ function findPublishHistoryEntryForDate(
   return history.find((entry) => entry.startDate <= date && entry.endDate >= date) ?? null;
 }
 
-function findPublishedChangeForCell(
+type PublishedCellChange = {
+  entryIndex: number;
+  change: MobilePublishHistoryEntry["changes"][number];
+};
+
+/** Each cell's changes, newest publish first, so a cell's lookup isn't a scan of every change. */
+export function indexPublishedChangesByCell(
   history: MobilePublishHistoryEntry[],
+): Map<string, PublishedCellChange[]> {
+  const byCell = new Map<string, PublishedCellChange[]>();
+  history.forEach((entry, entryIndex) => {
+    for (const change of entry.changes) {
+      const key = `${change.empId}:${change.date}`;
+      const cellChanges = byCell.get(key);
+      if (cellChanges) cellChanges.push({ entryIndex, change });
+      else byCell.set(key, [{ entryIndex, change }]);
+    }
+  });
+  return byCell;
+}
+
+export function findPublishedChangeForCell(
+  history: MobilePublishHistoryEntry[],
+  changesByCell: Map<string, PublishedCellChange[]>,
   employeeId: string,
   date: string,
 ):
@@ -865,22 +888,15 @@ function findPublishedChangeForCell(
       publishedAt: string;
     })
   | null {
-  for (let entryIndex = 0; entryIndex < history.length; entryIndex += 1) {
-    const entry = history[entryIndex]!;
-    const change = entry.changes.find(
-      (candidate) => candidate.empId === employeeId && candidate.date === date,
-    );
-    if (change) {
-      const isNewAddition =
-        change.kind === "new" &&
-        history
-          .slice(entryIndex + 1)
-          .some((olderEntry) => olderEntry.startDate <= date && olderEntry.endDate >= date);
-      return { ...change, isNewAddition, publishedAt: entry.publishedAt };
-    }
-  }
-
-  return null;
+  const newest = changesByCell.get(`${employeeId}:${date}`)?.[0];
+  if (!newest) return null;
+  const { entryIndex, change } = newest;
+  const isNewAddition =
+    change.kind === "new" &&
+    history
+      .slice(entryIndex + 1)
+      .some((olderEntry) => olderEntry.startDate <= date && olderEntry.endDate >= date);
+  return { ...change, isNewAddition, publishedAt: history[entryIndex]!.publishedAt };
 }
 
 /**
@@ -890,15 +906,13 @@ function findPublishedChangeForCell(
  * cell that ended where it started.
  */
 function describeCellPublishChange(
-  history: MobilePublishHistoryEntry[],
+  changesByCell: Map<string, PublishedCellChange[]>,
   employeeId: string,
   date: string,
   resolvers: ShiftChangeResolvers,
 ): ShiftChange | null {
-  const changes = history
-    .flatMap((entry) =>
-      entry.changes.filter((change) => change.empId === employeeId && change.date === date),
-    )
+  const changes = (changesByCell.get(`${employeeId}:${date}`) ?? [])
+    .map(({ change }) => change)
     .reverse();
   const original = selectOriginalCellChange(
     changes.map((change) => ({
@@ -1041,6 +1055,7 @@ export async function fetchMobileScheduleEntries(
     fetchMobilePublishHistory(serviceClient, input.orgId, {
       startDate: input.startDate,
       endDate: input.endDate,
+      changesInRange: { employeeId: input.employeeId },
     }),
     fetchShiftChangeResolvers(serviceClient, input.orgId),
     fetchMobileScheduleComparisonRowsData(serviceClient, input),
@@ -1094,11 +1109,17 @@ export async function fetchMobileScheduleEntries(
     } satisfies MobileScheduleComparisonRow;
   });
   const comparisonRows = [...data, ...missingDeletedRows.filter((row) => row != null)];
+  const changesByCell = indexPublishedChangesByCell(publishHistory);
 
   const entries: MobileScheduleEntry[] = [];
 
   for (const row of comparisonRows) {
-    const publishedChange = findPublishedChangeForCell(publishHistory, row.emp_id, row.date);
+    const publishedChange = findPublishedChangeForCell(
+      publishHistory,
+      changesByCell,
+      row.emp_id,
+      row.date,
+    );
     const state =
       row.publishedState ??
       (publishedChange?.kind === "deleted" ? publishedChange.fromState : null);
@@ -1267,7 +1288,7 @@ export async function fetchMobileScheduleEntries(
               publishedChange.kind === "new" && !publishedChange.isNewAddition
                 ? null
                 : describeCellPublishChange(
-                    publishHistory,
+                    changesByCell,
                     row.employees.id,
                     row.date as string,
                     shiftChangeResolvers,
@@ -1414,6 +1435,8 @@ type MobileOpenShiftInput = {
   timeZone?: string | null;
   /** People whose shifts the viewer must not be shown; coverage counts only the rest. */
   hiddenUserIds?: readonly string[];
+  /** False counts published cells only, for a viewer who can't edit shifts. */
+  includeDrafts?: boolean;
 };
 
 /**
@@ -1441,9 +1464,11 @@ async function buildMobileCoverageEngineInputs(
   ] = await Promise.all([
     fetchAssignmentDetailsMap(serviceClient, input.orgId),
     fetchFocusAreaNameMap(serviceClient, input.orgId),
+    // Only which dates were published is read here, never the changes.
     fetchMobilePublishHistory(serviceClient, input.orgId, {
       startDate: range.startDate,
       endDate: range.endDate,
+      changesInRange: {},
     }),
     fetchMobileOpenShiftContext(serviceClient, input.orgId, input.hiddenUserIds),
     // Draft-preferred ("effective") rows, not published-only — matches web's
@@ -1451,8 +1476,11 @@ async function buildMobileCoverageEngineInputs(
     // `isScheduler ? (draft ?? published) : published`), so an admin's
     // pending unpublished edits count toward coverage here too, the same way
     // they already do on web's dashboard. Using the same fetcher mobile's
-    // staff-hours calc already relies on for this exact reason.
-    fetchMobileEffectiveScheduleRows(serviceClient, {
+    // staff-hours calc already relies on for this exact reason. Web redacts
+    // drafts from anyone who can't edit shifts, so they get published cells.
+    (input.includeDrafts === false
+      ? fetchPublishedMobileScheduleRows
+      : fetchMobileEffectiveScheduleRows)(serviceClient, {
       orgId: input.orgId,
       startDate: range.startDate,
       endDate: range.endDate,

@@ -7,7 +7,7 @@ import {
 } from "@dubgrid/contracts";
 import { settleShiftRequestAfterTransition } from "@dubgrid/data-access";
 import { updateMobileShiftRequest } from "@dubgrid/mobile-api-core";
-import { dispatchNotificationEvent } from "@/features/notifications/server";
+import { dispatchNotificationEventAfterResponse } from "@/features/notifications/server";
 import { requireMobileAuth } from "@/features/mobile/server";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +50,8 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   try {
     const { autoApproved } = await updateMobileShiftRequest(auth, id, parsed.data, {
-      dispatchNotificationEvent,
+      dispatchNotificationEvent: async (actorUserId, event) =>
+        dispatchNotificationEventAfterResponse(actorUserId, event),
       settleShiftRequestAfterTransition,
     });
 

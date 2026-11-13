@@ -19,11 +19,13 @@ const fetchMobilePublishHistoryRows = vi.fn();
 const fetchMobileAcceptedInvitationRows = vi.fn();
 const fetchProfileNameRowsByIds = vi.fn();
 const fetchMobileScheduleComparisonRows = vi.fn();
+const fetchLinkedEmployeeForUser = vi.fn();
 
 const fetchMobileHiddenPeople = vi.fn(async (..._args: unknown[]) => [] as string[]);
 const fetchHiddenEmployeeIds = vi.fn(async (..._args: unknown[]) => [] as string[]);
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
+  fetchLinkedEmployeeForUser,
   fetchMobileHiddenPeople: (...args: unknown[]) => fetchMobileHiddenPeople(...args),
   resolveMobileDateRange,
   fetchMobileCoverageSummary,
@@ -39,11 +41,25 @@ vi.mock("@dubgrid/data-access", () => ({
   fetchMobileScheduleComparisonRows,
 }));
 
-function mockAuth(overrides: { role: string; canEditShifts?: boolean }) {
+function mockAuth(overrides: {
+  role: string;
+  canEditShifts?: boolean;
+  canApproveShiftRequests?: boolean;
+  canManageEmployees?: boolean;
+  canViewDashboardAnalytics?: boolean;
+}) {
+  const { role, ...flags } = overrides;
   requireMobileAuth.mockResolvedValue({
     user: { id: "viewer-user" },
     currentOrg: { id: "org-1", timezone: "America/Los_Angeles" },
-    permissions: { role: overrides.role, canEditShifts: overrides.canEditShifts ?? false },
+    permissions: {
+      role,
+      canEditShifts: false,
+      canApproveShiftRequests: false,
+      canManageEmployees: false,
+      canViewDashboardAnalytics: false,
+      ...flags,
+    },
     serviceClient: {},
   });
 }
@@ -74,6 +90,7 @@ describe("mobile dashboard route", () => {
     fetchMobileAcceptedInvitationRows.mockResolvedValue([]);
     fetchProfileNameRowsByIds.mockResolvedValue([]);
     fetchMobileScheduleComparisonRows.mockResolvedValue([]);
+    fetchLinkedEmployeeForUser.mockResolvedValue({ id: "emp-viewer" });
   });
 
   it("rejects a plain user", async () => {
@@ -91,7 +108,7 @@ describe("mobile dashboard route", () => {
   });
 
   it("leaves a hidden staff member's changes out of the activity feed", async () => {
-    mockAuth({ role: "admin", canEditShifts: true });
+    mockAuth({ role: "admin", canEditShifts: true, canViewDashboardAnalytics: true });
     const change = (empId: string) => ({
       empId,
       date: "2026-05-12",
@@ -205,6 +222,7 @@ describe("mobile dashboard route", () => {
         timeZone: "America/Los_Angeles",
         startDate: "2026-05-11",
         endDate: "2026-05-17",
+        includeDrafts: true,
         hiddenUserIds: ["qa-person"],
       },
     );
@@ -238,6 +256,33 @@ describe("mobile dashboard route", () => {
     expect(response.status).toBe(200);
     expect(fetchMobileScheduleComparisonRows).not.toHaveBeenCalled();
     expect(payload.metrics.draftSummary).toBeNull();
+  });
+
+  it("gives an admin with every view off only what web's dashboard shows them", async () => {
+    mockAuth({ role: "admin" });
+
+    const { GET } = await import("./dashboard");
+    const response = await GET({
+      nextUrl: new URL(
+        "http://localhost/api/mobile/v1/dashboard?startDate=2026-05-11&endDate=2026-05-17",
+      ),
+    } as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(fetchMobilePublishHistoryRows).not.toHaveBeenCalled();
+    expect(fetchMobileAcceptedInvitationRows).not.toHaveBeenCalled();
+    expect(fetchLinkedEmployeeForUser).toHaveBeenCalledWith({}, "org-1", "viewer-user");
+    expect(fetchMobileShiftRequests).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ employeeId: "emp-viewer", includeOpenPickupRequests: true }),
+    );
+    expect(fetchMobileCoverageSummary).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ includeDrafts: false }),
+    );
+    expect(payload.actionQueue).toEqual([]);
+    expect(payload.metrics.pendingApprovalsCount).toBe(0);
   });
 
   it("defaults to the current week (not resolveMobileDateRange's forward-looking window) when no query params are given", async () => {

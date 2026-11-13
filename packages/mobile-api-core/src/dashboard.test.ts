@@ -20,7 +20,28 @@ import {
   type DashboardScheduleCellRow,
   type DashboardShiftCategoryRow,
   type MobileCoverageSummary,
+  type MobileDashboardViewerPermissions,
 } from "./dashboard";
+
+const NO_DASHBOARD_PERMISSIONS: MobileDashboardViewerPermissions = {
+  canEditShifts: false,
+  canApproveShiftRequests: false,
+  canManageEmployees: false,
+  canViewDashboardAnalytics: false,
+};
+
+const ALL_DASHBOARD_PERMISSIONS: MobileDashboardViewerPermissions = {
+  canEditShifts: true,
+  canApproveShiftRequests: true,
+  canManageEmployees: true,
+  canViewDashboardAnalytics: true,
+};
+
+function viewerPermissions(
+  overrides: Partial<MobileDashboardViewerPermissions> = {},
+): MobileDashboardViewerPermissions {
+  return { ...NO_DASHBOARD_PERMISSIONS, ...overrides };
+}
 
 describe("summarizeDashboardDraftChanges", () => {
   it("keeps zero distinct from redaction when an editor has no draft changes", () => {
@@ -603,14 +624,16 @@ describe("loadMobileDashboardPayload", () => {
       fetchMobilePublishHistoryRows: vi.fn().mockResolvedValue([]),
       fetchMobileAcceptedInvitationRows: vi.fn().mockResolvedValue([]),
       fetchProfileNameRowsByIds: vi.fn().mockResolvedValue([]),
+      fetchLinkedEmployeeForUser: vi.fn().mockResolvedValue(null),
     };
   }
 
   it("rejects a plain user role", async () => {
     const auth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "user",
-      canEditSchedule: false,
+      permissions: viewerPermissions({ canEditShifts: false }),
       serviceClient: {} as never,
     };
 
@@ -638,8 +661,9 @@ describe("loadMobileDashboardPayload", () => {
 
     const adminAuth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "admin",
-      canEditSchedule: false,
+      permissions: viewerPermissions({ canApproveShiftRequests: true }),
       serviceClient: {} as never,
     };
     const adminPayload = await loadMobileDashboardPayload(adminAuth, range, deps);
@@ -650,8 +674,9 @@ describe("loadMobileDashboardPayload", () => {
     deps.fetchMobileShiftRequests.mockClear();
     const superAdminAuth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "super_admin",
-      canEditSchedule: false,
+      permissions: viewerPermissions({ canEditShifts: false }),
       serviceClient: {} as never,
     };
     const superAdminPayload = await loadMobileDashboardPayload(superAdminAuth, range, deps);
@@ -679,8 +704,9 @@ describe("loadMobileDashboardPayload", () => {
     ]);
     const editorAuth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "admin",
-      canEditSchedule: true,
+      permissions: viewerPermissions({ canEditShifts: true }),
       serviceClient: {} as never,
     };
 
@@ -698,7 +724,7 @@ describe("loadMobileDashboardPayload", () => {
     });
 
     const viewerPayload = await loadMobileDashboardPayload(
-      { ...editorAuth, canEditSchedule: false },
+      { ...editorAuth, permissions: viewerPermissions() },
       range,
       deps,
     );
@@ -731,7 +757,9 @@ describe("loadMobileDashboardPayload", () => {
 
     const adminAuth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "admin",
+      permissions: ALL_DASHBOARD_PERMISSIONS,
       serviceClient: {} as never,
     };
     const payload = await loadMobileDashboardPayload(adminAuth, range, deps);
@@ -762,7 +790,9 @@ describe("loadMobileDashboardPayload", () => {
     );
     const auth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "admin",
+      permissions: ALL_DASHBOARD_PERMISSIONS,
       serviceClient: {} as never,
     };
 
@@ -813,7 +843,9 @@ describe("loadMobileDashboardPayload", () => {
     );
     const auth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "admin",
+      permissions: ALL_DASHBOARD_PERMISSIONS,
       serviceClient: {} as never,
     };
 
@@ -838,7 +870,9 @@ describe("loadMobileDashboardPayload", () => {
     const deps = makeDeps();
     const auth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "admin",
+      permissions: ALL_DASHBOARD_PERMISSIONS,
       serviceClient: {} as never,
     };
 
@@ -857,7 +891,9 @@ describe("loadMobileDashboardPayload", () => {
     );
     const auth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "admin",
+      permissions: ALL_DASHBOARD_PERMISSIONS,
       serviceClient: {} as never,
     };
 
@@ -879,7 +915,9 @@ describe("loadMobileDashboardPayload", () => {
     );
     const auth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "admin",
+      permissions: ALL_DASHBOARD_PERMISSIONS,
       serviceClient: {} as never,
     };
 
@@ -887,6 +925,200 @@ describe("loadMobileDashboardPayload", () => {
 
     expect(payload.metrics.coveragePct).toBe(80);
     expect(payload.metrics.coverageWindow).toBe("partial");
+  });
+});
+
+describe("dashboard sections follow the viewer's permissions", () => {
+  const range = { startDate: "2026-05-11", endDate: "2026-05-17" };
+  const pendingRequest = {
+    id: "req-1",
+    type: "pickup",
+    status: "pending_approval",
+    requesterName: "Alex Rivera",
+    requesterShiftDate: "2099-01-01",
+    requesterPresentation: { label: "D", shiftName: "Day Shift", segments: [] },
+    expiresAt: "2099-01-02T00:00:00.000Z",
+    createdAt: "2026-05-10T09:00:00.000Z",
+  } as unknown as MobileShiftRequest;
+  const publishRow: DashboardPublishHistoryRow = {
+    published_by: "publisher-1",
+    start_date: "2026-05-11",
+    end_date: "2026-05-17",
+    published_at: "2026-05-12T09:00:00.000Z",
+    change_count: 1,
+    changes: [{ empId: "emp-1", date: "2026-05-12", kind: "new" }],
+  };
+  const signup = {
+    email: "new.hire@example.com",
+    role_to_assign: "user",
+    accepted_at: "2026-05-13T09:00:00.000Z",
+  };
+
+  function makeDeps() {
+    return {
+      fetchMobileCoverageSummary: vi.fn().mockResolvedValue(makeCoverageSummary()),
+      fetchMobileShiftRequests: vi.fn().mockResolvedValue([pendingRequest]),
+      fetchMobileDashboardDraftComparisons: vi.fn().mockResolvedValue([]),
+      fetchMobileOpenShiftContext: vi.fn().mockResolvedValue({ focusAreaRows: [] }),
+      fetchMobilePublishHistoryRows: vi.fn().mockResolvedValue([publishRow]),
+      fetchMobileAcceptedInvitationRows: vi.fn().mockResolvedValue([signup]),
+      fetchProfileNameRowsByIds: vi.fn().mockResolvedValue([]),
+      fetchLinkedEmployeeForUser: vi.fn().mockResolvedValue({ id: "emp-me" }),
+    };
+  }
+
+  function adminWith(permissions: MobileDashboardViewerPermissions) {
+    return {
+      currentOrg: { id: "org-1" },
+      userId: "user-1",
+      effectiveRole: "admin",
+      permissions,
+      serviceClient: {} as never,
+    };
+  }
+
+  const activityTypes = (payload: { activity: Array<{ type: string }> }) =>
+    payload.activity.map((item) => item.type).sort();
+
+  it("gives an admin with every view off no approvals, publishes, sign-ups or drafts", async () => {
+    const deps = makeDeps();
+
+    const payload = await loadMobileDashboardPayload(
+      adminWith(NO_DASHBOARD_PERMISSIONS),
+      range,
+      deps,
+    );
+
+    expect(payload.actionQueue).toEqual([]);
+    expect(payload.metrics.pendingApprovalsCount).toBe(0);
+    expect(payload.heroSummary.statusLabel).not.toBe("Approval");
+    expect(payload.metrics.draftSummary).toBeNull();
+    expect(deps.fetchMobilePublishHistoryRows).not.toHaveBeenCalled();
+    expect(deps.fetchMobileAcceptedInvitationRows).not.toHaveBeenCalled();
+    expect(deps.fetchMobileDashboardDraftComparisons).not.toHaveBeenCalled();
+    expect(deps.fetchMobileCoverageSummary.mock.calls[0][1]).toMatchObject({
+      includeDrafts: false,
+    });
+    // Only their own requests and open pickups, as web's request list allows.
+    expect(deps.fetchMobileShiftRequests).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ employeeId: "emp-me", includeOpenPickupRequests: true }),
+    );
+    expect(activityTypes(payload)).toEqual(["request"]);
+  });
+
+  it("leaves out an open pickup offered to someone else", async () => {
+    const deps = makeDeps();
+    const offered = (id: string, targetEmpId: string | null) =>
+      ({
+        ...pendingRequest,
+        id,
+        status: "open",
+        requesterEmpId: "emp-other",
+        targetEmpId,
+      }) as unknown as MobileShiftRequest;
+    deps.fetchMobileShiftRequests.mockResolvedValue([
+      offered("to-anyone", null),
+      offered("to-me", "emp-me"),
+      offered("to-someone-else", "emp-third"),
+    ]);
+
+    const payload = await loadMobileDashboardPayload(
+      adminWith(NO_DASHBOARD_PERMISSIONS),
+      range,
+      deps,
+    );
+
+    expect(payload.activity.map((item) => item.id).sort()).toEqual(["req_to-anyone", "req_to-me"]);
+  });
+
+  it("shows no request events to such an admin without a staff record", async () => {
+    const deps = makeDeps();
+    deps.fetchLinkedEmployeeForUser.mockResolvedValue(null);
+
+    const payload = await loadMobileDashboardPayload(
+      adminWith(NO_DASHBOARD_PERMISSIONS),
+      range,
+      deps,
+    );
+
+    expect(deps.fetchMobileShiftRequests).not.toHaveBeenCalled();
+    expect(payload.activity).toEqual([]);
+  });
+
+  it("lists pending approvals only with Approve requests on", async () => {
+    const deps = makeDeps();
+
+    const payload = await loadMobileDashboardPayload(
+      adminWith(viewerPermissions({ canApproveShiftRequests: true })),
+      range,
+      deps,
+    );
+
+    expect(payload.actionQueue).toEqual([pendingRequest]);
+    expect(payload.metrics.pendingApprovalsCount).toBe(1);
+    expect(deps.fetchMobileShiftRequests.mock.calls[0][1]).not.toHaveProperty("employeeId");
+  });
+
+  it("adds publishes only with Dashboard: View on", async () => {
+    const deps = makeDeps();
+
+    const payload = await loadMobileDashboardPayload(
+      adminWith(viewerPermissions({ canViewDashboardAnalytics: true })),
+      range,
+      deps,
+    );
+
+    expect(deps.fetchMobilePublishHistoryRows).toHaveBeenCalledTimes(1);
+    expect(activityTypes(payload)).toEqual(["publish", "request"]);
+    expect(payload.actionQueue).toEqual([]);
+  });
+
+  it("adds sign-ups and every request only with Staff: Edit on", async () => {
+    const deps = makeDeps();
+
+    const payload = await loadMobileDashboardPayload(
+      adminWith(viewerPermissions({ canManageEmployees: true })),
+      range,
+      deps,
+    );
+
+    expect(deps.fetchMobileAcceptedInvitationRows).toHaveBeenCalledTimes(1);
+    expect(deps.fetchMobileShiftRequests.mock.calls[0][1]).not.toHaveProperty("employeeId");
+    expect(deps.fetchLinkedEmployeeForUser).not.toHaveBeenCalled();
+    expect(activityTypes(payload)).toEqual(["request", "user_signup"]);
+  });
+
+  it("counts drafts in coverage and hours only with Schedule: Edit on", async () => {
+    const deps = makeDeps();
+
+    await loadMobileDashboardPayload(
+      adminWith(viewerPermissions({ canEditShifts: true })),
+      range,
+      deps,
+    );
+
+    expect(deps.fetchMobileCoverageSummary.mock.calls[0][1]).toMatchObject({
+      includeDrafts: true,
+    });
+    expect(deps.fetchMobileDashboardDraftComparisons).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives a super_admin everything whatever the flags say", async () => {
+    const deps = makeDeps();
+
+    const payload = await loadMobileDashboardPayload(
+      { ...adminWith(NO_DASHBOARD_PERMISSIONS), effectiveRole: "super_admin" },
+      range,
+      deps,
+    );
+
+    expect(payload.actionQueue).toEqual([pendingRequest]);
+    expect(payload.metrics.draftSummary).not.toBeNull();
+    expect(deps.fetchMobileCoverageSummary.mock.calls[0][1]).toMatchObject({
+      includeDrafts: true,
+    });
+    expect(activityTypes(payload)).toEqual(["publish", "request", "user_signup"]);
   });
 });
 
@@ -943,10 +1175,13 @@ describe("cross-platform coverage parity", () => {
       fetchMobilePublishHistoryRows: vi.fn().mockResolvedValue([]),
       fetchMobileAcceptedInvitationRows: vi.fn().mockResolvedValue([]),
       fetchProfileNameRowsByIds: vi.fn().mockResolvedValue([]),
+      fetchLinkedEmployeeForUser: vi.fn().mockResolvedValue(null),
     };
     const auth = {
       currentOrg: { id: "org-1" },
+      userId: "user-1",
       effectiveRole: "admin",
+      permissions: ALL_DASHBOARD_PERMISSIONS,
       serviceClient: {} as never,
     };
     const range = { startDate: "2026-05-11", endDate: "2026-05-11" };

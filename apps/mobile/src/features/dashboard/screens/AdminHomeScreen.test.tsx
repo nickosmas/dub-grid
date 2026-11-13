@@ -121,9 +121,11 @@ function makeBootstrapData(overrides: {
   effectiveRole: string;
   focusAreaIds: number[];
   departmentIds: number[];
+  canApproveShiftRequests?: boolean;
 }) {
   return {
     effectiveRole: overrides.effectiveRole,
+    permissions: { canApproveShiftRequests: overrides.canApproveShiftRequests ?? true },
     user: { firstName: "Jordan" },
     currentOrg: { name: "Acme Care", timezone: "America/Los_Angeles" },
     linkedEmployee: {
@@ -334,6 +336,30 @@ describe("AdminHomeScreen", () => {
     showView("Team");
 
     expect(screen.getByText("Casey Lee")).toBeInTheDocument();
+  });
+
+  it("leaves the approvals card and figure out for an admin who can't approve", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({
+        effectiveRole: "admin",
+        focusAreaIds: [1],
+        departmentIds: [],
+        canApproveShiftRequests: false,
+      }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...EMPTY_DASHBOARD_DATA, actionQueue: [] },
+    });
+
+    render(<AdminHomeScreen />);
+    showView("Team");
+
+    expect(screen.queryByText("No requests are waiting on you")).not.toBeInTheDocument();
+    expect(screen.queryByText(/pending approval/)).not.toBeInTheDocument();
+    expect(screen.getByText("No recent activity")).toBeInTheDocument();
   });
 
   it("gives a management-only admin the team alone, with no switch", () => {
