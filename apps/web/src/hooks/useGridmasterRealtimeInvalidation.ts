@@ -3,9 +3,9 @@
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import {
+  PLATFORM_TOPIC,
   createDebouncedTableFlusher,
-  createRealtimeChannelName,
-  subscribeToPostgresChanges,
+  subscribeToTableChanges,
   type RealtimeChangePayload,
 } from "@dubgrid/realtime-core";
 import * as Sentry from "@/lib/sentry";
@@ -227,46 +227,34 @@ export function getGridmasterRealtimeInvalidationKeys(
   }
 }
 
-export function resolveGridmasterRealtimeOrgId(
-  table: GridmasterRealtimeTable,
-  payload: RealtimePayload,
-): string | null {
-  const row = payload.new ?? payload.old ?? {};
-  const key =
-    table === "organizations"
-      ? "id"
-      : table === "impersonation_sessions"
-        ? "target_org_id"
-        : "org_id";
-  const value = row[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
+/** The organizations a platform change touched, or one null when none. */
+export function resolveGridmasterRealtimeOrgIds(payload: RealtimePayload): (string | null)[] {
+  return payload.orgIds && payload.orgIds.length > 0 ? [...payload.orgIds] : [null];
 }
 
 function personPageKey(userId: string | null | undefined) {
   return userId ? queryKeys.gridmaster.person("user", userId) : queryKeys.gridmaster.personAll();
 }
 
-/** Resolves the affected user's id, for tables where invalidation targets that
- * person's page (`queryKeys.gridmaster.person("user", userId)`). */
-export function resolveGridmasterRealtimeUserId(
+/** The people whose pages a platform change touched, for the tables that
+ * have one (`queryKeys.gridmaster.person("user", userId)`), or one null. */
+export function resolveGridmasterRealtimeUserIds(
   table: GridmasterRealtimeTable,
   payload: RealtimePayload,
-): string | null {
-  const column =
-    table === "profiles"
-      ? "id"
-      : table === "organization_memberships" || table === "user_sessions" || table === "employees"
-        ? "user_id"
-        : null;
-  if (!column) return null;
-  const row = payload.new ?? payload.old ?? {};
-  const value = row[column];
-  return typeof value === "string" && value.length > 0 ? value : null;
+): (string | null)[] {
+  const hasPersonPage =
+    table === "profiles" ||
+    table === "organization_memberships" ||
+    table === "user_sessions" ||
+    table === "employees";
+  return hasPersonPage && payload.userIds && payload.userIds.length > 0
+    ? [...payload.userIds]
+    : [null];
 }
 
 /**
- * Batches invalidations by query key: a bulk change in any organization emits
- * one event per row, and many tables share keys (`overview`, `orgHealth`), so
+ * Batches invalidations by query key: changes arrive in bursts across
+ * organizations, and many tables share keys (`overview`, `orgHealth`), so
  * each distinct key refetches and broadcasts once per burst. Keys are plain
  * strings and numbers, so they round-trip through JSON unchanged.
  */
@@ -303,17 +291,15 @@ export function useGridmasterRealtimeInvalidation({
 
     const batcher = createGridmasterInvalidationBatcher(queryClient);
     const handleChange = (table: GridmasterRealtimeTable, payload: RealtimePayload) => {
-      batcher.markChanged(
-        table,
-        resolveGridmasterRealtimeOrgId(table, payload),
-        resolveGridmasterRealtimeUserId(table, payload),
-      );
+      for (const orgId of resolveGridmasterRealtimeOrgIds(payload)) {
+        for (const userId of resolveGridmasterRealtimeUserIds(table, payload)) {
+          batcher.markChanged(table, orgId, userId);
+        }
+      }
     };
 
-    // Gridmaster is platform-wide: subscribe unfiltered (every org's rows) and
-    // derive the affected org/user from each payload. One channel, N listeners —
-    // routed through the shared realtime-core helper rather than hand-rolled
-    // channel plumbing.
+    // Gridmaster is platform-wide: the platform topic carries every change,
+    // with the organizations and people each statement touched.
     const tables: GridmasterRealtimeTable[] = [
       "organizations",
       "audit_log",
@@ -321,10 +307,9 @@ export function useGridmasterRealtimeInvalidation({
       ...ORG_FILTER_TABLES,
     ];
 
-    const unsubscribe = subscribeToPostgresChanges<GridmasterRealtimeTable>(
+    const unsubscribe = subscribeToTableChanges<GridmasterRealtimeTable>(
       getBrowserSupabaseClient(),
-      createRealtimeChannelName("gridmaster-freshness"),
-      tables.map((table) => ({ table, onEvent: handleChange })),
+      tables.map((table) => ({ table, topic: PLATFORM_TOPIC, onEvent: handleChange })),
       {
         onReconnectAfterError: () => {
           void queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.all() });
