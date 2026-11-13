@@ -670,13 +670,13 @@
 **Suggested fix:** Send challenge and verify with the bearer token directly; drop the refresh if the verified token already carries the hook claims (check this first).
 **Resolution:**
 
-### F-187 [P3] unverified - The mobile session is re-read from SecureStore on every `getSession`, including each realtime heartbeat
+### F-187 [P3] fixed - The mobile session is re-read from SecureStore on every `getSession`, including each realtime heartbeat
 
 **File:** `apps/mobile/src/shared/lib/local-storage.ts:32`; `apps/mobile/src/shared/lib/supabase.ts:28-31`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** auth-js re-reads storage on each `getSession`: about five reads of the over-2KB value at launch (initialize, warm, provider, auto-refresh, realtime connect), then one per 25s heartbeat. The comment claiming the work is shared is inaccurate. Cost on the Android keystore unmeasured. Related to F-128.
 **Suggested fix:** An in-memory read-through cache in `local-storage.ts`, written through on set and remove.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `local-storage.ts` keeps each SecureStore value in memory once read or written, shares one read between callers that ask together, writes through on set, and holds `null` after a remove, so sign-out leaves nothing cached. A per-key version stops a read that began before a write from putting the old value back, and a failed write caches nothing. The web path still reads `localStorage` directly. `local-storage.test.ts` covers each case and fails on the old code; not measured on a device.
 **Update 2026-11-13 (re-check against dev):** still open; the inaccurate comment is gone. A write-through cache must also clear on remove.
 
 ### F-188 [P3] open - Smaller mobile startup and sign-in costs
