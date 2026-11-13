@@ -48,6 +48,7 @@ vi.mock("@/hooks", () => ({
   MOBILE: "(max-width: 767px)",
   TABLET: "(min-width: 768px) and (max-width: 1024px)",
   HEADER_NARROW: "(max-width: 1200px)",
+  useSandboxSourceOrgId: () => null,
   useClientFeatureFlags: () => ({
     stripe: true,
     csvImport: true,

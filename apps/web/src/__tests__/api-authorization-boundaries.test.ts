@@ -6,7 +6,7 @@ const repoRoot = path.resolve(process.cwd(), "..", "..");
 const apiRoot = path.join(repoRoot, "apps", "web", "src", "app", "api");
 
 const canonicalAuthorizationCall =
-  /\b(?:requireAuthenticatedSession|requireAuthenticatedUserWithClaims|requireAuthenticatedUser|requireLiveAuthenticatedSession|requireSensitiveActionAuth|requireGridmasterSession|requireOrgPermissions)\s*\(/;
+  /\b(?:requireAuthenticatedSession|requireAuthenticatedUserWithClaims|requireAuthenticatedUserWithTokenClaims|requireAuthenticatedUser|requireLiveAuthenticatedSession|requireSensitiveActionAuth|requireGridmasterSession|requireOrgPermissions)\s*\(/;
 const delegatedAuthorizationCall = /\b(?:authorizeAuditLogRead|createMfaLifecycleHandler)\s*\(/;
 
 /**

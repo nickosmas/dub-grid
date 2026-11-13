@@ -17,6 +17,28 @@ import type { BillingAccessState } from "@dubgrid/domain";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { fetchWithTimeout, RequestTimeoutError } from "@/lib/fetch-with-timeout";
 import { STEP_UP_REQUIRED_CODE } from "@dubgrid/authz";
+import { SANDBOX_ENDED_CODE } from "@/lib/sandbox-cookie";
+
+const SANDBOX_ENDED_RELOAD_KEY = "dg_sandbox_ended_reload_at";
+
+/**
+ * The server refused this request because the test sandbox it was routed to
+ * has ended, and cleared the sandbox cookie on that same response. Reload once
+ * so every view (and every query cached for the sandbox) starts over in the
+ * real organization. Guarded so a server that keeps answering this cannot put
+ * the tab in a reload loop; after that, the bootstrap retry takes over.
+ */
+function reloadAfterSandboxEnded(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const last = Number(window.sessionStorage.getItem(SANDBOX_ENDED_RELOAD_KEY));
+    if (Number.isFinite(last) && Date.now() - last < 30_000) return;
+    window.sessionStorage.setItem(SANDBOX_ENDED_RELOAD_KEY, String(Date.now()));
+  } catch {
+    // Storage unavailable: still reload; the cookie is already gone.
+  }
+  window.location.reload();
+}
 
 const ORGANIZATION_BOOTSTRAP_TIMEOUT_MS = 5_000;
 const ORGANIZATION_BOOTSTRAP_STALE_TIME_MS = 5 * 60_000;
@@ -88,6 +110,7 @@ async function requestOrganizationJson<T>(
     : null;
 
   if (!response.ok) {
+    if (response.status === 403 && body?.code === SANDBOX_ENDED_CODE) reloadAfterSandboxEnded();
     const retryAfterSeconds = Number(response.headers.get("retry-after"));
     throw new OrganizationRequestError(
       formatClientErrorMessage(body?.error, "Organization request failed."),
@@ -127,6 +150,9 @@ export function isRetryableOrganizationBootstrapError(error: unknown): boolean {
     // loading screen. A caller who genuinely lacks the factor keeps failing
     // and lands on the same refusal it would have had.
     if (error.status === 403 && error.code === STEP_UP_REQUIRED_CODE) return true;
+    // The refusal cleared a stale sandbox cookie, so the next attempt loads
+    // the real organization.
+    if (error.status === 403 && error.code === SANDBOX_ENDED_CODE) return true;
     return error.status === 408 || error.status === 429 || error.status >= 500;
   }
   if (error instanceof RequestTimeoutError) return true;
