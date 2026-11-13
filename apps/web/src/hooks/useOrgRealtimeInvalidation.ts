@@ -136,14 +136,12 @@ export function getOrgRealtimeInvalidationKeys(
       return uniqueKeys([queryKeys.org.users(orgId), queryKeys.org.directory(orgId)]);
     case "shift_requests":
       return uniqueKeys([queryKeys.shiftRequests.all(orgId), queryKeys.shifts.all(orgId)]);
+    // The operations report reads published cells only, so a draft edit leaves
+    // it alone; `changesPublishedSchedule` adds it when a published snapshot moves.
     case "schedule_cells":
     case "schedule_cell_snapshots":
     case "schedule_cell_segments":
-      return uniqueKeys([
-        queryKeys.shifts.all(orgId),
-        queryKeys.shiftRequests.all(orgId),
-        queryKeys.reports.operationsAll(orgId),
-      ]);
+      return uniqueKeys([queryKeys.shifts.all(orgId), queryKeys.shiftRequests.all(orgId)]);
     case "schedule_notes":
       return uniqueKeys([queryKeys.shifts.all(orgId)]);
     case "profile_change_requests":
@@ -174,13 +172,45 @@ export function getOrgRealtimeInvalidationKeys(
   }
 }
 
+/**
+ * Whether an event changed what was published. Every publish, approval and
+ * past-day correction upserts the cell's published snapshot, and a correction
+ * writes no publish_history row, so this is the report's only signal for one.
+ * A DELETE carries only the id, so it counts.
+ */
+export function changesPublishedSchedule(
+  table: OrgRealtimeTable,
+  payload: RealtimeChangePayload,
+): boolean {
+  if (table !== "schedule_cell_snapshots") return false;
+  if (payload.eventType === "DELETE" || !payload.new) return true;
+  return payload.new.snapshot_kind === "published";
+}
+
+export function getOrgRealtimeFlushKeys(
+  orgId: string,
+  tables: readonly OrgRealtimeTable[],
+  publishedChanged: boolean,
+): readonly unknown[][] {
+  const keys: (readonly unknown[])[] = tables.flatMap((table) =>
+    getOrgRealtimeInvalidationKeys(orgId, table),
+  );
+  if (publishedChanged) keys.push(queryKeys.reports.operationsAll(orgId));
+  return uniqueKeys(keys);
+}
+
+/**
+ * Invalidates each key once per flush. A cell save touches three tables that
+ * share keys, and the default cancelRefetch restarted the same fetch for each.
+ */
 export function invalidateOrgRealtimeQueries(
   queryClient: QueryClient,
   orgId: string,
-  table: OrgRealtimeTable,
+  tables: readonly OrgRealtimeTable[],
+  publishedChanged = false,
 ): void {
-  for (const queryKey of getOrgRealtimeInvalidationKeys(orgId, table)) {
-    void queryClient.invalidateQueries({ queryKey });
+  for (const queryKey of getOrgRealtimeFlushKeys(orgId, tables, publishedChanged)) {
+    void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
     broadcastInvalidation(queryKey);
   }
 }
@@ -275,6 +305,7 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
   if (existing) {
     existing.count += 1;
   } else {
+    let publishedChanged = false;
     const unsubscribe = subscribeOrgScopedRealtime<OrgRealtimeTable>({
       client: getBrowserSupabaseClient(),
       orgId,
@@ -288,13 +319,17 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
       // invalidated, just once per burst.
       debounceMs: 150,
       channelNamePrefix: `org-freshness:${orgId}`,
-      skipEvent: (table, payload) =>
-        table === "organization_memberships" &&
-        absorbMembershipViewStamp(queryClient, orgId, payload),
+      skipEvent: (table, payload) => {
+        if (changesPublishedSchedule(table, payload)) publishedChanged = true;
+        return (
+          table === "organization_memberships" &&
+          absorbMembershipViewStamp(queryClient, orgId, payload)
+        );
+      },
       onFlush: (tables) => {
-        for (const table of tables) {
-          invalidateOrgRealtimeQueries(queryClient, orgId, table);
-        }
+        const published = publishedChanged;
+        publishedChanged = false;
+        invalidateOrgRealtimeQueries(queryClient, orgId, tables, published);
       },
       onReconnectAfterError: () => {
         void queryClient.invalidateQueries({

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getOrgRealtimeInvalidationKeys } from "@/hooks/useOrgRealtimeInvalidation";
+import {
+  changesPublishedSchedule,
+  getOrgRealtimeFlushKeys,
+  getOrgRealtimeInvalidationKeys,
+} from "@/hooks/useOrgRealtimeInvalidation";
 import { queryKeys } from "@/lib/query-keys";
 
 describe("getOrgRealtimeInvalidationKeys", () => {
@@ -45,8 +49,74 @@ describe("getOrgRealtimeInvalidationKeys", () => {
     ]);
   });
 
-  it("invalidates schedule, derived request, and operations-report caches for schedule cell changes", () => {
-    expect(getOrgRealtimeInvalidationKeys("org-1", "schedule_cells")).toEqual([
+  it("leaves the published-only operations report alone for schedule cell changes", () => {
+    for (const table of [
+      "schedule_cells",
+      "schedule_cell_snapshots",
+      "schedule_cell_segments",
+    ] as const) {
+      expect(getOrgRealtimeInvalidationKeys("org-1", table)).toEqual([
+        queryKeys.shifts.all("org-1"),
+        queryKeys.shiftRequests.all("org-1"),
+      ]);
+    }
+  });
+});
+
+describe("changesPublishedSchedule", () => {
+  it("counts a published snapshot written by a publish, an approval or a correction", () => {
+    expect(
+      changesPublishedSchedule("schedule_cell_snapshots", {
+        eventType: "UPDATE",
+        new: { snapshot_kind: "published" },
+      }),
+    ).toBe(true);
+    expect(
+      changesPublishedSchedule("schedule_cell_snapshots", {
+        eventType: "INSERT",
+        new: { snapshot_kind: "published" },
+      }),
+    ).toBe(true);
+  });
+
+  it("ignores a draft snapshot and every other table", () => {
+    expect(
+      changesPublishedSchedule("schedule_cell_snapshots", {
+        eventType: "UPDATE",
+        new: { snapshot_kind: "draft" },
+      }),
+    ).toBe(false);
+    expect(
+      changesPublishedSchedule("schedule_cells", {
+        eventType: "UPDATE",
+        new: { snapshot_kind: "published" },
+      }),
+    ).toBe(false);
+  });
+
+  it("counts a delete, whose payload carries only the id", () => {
+    expect(
+      changesPublishedSchedule("schedule_cell_snapshots", {
+        eventType: "DELETE",
+        old: { id: "snap-1" },
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("getOrgRealtimeFlushKeys", () => {
+  it("lists each key once across the tables one cell save touches", () => {
+    expect(
+      getOrgRealtimeFlushKeys(
+        "org-1",
+        ["schedule_cells", "schedule_cell_snapshots", "schedule_cell_segments"],
+        false,
+      ),
+    ).toEqual([queryKeys.shifts.all("org-1"), queryKeys.shiftRequests.all("org-1")]);
+  });
+
+  it("adds the operations report when a published snapshot changed", () => {
+    expect(getOrgRealtimeFlushKeys("org-1", ["schedule_cell_snapshots"], true)).toEqual([
       queryKeys.shifts.all("org-1"),
       queryKeys.shiftRequests.all("org-1"),
       queryKeys.reports.operationsAll("org-1"),
