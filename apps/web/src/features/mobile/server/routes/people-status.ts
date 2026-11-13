@@ -19,7 +19,7 @@ import {
 } from "@dubgrid/data-access";
 import logger from "@/lib/logger";
 import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
-import { endUserSessions } from "@/lib/auth/revocation";
+import { endUserSessionsInOrganization } from "@/lib/auth/revocation";
 import {
   endOffboardedAccess,
   reopenRestoredAccess,
@@ -100,7 +100,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         // refuses their next sign-in and refresh (101).
         endAccess: async (serviceClient, { userId, orgId }) => {
           try {
-            await endUserSessions(userId);
+            await endUserSessionsInOrganization(userId, orgId);
             await disableMobilePushTokensForOrg(serviceClient, { userId, orgId });
           } catch (error) {
             logger.error(

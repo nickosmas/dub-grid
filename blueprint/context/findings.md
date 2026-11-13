@@ -822,7 +822,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 
 **Suggested fix:** Fix alongside the larger findings; scope the idempotency lookups and the email throttle by organization first.
 **Resolution:**
-**Update 2026-11-13 (re-check against dev):** per item: (2) owner decision (2026-11-13): suspending or offboarding someone ends only their sessions in that organization, as Move email does, replacing 51c and 51k's "everywhere". (9) `job_shift_overrides` now has composite foreign keys (124). Everything else is still open.
+**Update 2026-11-13 (re-check against dev):** per item: (2) owner decision (2026-11-13): suspending or offboarding someone ends only their sessions in that organization, as Move email does, replacing 51c and 51k's "everywhere". Fixed on fix/sessions-end-in-one-org: `endUserSessionsInOrganization` ends each session whose `active_org_id` is the organization, and Suspend (web, app, bulk, a planned start), Offboard and removing a member use it; the roster guide says so. (9) `job_shift_overrides` now has composite foreign keys (124). Everything else is still open.
 
 ### F-214 [P2] fixed - An Admin who can edit notes can publish or delete published notes directly
 

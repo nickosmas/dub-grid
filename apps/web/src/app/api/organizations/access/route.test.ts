@@ -6,7 +6,7 @@ const requireAuthenticatedUser = vi.fn();
 const checkRateLimit = vi.fn();
 const requireOrgPermissions = vi.fn();
 const dispatchNotificationEvent = vi.fn();
-const revokeAllUserSessions = vi.fn();
+const endUserSessionsInOrganization = vi.fn();
 const cacheDel = vi.fn();
 const membershipSelectEq2 = vi.fn();
 const membershipUpdateEq3 = vi.fn();
@@ -55,7 +55,7 @@ vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 vi.mock("@/lib/auth/revocation", () => ({
-  revokeAllUserSessions: (userId: string) => revokeAllUserSessions(userId),
+  endUserSessionsInOrganization: (...args: unknown[]) => endUserSessionsInOrganization(...args),
 }));
 const offboardRemovedMember = vi.fn();
 vi.mock("@/features/employees/server/status-change", () => ({
@@ -161,7 +161,7 @@ describe("DELETE /api/organizations/access", () => {
     });
     getUserById.mockResolvedValue({ data: { user: { email: "target@test.com" } } });
     auditInsert.mockResolvedValue({ error: null });
-    revokeAllUserSessions.mockResolvedValue(undefined);
+    endUserSessionsInOrganization.mockResolvedValue(undefined);
     cacheDel.mockResolvedValue(undefined);
   });
 
@@ -197,7 +197,7 @@ describe("DELETE /api/organizations/access", () => {
     // Every downstream call must use the SANDBOX org, never the raw requested org.
     expect(membershipSelectEq2).toHaveBeenCalledWith(TARGET_USER_ID, SANDBOX_ORG_ID);
     expect(membershipUpdateEq3).toHaveBeenCalledWith(TARGET_USER_ID, SANDBOX_ORG_ID, UPDATED_AT);
-    expect(revokeAllUserSessions).toHaveBeenCalledWith(TARGET_USER_ID);
+    expect(endUserSessionsInOrganization).toHaveBeenCalledWith(TARGET_USER_ID, SANDBOX_ORG_ID);
     expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
     expect(dispatchNotificationEvent).toHaveBeenCalledWith(
       ACTOR_ID,
@@ -264,7 +264,7 @@ describe("DELETE /api/organizations/access", () => {
     expect(res.status).toBe(403);
     expect(membershipSelectEq2).not.toHaveBeenCalled();
     expect(membershipUpdateEq3).not.toHaveBeenCalled();
-    expect(revokeAllUserSessions).not.toHaveBeenCalled();
+    expect(endUserSessionsInOrganization).not.toHaveBeenCalled();
   });
 });
 

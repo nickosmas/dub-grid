@@ -8,7 +8,7 @@ const auditInsert = vi.fn();
 const cacheDel = vi.fn();
 const endOffboardedAccess = vi.fn();
 const reopenRestoredAccess = vi.fn();
-const endUserSessions = vi.fn();
+const endUserSessionsInOrganization = vi.fn();
 const disablePush = vi.fn();
 const scheduleSuspensionNotice = vi.fn();
 const repairLinkedEmails = vi.fn();
@@ -31,7 +31,7 @@ vi.mock("@/features/employees/server/suspension-notice", () => ({
 }));
 
 vi.mock("@/lib/auth/revocation", () => ({
-  endUserSessions: (...args: unknown[]) => endUserSessions(...args),
+  endUserSessionsInOrganization: (...args: unknown[]) => endUserSessionsInOrganization(...args),
 }));
 
 vi.mock("@dubgrid/data-access", () => ({
@@ -712,7 +712,7 @@ describe("GET /api/cron/return-from-away", () => {
           ["version", 4],
         ],
       );
-      expect(endUserSessions).toHaveBeenCalledWith("user-emp-la");
+      expect(endUserSessionsInOrganization).toHaveBeenCalledWith("user-emp-la", "org-la");
       expect(disablePush).toHaveBeenCalledWith(expect.anything(), {
         userId: "user-emp-la",
         orgId: "org-la",
@@ -774,7 +774,7 @@ describe("GET /api/cron/return-from-away", () => {
         { planned_status: null, version: 5 },
         { planned_status: null, version: 5 },
       ]);
-      expect(endUserSessions).not.toHaveBeenCalled();
+      expect(endUserSessionsInOrganization).not.toHaveBeenCalled();
       expect(scheduleSuspensionNotice).not.toHaveBeenCalled();
     });
 
@@ -794,7 +794,7 @@ describe("GET /api/cron/return-from-away", () => {
     });
 
     it("still suspends when signing out fails, which the hook backs up", async () => {
-      endUserSessions.mockRejectedValueOnce(new Error("redis down"));
+      endUserSessionsInOrganization.mockRejectedValueOnce(new Error("redis down"));
       rows([], [], [], {
         suspensions: [
           plannedSuspension("emp-la", "org-la", "2026-10-26", null, "America/Los_Angeles"),
