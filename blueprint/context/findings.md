@@ -478,8 +478,9 @@
 **Why it matters:** A cell save touches `schedule_cells`, `schedule_cell_snapshots` and `schedule_cell_segments`, which map to the same keys, so each key is invalidated three times per flush with the default `cancelRefetch`, restarting fetches whose requests still go out. Every invalidation is also broadcast to other tabs, which got the same event on their own channel and invalidate again, so load grows with the square of open tabs. The 150ms fixed-window flusher fires about seven times a second through a paste or Auto-build Apply. `permissionsRealtime.ts:63-66` already uses `cancelRefetch: false`. The web side of F-150.
 **Suggested fix:** Collect the union of keys per flush and invalidate each once with `{ cancelRefetch: false }`; don't re-broadcast keys that came from realtime; make the flusher trailing with a 1-2s max wait.
 **Resolution:**
+**Update 2026-11-13 (fix/report-refresh-published-only):** the web org channel now invalidates the union of a flush's keys once each with `cancelRefetch: false` (`getOrgRealtimeFlushKeys`). Still open: the re-broadcast to other tabs and the fixed 150ms window, which move with F-199.
 
-### F-164 [P2] open - Draft edits regenerate the published-only operations report
+### F-164 [P2] fixed - Draft edits regenerate the published-only operations report
 
 **File:** `apps/web/src/hooks/useOrgRealtimeInvalidation.ts:138-145`; `apps/web/src/app/(app)/reports/ReportsPageContent.tsx:479-497`; `apps/web/src/features/reports/server/operations.ts:477, 942`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
@@ -487,6 +488,7 @@
 **Suggested fix:** Drop `reports.operationsAll` from the cell-table cases; keep it for `publish_history`, `employees` and `recurring_shifts`.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** the suggested fix would regress item 53: a past-day correction writes published cells with no `publish_history` row, so the cell tables are the report's only signal. Invalidate `reports.operationsAll` on correction events (or published-snapshot changes) instead, together with F-163.
+**Resolution:** Fixed on fix/report-refresh-published-only (2026-11-13), on published-snapshot changes as the re-check said: the cell tables no longer invalidate `reports.operationsAll`, and `changesPublishedSchedule` adds it to the flush when a `schedule_cell_snapshots` event carries `snapshot_kind = published` (every publish, approval and correction upserts that row) or is a DELETE, whose payload holds only the id. Tested in `org-realtime-invalidation.test.ts`.
 
 ### F-165 [P2] fixed - The header loads the organization's whole roster on every page for one boolean
 
