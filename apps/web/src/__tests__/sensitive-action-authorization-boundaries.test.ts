@@ -118,7 +118,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /\.eq\("planned_status", "removed"\)[\s\S]*?if \(await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)\)[\s\S]*?await endOffboardedAccess\(db, \{[\s\S]*?userId: row\.user_id,/,
       // It starts a suspension a manager planned (51g3) with that Suspend's
       // follow-up, signing out only the suspended person.
-      /\.eq\("planned_status", "suspended"\)[\s\S]*?await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)[\s\S]*?await endUserSessions\(row\.user_id\);/,
+      /\.eq\("planned_status", "suspended"\)[\s\S]*?await isOnlySuperAdmin\(db, row\.org_id, row\.user_id\)[\s\S]*?await endUserSessionsInOrganization\(row\.user_id, row\.org_id\);/,
     ],
   },
   "apps/web/src/app/api/gridmaster/accounts/route.ts": {
@@ -284,7 +284,7 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
     policy: "authorized-target-revocation",
     assertions: [
       /export async function DELETE[\s\S]*?\brequirePrivilegedActor\s*\(/,
-      /export async function DELETE[\s\S]*?revokeAllUserSessions/,
+      /export async function DELETE[\s\S]*?endUserSessionsInOrganization\(userId, orgId\)/,
       // Their staff record is offboarded after the membership, by the shared change (51k).
       /export async function DELETE[\s\S]*?if \(!updatedMembership\)[\s\S]*?await offboardRemovedMember\(/,
       // A Gridmaster's removal needs fresh proof before the membership is read (F-96).
@@ -349,7 +349,7 @@ const MOBILE_DELEGATES: Record<string, RegExp[]> = {
   // only after the core has checked canManageEmployees and the guards (51c).
   // Gridmasters can't reach mobile, so no fresh-proof step is owed.
   "apps/web/src/features/mobile/server/routes/people-status.ts": [
-    /endAccess: async \(serviceClient, \{ userId, orgId \}\) => \{\s*try \{\s*await endUserSessions\(userId\);/,
+    /endAccess: async \(serviceClient, \{ userId, orgId \}\) => \{\s*try \{\s*await endUserSessionsInOrganization\(userId, orgId\);/,
   ],
   "apps/web/src/features/mobile/server/routes/auth-sign-out.ts": [
     /requireAssuredCaller[\s\S]*?\brequireMobileSensitiveActionAuth\s*\(/,
@@ -391,7 +391,7 @@ const SHARED_STATUS_CHANGE_ASSERTIONS: RegExp[] = [
   /if \(\s*\(offboarding \|\| restoring \|\| suspending \|\| reinstating \|\| replacingPlan\) &&\s*!isGridmaster &&\s*!isSuperAdmin &&\s*currentEmployee\.userId\s*\) \{[\s\S]*?if \(!canOffboardAtTier\(actor, targetMembership\?\.org_role\)\) \{[\s\S]*?\{ status: 403 \}[\s\S]*?\.from\("employees"\)\s*\.update\(update\)/,
   // Suspension signs only the suspended person out (51c), and only once
   // it starts: a planned one (51g3) waits for the daily job.
-  /if \(action === "suspend" && !planning && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessions\(currentEmployee\.userId\);/,
+  /if \(action === "suspend" && !planning && currentEmployee\.userId\) \{\s*try \{\s*await endUserSessionsInOrganization\(currentEmployee\.userId, orgId\);/,
 ];
 
 // The move both move-email routes run: it refuses the caller's own record and
@@ -409,7 +409,7 @@ const SHARED_MOVE_EMAIL_ASSERTIONS: RegExp[] = [
 // and mobile handlers only, so a new helper that makes such a change belongs
 // in this list.
 const sensitiveSourceMarker =
-  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|endOffboardedAccess|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail|applyStatusChange)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email|change_user_role|send_invitation|replace_pending_invitation_access/;
+  /\b(?:requireSensitiveActionAuth|requireMobileSensitiveActionAuth|revokeAllUserSessions|endOffboardedAccess|revokeOtherUserSessions|revokeUserSessionForUser|endUserSessionsInOrganization|endUserSessions?|resetPasswordForEmail|deleteUserAccountWithCleanup|syncLinkedLoginEmail|applyStatusChange)\s*\(|auth\.admin\.(?:createUser|updateUserById|deleteUser|signOut)\s*\(|gdpr_erase_user_data|force_logout_user|promote_gridmaster_by_email|demote_gridmaster_account|set_gridmaster_account_deactivated|assign_org_role_by_email|change_user_role|send_invitation|replace_pending_invitation_access/;
 const delegatedSensitivePath =
   /\/(?:(?:account|mobile\/v1\/profile)\/(?:credential-assurance|mfa-lifecycle|sessions)|mobile\/v1\/auth\/sign-out)\/route\.ts$/;
 
