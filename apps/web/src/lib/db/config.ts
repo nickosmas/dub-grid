@@ -439,6 +439,7 @@ export async function deleteFocusArea(focusAreaId: number, orgId: string): Promi
   // Remove this focus area from employee focusAreaIds arrays (single batch UPDATE via RPC)
   const { error: empErr } = await supabase.rpc("remove_focus_area_from_employees", {
     p_focus_area_id: focusAreaId,
+    p_org_id: orgId,
   });
   if (empErr) throw empErr;
 

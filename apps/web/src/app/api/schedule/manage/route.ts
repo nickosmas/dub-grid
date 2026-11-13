@@ -309,7 +309,6 @@ const requestActionSchema = z.discriminatedUnion("action", [
     indicatorTypeId: z.number().int(),
     focusAreaId: z.number().int(),
     shift: noteShiftSchema,
-    existingStatus: noteStatusSchema.optional(),
   }),
   z.object({
     action: z.literal("deleteScheduleNote"),
@@ -319,7 +318,6 @@ const requestActionSchema = z.discriminatedUnion("action", [
     indicatorTypeId: z.number().int(),
     focusAreaId: z.number().int(),
     shift: noteShiftSchema,
-    existingStatus: noteStatusSchema.optional(),
   }),
 ]);
 
@@ -983,6 +981,47 @@ function matchNoteShift<Q extends NoteShiftFilter<Q>>(
 ): Q {
   const byJob = query.eq("job_id", shift.jobId);
   return shift.shiftId == null ? byJob.is("shift_id", null) : byJob.eq("shift_id", shift.shiftId);
+}
+
+interface NoteKey {
+  orgId: string;
+  employeeId: string;
+  date: string;
+  indicatorTypeId: number;
+  focusAreaId: number;
+  shift: { shiftId: number | null; jobId: number };
+}
+
+/**
+ * The note's stored status decides what a save or delete does. The client's
+ * own idea of it is never trusted (F-214): claiming a published note was a
+ * draft would delete it outright, and claiming draft_deleted would publish a
+ * new note without a publish.
+ */
+async function readNoteStatus(
+  client: SupabaseClient,
+  note: NoteKey,
+): Promise<z.infer<typeof noteStatusSchema> | null> {
+  const byJob = client
+    .from("schedule_notes")
+    .select("status")
+    .eq("org_id", note.orgId)
+    .eq("emp_id", note.employeeId)
+    .eq("date", note.date)
+    .eq("indicator_type_id", note.indicatorTypeId)
+    .eq("focus_area_id", note.focusAreaId)
+    .eq("job_id", note.shift.jobId);
+  const query =
+    note.shift.shiftId == null
+      ? byJob.is("shift_id", null)
+      : byJob.eq("shift_id", note.shift.shiftId);
+  const { data, error } = await query.maybeSingle<{
+    status: z.infer<typeof noteStatusSchema>;
+  }>();
+  if (error) {
+    throw error;
+  }
+  return data?.status ?? null;
 }
 
 /**
@@ -2602,7 +2641,8 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const status = data.existingStatus === "draft_deleted" ? "published" : "draft";
+        const existingStatus = await readNoteStatus(auth.serviceClient, data);
+        const status = existingStatus === "draft_deleted" ? "published" : "draft";
         const { error } = await auth.serviceClient.from("schedule_notes").upsert(
           {
             org_id: data.orgId,
@@ -2672,7 +2712,12 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        if (data.existingStatus === "draft") {
+        const existingStatus = await readNoteStatus(auth.serviceClient, data);
+        if (existingStatus === null || existingStatus === "draft_deleted") {
+          return NextResponse.json({ success: true });
+        }
+
+        if (existingStatus === "draft") {
           const { error } = await matchNoteShift(
             auth.serviceClient
               .from("schedule_notes")
@@ -2713,7 +2758,7 @@ export async function POST(req: NextRequest) {
             empId: data.employeeId,
             date: data.date,
             mode: "delete",
-            status: data.existingStatus === "draft" ? "draft" : "published",
+            status: existingStatus === "draft" ? "draft" : "published",
             noteTypeId: data.indicatorTypeId,
           }),
         );
@@ -2727,7 +2772,7 @@ export async function POST(req: NextRequest) {
           details: {
             indicatorTypeId: data.indicatorTypeId,
             focusAreaId: data.focusAreaId,
-            existingStatus: data.existingStatus,
+            existingStatus,
           },
         });
 

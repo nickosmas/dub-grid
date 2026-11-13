@@ -712,13 +712,13 @@
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. The fix also has to move the mobile invalidation hook. Plan with F-150, F-163 and F-179.
 
-### F-200 [P2] open - Super Admins can change write-once organization fields directly, including the subdomain
+### F-200 [P2] fixed - Super Admins can change write-once organization fields directly, including the subdomain
 
 **File:** column UPDATE grants on `organizations` to `authenticated` (`slug`, `feature_overrides`, `employee_count`, `data_retention_days`, among others); `admin_update_organization`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** Confirmed on the throwaway stack: an org A Super Admin updated their own `slug`, `feature_overrides` and `employee_count` through the table. I found no customer path that changes `slug`, which the app treats as permanent. Changing it frees the old subdomain, which another organization's Super Admin can then claim the same way, serving their sign-in page at a name the first organization's staff trust. Taking a name in use and the reserved names were refused.
 **Suggested fix:** Revoke UPDATE on `slug`, `employee_count` and any Gridmaster-owned field, or all columns and route writes through `organizations/settings`.
-**Resolution:**
+**Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 revokes INSERT, UPDATE, DELETE and TRUNCATE on `organizations` from `authenticated`, which also removes 004's column grants, so no write-once field (the subdomain among them) can be changed through the data API. Every organization write already went through the service client; the unused browser `updateOrganization` is deleted. The live test `migration-137-leftover-direct-writes.integration.test.ts` checks no table or column privilege is left.
 **Update 2026-11-13 (re-check against dev):** still open. Revoking every column is safe (settings write through the service client); delete the unused `updateOrganization` in `lib/db/organizations.ts` with it.
 
 ### F-201 [P2] open - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
@@ -823,31 +823,31 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** per item: (2) owner decision (2026-11-13): suspending or offboarding someone ends only their sessions in that organization, as Move email does, replacing 51c and 51k's "everywhere". (9) `job_shift_overrides` now has composite foreign keys (124). Everything else is still open.
 
-### F-214 [P2] open - An Admin who can edit notes can publish or delete published notes directly
+### F-214 [P2] fixed - An Admin who can edit notes can publish or delete published notes directly
 
 **File:** `003:391-403` (policies on `canEditNotes`, any status), `004:59`; `apps/web/src/app/api/schedule/manage/route.ts:2528` (published status taken from the client's `existingStatus`)
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security)
 **Why it matters:** F-197's hole on `schedule_notes`. On the stack an Admin with only `canEditNotes` inserted a `published` note directly, past publish, the audit log and alerts. Sending `draft_deleted` to the route reaches the same result, traced only. `authenticated` also holds TRUNCATE on the table, which PostgREST can't reach.
 **Suggested fix:** Revoke writes as 122 does, after confirming no client writes remain, and read the note's status from the database in the route.
-**Resolution:**
+**Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 revokes every write on `schedule_notes` from `authenticated` (all note writes are service-client route writes), and the route reads the note's stored status before saving or deleting instead of trusting the client's `existingStatus`. Route tests fail on the old code: a claimed draft no longer deletes a published note, a claimed `draft_deleted` no longer publishes a new one, and a note already gone writes nothing.
 **Update 2026-11-13 (re-check against dev):** still open. Every note write is a service-client route write, so revoking is safe.
 
-### F-215 [P2] open - Deleting a focus area, shift or job directly rewrites published schedule rows
+### F-215 [P2] fixed - Deleting a focus area, shift or job directly rewrites published schedule rows
 
 **File:** `003:210, 306, 330` (delete policies), `004:59`; `001` (`ON DELETE SET NULL` on `schedule_cells.focus_area_id`); `schedule_cell_segments` (no foreign key)
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security)
 **Why it matters:** Referential actions run as the owner, so 122 doesn't stop them. On the stack a Super Admin's direct `DELETE` on `focus_areas` cleared the focus area from its published cells, past days included, past the settings route's in-use checks. Direct deletes on `shift_categories` or `jobs` should leave segments pointing at nothing, traced only.
 **Suggested fix:** Revoke DELETE on these tables from `authenticated`, since the settings route archives or checks use through the service client.
-**Resolution:**
+**Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 revokes DELETE and TRUNCATE on `focus_areas`, `shift_categories` and `jobs` from `authenticated`, so their ON DELETE actions can only run through the settings route's service-client deletes, after its in-use checks.
 **Update 2026-11-13 (re-check against dev):** still open. The only hard deletes are service-client calls in the settings route, so revoking is safe.
 
-### F-216 [P2] open - Archiving a focus area leaves it on every person
+### F-216 [P2] fixed - Archiving a focus area leaves it on every person
 
 **File:** `apps/web/src/app/api/settings/config/route.ts:651`; `remove_focus_area_from_employees` (`002:7533-7536`)
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: quality)
 **Why it matters:** The route calls the function with the service client, and the function filters on `caller_org_id()`, which is NULL there. On the stack it ran with no error and all 15 people stayed on the area. The route's test mocks the RPC. `validateStaffOrgReferences` should then reject the archived id on that person's next save, traced only. It fails closed, so it isn't a tenant leak.
 **Suggested fix:** Pass the organization into the function, and filter on it.
-**Resolution:**
+**Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 replaces `remove_focus_area_from_employees(BIGINT)` with `(BIGINT, UUID)`, which removes the area only from that organization's people. The service role may name any organization; any other caller must be signed in to it (`refuse_caller_outside_org`) and allowed to manage focus areas. The settings route passes the effective organization (tested against a sandbox), and the live test proves another organization's people are untouched.
 **Update 2026-11-13 (re-check against dev):** still open. When adding `p_org_id`, keep checking it against `caller_org_id()` for non-service-role callers.
 
 ### F-217 [P2] open - Self-service routes have no session or suspension check
