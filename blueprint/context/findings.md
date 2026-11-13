@@ -150,7 +150,7 @@
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** the suggested fix now conflicts with later work. The layout verifies the session on the server to paint at once (F-131) and reads client flags (F-158), and the sign-in pages moved onto the nonce policy (F-204). Prerendering would lose the first and need `'unsafe-inline'` again. Measure cold starts before pursuing it.
 
-### F-134 [P2] open - Sentry's full SDK, Session Replay included, downloads and parses on every page at boot
+### F-134 [P2] fixed - Sentry's full SDK, Session Replay included, downloads and parses on every page at boot
 
 **File:** `apps/web/src/lib/sentry.ts:84` (`void import("@sentry/nextjs")` at module load); `apps/web/src/instrumentation-client.ts:60-68`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
@@ -162,6 +162,7 @@
 - Add Sentry's `bundleSizeOptimizations` (exclude the replay iframe, shadow DOM and worker).
   **Resolution:**
   **Update 2026-11-13 (re-check against dev):** still open. Don't use `lazyLoadIntegration`: it loads from Sentry's CDN, which the CSP doesn't allow. Import the SDK on idle or `load` and add `bundleSizeOptimizations`; Replay stays in the one SDK chunk on purpose.
+  **Update 2026-11-13 (fix/web-page-weight):** fixed as the re-check suggested. `lib/sentry.ts` starts the SDK import after the page's load event and an idle callback (a 500ms timer where Safari has none), and until it loads an uncaught error or rejection is queued for it (`bufferEarlyErrors`), so nothing thrown at startup is lost. On a local production build the page's chunks finished at 0.66s, load at 0.70s, and the 158 KB gzip Sentry chunk was requested at 3.7s. Tested in `sentry-loading.test.ts`. `bundleSizeOptimizations` not added.
 
 ### F-135 [P2] fixed - Each staff-search keystroke re-renders every Schedule grid section
 
@@ -238,6 +239,7 @@
 - Preload only Inter in the root layout.
   **Resolution:**
   **Update 2026-11-13 (re-check against dev):** every part is still present. Narrow the font advice: keep the DM Sans preload (every header's wordmark uses it) and drop only DM Mono if it isn't above the fold.
+  **Update 2026-11-13 (fix/web-page-weight, measured):** a production build of dev puts first-load JS at 585 KB gzip on `/schedule`, 579 on `/people/[id]`, 556 on `/people` and 384 on `/dashboard`; 371 KB is shared by every app page (React DOM 72, Supabase auth and realtime 65, Next runtime 41, React Query and zod). Loading Schedule's Month view, history panel and modals, the person page's dialogs and the sandbox dialog on demand saved only 6, 2 and about 1 KB, so those were left static; Settings' billing-only screen loads `BillingSettings` on demand (-14 KB). The remaining weight is the pages' own grid and editors, not on-click code.
 
 ### F-141 [P2] unverified - RLS policies call SECURITY DEFINER helpers per row instead of once per query
 
@@ -478,8 +480,9 @@
 **Why it matters:** A cell save touches `schedule_cells`, `schedule_cell_snapshots` and `schedule_cell_segments`, which map to the same keys, so each key is invalidated three times per flush with the default `cancelRefetch`, restarting fetches whose requests still go out. Every invalidation is also broadcast to other tabs, which got the same event on their own channel and invalidate again, so load grows with the square of open tabs. The 150ms fixed-window flusher fires about seven times a second through a paste or Auto-build Apply. `permissionsRealtime.ts:63-66` already uses `cancelRefetch: false`. The web side of F-150.
 **Suggested fix:** Collect the union of keys per flush and invalidate each once with `{ cancelRefetch: false }`; don't re-broadcast keys that came from realtime; make the flusher trailing with a 1-2s max wait.
 **Resolution:**
+**Update 2026-11-13 (fix/report-refresh-published-only):** the web org channel now invalidates the union of a flush's keys once each with `cancelRefetch: false` (`getOrgRealtimeFlushKeys`). Still open: the re-broadcast to other tabs and the fixed 150ms window, which move with F-199.
 
-### F-164 [P2] open - Draft edits regenerate the published-only operations report
+### F-164 [P2] fixed - Draft edits regenerate the published-only operations report
 
 **File:** `apps/web/src/hooks/useOrgRealtimeInvalidation.ts:138-145`; `apps/web/src/app/(app)/reports/ReportsPageContent.tsx:479-497`; `apps/web/src/features/reports/server/operations.ts:477, 942`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
@@ -487,6 +490,7 @@
 **Suggested fix:** Drop `reports.operationsAll` from the cell-table cases; keep it for `publish_history`, `employees` and `recurring_shifts`.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** the suggested fix would regress item 53: a past-day correction writes published cells with no `publish_history` row, so the cell tables are the report's only signal. Invalidate `reports.operationsAll` on correction events (or published-snapshot changes) instead, together with F-163.
+**Resolution:** Fixed on fix/report-refresh-published-only (2026-11-13), on published-snapshot changes as the re-check said: the cell tables no longer invalidate `reports.operationsAll`, and `changesPublishedSchedule` adds it to the flush when a `schedule_cell_snapshots` event carries `snapshot_kind = published` (every publish, approval and correction upserts that row) or is a DELETE, whose payload holds only the id. Tested in `org-realtime-invalidation.test.ts`.
 
 ### F-165 [P2] fixed - The header loads the organization's whole roster on every page for one boolean
 
