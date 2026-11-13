@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import {
   getOrganizationBootstrapQueryPolicy,
@@ -13,14 +14,53 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { BrandLoadingScreen } from "@/components/BrandLoadingScreen";
 import { Banner } from "@/components/ui/Banner";
 import { FlaskConical } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
+import { setUserViewActive } from "@/hooks";
+import { SANDBOX_ENDED_NOTICE_COOKIE } from "@/lib/sandbox-cookie";
 
+/**
+ * True once, when the server just ended this tab's sandbox from elsewhere
+ * (another window started one, a new sign-in, the cleanup job) and left its
+ * short-lived note. Reading it removes it, so the notice is never repeated.
+ */
+function takeSandboxEndedNotice(): boolean {
+  if (typeof document === "undefined") return false;
+  const present = document.cookie
+    .split(/;\s*/)
+    .some((part) => part.startsWith(`${SANDBOX_ENDED_NOTICE_COOKIE}=`));
+  if (present) {
+    document.cookie = `${SANDBOX_ENDED_NOTICE_COOKIE}=; path=/; max-age=0`;
+  }
+  return present;
+}
+
+/**
+ * Rendered by AppShell above the header, not inside it: the header is withheld
+ * while a billing or setup lock is loading or applies, and a banner that
+ * shares its fate left a sandboxed person with no sign they were in one and no
+ * way out.
+ */
 export default function SandboxBanner() {
+  const { user } = useAuth();
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
     queryKey: queryKeys.org.bootstrap(),
     ...getOrganizationBootstrapQueryPolicy(),
+    enabled: Boolean(user),
   });
   const [pendingAction, setPendingAction] = useState<"exit" | "reset" | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Without this the person was simply back in their organization with no word
+  // on where the sandbox went. User view goes too: it was switched on inside a
+  // sandbox that no longer exists.
+  useEffect(() => {
+    if (!takeSandboxEndedNotice()) return;
+    setUserViewActive(false);
+    toast.info("Your test sandbox has ended, so you're back in your organization.", {
+      description:
+        "This happens when you start a sandbox or sign in somewhere else. Its changes were discarded.",
+    });
+  }, []);
 
   const org = bootstrapQuery.data?.org ?? null;
   if (!org || org.workspaceKind !== "sandbox") return null;
@@ -35,7 +75,9 @@ export default function SandboxBanner() {
         body: JSON.stringify({ action }),
       });
       if (!response.ok) {
-        const body = (await response.json()) as Record<string, unknown>;
+        // An error page from the platform (a 502, say) is not JSON; that is
+        // still a failed action, not an unreachable server.
+        const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
         setError(formatClientErrorMessage(body?.error, errorFallback));
         setPendingAction(null);
         return;
@@ -58,6 +100,10 @@ export default function SandboxBanner() {
       // (exit) or rewritten (reset) by the server response, so the
       // reloaded page sees the new sandbox state on its first
       // bootstrap fetch.
+      // User view is a per-tab flag that survives the reload. Leaving or
+      // restarting the sandbox should not drop the person into their real
+      // organization still previewing it as a regular user.
+      setUserViewActive(false);
       window.location.reload();
     } catch {
       setError("We couldn't reach the server. Try again in a moment.");

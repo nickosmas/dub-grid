@@ -8,12 +8,14 @@ const getServiceClient = vi.fn();
 const createSandboxForUser = vi.fn();
 const deleteSandboxForUser = vi.fn();
 const findActiveSandboxForUser = vi.fn();
+const findSandboxFromOtherSession = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
+  requireAuthenticatedUserWithTokenClaims: (req: NextRequest) =>
+    requireAuthenticatedUserWithClaims(req),
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: {},
@@ -26,6 +28,7 @@ vi.mock("@/features/test-sandbox/server", () => ({
   createSandboxForUser: (...args: unknown[]) => createSandboxForUser(...args),
   deleteSandboxForUser: (...args: unknown[]) => deleteSandboxForUser(...args),
   findActiveSandboxForUser: (...args: unknown[]) => findActiveSandboxForUser(...args),
+  findSandboxFromOtherSession: (...args: unknown[]) => findSandboxFromOtherSession(...args),
 }));
 
 const USER_ID = "user-1";
@@ -110,10 +113,17 @@ function buildServiceClient(opts: {
   };
 }
 
-function makeRequest(action: string, opts?: { sandboxCookie?: boolean }): NextRequest {
+function makeRequest(
+  action: string,
+  opts?: { sandboxCookie?: boolean; replaceExisting?: boolean },
+): NextRequest {
   return new NextRequest("https://app.test/api/test-sandbox", {
     method: "POST",
-    body: JSON.stringify({ action }),
+    body: JSON.stringify(
+      opts?.replaceExisting === undefined
+        ? { action }
+        : { action, replaceExisting: opts.replaceExisting },
+    ),
     headers: opts?.sandboxCookie ? { cookie: "dubgrid-sandbox=already-in-one" } : undefined,
   });
 }
@@ -128,11 +138,76 @@ beforeEach(() => {
   });
   checkRateLimit.mockResolvedValue({ limited: false, reset: 0, misconfigured: false });
   findActiveSandboxForUser.mockResolvedValue(null);
+  findSandboxFromOtherSession.mockResolvedValue(null);
   createSandboxForUser.mockResolvedValue({ id: "sandbox-1", slug: "sandbox-abc" });
   deleteSandboxForUser.mockResolvedValue(undefined);
 });
 
 describe("POST /api/test-sandbox", () => {
+  it("asks before replacing a sandbox open in another session, and deletes nothing", async () => {
+    getServiceClient.mockReturnValue(buildServiceClient({ role: "super_admin" }));
+    findSandboxFromOtherSession.mockResolvedValue({
+      id: "other-sandbox",
+      startedAt: "2026-11-12T22:14:00.000Z",
+    });
+
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest("enter"));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({
+      code: "SANDBOX_OPEN_ELSEWHERE",
+      startedAt: "2026-11-12T22:14:00.000Z",
+    });
+    expect(deleteSandboxForUser).not.toHaveBeenCalled();
+    expect(createSandboxForUser).not.toHaveBeenCalled();
+  });
+
+  it("replaces the other session's sandbox once the person confirms", async () => {
+    getServiceClient.mockReturnValue(buildServiceClient({ role: "super_admin" }));
+    findSandboxFromOtherSession.mockResolvedValue({ id: "other-sandbox", startedAt: null });
+
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest("enter", { replaceExisting: true }));
+
+    expect(res.status).toBe(200);
+    expect(findSandboxFromOtherSession).not.toHaveBeenCalled();
+    expect(deleteSandboxForUser).toHaveBeenCalled();
+    expect(createSandboxForUser).toHaveBeenCalled();
+  });
+
+  it("replaces this session's sandbox when it was cloned from another organization", async () => {
+    getServiceClient.mockReturnValue(buildServiceClient({ role: "super_admin" }));
+    findActiveSandboxForUser.mockResolvedValue({
+      id: "old-sandbox",
+      slug: "sandbox-old",
+      sourceOrgId: "22222222-2222-2222-2222-222222222222",
+    });
+
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest("enter"));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ sandbox: { reused: false } });
+    expect(deleteSandboxForUser).toHaveBeenCalled();
+    expect(createSandboxForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceOrgId: SOURCE_ORG }),
+    );
+  });
+
+  it("exits without consulting the sandbox cookie's validity", async () => {
+    // Exit authenticates with the token's own claims; a stale cookie must not
+    // be able to refuse the one action that clears it.
+    getServiceClient.mockReturnValue(buildServiceClient({ role: "super_admin" }));
+
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest("exit", { sandboxCookie: true }));
+
+    expect(res.status).toBe(200);
+    expect(deleteSandboxForUser).toHaveBeenCalled();
+    expect(res.headers.get("set-cookie")).toMatch(/dubgrid-sandbox=;.*Max-Age=0/i);
+  });
+
   it("refuses to clone an org the user is not an active member of", async () => {
     getServiceClient.mockReturnValue(buildServiceClient({ role: null }));
 

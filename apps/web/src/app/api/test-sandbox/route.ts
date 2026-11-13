@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { requireAuthenticatedUserWithTokenClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { retryAfterSeconds } from "@/lib/retry-after";
 import { canUseTestSandbox } from "@/lib/sandbox-access";
 import { getServiceClient } from "@/lib/supabase-service";
-import { SANDBOX_COOKIE_NAME, encodeSandboxCookieValue } from "@/lib/sandbox-cookie";
+import {
+  SANDBOX_COOKIE_NAME,
+  SANDBOX_OPEN_ELSEWHERE_CODE,
+  encodeSandboxCookieValue,
+} from "@/lib/sandbox-cookie";
 import {
   createSandboxForUser,
   deleteSandboxForUser,
   findActiveSandboxForUser,
+  findSandboxFromOtherSession,
 } from "@/features/test-sandbox/server";
 import { API_ERRORS, DEFAULT_ERROR_FALLBACK } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
@@ -20,7 +25,9 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 export const dynamic = "force-dynamic";
 
 const requestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("enter") }),
+  // replaceExisting: the person saw that a sandbox is open in another session
+  // and chose to discard it. Without it, Enter refuses rather than deleting.
+  z.object({ action: z.literal("enter"), replaceExisting: z.boolean().optional() }),
   z.object({ action: z.literal("exit") }),
   // Reset = wipe and re-create. Used by the banner's Reset button so the
   // user can discard accumulated sandbox changes and start with a fresh
@@ -41,7 +48,11 @@ export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
 
-  const auth = await requireAuthenticatedUserWithClaims(req);
+  // The token's own claims, not the sandbox-rewritten ones. Exit has to work
+  // while the sandbox cookie is stale (the rewriting helper refuses such a
+  // request outright), and Enter takes its source organization from the real
+  // session rather than from a sandbox that is already open.
+  const auth = await requireAuthenticatedUserWithTokenClaims(req);
   if ("response" in auth) return auth.response;
 
   let body: unknown;
@@ -104,28 +115,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Mirrors Header.tsx's client-side canOpenSandbox gate. auth.claims.org_role
-    // can't be used for this: requireAuthenticatedUserWithClaims already
-    // widens it to "super_admin" once a sandbox cookie exists, which would
-    // let a user demoted after entering keep resetting their sandbox. Read the
-    // caller's real role in the source org instead.
+    // Mirrors Header.tsx's client-side canOpenSandbox gate. Read the caller's
+    // live role in the source org rather than the token's org_role claim,
+    // which trails a demotion until the session refreshes.
     if (!(await canUseTestSandbox(serviceClient, auth.user.id, sourceOrgId))) {
       return NextResponse.json(
         { error: "You don't have permission to use sandbox mode." },
         { status: 403 },
       );
     }
+    // A sandbox open in another session would be discarded below. Ask first:
+    // the person may still be working in it in another window or device.
+    const replaceExisting = parsed.data.action === "enter" && parsed.data.replaceExisting === true;
+    if (!isReset && !existing && !replaceExisting) {
+      const elsewhere = await findSandboxFromOtherSession(
+        serviceClient,
+        auth.user.id,
+        auth.sessionId,
+      );
+      if (elsewhere) {
+        return NextResponse.json(
+          {
+            error:
+              "You already have a sandbox open in another window or device. Starting one here closes it and discards its changes.",
+            code: SANDBOX_OPEN_ELSEWHERE_CODE,
+            startedAt: elsewhere.startedAt,
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     // For "enter": reuse the existing sandbox if there is one (typical case is
     // the user re-clicking enter from another tab and expecting their
     // in-progress work back). For "reset": ignore it — we recreate below.
     // One sandbox is retained per user. A sandbox from another browser session
     // is invalid for this request and is removed before this session creates
     // its own, so stale state cannot silently migrate between sessions.
-    if (isReset || !existing) {
+    // A sandbox this session cloned from another organization (before an
+    // organization switch) is not reusable: its source is not the one just
+    // checked, and reusing it answered 200 and then refused every request.
+    const reusable = !isReset && existing && existing.sourceOrgId === sourceOrgId ? existing : null;
+    if (!reusable) {
       await deleteSandboxForUser({ serviceClient, actor: auth.user });
     }
 
-    const reusable = isReset ? null : existing;
     const sandbox =
       reusable ??
       (await createSandboxForUser({

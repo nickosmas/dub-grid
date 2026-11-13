@@ -7,6 +7,31 @@
 
 export const SANDBOX_COOKIE_NAME = "dubgrid-sandbox";
 
+/**
+ * Machine-readable code on a refusal whose cause is a sandbox cookie that no
+ * longer names a sandbox this session may use (exited elsewhere, deleted by the
+ * cleanup cron, a new sign-in, or its owner lost access). The refusing response
+ * also clears the cookie, so the client reloads once and lands back in the real
+ * organization instead of every request failing until the cookie expires.
+ */
+export const SANDBOX_ENDED_CODE = "SANDBOX_ENDED";
+/**
+ * Enter found a sandbox this person opened in another session (another window,
+ * browser or device). Nothing was deleted; the client asks before replacing it
+ * by resending with `replaceExisting: true`.
+ */
+export const SANDBOX_OPEN_ELSEWHERE_CODE = "SANDBOX_OPEN_ELSEWHERE";
+
+/**
+ * A short-lived, script-readable cookie set alongside clearing the sandbox
+ * cookie when the sandbox ended outside this tab. The app reads it once after
+ * the reload to say why the person is back in their organization.
+ */
+export const SANDBOX_ENDED_NOTICE_COOKIE = "dg-sandbox-ended";
+
+export const SANDBOX_ENDED_MESSAGE =
+  "Your test sandbox has ended. Reload to return to your organization.";
+
 export interface SandboxCookieData {
   sandboxOrgId: string;
   userId: string;

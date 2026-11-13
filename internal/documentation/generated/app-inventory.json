@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:cda3326526bcf35cbd037acf786e4845adae901f5b951fccfb9c4efa1166981f",
+  "sourceDigest": "sha256:b1951d1b47492052f7f50080eb27822b259793337f819a5d65b704d01cdcfc0c",
   "webRoutes": [
     {
       "id": "web:/",
@@ -6876,6 +6876,9 @@
         },
         {
           "path": "apps/web/src/lib/rate-limit.ts"
+        },
+        {
+          "path": "apps/web/src/lib/sandbox-ended.ts"
         },
         {
           "path": "apps/web/src/lib/sentry.ts"

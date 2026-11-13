@@ -70,6 +70,7 @@ import {
   requireAuthenticatedSession,
   requireAuthenticatedUser,
   requireAuthenticatedUserWithClaims,
+  requireAuthenticatedUserWithTokenClaims,
   requireGridmasterSession,
   requireSensitiveActionAuth,
   createTokenScopedClient,
@@ -432,6 +433,44 @@ describe("api auth helpers", () => {
       const result = await requireAuthenticatedUserWithClaims(sandboxBearerRequest(token));
 
       expect("response" in result && result.response.status).toBe(403);
+      expect(authMocks.serviceFrom).not.toHaveBeenCalled();
+    });
+
+    it("clears a Test Sandbox cookie that no longer names a usable sandbox", async () => {
+      // The sandbox row is gone (exited in another tab, cleanup cron, a new
+      // sign-in). The refusal must drop the HttpOnly cookie, or every request,
+      // Exit included, is refused until it expires.
+      authMocks.serviceFrom.mockImplementation((table: string) => {
+        if (table === "organizations") {
+          const chain = {
+            select: () => chain,
+            eq: () => chain,
+            is: () => chain,
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+          };
+          return chain;
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      const token = await signToken({ claims: { org_id: "real-org" } });
+
+      const result = await requireAuthenticatedUserWithClaims(sandboxBearerRequest(token));
+
+      expect("response" in result).toBe(true);
+      if ("response" in result) {
+        expect(result.response.status).toBe(403);
+        await expect(result.response.json()).resolves.toMatchObject({ code: "SANDBOX_ENDED" });
+        expect(result.response.headers.get("set-cookie")).toMatch(/dubgrid-sandbox=;.*Max-Age=0/i);
+      }
+    });
+
+    it("gives the sandbox route the token's own claims even with a stale sandbox cookie", async () => {
+      const token = await signToken({ claims: { org_id: "real-org" } });
+
+      const result = await requireAuthenticatedUserWithTokenClaims(sandboxBearerRequest(token));
+
+      expect("response" in result).toBe(false);
+      if (!("response" in result)) expect(result.claims.org_id).toBe("real-org");
       expect(authMocks.serviceFrom).not.toHaveBeenCalled();
     });
 
