@@ -885,6 +885,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-07 (review):** `permissions.ts:468` ignores every read error, not only the `employees` one: an `organizations` error skips the sandbox, archived and lock checks, and a `profiles` error skips deactivated. An attacker can't cause these reads to fail. Traced, not run.
 **Update 2026-11-13 (re-check against dev):** (1) is fixed (the header asks billing for the source organization). (2), (3) and (4) are still open.
+**Update 2026-11-13 (fix/p3-quick-wins):** (2) and (3) are fixed. `requireOrgPermissions` answers 503 (`SERVICE_UNAVAILABLE`, as `api-auth.ts` does for a failed read) and logs when the membership, profile, organization or employees read errors, instead of reading it as no row. `readSessionOrgId` returns the token's refusal when the re-verify fails, and `requireOrgPermissions` passes it on rather than skipping the session comparison. Tests in `permissions.test.ts` fail on the old code. (4), the identity route writing `email` on a linked row, is still open.
 
 ### F-221 [P3] open - Smaller gaps left around the repairs
 

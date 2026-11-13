@@ -34,6 +34,7 @@ type MockAccessRow = {
     trial_ends_at: string | null;
   } | null;
   employee?: { status?: string | null; suspended_at?: string | null } | null;
+  readErrors?: Partial<Record<string, { message: string }>>;
   impersonation?: { session_id: string } | null;
   impersonationFilters?: Array<[string, unknown]>;
   setup?: Partial<MockSetupRows>;
@@ -148,7 +149,7 @@ function createServiceClientMock(rows: MockAccessRow) {
                         : table === "impersonation_sessions"
                           ? (rows.impersonation ?? null)
                           : null,
-              error: null,
+              error: rows.readErrors?.[table] ?? null,
             }),
             then<TResult1 = unknown, TResult2 = never>(
               onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
@@ -337,7 +338,7 @@ describe("requireOrgPermissions", () => {
     });
 
     it("checks a caller passed in as the actor the same way", async () => {
-      readSessionOrgId.mockResolvedValue(SESSION_ORG);
+      readSessionOrgId.mockResolvedValue({ sessionOrgId: SESSION_ORG });
       getServiceClient.mockReturnValue(createServiceClientMock(member));
 
       const refused = await ask(OTHER_ORG, { actor: { id: USER_ID } });
@@ -374,6 +375,35 @@ describe("requireOrgPermissions", () => {
 
       expect("response" in result && result.response.status).toBe(403);
     });
+
+    it("refuses an actor whose session no longer verifies, rather than skipping the check (F-220)", async () => {
+      const { NextResponse } = await import("next/server");
+      readSessionOrgId.mockResolvedValue({
+        response: NextResponse.json({ error: "expired" }, { status: 401 }),
+      });
+      getServiceClient.mockReturnValue(createServiceClientMock(member));
+
+      const result = await ask(OTHER_ORG, { actor: { id: USER_ID } });
+
+      expect("response" in result && result.response.status).toBe(401);
+    });
+
+    it.each(["organization_memberships", "profiles", "organizations", "employees"])(
+      "refuses when the %s read fails, rather than reading it as no row (F-220)",
+      async (table) => {
+        signedInTo(SESSION_ORG);
+        getServiceClient.mockReturnValue(
+          createServiceClientMock({
+            ...member,
+            readErrors: { [table]: { message: "connection reset" } },
+          }),
+        );
+
+        const result = await ask(SESSION_ORG);
+
+        expect("response" in result && result.response.status).toBe(503);
+      },
+    );
 
     it("leaves a Gridmaster free to manage other organizations", async () => {
       signedInTo(SESSION_ORG);

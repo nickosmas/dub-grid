@@ -30,7 +30,7 @@ vi.mock("@/features/notifications/server/publish-alerts", () => ({
 
 vi.mock("@/lib/api-auth", () => ({
   createRequestSupabaseClient: vi.fn(() => ({})),
-  readSessionOrgId: vi.fn(async () => null),
+  readSessionOrgId: vi.fn(async () => ({ sessionOrgId: null })),
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
 }));
 
