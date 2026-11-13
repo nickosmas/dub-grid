@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createRealtimeChannelName } from "./channel-name";
 import { createDebouncedTableFlusher } from "./debounced-flusher";
-import { subscribeToPostgresChanges, type RealtimeErrorHooks } from "./postgres-changes";
+import {
+  subscribeToPostgresChanges,
+  type RealtimeChangePayload,
+  type RealtimeErrorHooks,
+} from "./postgres-changes";
 
 export interface OrgScopedRealtimeOptions<Table extends string> extends RealtimeErrorHooks {
   client: SupabaseClient;
@@ -13,6 +17,8 @@ export interface OrgScopedRealtimeOptions<Table extends string> extends Realtime
   debounceMs: number;
   /** Called with the deduplicated set of changed tables once per debounce window. */
   onFlush: (tables: Table[]) => void;
+  /** Return true to leave an event out of the flush, for one the caller has fully handled. */
+  skipEvent?: (table: Table, payload: RealtimeChangePayload) => boolean;
   channelNamePrefix: string;
 }
 
@@ -31,14 +37,18 @@ export function subscribeOrgScopedRealtime<Table extends string>(
     table: Table;
     event?: "INSERT" | "UPDATE" | "DELETE" | "*";
     filter: string;
-    onEvent: (table: Table) => void;
+    onEvent: (table: Table, payload: RealtimeChangePayload) => void;
   }> = [];
+  const markChanged = (table: Table, payload: RealtimeChangePayload) => {
+    if (options.skipEvent?.(table, payload)) return;
+    flusher.markChanged(table);
+  };
 
   if (options.rowScopedTable) {
     listeners.push({
       table: options.rowScopedTable,
       filter: `id=eq.${options.orgId}`,
-      onEvent: (table) => flusher.markChanged(table),
+      onEvent: markChanged,
     });
   }
 
@@ -46,7 +56,7 @@ export function subscribeOrgScopedRealtime<Table extends string>(
     listeners.push({
       table,
       filter: `org_id=eq.${options.orgId}`,
-      onEvent: (t) => flusher.markChanged(t),
+      onEvent: markChanged,
     });
   }
 

@@ -496,13 +496,13 @@
 **Suggested fix:** Use `useEmployeeCount` (already keyed under `org.employeeCount`), or enable the roster only while onboarding is incomplete.
 **Resolution:** Fixed on fix/sign-in-cold-open-speed (2026-10-30): the header reads the bootstrap's `activeEmployeeCount`, as `SetupGuard` does; in the browser `/alerts` loads no roster.
 
-### F-166 [P3] open - Opening Schedule refetches the directory in every other tab in the organization
+### F-166 [P3] fixed - Opening Schedule refetches the directory in every other tab in the organization
 
 **File:** `apps/web/src/app/(app)/schedule/SchedulePageClient.tsx:1656, 6518, 8975` (`updateScheduleLastViewed`); `apps/web/src/hooks/useOrgRealtimeInvalidation.ts:134-135`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** Writing `organization_memberships.schedule_last_viewed_at` makes the org channel invalidate `org.users` and `org.directory` everywhere that can see the row. `permissionsRealtime.ts:110-113` already ignores that column; the org channel doesn't.
 **Suggested fix:** Ignore membership updates that change only `schedule_last_viewed_at`, as the permissions path does.
-**Resolution:**
+**Resolution:** Fixed on fix/p3-quick-wins (2026-11-13): `subscribeOrgScopedRealtime` takes a `skipEvent`, and the org channel uses it to absorb a membership UPDATE whose new row matches the cached directory entry in every field the directory takes from the membership (role, permissions, management departments and their admin subset, phone, not archived). Since the stamp also moves `updated_at`, the cached `membershipUpdatedAt` moves forward in place, so the next role or permission edit still passes its conflict check. Anything it can't compare refetches as before: no cached directory, a person whose account the viewer can't see (a regular member's directory has no `userId`), or a timestamp without an offset. Tested in `useOrgRealtimeInvalidation.test.ts` and `org-scoped-subscription.test.ts`; not run against live Realtime, so the payload's timestamp format is assumed to carry an offset (one without refetches).
 **Update 2026-11-13 (re-check against dev):** still open. The org channel has no old values to compare, so compare the new row with the cached one, as the permissions path does.
 
 ### F-167 [P2] open - Bulk alert actions cause a request storm on the Alerts page

@@ -2,12 +2,13 @@
 
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { subscribeOrgScopedRealtime } from "@dubgrid/realtime-core";
+import { subscribeOrgScopedRealtime, type RealtimeChangePayload } from "@dubgrid/realtime-core";
 import * as Sentry from "@/lib/sentry";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { queryKeys } from "@/lib/query-keys";
 import { uniqueKeys } from "@/lib/realtime-invalidation";
 import { getBrowserSupabaseClient } from "@/features/account/client";
+import type { DirectoryPerson } from "@/types";
 
 type OrgRealtimeTable =
   | "organizations"
@@ -184,6 +185,78 @@ export function invalidateOrgRealtimeQueries(
   }
 }
 
+// The cached version goes back to the server, which refuses one without an offset.
+function isTimestampWithOffset(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /(Z|[+-]\d\d:\d\d)$/.test(value) &&
+    !Number.isNaN(Date.parse(value))
+  );
+}
+
+function sameIds(cached: readonly number[], value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length === cached.length &&
+    value.every((id, index) => Number(id) === cached[index])
+  );
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value ?? null);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
+  return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(",")}}`;
+}
+
+/**
+ * Opening Schedule stamps schedule_last_viewed_at on the viewer's membership,
+ * which also moves its updated_at. The payload carries no old values, so the
+ * new row is compared with the person the cached directory holds: when every
+ * field the directory takes from the membership still matches, only the stamp
+ * moved, and the cached version is moved forward in place (role and permission
+ * edits send it back for their conflict check) instead of refetching the
+ * directory in every tab. Any doubt answers false, and the event is flushed.
+ */
+export function absorbMembershipViewStamp(
+  queryClient: QueryClient,
+  orgId: string,
+  payload: RealtimeChangePayload,
+): boolean {
+  const row = payload.new;
+  if (payload.eventType !== "UPDATE" || !row) return false;
+  if (typeof row.user_id !== "string" || !isTimestampWithOffset(row.updated_at)) return false;
+  if (row.org_id !== orgId || row.archived_at !== null) return false;
+
+  const directoryKey = queryKeys.org.directory(orgId);
+  const directory = queryClient.getQueryData<DirectoryPerson[]>(directoryKey);
+  const person = directory?.find(
+    (entry) => entry.userId === row.user_id && entry.source !== "pending_invite",
+  );
+  if (!person) return false;
+
+  const membershipPhone = typeof row.phone === "string" ? row.phone : "";
+  const unchanged =
+    person.orgRole === row.org_role &&
+    sameIds(person.managementDepartmentIds, row.department_ids) &&
+    sameIds(person.managementDeptAdminIds, row.dept_admin_ids) &&
+    (membershipPhone === "" || membershipPhone === person.phone) &&
+    canonicalJson(person.adminPermissions ?? null) === canonicalJson(row.admin_permissions);
+  if (!unchanged) return false;
+
+  if (person.membershipUpdatedAt != null && person.membershipUpdatedAt !== row.updated_at) {
+    const updatedAt = row.updated_at;
+    queryClient.setQueryData<DirectoryPerson[]>(directoryKey, (current) =>
+      current?.map((entry) =>
+        entry.personId === person.personId ? { ...entry, membershipUpdatedAt: updatedAt } : entry,
+      ),
+    );
+  }
+  return true;
+}
+
 /**
  * One shared subscription per org, reference-counted.
  *
@@ -215,6 +288,9 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
       // invalidated, just once per burst.
       debounceMs: 150,
       channelNamePrefix: `org-freshness:${orgId}`,
+      skipEvent: (table, payload) =>
+        table === "organization_memberships" &&
+        absorbMembershipViewStamp(queryClient, orgId, payload),
       onFlush: (tables) => {
         for (const table of tables) {
           invalidateOrgRealtimeQueries(queryClient, orgId, table);
