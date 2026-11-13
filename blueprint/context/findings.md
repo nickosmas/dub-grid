@@ -148,6 +148,7 @@
 **Why it matters:** The pages render no server data, so their shell could come from the CDN. Instead each hard load invokes a function, which can cold start. The cold-start share of TTFB is unmeasured.
 **Suggested fix:** Check Vercel's function cold-start metrics first. If they matter, move to a hash-based CSP or SRI (`experimental.sri`) and drop `force-dynamic` for shell routes. This is architectural, so do it after F-129 to F-132.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** the suggested fix now conflicts with later work. The layout verifies the session on the server to paint at once (F-131) and reads client flags (F-158), and the sign-in pages moved onto the nonce policy (F-204). Prerendering would lose the first and need `'unsafe-inline'` again. Measure cold starts before pursuing it.
 
 ### F-134 [P2] open - Sentry's full SDK, Session Replay included, downloads and parses on every page at boot
 
@@ -160,6 +161,7 @@
 - Load Replay through `lazyLoadIntegration` only after consent.
 - Add Sentry's `bundleSizeOptimizations` (exclude the replay iframe, shadow DOM and worker).
   **Resolution:**
+  **Update 2026-11-13 (re-check against dev):** still open. Don't use `lazyLoadIntegration`: it loads from Sentry's CDN, which the CSP doesn't allow. Import the SDK on idle or `load` and add `bundleSizeOptimizations`; Replay stays in the one SDK chunk on purpose.
 
 ### F-135 [P2] open - Each staff-search keystroke re-renders every Schedule grid section
 
@@ -215,6 +217,7 @@
 **Why it matters:** `/people/[id]` scores 74 and ships 538 KB gzip of first-load JS. Its data cost grows with the organization rather than the person.
 **Suggested fix:** `Promise.all` the two fetches. Filter corrections, notes and change requests by `emp_id` on the server. Use a Map for the directory.
 **Resolution:** Re-examined 2026-10-30 (second /audit pass) after the staff page rework: shift requests are now filtered by `empId` (`StaffDetailPage.tsx:962`). Still open: the employee-then-recurring waterfall (`:295-318`), organization-wide corrections and notes filtered on the client (`:1002-1019`, `:1038-1056`), every profile change request (`:969-978`) and `directory.find` per row (`:984`). See also F-168.
+**Update 2026-11-13 (re-check against dev):** requests are filtered by `empId`, and these queries now load only on the Schedule or Requests tab. The employee-then-recurring waterfall, organization-wide corrections and notes, every profile change request, and `directory.find` per row are still open.
 
 ### F-140 [P3] open - Code splitting gaps across signed-in routes
 
@@ -234,6 +237,7 @@
 - Read `NEXT_PUBLIC_*` directly in `subdomain.ts`.
 - Preload only Inter in the root layout.
   **Resolution:**
+  **Update 2026-11-13 (re-check against dev):** every part is still present. Narrow the font advice: keep the DM Sans preload (every header's wordmark uses it) and drop only DM Mono if it isn't above the fold.
 
 ### F-141 [P2] unverified - RLS policies call SECURITY DEFINER helpers per row instead of once per query
 
@@ -264,6 +268,7 @@
 **Why it matters:** Likely a scan of the org's notifications on each dedupe. The crons in F-142 and the Stripe webhook call it per row, and the table only grows.
 **Suggested fix:** EXPLAIN it. Add a partial index on `(org_id, type)` or dedupe per recipient through the `user_id` index. Add retention for read, archived and email-tracking rows.
 **Resolution:** Re-examined 2026-10-30 (second /audit pass): no notifications index leads with `org_id` (`001:1432-1436`), so the dedupe can only filter after reading across organizations; five overlapping `user_id` indexes also slow every insert. Still needs EXPLAIN.
+**Update 2026-11-13 (re-check against dev):** still open. Add the `(org_id, type)` index; don't dedupe per recipient, which would send a duplicate to someone added after the first alert.
 
 ### F-144 [P2] open - Creating or answering a shift request waits for every approver's alert to send
 
@@ -272,6 +277,7 @@
 **Why it matters:** These handlers `await` the dispatch. Per recipient, `sendNotification` makes 6-8 sequential calls (facts, insert, Expo push, preferences, throttle, dedupe, `getUserById`, org name, Resend, insert) before the requester gets a response.
 **Suggested fix:** `after(() => dispatchNotificationEvent(...))`, as `shifts/publish/route.ts:149` already does.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open: #286 moved other routes to `after()` but not these. Keep `settleOrNotify`'s choice of event synchronous and defer only the dispatch.
 
 ### F-146 [P2] open - Publish alerts fan out with no concurrency limit and a query chain per recipient
 
@@ -285,6 +291,7 @@
 - Cap concurrency.
 - Use Resend's batch send.
   **Resolution:**
+  **Update 2026-11-13 (re-check against dev):** still open; 51j's can-still-sign-in check adds to each recipient's chain. A batched version must keep 51j's gating and 46f's visibility rules.
 
 ### F-147 [P2] unverified - Publish reads every cell in the period, not only the changed ones
 
@@ -297,6 +304,7 @@
 - Unmeasured.
   **Suggested fix:** EXPLAIN on a month publish in a large org. Restrict to cells with a draft snapshot (`EXISTS`), and build changes with `jsonb_agg` or direct inserts. Check discard for the same shape.
   **Resolution:**
+  **Update 2026-11-13 (re-check against dev):** still open (latest definition in 092). A rewrite must keep `ORDER BY c.id` (the lock order shared with discard) and the 114/116 organization advisory lock.
 
 ### F-148 [P2] open - Batch cell saves query per cell
 
@@ -305,6 +313,7 @@
 **Why it matters:** Each cell makes two before-state reads, an RPC, possibly a note clear and an audit insert. That is about 150-200 round trips per 50-cell batch, which is how bulk edits, paste and Auto-build Apply save.
 **Suggested fix:** One before-state read and one audit insert per batch, with bounded concurrency. A set-based RPC later.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** partly fixed: the audit insert runs in `after()` (#286). Two reads and an RPC per cell with no concurrency cap remain; a set-based version must keep the per-cell saved, conflict and error outcomes.
 
 ### F-149 [P3] open - Smaller server data costs
 
@@ -327,6 +336,7 @@
 - Leave Offboarded people out of the mobile list by default.
 - Use set-based cron updates.
   **Resolution:**
+  **Update 2026-11-13 (re-check against dev):** (g) is partly fixed: `return-from-away` batches its away and suspension passes. Everything else is still open.
 
 ### F-150 [P2] open - Every member's phone refetches after every schedule edit, drafts included, several times over
 
@@ -345,6 +355,7 @@
 - Have non-editors key schedule refetches off `publish_history`.
 - Drop `audit_log` from the mobile subscription.
   **Resolution:**
+  **Update 2026-11-13 (re-check against dev):** one invalidation per flush with `cancelRefetch: false` is fixed. Draft tables for every user, the fixed 150ms window, no `publish_history` keying for non-editors and the `audit_log` subscription are still open. Plan with F-199.
 
 ### F-151 [P2] open - Mobile schedule endpoints load every publish change in the organization and scan it per entry
 
@@ -384,6 +395,7 @@
 - Use a stable `renderItem` and separator, and memo the rows.
 - Push `now` down to the rows that show relative time.
   **Resolution:** Re-examined 2026-10-30 (second /audit pass): confirmed at the cited lines, so moved to open. It missed the token refresh before bootstrap, fonts and the theme read gating bootstrap (F-183), Home content being a further wave after the splash, and the missing persisted cache (F-181).
+  **Update 2026-11-13 (re-check against dev):** partly fixed: bootstrap starts at module load (F-183) and a restored cache starts Home at once (F-181). On a cold cache `/me/schedule` still waits for bootstrap; the inline `renderItem`, separator and minute clock are still open.
 
 ### F-154 [P2] fixed - After sign-in, the app shell's code downloads only once the dashboard has rendered on the server
 
@@ -440,6 +452,7 @@
 **Why it matters:** After the code, `challengeAndVerify` has saved the session and emitted `MFA_CHALLENGE_VERIFIED`, but `AuthProvider` doesn't trust that event and calls `getUser` under the auth lock; `MFAVerify` then calls `setBrowserSession`, a second `getUser` queued behind it; `proceed()` waits on both. Before the form shows, the browser waits on `setSession`'s `getUser`, then `listFactors` calls `getUser` again.
 **Suggested fix:** Trust `MFA_CHALLENGE_VERIFIED` (its response carries the user), drop the extra `setBrowserSession` once E2E confirms the aal2 cookie, and return `factorId` from the login route.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. Don't drop `setBrowserSession`: it prevents a 403 race on the aal2 cookie. Replace it with a write that skips the round trip.
 
 ### F-161 [P3] unverified - `SignInPrefetch` pulls dashboard, roster and billing modules into the `/login` bundle
 
@@ -448,6 +461,7 @@
 **Why it matters:** It statically imports `dashboardQueries` (shift requests, shift-change formatting, schedule view), `useOrganizationData`, `useEmployees` (realtime-core, step-up) and the gridmaster and billing clients, all of which run only after a submit. Not in F-140; size unmeasured.
 **Suggested fix:** Move the priming into a module loaded with `import()` on submit.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. Narrow the fix: since F-156 the same component primes hard loads from the layout, so lazy-load it only on `/login` and the submit path.
 
 ### F-162 [P3] unverified - The background `getUser` on a hard load holds the auth lock that browser queries wait on
 
@@ -472,6 +486,7 @@
 **Why it matters:** `reports.operationsAll` is invalidated on every change to the three cell tables, though the report reads published data only. A manager with a long-range report open has it re-aggregated on the server on every peer's draft save, multiplied by F-163.
 **Suggested fix:** Drop `reports.operationsAll` from the cell-table cases; keep it for `publish_history`, `employees` and `recurring_shifts`.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** the suggested fix would regress item 53: a past-day correction writes published cells with no `publish_history` row, so the cell tables are the report's only signal. Invalidate `reports.operationsAll` on correction events (or published-snapshot changes) instead, together with F-163.
 
 ### F-165 [P2] fixed - The header loads the organization's whole roster on every page for one boolean
 
@@ -488,6 +503,7 @@
 **Why it matters:** Writing `organization_memberships.schedule_last_viewed_at` makes the org channel invalidate `org.users` and `org.directory` everywhere that can see the row. `permissionsRealtime.ts:110-113` already ignores that column; the org channel doesn't.
 **Suggested fix:** Ignore membership updates that change only `schedule_last_viewed_at`, as the permissions path does.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. The org channel has no old values to compare, so compare the new row with the cached one, as the permissions path does.
 
 ### F-167 [P2] open - Bulk alert actions cause a request storm on the Alerts page
 
@@ -504,6 +520,7 @@
 **Why it matters:** The Schedule tab loads the period's shifts and the month grid loads the padded month under its own key, the same data twice by default. The person and their recurring shifts sit in `useState`, so previous and next, and Back, repeat F-139's two-step waterfall each time, ignore the roster the People list just loaded, and get no realtime refresh.
 **Suggested fix:** Serve the grid month from the period's data when it falls inside it; move the person into `useQuery` with `placeholderData` from `employees.all`.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. The month grid pads past the period, so widen the period query to the padded grid rather than serving the grid from the period.
 
 ### F-169 [P2] unverified - Every in-app navigation waits on the proxy and a function render, Back included
 
@@ -512,6 +529,7 @@
 **Why it matters:** The page segments are client wrappers with no server data, yet each click, including Back to a visited page, goes edge proxy (verify, org memo, database) then a pdx1 render before the page swaps, with a bare `ProgressBar` meanwhile. Related to F-133 (hard loads); this is soft navigation. Latency unmeasured.
 **Suggested fix:** Set `experimental.staleTimes: { dynamic: 30 }` so visited segments are reused from the router cache; measure a click before and after.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. With `staleTimes`, a revisited route skips the proxy's lock and suspension redirects for up to 30 seconds (APIs still refuse), so confirm an organization switch and impersonation clear the router cache.
 
 ### F-170 [P3] unverified - Schedule's presence and drafts channels rejoin on any organization row change
 
@@ -528,6 +546,7 @@
 **Why it matters:** The read is unpaged, so past PostgREST's `max_rows = 1000` (`supabase/config.toml:18`) the summary written to the audit log undercounts. The notes query loads published notes too. Discard with `scope: "all"` makes the dates optional (`discard/route.ts:26-27`), so it reads the organization's whole cell history. Publish's two pre-reads run one after the other, then the RPC scans the same range again (F-147).
 **Suggested fix:** For publish, count `schedule_publish_changes` by kind for the returned history id after the RPC. For discard, join only cells with a draft snapshot and require dates. Run the two reads with `Promise.all`.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open; the notes pre-read is paged now, the cells read isn't. Counting `schedule_publish_changes` after the RPC must leave out note rows and apply the banner's added-beside-published rule.
 
 ### F-172 [P2] open - The shift-request list has no limit, no paging and no index for its sort or date filter
 
@@ -536,14 +555,15 @@
 **Why it matters:** `select('*')` with two employee embeds, ordered by `created_at`, no limit. The History tab (`ShiftRequestBoard.tsx:195`) and the staff page (`StaffDetailPage.tsx:962`) fetch the whole history, which grows with every request ever made and stops silently at 1,000 rows. The date filter ORs `requester_shift_date` and `target_shift_date`, neither indexed, and nothing indexes `(org_id, created_at)`.
 **Suggested fix:** Keyset paging with a limit, narrower columns, and an index on `shift_requests (org_id, created_at DESC)`.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. Staff are now scoped on the server; paging must keep that scope and the open-pickup pool.
 
-### F-173 [P2] unverified - The staffed call-off trigger resolves every publish change before checking whether any pickup is waiting
+### F-173 [P2] closed - The staffed call-off trigger resolves every publish change before checking whether any pickup is waiting
 
 **File:** `supabase/migrations/099_away_until.sql:3811-3930` (`finalize_scheduler_staffed_calloffs`, AFTER INSERT on `schedule_publish_changes`); `082` `resolve_schedule_state_storage`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** Each worked change runs `resolve_schedule_state_storage` twice (several job, shift and absence-type lookups) before scanning for open pickups that day, which usually returns none. A month publish for 150 people is about 3,000 runs. Out of lens and unchecked: `resolve_schedule_state_storage` raises on a since-archived job or shift, which could fail a whole publish.
 **Suggested fix:** Return early unless an open pickup with a parent exists for the org and date (`idx_shift_requests_org_open_pickups`). Check the archived-reference case separately.
-**Resolution:**
+**Resolution:** Fixed by migration 117 (`117_archived_items_stay_scheduled.sql`), found by the 2026-11-13 re-check: `finalize_scheduler_staffed_calloffs` returns early unless an open pickup with a parent exists for the organization and date, and uses `resolve_existing_schedule_state_storage`, so an archived reference no longer fails a publish.
 
 ### F-174 [P2] fixed - Leaving the grid locks the person's whole schedule history
 
@@ -560,6 +580,7 @@
 **Why it matters:** Up to 100 people go through `applyStatusChange` in sequence, each several round trips plus F-174's trigger and the away-absence fill. No route sets `maxDuration`.
 **Suggested fix:** Bounded concurrency (keep Super Admin offboards serial for the last-Super-Admin check) and a `maxDuration`.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open, with less to gain: Offboard and Away with no return take the organization publish lock (114/116), so they run one at a time anyway. Cap concurrency for the rest and add `maxDuration`.
 
 ### F-176 [P2] open - The hidden-people filter scans every profile on the platform, unindexed, before most schedule and people reads
 
@@ -568,6 +589,7 @@
 **Why it matters:** `profiles where is_internal = true` has no index, so it reads every user across every organization, serially before `fetchHiddenEmployeeIds`, on about 40 call sites. It grows with the platform, not the organization.
 **Suggested fix:** A partial index on `profiles (id) WHERE is_internal`, plus a 30s in-process memo, since the list is platform-wide.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** half fixed: the 30-second memo shipped with F-185. The partial index on `profiles (id) WHERE is_internal` is still missing.
 
 ### F-178 [P3] open - Gridmaster oversight reads whole platform tables with unordered offset paging
 
@@ -584,6 +606,7 @@
 **Why it matters:** Includes `audit_log`, `user_sessions`, `notifications`, `profiles` and every schedule table. Each update or delete writes the full old row to the WAL, and Realtime re-checks access per subscriber, compounding F-141, F-150 and F-163. Also, the web org channel registers 24 bindings per tab and each tab opens three more per-user channels (`perms:m`, `perms:e`, `account-freshness`) that could be one.
 **Suggested fix:** Remove tables no client subscribes to from the publication, use default replica identity where old values aren't read, and merge the per-user channels.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. Do it with F-199 so the publication is reworked once.
 
 ### F-180 [P3] open - Smaller schedule read costs
 
@@ -597,6 +620,7 @@
 
 **Suggested fix:** Skip the draft embed when `!canEditShifts`, use the cached config reads, and delete the unused key's invalidations.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. Change (2): the cached reads in `lib/db/config.ts` skip archived rows and use the user client, while the server needs archived rows (117); use an in-process memo instead.
 
 ### F-181 [P2] fixed - The mobile app keeps no data between launches, so every cold open waits on a token refresh and bootstrap before anything shows
 
@@ -653,6 +677,7 @@
 **Why it matters:** auth-js re-reads storage on each `getSession`: about five reads of the over-2KB value at launch (initialize, warm, provider, auto-refresh, realtime connect), then one per 25s heartbeat. The comment claiming the work is shared is inaccurate. Cost on the Android keystore unmeasured. Related to F-128.
 **Suggested fix:** An in-memory read-through cache in `local-storage.ts`, written through on set and remove.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open; the inaccurate comment is gone. A write-through cache must also clear on remove.
 
 ### F-188 [P3] open - Smaller mobile startup and sign-in costs
 
@@ -684,6 +709,7 @@
 **Why it matters:** Confirmed live on the throwaway stack: a staff user of org A, subscribed to `schedule_cells` with no filter, received `{"id": ...}` for a row deleted in org B; an UPDATE in org B correctly did not arrive. Postgres Changes cannot apply RLS or filters to DELETE. Only primary keys travel, so the leak is ids, timing and volume, but ids of deleted memberships and profiles are person identifiers.
 **Suggested fix:** Move invalidation to Broadcast from the database (`realtime.broadcast_changes`) on the private per-organization channels already in use, then remove these tables from the publication. Until then remove tables no client subscribes to, and check the dashboard's "Allow public access" Realtime setting is off.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. The fix also has to move the mobile invalidation hook. Plan with F-150, F-163 and F-179.
 
 ### F-200 [P2] open - Super Admins can change write-once organization fields directly, including the subdomain
 
@@ -692,6 +718,7 @@
 **Why it matters:** Confirmed on the throwaway stack: an org A Super Admin updated their own `slug`, `feature_overrides` and `employee_count` through the table. I found no customer path that changes `slug`, which the app treats as permanent. Changing it frees the old subdomain, which another organization's Super Admin can then claim the same way, serving their sign-in page at a name the first organization's staff trust. Taking a name in use and the reserved names were refused.
 **Suggested fix:** Revoke UPDATE on `slug`, `employee_count` and any Gridmaster-owned field, or all columns and route writes through `organizations/settings`.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. Revoking every column is safe (settings write through the service client); delete the unused `updateOrganization` in `lib/db/organizations.ts` with it.
 
 ### F-201 [P2] open - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
 
@@ -700,6 +727,7 @@
 **Why it matters:** F-75's rule binds a Gridmaster's organization writes to an active impersonation, but only schedule, requests, recurring, publish and settings/config apply it. A stale or stolen Gridmaster token can edit staff, organization settings or drafts in any organization with no notice to it, and `shifts/discard` uses direct service-role writes that migration 075 doesn't cover. `start_impersonation` writes no `audit_log` row itself: the route does, after the RPC, so a direct call with a fresh-proof token skips it and the notice email (`impersonation_sessions` still records it). The API role stays `gridmaster` while impersonating, so an impersonator isn't limited to the target's rights. Read in code.
 **Suggested fix:** Make the impersonation requirement the default for any Gridmaster write in `requireOrgPermissions`, with named exceptions, and apply it in `canManageEmployees`. Write the audit row inside `start_impersonation`, as migration 071 does elsewhere.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** employee import now requires impersonation. Owner decision (2026-11-13): keep 075's rule as it is (schedule, requests, publish and settings need an impersonation) and don't extend it to staff, organization settings or discard. Impersonating never narrows a Gridmaster's powers (see F-250). Still worth doing: `start_impersonation` should write its own audit row.
 
 ### F-202 [P2] open - The server code has no enforced tenant boundary: 196 files can reach the service client
 
@@ -710,6 +738,7 @@
 **Update 2026-11-06 (fix/tenant-mutation-guard):** the lint rule is in. `design/no-unscoped-tenant-write` fails an update or delete on an organization's table in `app/api` and `features/**/server` unless it filters on `org_id` or one account. It flagged 16 existing writes. None was exploitable, since each id came from the server or was tied to a person, and each now carries the filter. Still open: the `orgDb` helper, the generated CI test that sends org B's ids to every mutation route, and writes built across several statements, which the rule can't see.
 **Resolution:**
 **Update 2026-11-07 (review):** the lint rule passes `.upsert`, `.insert`, `.rpc`, a table name in a variable or template, a query split across statements, any `user_id` filter beside `.eq("id", id)`, and `.eq("org_id", body.orgId)`. It leaves out `organizations`, `notifications`, `audit_log`, `user_sessions`, `mobile_device_tokens` and others, and doesn't cover `apps/web/src/lib` or `packages/*`. A scan of all 285 write chains found no service-client update or delete whose only filter is a client-supplied id.
+**Update 2026-11-13 (re-check against dev):** the lint rule shipped (#383); the `orgDb` helper and the cross-organization route test are still open.
 
 ### F-203 [P2] open - Deleted organizations' data is kept indefinitely and the retention jobs never run
 
@@ -718,6 +747,7 @@
 **Why it matters:** Organization delete is a soft archive, `purge_expired_data` skips archived organizations, and nothing hard-deletes them, so staff data outlives the customer. The Privacy Policy promises configurable retention, and the open question on self-serve data export is still unanswered. A Supabase dashboard schedule wouldn't show in the repo, so check that first.
 **Suggested fix:** Schedule the jobs, define a hard-delete window after archive with a verified per-organization export before it, and align the policy text.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** owner decision (2026-11-13): an archived organization stays restorable by a Gridmaster for 90 days, then a scheduled job deletes it and its staff data; the Super Admin is offered an export in that window, and the Privacy Policy states the 90 days and the backup window. Needs its own spec.
 
 ### F-204 [P2] open - Auth cookies are readable by script, and sign-in pages allow inline scripts
 
@@ -728,6 +758,7 @@
 **Update 2026-11-08 (fix/sign-in-page-hardening):** the sign-in pages (`/login`, `/goodbye`, `/accept-invite`, `/forgot-password`, `/reset-password`, `/auth/*`) take the nonce policy, `connect-src` names the configured project alone (`https` and `wss`), and every writer of the session cookies sets `SameSite=Lax` and, over https, `Secure` (`authCookieOptions`). The web idle sign-out now runs on one deadline across sleep, reloads and tabs (#410). Still open: cookies stay readable by script, which the browser client needs, and there is no server-side session limit, since Supabase's time-box and inactivity timeout would also sign out the mobile app, which is meant to stay signed in.
 **Update 2026-11-08 (fix/web-session-idle-limit):** the server now ends idle web sessions: the web reports activity at most every 5 minutes of use (`touch_web_session`), and the token hook refuses to renew a web session with no report for 35 minutes (migration 128). The access token already issued still runs up to an hour. iOS, Android and a session with no recorded platform are never limited: the app stays signed in until the person signs out (owner, 2026-11-08). Still open: cookies readable by script.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** drop the session time-box and inactivity timeout from the suggested fix: they would sign the mobile app out, against the owner decision that it stays signed in (2026-11-08). Only script-readable cookies remain, which the browser client needs.
 
 ### F-205 [P2] open - Mobile access and data outlast a session
 
@@ -742,6 +773,7 @@
 Traced, not run on a device. Whether `allowBackup` carries the cache into device backups is unchecked.
 **Suggested fix:** Delete `mobile_device_tokens` rows server-side wherever sessions are ended, clear the cache at cold start when the session restores empty, and check account state in mobile auth as web does.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. 51j already stops delivery to Suspended and Offboarded people; the gap is a revoked session for someone still a member.
 
 ### F-206 [P2] open - The mobile API shows staff more than the organization's settings allow
 
@@ -750,6 +782,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** Inside one organization: swap options return entries without `withScheduleVisibility`, so item 46f's hidden publisher and change details reach staff. `/people` and `/people/[id]` leave a coworker's suspension, planned status and dates, first day, `orgRole` and `adminPermissions` in the response, and the detail route has no internal-account filter. Staff open shifts are computed from draft rows, so unpublished edits can be inferred. Traced, not run.
 **Suggested fix:** Apply the visibility helper to swap options, build the staff response from an allowed-fields list rather than a strip list, and use published rows for anyone who can't edit.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** partly fixed: #515 blanks colleague status in the list and detail and drops admin permissions from the list. Still open: the detail route returns `adminPermissions`, has no internal-account filter, swap options skip `withScheduleVisibility`, and open shifts come from draft rows. An allowed-fields list must keep `orgRole`, roles and departments (#515, 56e).
 
 ### F-207 [P2] open - Telemetry sends staff emails to third parties and can't be tied to an organization
 
@@ -766,6 +799,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** The email, IP and `login:global` limiters run together in `Promise.all`, so a request the IP limiter refuses may still count against the global 500 per 10 seconds, which is about 50 requests a second from one address. Mobile shares the key, and recovery has the same shape at 100 per 10 seconds. Upstash's counting wasn't run, so this needs a test.
 **Suggested fix:** Check the IP limiter first and only then consume the global one.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open, in three places: web login, mobile login and recovery.
 
 ### F-209 [P3] open - Smaller multi-tenancy gaps
 
@@ -786,6 +820,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 
 **Suggested fix:** Fix alongside the larger findings; scope the idempotency lookups and the email throttle by organization first.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** per item: (2) owner decision (2026-11-13): suspending or offboarding someone ends only their sessions in that organization, as Move email does, replacing 51c and 51k's "everywhere". (9) `job_shift_overrides` now has composite foreign keys (124). Everything else is still open.
 
 ### F-214 [P2] open - An Admin who can edit notes can publish or delete published notes directly
 
@@ -794,6 +829,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** F-197's hole on `schedule_notes`. On the stack an Admin with only `canEditNotes` inserted a `published` note directly, past publish, the audit log and alerts. Sending `draft_deleted` to the route reaches the same result, traced only. `authenticated` also holds TRUNCATE on the table, which PostgREST can't reach.
 **Suggested fix:** Revoke writes as 122 does, after confirming no client writes remain, and read the note's status from the database in the route.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. Every note write is a service-client route write, so revoking is safe.
 
 ### F-215 [P2] open - Deleting a focus area, shift or job directly rewrites published schedule rows
 
@@ -802,6 +838,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** Referential actions run as the owner, so 122 doesn't stop them. On the stack a Super Admin's direct `DELETE` on `focus_areas` cleared the focus area from its published cells, past days included, past the settings route's in-use checks. Direct deletes on `shift_categories` or `jobs` should leave segments pointing at nothing, traced only.
 **Suggested fix:** Revoke DELETE on these tables from `authenticated`, since the settings route archives or checks use through the service client.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. The only hard deletes are service-client calls in the settings route, so revoking is safe.
 
 ### F-216 [P2] open - Archiving a focus area leaves it on every person
 
@@ -810,6 +847,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** The route calls the function with the service client, and the function filters on `caller_org_id()`, which is NULL there. On the stack it ran with no error and all 15 people stayed on the area. The route's test mocks the RPC. `validateStaffOrgReferences` should then reject the archived id on that person's next save, traced only. It fails closed, so it isn't a tenant leak.
 **Suggested fix:** Pass the organization into the function, and filter on it.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. When adding `p_org_id`, keep checking it against `caller_org_id()` for non-service-role callers.
 
 ### F-217 [P2] open - Self-service routes have no session or suspension check
 
@@ -845,6 +883,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Update 2026-11-12 (claude/sandbox-recovery):** the sandbox billing item is fixed differently: the header and its billing notice ask `/api/billing` for the sandbox's source organization, as Billing settings already did, and a pending or refused billing read no longer holds the header inside a sandbox. The other items stay open.
 **Resolution:**
 **Update 2026-11-07 (review):** `permissions.ts:468` ignores every read error, not only the `employees` one: an `organizations` error skips the sandbox, archived and lock checks, and a `profiles` error skips deactivated. An attacker can't cause these reads to fail. Traced, not run.
+**Update 2026-11-13 (re-check against dev):** (1) is fixed (the header asks billing for the source organization). (2), (3) and (4) are still open.
 
 ### F-221 [P3] open - Smaller gaps left around the repairs
 
@@ -860,6 +899,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 
 **Suggested fix:** Fix alongside F-198 and F-214.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. Since 136 keeps live sandboxes across sign-ins, a leftover sandbox membership blocks an account delete more often (item 4).
 
 ### F-222 [P2] unverified - Id arrays aren't bound to the organization
 
@@ -868,6 +908,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** Arrays can't carry a foreign key, so F-192's repair doesn't cover them, and an Admin can write the `jobs` arrays through PostgREST. The eligibility SQL that was read ignores foreign ids, but other readers weren't traced. `employees/manage/route.ts:115-117` showed no organization check by grep. Whether production holds a cross-organization value is unknown.
 **Suggested fix:** Check production with a read-only query, then validate these on write as `validate_department_ids` does.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** narrower than written: employees' `role_ids` and `focus_area_ids` are validated by `validateStaffOrgReferences`, and employee writes are server-only (065). The `jobs`, `organization_roles` and `certifications` arrays are still unchecked.
 
 ### F-223 [P3] fixed - Approving a request inside a Test Sandbox is refused
 
@@ -957,6 +998,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** Switching organization into one that suspended you answers `ACCOUNT_SUSPENDED` without `suspendedUntil`, though F-224's resolution says the route returns the date. And someone suspended at this address and in every other organization is refused with the date from their default organization's staff row, not this one's. Neither grants access; both can tell the person the wrong day. Read in code, not run.
 **Suggested fix:** Return `suspendedUntil` from the switch route as the login route does, and have the hook name the date of the organization it refused for.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. The hook can't know which organization the person asked for, so the login route should look up that organization's `suspended_until` itself.
 
 ### F-237 [P2] open - The People filter sheet doesn't open on Android
 
@@ -964,6 +1006,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Found:** 2026-11-10 while restoring the native segmented switch
 **Why it matters:** On the Android emulator, tapping People's Filter calls `onPress` (logged) and sets the sheet visible, but no sheet appears and nothing is logged. It happens with the drawn switch and the native one, and with People's search action removed from the bar, so neither causes it. iOS opens the same sheet. Only the emulator's development build was tried, not a release build or a phone, and other native sheets on Android weren't checked.
 **Suggested fix:** Check whether any `BottomSheetModal.native` sheet opens on Android, then whether 56d's `sheetOpenSize` refactor changed the Android first render (it now reads `androidResizableRef` before setting it).
+**Update 2026-11-13 (re-check against dev):** still unknown. Nothing since 2026-11-10 changed `HeaderFilterAction` or `sheet-open-size.ts`, and #506's People filter change wasn't run on Android.
 
 ### F-241 [P2] open - The mobile admin dashboard ignores Dashboard: View
 
@@ -972,6 +1015,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** It checks only that the caller is an Admin or Super Admin, while web's `/api/dashboard/analytics` requires `canViewDashboardAnalytics`. An Admin with every view off still gets org-wide coverage, every shift request in the range, publish history and staff hours on the phone. The comment assumes approvals default on; `ADMIN_DEFAULT_PERMS` has them off.
 **Suggested fix:** Require the resolved `canViewDashboardAnalytics` (and per-section keys where web has them), and add a contract test that web and mobile refuse the same Admin.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open. Use the resolved `canViewDashboardAnalytics`, not the stored key.
 
 ### F-242 [P2] unverified - A non-approver Admin may get a request approved, and published, in an approver's name
 
@@ -980,14 +1024,15 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** The database lets any Admin act for another employee with no permission key; the route narrows it to Schedule or Staff edit, but PostgREST calls skip the route. An Admin without approve or publish rights could file a call-off as an approver's employee row, and auto-approval would then publish it as that approver. Traced by a subagent, not run.
 **Suggested fix:** Confirm on the stack. If it holds, require `canEditShifts` or `canManageEmployees` in the SQL for acting on someone else, and never auto-approve a request that someone other than the requester filed.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still unverified. Request functions were rewritten since (121, 126, 129, 135); start any fix from those.
 
-### F-244 [P2] open - An Admin never configured shows no permissions, and can't be edited on mobile
+### F-244 [P2] closed - An Admin never configured shows no permissions, and can't be edited on mobile
 
 **File:** `apps/mobile/src/features/people/screens/PersonDetailScreen.tsx:1051-1055, 1811`; `apps/web/src/components/staff-detail/PersonInfoCards.tsx:177-189`
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX)
 **Why it matters:** Both gate on a stored set. For an Admin with `NULL` (F-239's common case), web drops the Permissions line and mobile hides the Permissions row, so a Super Admin on the phone has no way to set them.
 **Suggested fix:** Gate on `orgRole === "admin"` and count from `buildInitialPermissions(stored)`.
-**Resolution:**
+**Resolution:** Fixed by migration 131 (`131_admin_permissions_complete.sql`), found by the 2026-11-13 re-check: a trigger stores a complete permission set for every Admin and backfilled existing ones, so the web Permissions line and the mobile Permissions row always show.
 
 ### F-246 [P3] open - Permission counts and change summaries disagree with the editor
 
@@ -996,6 +1041,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** Seen locally for the same Admin: the Access card reads "24 of 25" (raw stored keys, a total no Admin can reach) while the editor reads "16 of 16 turned on". The save review says "10 permissions enabled → 12", not which areas changed, so granting Staff: Edit looks like granting Reports. For a first edit of a `NULL` set, the alert, email and activity log list every standard permission as newly added.
 **Suggested fix:** Count with `countPermissionLevels` everywhere, list each flipped area and level in the review and alert ("Staff: Edit on"), diff against `buildInitialPermissions(before)`, and remove the unused raw counter.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** the mobile count and the NULL first-edit diff are fixed (131). The web Access card's raw count, the review summary and alert diffs by raw key remain; drop the unused `adminPermissionCount` contract field.
 
 ### F-247 [P3] open - The editor hides the Recurring dependency, mobile shows no notes, and Select all grants Staff: Edit unchecked
 
@@ -1004,6 +1050,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** `impliedNote ?? mod.note` replaces "Applying to the grid and creating series also need Schedule: Edit." with "Included with Edit." whenever Recurring Edit is on, which is the default (seen locally). The phone sheet shows neither note, so "Included" and "Off" come with no reason, and swiping it down discards edits without asking. Select all turns on every switch, Staff: Edit included, in one click.
 **Suggested fix:** Show both lines, warn inline when Recurring Edit is on without Schedule Edit, render notes on mobile, prompt before discarding, and leave Staff: Edit out of Select all (or confirm it).
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** the mobile sheet now asks before discarding (#469). The hidden Recurring note, notes on mobile and Select all granting Staff: Edit remain.
 
 ### F-248 [P3] open - Permission alerts and the activity log use a second, hardcoded vocabulary
 
@@ -1028,6 +1075,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** `buildPermissionContext` turns off staff, settings, approvals and notes while a Gridmaster impersonates, but `requireOrgPermissions` never passes `isImpersonating`, so routes grant all of it and only the client hides it. Part of F-201's gap.
 **Suggested fix:** Pass the impersonation state into the resolver in `requireOrgPermissions` and the mobile auth context, with F-201.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** owner decision (2026-11-13): impersonating never narrows a Gridmaster's powers. Remove the narrowing from `buildPermissionContext` rather than applying it on the server, and remove the dead `skip: isImpersonating` branch in the requests route.
 
 ### F-251 [P3] open - `departments.permissions` is written from client input and read by nothing
 
@@ -1036,3 +1084,4 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Why it matters:** The column's comment still says it "defines what members can do", the settings route stores whatever the client sends, and nothing reads it. A future change that trusts it would grant permissions from data anyone with Departments: Edit can write. Beside the Access card's "Administrative Teams" line, it also suggests teams grant something.
 **Suggested fix:** Drop the column (or at least stop writing it and fix the comment) in a forward migration.
 **Resolution:**
+**Update 2026-11-13 (re-check against dev):** still open; the `mgmt_permissions_only` CHECK constraint goes with the column.
