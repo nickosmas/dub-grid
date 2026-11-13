@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:0a0727708e1e5550781754ac3b9c8d42b7f0961b7ee1fbcdba110499de0a417f",
+  "sourceDigest": "sha256:643f767d1ad6cbe09f98b22794803856c900e7f031785f22e1ab9b949e385946",
   "webRoutes": [
     {
       "id": "web:/",
@@ -6916,6 +6916,9 @@
         },
         {
           "path": "apps/web/src/lib/sentry.ts"
+        },
+        {
+          "path": "apps/web/src/lib/supabase-service.ts"
         },
         {
           "path": "apps/web/src/proxy.ts"

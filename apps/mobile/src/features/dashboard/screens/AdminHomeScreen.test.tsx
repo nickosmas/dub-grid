@@ -455,7 +455,7 @@ describe("AdminHomeScreen", () => {
         range,
         includeSchedule: true,
         ready: true,
-        currentUpdatedAt: 1700,
+        currentLoaded: true,
       }),
     );
   });

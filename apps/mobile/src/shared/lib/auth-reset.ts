@@ -86,6 +86,10 @@ export async function handleRejectedMobileToken(rejectedToken: string): Promise<
     // A lookup that failed (a refresh Supabase could not complete) keeps the
     // session in storage but reports none, so only a clean answer counts.
     if (result && !result.error && !result.data.session) return;
+    // The refresh couldn't reach Supabase: the session is still stored and
+    // will refresh once it can, so a bad connection never signs anyone out.
+    // By name: the UI layers may not import supabase-js values directly.
+    if (result?.error?.name === "AuthRetryableFetchError") return;
     liveToken = result?.data.session?.access_token ?? null;
   } catch {
     liveToken = null;
