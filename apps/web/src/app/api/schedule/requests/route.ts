@@ -22,7 +22,10 @@ import { withoutHiddenRequests } from "@dubgrid/data-access";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchSegmentResolutionMaps } from "@/app/api/shared/schedule";
-import { dispatchNotificationEvent } from "@/features/notifications/server";
+import {
+  dispatchNotificationEventAfterResponse,
+  type NotificationEvent,
+} from "@/features/notifications/server";
 import { rowToShiftRequest } from "@/lib/db/mappers";
 import { assertSafeFilterValue } from "@/lib/db/shared";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -225,13 +228,15 @@ type EmployeeActionAuth = Exclude<
 /**
  * After a request enters pending_approval: an approver who is party to it
  * settles it right away, otherwise the ordinary approver notifications go
- * out. A gridmaster impersonating a member never settles anything.
+ * out. A gridmaster impersonating a member never settles anything. The
+ * settlement is awaited because the response reports it; the alert it picks
+ * is sent after the response.
  */
 async function settleOrNotify(
   auth: EmployeeActionAuth,
   requestId: string,
   requestType: ShiftRequestType,
-  transitionEvent: Parameters<typeof dispatchNotificationEvent>[1] & { orgId: string },
+  transitionEvent: NotificationEvent & { orgId: string },
 ): Promise<ShiftRequestSettlement> {
   const settlement = await settleShiftRequestAfterTransition({
     userClient: auth.userClient,
@@ -241,7 +246,7 @@ async function settleOrNotify(
   });
 
   if (settlement.autoApproved) {
-    await dispatchNotificationEvent(auth.actor.id, {
+    dispatchNotificationEventAfterResponse(auth.actor.id, {
       action: "shift_request_resolved",
       orgId: transitionEvent.orgId,
       requestId,
@@ -259,7 +264,7 @@ async function settleOrNotify(
       "Shift request auto-approval failed; left in the approval queue",
     );
   }
-  await dispatchNotificationEvent(auth.actor.id, transitionEvent);
+  dispatchNotificationEventAfterResponse(auth.actor.id, transitionEvent);
   return settlement;
 }
 
@@ -586,7 +591,7 @@ export async function POST(req: NextRequest) {
           accepted: data.accept,
         } as const;
         if (!data.accept) {
-          await dispatchNotificationEvent(auth.actor.id, respondedEvent);
+          dispatchNotificationEventAfterResponse(auth.actor.id, respondedEvent);
           return NextResponse.json({ success: true, autoApproved: false });
         }
 
@@ -630,7 +635,7 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        await dispatchNotificationEvent(auth.actor.id, {
+        dispatchNotificationEventAfterResponse(auth.actor.id, {
           action: "shift_request_resolved",
           orgId: data.orgId,
           requestId: data.requestId,
@@ -687,7 +692,7 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        await dispatchNotificationEvent(auth.actor.id, {
+        dispatchNotificationEventAfterResponse(auth.actor.id, {
           action: "shift_request_cancelled",
           orgId: data.orgId,
           requestId: data.requestId,

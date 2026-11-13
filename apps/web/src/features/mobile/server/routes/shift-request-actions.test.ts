@@ -10,7 +10,11 @@ vi.mock("@dubgrid/mobile-api-core", () => ({
   updateMobileShiftRequest: (...args: unknown[]) => updateMobileShiftRequest(...args),
 }));
 vi.mock("@dubgrid/data-access", () => ({ settleShiftRequestAfterTransition }));
-vi.mock("@/features/notifications/server", () => ({ dispatchNotificationEvent: vi.fn() }));
+const dispatchNotificationEventAfterResponse = vi.fn();
+vi.mock("@/features/notifications/server", () => ({
+  dispatchNotificationEventAfterResponse: (...args: unknown[]) =>
+    dispatchNotificationEventAfterResponse(...args),
+}));
 
 const REQUEST_ID = "33333333-3333-4333-8333-333333333333";
 const EMP_ID = "22222222-2222-4222-8222-222222222222";
@@ -58,6 +62,22 @@ describe("mobile shift-request actions route", () => {
       { action: "claim", claimerEmpId: EMP_ID },
       expect.objectContaining({ settleShiftRequestAfterTransition }),
     );
+  });
+
+  it("gives the package a dispatcher that sends the alert after the response", async () => {
+    updateMobileShiftRequest.mockResolvedValueOnce({ autoApproved: false });
+    const { PATCH } = await import("./shift-request-actions");
+
+    await PATCH(patchRequest({ action: "claim", claimerEmpId: EMP_ID }), {
+      params: Promise.resolve({ id: REQUEST_ID }),
+    });
+
+    const deps = updateMobileShiftRequest.mock.calls[0][3] as {
+      dispatchNotificationEvent: (actorId: string, event: object) => Promise<unknown>;
+    };
+    const event = { action: "shift_request_claimed", orgId: "org-1", requestId: REQUEST_ID };
+    await deps.dispatchNotificationEvent("actor", event);
+    expect(dispatchNotificationEventAfterResponse).toHaveBeenCalledWith("actor", event);
   });
 
   it("surfaces the rule the caller broke in client copy", async () => {

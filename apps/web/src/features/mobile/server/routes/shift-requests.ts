@@ -11,7 +11,7 @@ import {
 } from "@dubgrid/contracts";
 import { settleShiftRequestAfterTransition } from "@dubgrid/data-access";
 import { createMobileShiftRequest, loadMobileShiftRequestsPayload } from "@dubgrid/mobile-api-core";
-import { dispatchNotificationEvent } from "@/features/notifications/server";
+import { dispatchNotificationEventAfterResponse } from "@/features/notifications/server";
 import {
   fetchLinkedEmployeeForUser,
   fetchMobileHiddenPeople,
@@ -98,7 +98,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const payload = await createMobileShiftRequest(auth, parsed.data, {
-      dispatchNotificationEvent,
+      dispatchNotificationEvent: async (actorUserId, event) =>
+        dispatchNotificationEventAfterResponse(actorUserId, event),
       settleShiftRequestAfterTransition,
     });
 
