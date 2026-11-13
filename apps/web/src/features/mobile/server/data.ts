@@ -26,6 +26,7 @@ import {
   fetchMobileDepartmentRows as fetchMobileDepartmentRowsData,
   fetchMobileEffectiveScheduleRows,
   fetchMobileEmployeeRowsByIds,
+  fetchPublishedMobileScheduleRows,
   fetchMobileFocusAreaRows as fetchMobileFocusAreaRowsData,
   fetchMobileFocusAreaRowsInDepartmentOrder,
   fetchMobileJobNameRows,
@@ -1414,6 +1415,8 @@ type MobileOpenShiftInput = {
   timeZone?: string | null;
   /** People whose shifts the viewer must not be shown; coverage counts only the rest. */
   hiddenUserIds?: readonly string[];
+  /** False counts published cells only, for a viewer who can't edit shifts. */
+  includeDrafts?: boolean;
 };
 
 /**
@@ -1451,8 +1454,11 @@ async function buildMobileCoverageEngineInputs(
     // `isScheduler ? (draft ?? published) : published`), so an admin's
     // pending unpublished edits count toward coverage here too, the same way
     // they already do on web's dashboard. Using the same fetcher mobile's
-    // staff-hours calc already relies on for this exact reason.
-    fetchMobileEffectiveScheduleRows(serviceClient, {
+    // staff-hours calc already relies on for this exact reason. Web redacts
+    // drafts from anyone who can't edit shifts, so they get published cells.
+    (input.includeDrafts === false
+      ? fetchPublishedMobileScheduleRows
+      : fetchMobileEffectiveScheduleRows)(serviceClient, {
       orgId: input.orgId,
       startDate: range.startDate,
       endDate: range.endDate,

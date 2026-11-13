@@ -2445,6 +2445,18 @@ describe("fetchMobileCoverageSummary", () => {
       expect(summary.dailyByFocusArea.get(summary.byFocusArea[0].focusAreaId)).toEqual([
         { dateKey: "2026-04-16", filledCount: 1, requiredCount: 1, status: "green" },
       ]);
+
+      // Someone who can't edit shifts reads published cells only, as on web.
+      const published = await fetchMobileCoverageSummary(serviceClient as never, {
+        orgId: "org-1",
+        showAll: true,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+        includeDrafts: false,
+      });
+      expect(published.totals).toEqual({ totalRequired: 1, totalFilled: 0, pct: 0, openSlots: 1 });
+      expect(published.scheduleRows).toEqual([]);
     } finally {
       vi.useRealTimers();
     }

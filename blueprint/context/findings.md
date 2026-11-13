@@ -1008,13 +1008,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Check whether any `BottomSheetModal.native` sheet opens on Android, then whether 56d's `sheetOpenSize` refactor changed the Android first render (it now reads `androidResizableRef` before setting it).
 **Update 2026-11-13 (re-check against dev):** still unknown. Nothing since 2026-11-10 changed `HeaderFilterAction` or `sheet-open-size.ts`, and #506's People filter change wasn't run on Android.
 
-### F-241 [P2] open - The mobile admin dashboard ignores Dashboard: View
+### F-241 [P2] fixed - The mobile admin dashboard ignores Dashboard: View
 
 **File:** `packages/mobile-api-core/src/dashboard.ts:604`; `apps/web/src/features/mobile/server/routes/dashboard.ts:83`
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
 **Why it matters:** It checks only that the caller is an Admin or Super Admin, while web's `/api/dashboard/analytics` requires `canViewDashboardAnalytics`. An Admin with every view off still gets org-wide coverage, every shift request in the range, publish history and staff hours on the phone. The comment assumes approvals default on; `ADMIN_DEFAULT_PERMS` has them off.
 **Suggested fix:** Require the resolved `canViewDashboardAnalytics` (and per-section keys where web has them), and add a contract test that web and mobile refuse the same Admin.
-**Resolution:**
+**Resolution:** Fixed on fix/mobile-dashboard-permissions (2026-11-13), section by section rather than by refusing the dashboard, since web shows every Admin its dashboard and gates cards one at a time. The loader now takes the resolved permissions (`resolveDashboardSections`): pending approvals and the queue need `canApproveShiftRequests`, publishes in the activity feed need `canViewDashboardAnalytics`, sign-ups need `canManageEmployees`, and drafts (the draft summary, and drafts counted in coverage, open shifts and staff hours) need `canEditShifts`; without it the coverage summary reads published cells only. Request events cover the whole organization only for someone who can approve, edit shifts or edit staff, otherwise their own requests and open pickups, as web's request list does. Coverage, open shifts and staff hours stay for every Admin, as on web, where the schedule is always readable. A Super Admin keeps everything. The app hides the approvals card and figure for an Admin who can't approve, reading the bootstrap's permissions. Tests in `dashboard.test.ts` (package and route), `data.test.ts`, `DashboardHeroCard.test.tsx` and `AdminHomeScreen.test.tsx`; the package tests fail against the old loader. Not run on a device.
 **Update 2026-11-13 (re-check against dev):** still open. Use the resolved `canViewDashboardAnalytics`, not the stored key.
 
 ### F-242 [P2] unverified - A non-approver Admin may get a request approved, and published, in an approver's name

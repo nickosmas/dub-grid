@@ -91,6 +91,7 @@ export function DashboardHeroCard({
   onOpenCoverage,
   onOpenGaps,
   onOpenApprovals,
+  showPendingApprovals = true,
 }: {
   metrics: MobileDashboardResponse["metrics"];
   /** Per-focus-area coverage; the card previews the first three. */
@@ -98,6 +99,8 @@ export function DashboardHeroCard({
   onOpenCoverage?: () => void;
   onOpenGaps?: () => void;
   onOpenApprovals?: () => void;
+  /** False for an admin who can't approve requests; web drops the figure for them too. */
+  showPendingApprovals?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -107,6 +110,7 @@ export function DashboardHeroCard({
   const configured = coverage != null;
   const meterColor = configured ? coverageColor(mobileColors, coverage) : mobileColors.textMuted;
   const displayedCoverage = useAnimatedCount(coverage ?? 0);
+  const showGaps = configured || unpublished;
 
   return (
     <DashboardCard
@@ -163,25 +167,27 @@ export function DashboardHeroCard({
           />
         </View>
       ) : null}
-      <View style={styles.statRow}>
-        {configured || unpublished ? (
-          <>
+      {showGaps || showPendingApprovals ? (
+        <View style={styles.statRow}>
+          {showGaps ? (
             <MetricStat
               label={!unpublished && metrics.openGapCount === 1 ? "open gap" : "open gaps"}
               onPress={!unpublished && metrics.openGapCount > 0 ? onOpenGaps : undefined}
               tone="danger"
               value={unpublished ? null : metrics.openGapCount}
             />
-            <View style={styles.statDivider} />
-          </>
-        ) : null}
-        <MetricStat
-          label={metrics.pendingApprovalsCount === 1 ? "pending approval" : "pending approvals"}
-          onPress={metrics.pendingApprovalsCount > 0 ? onOpenApprovals : undefined}
-          tone="warning"
-          value={metrics.pendingApprovalsCount}
-        />
-      </View>
+          ) : null}
+          {showGaps && showPendingApprovals ? <View style={styles.statDivider} /> : null}
+          {showPendingApprovals ? (
+            <MetricStat
+              label={metrics.pendingApprovalsCount === 1 ? "pending approval" : "pending approvals"}
+              onPress={metrics.pendingApprovalsCount > 0 ? onOpenApprovals : undefined}
+              tone="warning"
+              value={metrics.pendingApprovalsCount}
+            />
+          ) : null}
+        </View>
+      ) : null}
     </DashboardCard>
   );
 }

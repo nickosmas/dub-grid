@@ -194,6 +194,9 @@ export function AdminHomeScreen() {
   }
 
   const data = dashboardQuery.data;
+  // The server leaves approvals empty for an admin who can't approve, so the
+  // card and the figure would only say "none waiting".
+  const canApprove = Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests);
   const openExpanded = (pathname: `/(tabs)/home/${string}`) => () =>
     router.push({ pathname, params: { weekOf: range.startDate } });
 
@@ -212,18 +215,23 @@ export function AdminHomeScreen() {
             data.coverageBySection.length > 0 ? openExpanded("/(tabs)/home/coverage") : undefined
           }
           onOpenGaps={openExpanded("/(tabs)/home/open-shifts")}
+          showPendingApprovals={canApprove}
         />
       ),
     },
-    {
-      key: "approvals",
-      node: (
-        <ActionQueueCard
-          requests={data.actionQueue}
-          onSeeAll={openExpanded("/(tabs)/home/pending-approvals")}
-        />
-      ),
-    },
+    ...(canApprove
+      ? [
+          {
+            key: "approvals",
+            node: (
+              <ActionQueueCard
+                requests={data.actionQueue}
+                onSeeAll={openExpanded("/(tabs)/home/pending-approvals")}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       key: "staff-hours",
       node: (

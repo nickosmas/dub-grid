@@ -16,6 +16,7 @@ import {
   fetchHiddenEmployeeIds,
 } from "@dubgrid/data-access";
 import {
+  fetchLinkedEmployeeForUser,
   fetchMobileCoverageSummary,
   fetchMobileHiddenPeople,
   fetchMobileOpenShiftContext,
@@ -83,8 +84,9 @@ export async function GET(req: NextRequest) {
     const payload = await loadMobileDashboardPayload(
       {
         currentOrg: { id: auth.currentOrg.id, timezone: auth.currentOrg.timezone },
+        userId: auth.user.id,
         effectiveRole: getEffectiveMobileRole(auth.permissions.role),
-        canEditSchedule: auth.permissions.canEditShifts,
+        permissions: auth.permissions,
         canSeePublisher: scheduleViewerVisibility(
           {
             canEditShifts: auth.permissions.canEditShifts,
@@ -140,6 +142,7 @@ export async function GET(req: NextRequest) {
         },
         fetchMobileAcceptedInvitationRows,
         fetchProfileNameRowsByIds,
+        fetchLinkedEmployeeForUser,
       },
     );
     return json(mobileDashboardResponseSchema.parse(payload));
