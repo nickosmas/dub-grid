@@ -26,6 +26,7 @@ import {
   TABLET,
   HEADER_NARROW,
   useSandboxSourceOrgId,
+  useCanSeeBilling,
 } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAccountIdentity } from "@/features/account/client";
@@ -291,8 +292,9 @@ export default function Header({ orgName }: HeaderProps) {
   const avatarSeed = authUser?.id ?? "";
   const avatarTone = getAvatarTone(avatarSeed, resolvedTheme === "dark");
   const roleLabel = ROLE_LABELS[role] ?? "User";
+  const canSeeBilling = useCanSeeBilling(isSuperAdmin);
   const canShowBillingNotice =
-    Boolean(orgId) && !isUserViewActive && !isImpersonating && (isSuperAdmin || isGridmaster);
+    Boolean(orgId) && !isUserViewActive && !isImpersonating && (canSeeBilling || isGridmaster);
 
   const handleSignOut = useCallback(() => {
     // Always confirm before signing out — in sandbox mode the confirmation

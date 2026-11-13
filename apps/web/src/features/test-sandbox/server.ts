@@ -402,3 +402,19 @@ export async function deleteSandboxForUser(input: {
   if (deleteError) throw deleteError;
   return { deletedCount: ids.length };
 }
+
+/**
+ * Removes this person's sandboxes whose auth session has ended (migration 136),
+ * leaving one still open in a live session. Run at sign-in in place of deleting
+ * every sandbox, which discarded work open on another device without warning.
+ */
+export async function deleteEndedSessionSandboxes(
+  serviceClient: SupabaseClient,
+  userId: string,
+): Promise<number> {
+  const { data, error } = await serviceClient.rpc("delete_ended_session_sandboxes", {
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  return typeof data === "number" ? data : 0;
+}

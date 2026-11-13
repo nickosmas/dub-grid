@@ -49,6 +49,7 @@ vi.mock("@/hooks", () => ({
   TABLET: "(min-width: 768px) and (max-width: 1024px)",
   HEADER_NARROW: "(max-width: 1200px)",
   useSandboxSourceOrgId: () => null,
+  useCanSeeBilling: (isSuperAdmin: boolean) => isSuperAdmin,
   useClientFeatureFlags: () => ({
     stripe: true,
     csvImport: true,

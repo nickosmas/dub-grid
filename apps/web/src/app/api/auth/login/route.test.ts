@@ -8,7 +8,7 @@ const fetchTermsAcceptanceStatus = vi.fn();
 const rpc = vi.fn();
 const refreshSession = vi.fn();
 const serviceFrom = vi.fn();
-const deleteSandboxForUser = vi.fn();
+const deleteEndedSessionSandboxes = vi.fn();
 const after = vi.fn((task: () => unknown) => {
   void task();
 });
@@ -51,7 +51,7 @@ vi.mock("@/lib/supabase-service", () => ({
 }));
 
 vi.mock("@/features/test-sandbox/server", () => ({
-  deleteSandboxForUser: (...args: unknown[]) => deleteSandboxForUser(...args),
+  deleteEndedSessionSandboxes: (...args: unknown[]) => deleteEndedSessionSandboxes(...args),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -172,7 +172,7 @@ function makeRequest(
 describe("POST /api/auth/login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    deleteSandboxForUser.mockResolvedValue({ deletedCount: 0 });
+    deleteEndedSessionSandboxes.mockResolvedValue(0);
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "anon-key";
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
@@ -1042,14 +1042,15 @@ describe("POST /api/auth/login", () => {
       expect(res.cookies.get(SANDBOX_COOKIE_NAME)?.value).toBe("");
     });
 
-    it("tears down a leftover sandbox on a sign-in that did not switch", async () => {
+    it("removes sandboxes whose session ended on a sign-in that did not switch", async () => {
       signIn({ org_id: ORG_ID, org_slug: "acme", org_role: "user" });
 
       const res = await POST(makeRequest("acme.localhost"));
 
       expect((await res.json()).didSwitchOrg).toBe(false);
-      expect(deleteSandboxForUser).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ actor: expect.objectContaining({ id: USER_ID }) }),
+      expect(deleteEndedSessionSandboxes).toHaveBeenCalledExactlyOnceWith(
+        expect.anything(),
+        USER_ID,
       );
     });
 
@@ -1110,7 +1111,7 @@ describe("POST /api/auth/login", () => {
       const res = await POST(makeRequest("missing.localhost"));
 
       expect(res.status).toBe(403);
-      expect(deleteSandboxForUser).not.toHaveBeenCalled();
+      expect(deleteEndedSessionSandboxes).not.toHaveBeenCalled();
     });
 
     it("records a completed sign-in after the response", async () => {

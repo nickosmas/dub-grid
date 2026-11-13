@@ -16,8 +16,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { createAnonClient, createTokenScopedClient } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
-import { deleteSandboxForUser } from "@/features/test-sandbox/server";
-import type { User } from "@supabase/supabase-js";
+import { deleteEndedSessionSandboxes } from "@/features/test-sandbox/server";
 import { parseHost } from "@/lib/subdomain";
 import { fetchTermsAcceptanceStatus } from "@/features/account/server";
 import { lookupOrgBySlug } from "@/lib/org-lookup";
@@ -354,18 +353,13 @@ async function orchestratePostSignIn(
     }
   }
 
-  // A fresh login ends the previous session, so any sandbox left over from it
-  // must not be resumed, whether or not this sign-in switched organizations.
-  // The client used to do this itself, and its hard navigation aborted the
-  // request often enough that the sandbox survived; a surviving sandbox cookie
-  // pins every later request to a clone at an elevated role. Done here there
-  // is nothing to abort, so it runs alongside the other best-effort steps.
+  // A sign-in never resumes a sandbox: the response clears the cookie, and a
+  // sandbox opens only for the session that created it. Sandboxes whose
+  // session has ended are removed here; one still open in another live
+  // session stays, and entering a new one asks before replacing it.
   const sandboxTeardown = (async () => {
     try {
-      await deleteSandboxForUser({
-        serviceClient: getServiceClient(),
-        actor: { id: claims.sub as string } as User,
-      });
+      await deleteEndedSessionSandboxes(getServiceClient(), claims.sub as string);
     } catch {
       // Non-fatal: never block sign-in on sandbox teardown.
     }

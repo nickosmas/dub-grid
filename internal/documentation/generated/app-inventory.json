@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:b1951d1b47492052f7f50080eb27822b259793337f819a5d65b704d01cdcfc0c",
+  "sourceDigest": "sha256:eaffbf5d12c0b50427d09cbf3571494fe75026f3290b7e5eb365eb9614955b36",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5201,6 +5201,26 @@
       "sha256": "1338f2bf791495ca351b74eb21a6c1ad73360a966ad5ac930558db190c8332a0",
       "source": {
         "path": "supabase/migrations/134_staff_see_absence_names.sql"
+      }
+    },
+    {
+      "id": "migration:135_sandbox_settles_its_requests.sql",
+      "version": "135",
+      "name": "sandbox_settles_its_requests",
+      "file": "135_sandbox_settles_its_requests.sql",
+      "sha256": "67812b4339c50fb8e93a8a036668bf61c8c817d1bd7dc39d53e78128b1f2434e",
+      "source": {
+        "path": "supabase/migrations/135_sandbox_settles_its_requests.sql"
+      }
+    },
+    {
+      "id": "migration:136_sign_in_keeps_live_sandboxes.sql",
+      "version": "136",
+      "name": "sign_in_keeps_live_sandboxes",
+      "file": "136_sign_in_keeps_live_sandboxes.sql",
+      "sha256": "4530cc94a1eec084c954dbe7af7221fed5e6c3ed3351aaf39fb9d2929362fbe9",
+      "source": {
+        "path": "supabase/migrations/136_sign_in_keeps_live_sandboxes.sql"
       }
     }
   ],
