@@ -636,7 +636,7 @@ export async function proxy(req: NextRequest) {
         sandboxCookie.sessionId !== claims.session_id
       ) {
         // Cookie was set for another user or an earlier session: clear it.
-        clearEndedSandboxCookies(res);
+        clearEndedSandboxCookies(res, req.nextUrl.protocol);
       } else {
         try {
           const supabaseUrl2 = getSupabaseUrl();
@@ -669,7 +669,7 @@ export async function proxy(req: NextRequest) {
               // cookie, and the browser cannot remove it (HttpOnly), so drop
               // it here and the page loads the real organization. A failed
               // lookup keeps it: the APIs answer 503 and nothing is lost.
-              clearEndedSandboxCookies(res);
+              clearEndedSandboxCookies(res, req.nextUrl.protocol);
             }
           }
         } catch (e) {

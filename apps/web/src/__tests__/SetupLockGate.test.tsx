@@ -78,6 +78,7 @@ vi.mock("@/hooks", () => ({
   useEmployees: () => mockEmployeesData,
   useLogout: () => ({ signOut: vi.fn(), signOutOthers: vi.fn() }),
   useSandboxSourceOrgId: () => null,
+  useCanSeeBilling: (isSuperAdmin: boolean) => isSuperAdmin,
   useIsInSandbox: () => false,
 }));
 

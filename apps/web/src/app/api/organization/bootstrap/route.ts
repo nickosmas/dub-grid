@@ -263,6 +263,23 @@ function loadBootstrapData(timer: Timer, deadlineAt: number, targetOrgId: string
   );
 }
 
+/** The caller's live role in the organization a sandbox was copied from. */
+async function readSourceOrgRole(
+  sourceOrgId: string,
+  userId: string,
+): Promise<"super_admin" | "admin" | "user" | null> {
+  const { data, error } = await getServiceClient()
+    .from("organization_memberships")
+    .select("org_role")
+    .eq("org_id", sourceOrgId)
+    .eq("user_id", userId)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  const role = data?.org_role;
+  return role === "super_admin" || role === "admin" || role === "user" ? role : null;
+}
+
 async function handleGET(req: NextRequest, timer: Timer) {
   let orgId: string | null = null;
   let userId: string | null = null;
@@ -397,13 +414,19 @@ async function handleGET(req: NextRequest, timer: Timer) {
       jobs,
       includeArchived: true,
     });
-    const billingLocked = orgAuth.permissions.isSuperAdmin
-      ? (await evaluateOrganizationAccess(serviceClient, org)).isLocked
-      : null;
+    const [billingLocked, sandboxSourceRole] = await Promise.all([
+      orgAuth.permissions.isSuperAdmin
+        ? evaluateOrganizationAccess(serviceClient, org).then((access) => access.isLocked)
+        : null,
+      org.workspaceKind === "sandbox" && org.sandboxSourceOrgId
+        ? readSourceOrgRole(org.sandboxSourceOrgId, auth.user.id)
+        : null,
+    ]);
 
     return NextResponse.json({
       org,
       isGridmaster: false,
+      ...(org.workspaceKind === "sandbox" ? { sandboxSourceRole } : {}),
       entryGate: {
         onboardingCompleted: Boolean(onboardingResult.data?.onboarding_completed_at),
         adminOnboardingCompleted: (adminOnboardingResult.count ?? 0) > 0,

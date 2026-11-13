@@ -17,6 +17,7 @@ import {
   type OrganizationBootstrap,
 } from "@/features/organization/client/api";
 import {
+  useCanSeeBilling,
   useIsInSandbox,
   useOrganizationData,
   usePermissions,
@@ -49,13 +50,16 @@ function AppHeader() {
   // Asking for the copy's id held the header (and everything in it) behind a
   // refused request on every sandbox page load.
   const billingOrgId = useSandboxSourceOrgId() ?? perms.orgId;
+  // Billing is the source organization's, so inside a sandbox it follows the
+  // role there: an Admin's request would only be refused.
+  const canSeeBilling = useCanSeeBilling(perms.isSuperAdmin);
   const { data: billing, isLoading: billingLoading } = useQuery({
     ...organizationBillingQueryOptions(billingOrgId!),
     enabled:
-      Boolean(billingOrgId) && perms.isSuperAdmin && !perms.isGridmaster && !perms.isImpersonating,
+      Boolean(billingOrgId) && canSeeBilling && !perms.isGridmaster && !perms.isImpersonating,
   });
   const shouldLoadOrgHeader =
-    !perms.isSuperAdmin ||
+    !canSeeBilling ||
     perms.isGridmaster ||
     perms.isImpersonating ||
     (!billingLoading && billing?.billingAccess.isLocked !== true);

@@ -435,7 +435,7 @@ export async function requireOrgPermissions(
       auth = sessionAuth;
     }
     if (!sb || sb.userId !== auth.user.id || sb.sessionId !== auth.sessionId) {
-      return { response: sandboxEndedResponse() };
+      return { response: sandboxEndedResponse(req.nextUrl.protocol) };
     }
     const ownedSandbox = await findUsableSandbox(serviceClient, {
       sandboxOrgId: sb.sandboxOrgId,
@@ -453,7 +453,7 @@ export async function requireOrgPermissions(
         redirectedToSandbox = true;
       }
     } else {
-      return { response: sandboxEndedResponse() };
+      return { response: sandboxEndedResponse(req.nextUrl.protocol) };
     }
   }
 

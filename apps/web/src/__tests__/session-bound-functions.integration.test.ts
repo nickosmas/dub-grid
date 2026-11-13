@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 /**
- * Migrations 126 and 127 (F-194, F-195, F-198, F-212, F-213, F-224): a caller acts
+ * Migrations 126, 127, 135 and 136 (F-194, F-195, F-198, F-212, F-213, F-223, F-224): a caller acts
  * through the database only in the organization their session is signed in to, or
  * in a Test Sandbox they could still enter, and being refused one organization
  * doesn't cost them their others. Each case runs in a transaction that is rolled
@@ -39,6 +39,45 @@ async function probeDb(): Promise<boolean> {
 }
 
 const reachable = await probeDb();
+
+/** Migration 135 replaced the settle checks' token comparison with is_authorized_org. */
+async function probeSandboxSettles(): Promise<boolean> {
+  if (!reachable) return false;
+  const probe = new Client(DB_CONFIG);
+  try {
+    await probe.connect();
+    const { rows } = await probe.query<{ present: boolean }>(
+      `SELECT pg_get_functiondef('public.resolve_shift_request_unchecked(uuid, boolean, text, uuid)'::regprocedure)
+                LIKE '%is_authorized_org(v_request.org_id)%' AS present`,
+    );
+    return rows[0]?.present === true;
+  } catch {
+    return false;
+  } finally {
+    await probe.end().catch(() => undefined);
+  }
+}
+
+const sandboxSettles = await probeSandboxSettles();
+
+async function probeFunction(name: string): Promise<boolean> {
+  if (!reachable) return false;
+  const probe = new Client(DB_CONFIG);
+  try {
+    await probe.connect();
+    const { rows } = await probe.query<{ present: boolean }>(
+      `SELECT to_regproc($1) IS NOT NULL AS present`,
+      [name],
+    );
+    return rows[0]?.present === true;
+  } catch {
+    return false;
+  } finally {
+    await probe.end().catch(() => undefined);
+  }
+}
+
+const signInKeepsLiveSandboxes = await probeFunction("public.delete_ended_session_sandboxes");
 let db: Client;
 // A Super Admin with a staff record in both organizations.
 let orgA: string;
@@ -378,6 +417,66 @@ describe.skipIf(!reachable)("callers act in their session's organization", () =>
         null,
       );
     });
+
+    it.skipIf(!sandboxSettles)(
+      "lets its owner settle its requests, and nobody else (F-223)",
+      async () => {
+        await db.query(
+          `INSERT INTO public.organization_memberships (org_id, user_id, org_role, onboarding_completed_at)
+           VALUES ($1, $2, 'super_admin', now())`,
+          [sandbox, userId],
+        );
+        const clone = await one<string>(
+          `INSERT INTO public.employees
+             (org_id, employee_number, first_name, last_name, status, seniority)
+           VALUES ($1, 1, 'Sandbox', 'Staff', 'active', 1) RETURNING id`,
+          [sandbox],
+        );
+        const request = await pendingRequest(sandbox, clone);
+        const reject = () => refusal(`SELECT public.resolve_shift_request($1, FALSE)`, [request]);
+
+        await signedInTo(orgA, { session_id: "13501350-1350-4135-8135-135013501350" });
+        expect(await reject()).not.toBeNull();
+        expect(await refusal(`SELECT public.auto_approve_shift_request($1)`, [request])).toMatch(
+          /different organization|not found/i,
+        );
+
+        await signedInTo(orgA, { session_id: SESSION_ID });
+        expect(
+          await refusal(`SELECT public.auto_approve_shift_request($1)`, [request]),
+        ).not.toMatch(/different organization/i);
+        await db.query(`SELECT public.resolve_shift_request($1, FALSE)`, [request]);
+        await db.query("RESET ROLE");
+        expect(
+          await one<string>(`SELECT status FROM public.shift_requests WHERE id = $1`, [request]),
+        ).toBe("rejected");
+      },
+    );
+
+    it.skipIf(!signInKeepsLiveSandboxes)(
+      "survives a sign-in elsewhere while its session lives, and goes once it ends",
+      async () => {
+        const exists = () =>
+          one<boolean>(`SELECT EXISTS (SELECT 1 FROM public.organizations WHERE id = $1)`, [
+            sandbox,
+          ]);
+        await db.query(
+          `INSERT INTO auth.sessions (id, user_id, created_at, updated_at) VALUES ($1, $2, now(), now())`,
+          [SESSION_ID, userId],
+        );
+
+        expect(
+          await one<number>(`SELECT public.delete_ended_session_sandboxes($1)`, [userId]),
+        ).toBe(0);
+        expect(await exists()).toBe(true);
+
+        await db.query(`DELETE FROM auth.sessions WHERE id = $1`, [SESSION_ID]);
+        expect(
+          await one<number>(`SELECT public.delete_ended_session_sandboxes($1)`, [userId]),
+        ).toBe(1);
+        expect(await exists()).toBe(false);
+      },
+    );
 
     it("closes once they're suspended in the source organization (F-198)", async () => {
       await db.query(`UPDATE public.employees SET suspended_at = now() WHERE id = $1`, [empA]);

@@ -7,13 +7,15 @@ import {
 } from "@/lib/sandbox-cookie";
 
 /** Clears the sandbox cookie and leaves the one-time "your sandbox ended" note. */
-export function clearEndedSandboxCookies(response: NextResponse): void {
+export function clearEndedSandboxCookies(response: NextResponse, protocol: string): void {
   response.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   response.cookies.set(SANDBOX_ENDED_NOTICE_COOKIE, "1", {
     path: "/",
     maxAge: 120,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // As the auth cookies: Secure over https only. WebKit drops a Secure cookie
+    // set over plain http, even on localhost.
+    secure: protocol === "https:",
   });
 }
 
@@ -24,11 +26,11 @@ export function clearEndedSandboxCookies(response: NextResponse): void {
  * Exit included, refused for the cookie's full week, and the app sat on its
  * recovery screen with no banner and no way back to the real organization.
  */
-export function sandboxEndedResponse(): NextResponse {
+export function sandboxEndedResponse(protocol: string): NextResponse {
   const response = NextResponse.json(
     { error: SANDBOX_ENDED_MESSAGE, code: SANDBOX_ENDED_CODE },
     { status: 403 },
   );
-  clearEndedSandboxCookies(response);
+  clearEndedSandboxCookies(response, protocol);
   return response;
 }

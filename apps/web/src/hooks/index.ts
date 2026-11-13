@@ -34,7 +34,7 @@ export type { EmployeesData } from "./useEmployees";
 export { useEmployeeCount } from "./useEmployeeCount";
 export type { EmployeeCountData } from "./useEmployeeCount";
 
-export { useIsInSandbox, useSandboxSourceOrgId } from "./useIsInSandbox";
+export { useCanSeeBilling, useIsInSandbox, useSandboxSourceOrgId } from "./useIsInSandbox";
 
 export { useDirectory } from "./useDirectory";
 export type { DirectoryData } from "./useDirectory";

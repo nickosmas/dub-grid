@@ -289,7 +289,7 @@ Enables per-user Test Sandbox mode, where a Super Admin, or an Admin who can man
 ### Cookie Details
 
 - **Name:** `dubgrid-sandbox`
-- **Flags:** `HttpOnly`, `SameSite=Lax`, `Secure` (production only), `path=/`
+- **Flags:** `HttpOnly`, `SameSite=Lax`, `Secure` (over HTTPS, as the auth cookies), `path=/`
 - **Duration:** 7 days (`maxAge: 60 * 60 * 24 * 7`); cleared immediately on exit
 - **Set by:** Server Route Handler at `apps/web/src/app/api/test-sandbox/route.ts`
 - **Read by:** `apps/web/src/lib/sandbox-cookie.ts` (middleware, `api-auth.ts`, `permissions.ts`)
@@ -316,7 +316,7 @@ The cookie is `HttpOnly` because it is set, read, and cleared entirely server-si
 
 ### A sandbox that ended elsewhere
 
-The browser can't clear an `HttpOnly` cookie, so the server does. When a request carries a cookie whose sandbox no longer exists or no longer belongs to a session that may use it (another session's Enter or a new sign-in deleted it, the cleanup job ran, or the owner lost access), the API answers 403 `SANDBOX_ENDED` and the proxy, on a page load, simply drops it. Both clear `dubgrid-sandbox` and set `dg-sandbox-ended`. The client reloads once into the real organization and shows a notice. A failed ownership lookup keeps the cookie and answers 503 instead.
+The browser can't clear an `HttpOnly` cookie, so the server does. When a request carries a cookie whose sandbox no longer exists or no longer belongs to a session that may use it (another session's Enter replaced it, a sign-in removed it after its session ended, the cleanup job ran, or the owner lost access), the API answers 403 `SANDBOX_ENDED` and the proxy, on a page load, simply drops it. Both clear `dubgrid-sandbox` and set `dg-sandbox-ended`. The client reloads once into the real organization and shows a notice. A failed ownership lookup keeps the cookie and answers 503 instead.
 
 ---
 
@@ -404,16 +404,16 @@ between `localhost` and `sub.localhost`, it has **no effect in local development
 
 ### Security Flags Matrix
 
-| Cookie                   | Secure           | HttpOnly                     | SameSite                      |
-| ------------------------ | ---------------- | ---------------------------- | ----------------------------- |
-| `dubgrid-cookie-consent` | Yes (HTTPS)      | No                           | Lax                           |
-| `sb-*-auth-token`        | Yes (HTTPS)      | No (`@supabase/ssr` default) | Lax (`@supabase/ssr` default) |
-| `dubgrid-sandbox`        | Yes (production) | **Yes**                      | Lax                           |
-| `dg-sandbox-ended`       | Yes (production) | No                           | Lax                           |
-| `dubgrid-impersonation`  | Yes (HTTPS)      | No                           | Lax                           |
-| `sidebar_state`          | Yes (HTTPS)      | No                           | Lax                           |
-| `dg-theme`               | Yes (HTTPS)      | No                           | Lax                           |
-| `dg_device`              | Yes (HTTPS)      | **Yes**                      | Lax                           |
+| Cookie                   | Secure      | HttpOnly                     | SameSite                      |
+| ------------------------ | ----------- | ---------------------------- | ----------------------------- |
+| `dubgrid-cookie-consent` | Yes (HTTPS) | No                           | Lax                           |
+| `sb-*-auth-token`        | Yes (HTTPS) | No (`@supabase/ssr` default) | Lax (`@supabase/ssr` default) |
+| `dubgrid-sandbox`        | Yes (HTTPS) | **Yes**                      | Lax                           |
+| `dg-sandbox-ended`       | Yes (HTTPS) | No                           | Lax                           |
+| `dubgrid-impersonation`  | Yes (HTTPS) | No                           | Lax                           |
+| `sidebar_state`          | Yes (HTTPS) | No                           | Lax                           |
+| `dg-theme`               | Yes (HTTPS) | No                           | Lax                           |
+| `dg_device`              | Yes (HTTPS) | **Yes**                      | Lax                           |
 
 ### Notes
 
