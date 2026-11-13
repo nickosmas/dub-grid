@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:ccdbd6d027059c0c5d59742980ac290225d6bcd4bfa620c294fc2370a5117952",
+  "sourceDigest": "sha256:0a0727708e1e5550781754ac3b9c8d42b7f0961b7ee1fbcdba110499de0a417f",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5231,6 +5231,16 @@
       "sha256": "fb4d3cdcebbeabb4fe287fd1dc18b26278e0ae661f0e7101571e9946f8c16cd8",
       "source": {
         "path": "supabase/migrations/137_leftover_direct_writes_server_only.sql"
+      }
+    },
+    {
+      "id": "migration:138_internal_profiles_index.sql",
+      "version": "138",
+      "name": "internal_profiles_index",
+      "file": "138_internal_profiles_index.sql",
+      "sha256": "bc19047dd2a1806ba6685d49e658b641889ec3056101416ace6fb6bf7bf8234d",
+      "source": {
+        "path": "supabase/migrations/138_internal_profiles_index.sql"
       }
     }
   ],

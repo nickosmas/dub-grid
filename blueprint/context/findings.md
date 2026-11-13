@@ -582,13 +582,13 @@
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open, with less to gain: Offboard and Away with no return take the organization publish lock (114/116), so they run one at a time anyway. Cap concurrency for the rest and add `maxDuration`.
 
-### F-176 [P2] open - The hidden-people filter scans every profile on the platform, unindexed, before most schedule and people reads
+### F-176 [P2] fixed - The hidden-people filter scans every profile on the platform, unindexed, before most schedule and people reads
 
 **File:** `packages/data-access/src/internal-people.ts:17-23`, then `:37-50`; for example `apps/web/src/app/api/schedule/manage/route.ts:1134`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** `profiles where is_internal = true` has no index, so it reads every user across every organization, serially before `fetchHiddenEmployeeIds`, on about 40 call sites. It grows with the platform, not the organization.
 **Suggested fix:** A partial index on `profiles (id) WHERE is_internal`, plus a 30s in-process memo, since the list is platform-wide.
-**Resolution:**
+**Resolution:** Fixed (2026-11-13): the 30-second memo shipped with F-185, and migration 138 on fix/performance-quick-wins adds the partial index `idx_profiles_internal` on `profiles (id) WHERE is_internal`, so the internal-accounts lookup no longer scans every profile. Checked in a rolled-back transaction on the local stack: the lookup used an Index Only Scan.
 **Update 2026-11-13 (re-check against dev):** half fixed: the 30-second memo shipped with F-185. The partial index on `profiles (id) WHERE is_internal` is still missing.
 **Update 2026-11-13 (fix/performance-quick-wins):** the index is written as `138_internal_profiles_index.sql` (`CREATE INDEX IF NOT EXISTS idx_profiles_internal ON public.profiles (id) WHERE is_internal`), and in a rolled-back transaction the lookup used it (Index Only Scan). It isn't committed yet: migration 137 is on another branch, and the migration and documentation checks refuse a gap in the numbering. Commit it once 137 is on `dev`.
 
