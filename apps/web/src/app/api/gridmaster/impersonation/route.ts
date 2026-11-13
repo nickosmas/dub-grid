@@ -208,27 +208,13 @@ export async function POST(req: NextRequest) {
           return null;
         },
       );
-      // Before the audit write, which throws on failure: the session is
-      // running either way, and the person must hear about it.
+      // start_impersonation writes the audit row itself (139), so a direct
+      // call through the data API is recorded too.
       scheduleImpersonationNotice({
         kind: "start",
         targetUserId: parsed.data.targetUserId,
         targetOrgId: started?.target_org_id ?? null,
         expiresAt: result.expires_at,
-      });
-
-      await writeGridmasterAuditLog({
-        serviceClient: service,
-        actor: auth.user,
-        action: "impersonation.started",
-        resourceType: "impersonation_session",
-        resourceId: result.session_id,
-        orgId: started?.target_org_id ?? null,
-        details: {
-          targetUserId: parsed.data.targetUserId,
-          justification: parsed.data.justification,
-        },
-        request: req,
       });
 
       return NextResponse.json({

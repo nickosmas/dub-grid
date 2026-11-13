@@ -722,7 +722,7 @@
 **Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 revokes INSERT, UPDATE, DELETE and TRUNCATE on `organizations` from `authenticated`, which also removes 004's column grants, so no write-once field (the subdomain among them) can be changed through the data API. Every organization write already went through the service client; the unused browser `updateOrganization` is deleted. The live test `migration-137-leftover-direct-writes.integration.test.ts` checks no table or column privilege is left.
 **Update 2026-11-13 (re-check against dev):** still open. Revoking every column is safe (settings write through the service client); delete the unused `updateOrganization` in `lib/db/organizations.ts` with it.
 
-### F-201 [P2] open - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
+### F-201 [P2] fixed - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
 
 **File:** `apps/web/src/app/api/employees/manage`, `organizations/settings`, `import/employees`, `shifts/discard`, `employees/status`, `employees/identity` (none set `gridmasterNeedsImpersonation`); `start_impersonation` (migration 057)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security)
@@ -730,6 +730,7 @@
 **Suggested fix:** Make the impersonation requirement the default for any Gridmaster write in `requireOrgPermissions`, with named exceptions, and apply it in `canManageEmployees`. Write the audit row inside `start_impersonation`, as migration 071 does elsewhere.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** employee import now requires impersonation. Owner decision (2026-11-13): keep 075's rule as it is (schedule, requests, publish and settings need an impersonation) and don't extend it to staff, organization settings or discard. Impersonating never narrows a Gridmaster's powers (see F-250). Still worth doing: `start_impersonation` should write its own audit row.
+**Update 2026-11-13 (fix/impersonation-start-audit-row):** migration 139 has `start_impersonation` write the `impersonation.started` row itself, in the same transaction as the session, with the caller's address and user agent, so a direct call through the data API is recorded; the route no longer writes its own. Live test: `migration-139-impersonation-start-audit.integration.test.ts`. With the owner's decision above, nothing else in this finding remains, so it is fixed.
 
 ### F-202 [P2] open - The server code has no enforced tenant boundary: 196 files can reach the service client
 

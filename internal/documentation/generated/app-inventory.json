@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:643f767d1ad6cbe09f98b22794803856c900e7f031785f22e1ab9b949e385946",
+  "sourceDigest": "sha256:2de68a3930c46db4c56af8986ccbc83481415a9e93e176367ec7da7083e73b89",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5241,6 +5241,16 @@
       "sha256": "bc19047dd2a1806ba6685d49e658b641889ec3056101416ace6fb6bf7bf8234d",
       "source": {
         "path": "supabase/migrations/138_internal_profiles_index.sql"
+      }
+    },
+    {
+      "id": "migration:139_impersonation_start_audit_row.sql",
+      "version": "139",
+      "name": "impersonation_start_audit_row",
+      "file": "139_impersonation_start_audit_row.sql",
+      "sha256": "498174e1b623532135b91702befd3e48382a6e44fcecab9765a251413de8c4b7",
+      "source": {
+        "path": "supabase/migrations/139_impersonation_start_audit_row.sql"
       }
     }
   ],
