@@ -81,6 +81,33 @@ describe("organization bootstrap client", () => {
     });
   });
 
+  // The refusal cleared a stale sandbox cookie: reload once into the real
+  // organization, and let the retry recover if the reload is suppressed.
+  it("reloads once and retries when the server says the sandbox has ended", async () => {
+    const reload = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, origin: originalLocation.origin, reload },
+    });
+    window.sessionStorage.clear();
+    const ended = () =>
+      new Response(JSON.stringify({ code: "SANDBOX_ENDED", error: "ended" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      });
+    try {
+      fetchWithTimeout.mockResolvedValueOnce(ended()).mockResolvedValueOnce(ended());
+      const first = await fetchOrganizationBootstrap().catch((error: unknown) => error);
+      await fetchOrganizationBootstrap().catch(() => undefined);
+
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(isRetryableOrganizationBootstrapError(first)).toBe(true);
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+    }
+  });
+
   it("gives every bootstrap observer the same bounded query policy", () => {
     const policy = getOrganizationBootstrapQueryPolicy();
     const retryableError = new OrganizationRequestError("Temporary failure", 503, null);

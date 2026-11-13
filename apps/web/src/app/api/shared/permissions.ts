@@ -13,6 +13,7 @@ import {
   readSessionOrgId,
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
+import { sandboxEndedResponse } from "@/lib/sandbox-ended";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   BILLING_ACCESS_SELECT,
@@ -434,7 +435,7 @@ export async function requireOrgPermissions(
       auth = sessionAuth;
     }
     if (!sb || sb.userId !== auth.user.id || sb.sessionId !== auth.sessionId) {
-      return { response: forbiddenResponse() };
+      return { response: sandboxEndedResponse() };
     }
     const ownedSandbox = await findUsableSandbox(serviceClient, {
       sandboxOrgId: sb.sandboxOrgId,
@@ -452,7 +453,7 @@ export async function requireOrgPermissions(
         redirectedToSandbox = true;
       }
     } else {
-      return { response: forbiddenResponse() };
+      return { response: sandboxEndedResponse() };
     }
   }
 

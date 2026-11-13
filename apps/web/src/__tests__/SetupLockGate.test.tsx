@@ -77,6 +77,8 @@ vi.mock("@/hooks", () => ({
   }),
   useEmployees: () => mockEmployeesData,
   useLogout: () => ({ signOut: vi.fn(), signOutOthers: vi.fn() }),
+  useSandboxSourceOrgId: () => null,
+  useIsInSandbox: () => false,
 }));
 
 vi.mock("@/features/onboarding/client", () => ({

@@ -22,6 +22,12 @@ interface Remapping {
   col: string;
   map: Map<number, number>;
   isArray?: boolean;
+  /**
+   * The column is NOT NULL: a row whose reference has no counterpart in the
+   * sandbox (it points at an archived row, which is not cloned) is skipped
+   * rather than inserted with a null that the database refuses.
+   */
+  required?: boolean;
 }
 
 /**
@@ -45,7 +51,12 @@ async function cloneOrgTable(
   // Deterministic order so the new rows come back in the same order we
   // sent them — PostgREST returns inserts in input order, which lets us
   // build the id remap by index.
-  const liveRows = rows.filter((row) => row.archived_at == null && row.status !== "removed");
+  const liveRows = rows.filter(
+    (row) =>
+      row.archived_at == null &&
+      row.status !== "removed" &&
+      remappings.every((r) => !r.required || (row[r.col] != null && r.map.has(Number(row[r.col])))),
+  );
   if (liveRows.length === 0) return new Map();
   liveRows.sort((a, b) => Number(a.id) - Number(b.id));
 
@@ -129,12 +140,27 @@ async function cloneOrgIntoSandbox(
 
   // Phase 4 — jobs depend on focus areas, shift categories, departments,
   // roles, and certifications.
-  await cloneOrgTable(svc, "jobs", sourceOrgId, sandboxOrgId, [
+  const jobMap = await cloneOrgTable(svc, "jobs", sourceOrgId, sandboxOrgId, [
     { col: "focus_area_ids", map: focusAreaMap, isArray: true },
     { col: "applicable_shift_ids", map: shiftCategoryMap, isArray: true },
     { col: "department_ids", map: departmentMap, isArray: true },
     { col: "eligible_role_ids", map: roleMap, isArray: true },
     { col: "required_certification_ids", map: certificationMap, isArray: true },
+  ]);
+
+  // Phase 4b: rows keyed on jobs. Coverage targets drive the grid's coverage
+  // row and the dashboard; per-job shift times and colours change what every
+  // cell shows. Without them the sandbox looked like an unconfigured org.
+  await Promise.all([
+    cloneOrgTable(svc, "coverage_requirements", sourceOrgId, sandboxOrgId, [
+      { col: "focus_area_id", map: focusAreaMap, required: true },
+      { col: "job_id", map: jobMap, required: true },
+      { col: "preferred_shift_id", map: shiftCategoryMap },
+    ]),
+    cloneOrgTable(svc, "job_shift_overrides", sourceOrgId, sandboxOrgId, [
+      { col: "job_id", map: jobMap, required: true },
+      { col: "shift_id", map: shiftCategoryMap, required: true },
+    ]),
   ]);
 
   // Phase 5 — employees. Strip user_id so the cloned employees are
@@ -184,6 +210,31 @@ export async function findActiveSandboxForUser(
     slug: (data.slug as string | null) ?? null,
     sourceOrgId: (data.sandbox_source_org_id as string | null) ?? null,
   };
+}
+
+/**
+ * A sandbox this person still has open in a different auth session (another
+ * window, browser or device). Enter asks before replacing it rather than
+ * discarding someone's work in a window they may still be using.
+ */
+export async function findSandboxFromOtherSession(
+  serviceClient: SupabaseClient,
+  userId: string,
+  sessionId: string,
+): Promise<{ id: string; startedAt: string | null } | null> {
+  const { data, error } = await serviceClient
+    .from("organizations")
+    .select("id, created_at")
+    .eq("workspace_kind", "sandbox")
+    .eq("sandbox_owner_user_id", userId)
+    .neq("sandbox_owner_session_id", sessionId)
+    .is("archived_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { id: data.id as string, startedAt: (data.created_at as string | null) ?? null };
 }
 
 /**

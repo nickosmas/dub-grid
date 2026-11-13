@@ -29,6 +29,7 @@ This document covers DubGrid's cookie implementation, consent management, analyt
 | `dubgrid-cookie-consent`      | Essential | Stores consent preference (essential/analytics) + version. Also mirrored in `localStorage` for localhost reliability.                                                                                                                                                                          | 1 year                             | Client JS (`CookieConsent.tsx`)                  |
 | `sb-<project-ref>-auth-token` | Essential | Supabase authentication session (access + refresh tokens). May be chunked into `.0`, `.1`, etc. for large JWTs.                                                                                                                                                                                | ~400 days (auto-refreshed)         | `@supabase/ssr`                                  |
 | `dubgrid-sandbox`             | Essential | Activates Test Sandbox mode for the calling user. `HttpOnly`, read and written server-side only.                                                                                                                                                                                               | 7 days (cleared on exit)           | Server Route Handler (`/api/test-sandbox`)       |
+| `dg-sandbox-ended`            | Essential | One-time note that this tab's sandbox ended outside it, so the app can say why the person is back in their organization. Set beside clearing `dubgrid-sandbox`; the app deletes it once read.                                                                                                  | 2 minutes (or until read)          | Server (`lib/sandbox-ended.ts`, `proxy.ts`)      |
 | `dubgrid-impersonation`       | Essential | Gridmaster support impersonation session data.                                                                                                                                                                                                                                                 | Dynamic, up to 30 min              | Client JS (`impersonation.ts`)                   |
 | `sidebar_state`               | Essential | Remembers sidebar open/collapsed state.                                                                                                                                                                                                                                                        | 7 days                             | Client JS (`ui/sidebar.tsx`)                     |
 | `dg-theme`                    | Essential | Light/dark/system appearance preference, shared across the apex and org subdomains. Domain-scoped, so it has no effect on localhost — see `lib/theme-preference.ts`.                                                                                                                           | 1 year                             | Client JS (`ThemeProvider.tsx`)                  |
@@ -298,7 +299,8 @@ Enables per-user Test Sandbox mode, where a Super Admin, or an Admin who can man
 ```typescript
 {
   sandboxOrgId: string,  // sandbox organization UUID
-  userId: string         // owner's user ID (verified server-side)
+  userId: string,        // owner's user ID (verified server-side)
+  sessionId: string      // the auth session the sandbox belongs to
 }
 ```
 
@@ -308,9 +310,13 @@ The cookie is `HttpOnly` because it is set, read, and cleared entirely server-si
 
 ### Route Handler Actions
 
-- **`action: "enter"`** — Creates (or reuses) the sandbox for the user and sets the cookie.
-- **`action: "exit"`** — Deletes all sandboxes owned by the user and clears the cookie (`maxAge: 0`).
-- **`action: "reset"`** — Deletes the sandbox, re-creates it from the source org, and sets a fresh cookie.
+- **`action: "enter"`** - Creates the sandbox from the session's own organization, or reuses this session's sandbox when it was cloned from that organization, and sets the cookie. When the person has a sandbox open in another session it answers 409 `SANDBOX_OPEN_ELSEWHERE` and deletes nothing; resending with `replaceExisting: true` replaces it.
+- **`action: "exit"`** - Deletes all sandboxes owned by the user and clears the cookie (`maxAge: 0`). It authenticates with the token's own claims, so a stale cookie can't refuse it.
+- **`action: "reset"`** - Deletes the sandbox, re-creates it from the source org, and sets a fresh cookie.
+
+### A sandbox that ended elsewhere
+
+The browser can't clear an `HttpOnly` cookie, so the server does. When a request carries a cookie whose sandbox no longer exists or no longer belongs to a session that may use it (another session's Enter or a new sign-in deleted it, the cleanup job ran, or the owner lost access), the API answers 403 `SANDBOX_ENDED` and the proxy, on a page load, simply drops it. Both clear `dubgrid-sandbox` and set `dg-sandbox-ended`. The client reloads once into the real organization and shows a notice. A failed ownership lookup keeps the cookie and answers 503 instead.
 
 ---
 
@@ -403,6 +409,7 @@ between `localhost` and `sub.localhost`, it has **no effect in local development
 | `dubgrid-cookie-consent` | Yes (HTTPS)      | No                           | Lax                           |
 | `sb-*-auth-token`        | Yes (HTTPS)      | No (`@supabase/ssr` default) | Lax (`@supabase/ssr` default) |
 | `dubgrid-sandbox`        | Yes (production) | **Yes**                      | Lax                           |
+| `dg-sandbox-ended`       | Yes (production) | No                           | Lax                           |
 | `dubgrid-impersonation`  | Yes (HTTPS)      | No                           | Lax                           |
 | `sidebar_state`          | Yes (HTTPS)      | No                           | Lax                           |
 | `dg-theme`               | Yes (HTTPS)      | No                           | Lax                           |
@@ -584,6 +591,7 @@ Navigate ──────────────────────► a
 
 Enter sandbox ─────────────────► POST /api/test-sandbox { action: "enter" }
                                   verify auth + CSRF
+                                  sandbox open in another session? ─► 409, ask first
                                   create or reuse sandbox org ─► organizations (sandbox)
   ◄─── Set-Cookie: dubgrid-sandbox (HttpOnly)
 
