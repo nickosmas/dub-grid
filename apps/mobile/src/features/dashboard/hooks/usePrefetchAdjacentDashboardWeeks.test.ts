@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prefetchQuery, getDashboard, getMySchedule } = vi.hoisted(() => ({
   prefetchQuery: vi.fn(),
@@ -10,7 +10,10 @@ const { prefetchQuery, getDashboard, getMySchedule } = vi.hoisted(() => ({
 vi.mock("../../../shared/lib/query-client", () => ({ queryClient: { prefetchQuery } }));
 vi.mock("../../../shared/lib/api", () => ({ getDashboard, getMySchedule }));
 
-import { usePrefetchAdjacentDashboardWeeks } from "./usePrefetchAdjacentDashboardWeeks";
+import {
+  ADJACENT_WEEKS_PREFETCH_DELAY_MS,
+  usePrefetchAdjacentDashboardWeeks,
+} from "./usePrefetchAdjacentDashboardWeeks";
 
 function tokenFor(issuedAt: string): string {
   const encode = (value: object) =>
@@ -37,11 +40,18 @@ function rangeOf(key: unknown[]) {
 
 describe("usePrefetchAdjacentDashboardWeeks", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     prefetchQuery.mockReset();
     prefetchQuery.mockResolvedValue(undefined);
     getDashboard.mockReset();
     getMySchedule.mockReset();
   });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const settle = () => vi.advanceTimersByTime(ADJACENT_WEEKS_PREFETCH_DELAY_MS);
 
   it("does nothing until bootstrap has landed", () => {
     renderHook(() =>
@@ -50,11 +60,34 @@ describe("usePrefetchAdjacentDashboardWeeks", () => {
         range: WEEK,
         includeSchedule: true,
         ready: false,
-        currentUpdatedAt: 0,
+        currentLoaded: true,
       }),
     );
+    settle();
 
     expect(prefetchQuery).not.toHaveBeenCalled();
+  });
+
+  it("waits for the shown week before warming its neighbours", () => {
+    const { rerender } = renderHook(
+      ({ loaded }: { loaded: boolean }) =>
+        usePrefetchAdjacentDashboardWeeks({
+          accessToken: token,
+          range: WEEK,
+          includeSchedule: false,
+          ready: true,
+          currentLoaded: loaded,
+        }),
+      { initialProps: { loaded: false } },
+    );
+    settle();
+    expect(prefetchQuery).not.toHaveBeenCalled();
+
+    rerender({ loaded: true });
+    vi.advanceTimersByTime(ADJACENT_WEEKS_PREFETCH_DELAY_MS - 1);
+    expect(prefetchQuery).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(prefetchQuery).toHaveBeenCalledTimes(2);
   });
 
   it("warms the dashboard and schedule for the week before and after", () => {
@@ -64,9 +97,10 @@ describe("usePrefetchAdjacentDashboardWeeks", () => {
         range: WEEK,
         includeSchedule: true,
         ready: true,
-        currentUpdatedAt: 1,
+        currentLoaded: true,
       }),
     );
+    settle();
 
     const keys = keysOf(prefetchQuery.mock.calls);
     expect(keys).toHaveLength(4);
@@ -96,31 +130,35 @@ describe("usePrefetchAdjacentDashboardWeeks", () => {
         range: WEEK,
         includeSchedule: false,
         ready: true,
-        currentUpdatedAt: 1,
+        currentLoaded: true,
       }),
     );
+    settle();
 
     expect(keysOf(prefetchQuery.mock.calls)).toHaveLength(2);
   });
 
-  it("re-warms the neighbours each time the shown week refreshes", () => {
+  it("warms once per week shown, not on every refresh", () => {
     const { rerender } = renderHook(
-      ({ updatedAt }: { updatedAt: number }) =>
+      ({ range }: { range: typeof WEEK }) =>
         usePrefetchAdjacentDashboardWeeks({
           accessToken: token,
-          range: WEEK,
+          range,
           includeSchedule: false,
           ready: true,
-          currentUpdatedAt: updatedAt,
+          currentLoaded: true,
         }),
-      { initialProps: { updatedAt: 1 } },
+      { initialProps: { range: WEEK } },
     );
+    settle();
     expect(prefetchQuery).toHaveBeenCalledTimes(2);
 
-    rerender({ updatedAt: 1 });
+    rerender({ range: { ...WEEK } });
+    settle();
     expect(prefetchQuery).toHaveBeenCalledTimes(2);
 
-    rerender({ updatedAt: 2 });
+    rerender({ range: { startDate: "2026-11-01", endDate: "2026-11-07" } });
+    settle();
     expect(prefetchQuery).toHaveBeenCalledTimes(4);
   });
 });

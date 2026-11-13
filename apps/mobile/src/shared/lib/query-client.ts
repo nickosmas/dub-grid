@@ -17,11 +17,18 @@ const FOREGROUND_STALE_TIME_MS = 30_000;
  * network handover while the connection works, and leaving it to
  * `refetchOnReconnect` showed an error page that never cleared, since the app
  * never went offline to come back. React Query pauses retries while offline.
+ * A timeout is the exception: see below.
  */
 const TERMINAL_STATUSES = new Set([401, 403, 404]);
 
 export function shouldRetryMobileQuery(failureCount: number, error: unknown): boolean {
   if (error instanceof ApiResponseError && TERMINAL_STATUSES.has(error.status)) {
+    return false;
+  }
+  // A request that ran out its whole deadline met a busy server, not a
+  // dropped connection; sending it again only lengthens the queue it waited in.
+  // By name, since the class lives in api.ts, which imports this module.
+  if (error instanceof Error && error.name === "MobileRequestTimeoutError") {
     return false;
   }
 

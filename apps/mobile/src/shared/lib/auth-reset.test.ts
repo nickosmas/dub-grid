@@ -217,6 +217,19 @@ describe("auth-reset", () => {
       expect(queryClientClear).toHaveBeenCalled();
     });
 
+    it("keeps the session when the refresh couldn't reach Supabase", async () => {
+      getSession.mockResolvedValue({
+        data: { session: null },
+        error: Object.assign(new Error("Failed to fetch"), { name: "AuthRetryableFetchError" }),
+      });
+
+      await handleRejectedMobileToken("token-123");
+
+      expect(signOut).not.toHaveBeenCalled();
+      expect(queryClientClear).not.toHaveBeenCalled();
+      expect(routerReplace).not.toHaveBeenCalled();
+    });
+
     it("tears down when the rejected token is the live one", async () => {
       getSession.mockResolvedValue({ data: { session: { access_token: "token-123" } } });
 
