@@ -297,7 +297,7 @@ does.
   (`npm run build`) and start.
 - **Database:** Supabase (hosted Postgres + Auth + Realtime), an immutable
   ordered migration stream under `supabase/migrations/` (`001`-`004` frozen,
-  forward migrations through `075`, checksum-locked). Read the linked
+  forward migrations through `136`, checksum-locked). Read the linked
   production ledger with `npm run db:migrations:inspect` (read-only) before
   any release rather than trusting a recorded number. Feature flags are
   created via the Gridmaster UI; a new switch is one INSERT in a forward
