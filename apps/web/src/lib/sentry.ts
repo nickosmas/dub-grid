@@ -101,6 +101,9 @@ export function bufferEarlyErrors(): () => void {
   target.addEventListener("error", onError);
   target.addEventListener("unhandledrejection", onRejection);
   return () => {
+    // A test environment strips the window's methods when it tears down,
+    // which can happen before the deferred SDK load settles.
+    if (typeof target.removeEventListener !== "function") return;
     target.removeEventListener("error", onError);
     target.removeEventListener("unhandledrejection", onRejection);
   };
@@ -114,6 +117,10 @@ export const sentryReady: Promise<void> = new Promise((resolve) => {
 if (process.env.NODE_ENV !== "development") {
   if (typeof window === "undefined") {
     _sdk = require("@sentry/nextjs");
+    _resolveReady();
+  } else if (process.env.NODE_ENV === "test") {
+    // No test reads the real browser SDK, and a load deferred past the page's
+    // settling outlives the test that started it, then fails in teardown.
     _resolveReady();
   } else {
     _pending = [];

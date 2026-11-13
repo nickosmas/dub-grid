@@ -60,4 +60,15 @@ describe("bufferEarlyErrors", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it("stops cleanly after the window's methods are torn down", () => {
+    const stop = bufferEarlyErrors();
+    const remove = window.removeEventListener;
+    Object.defineProperty(window, "removeEventListener", { value: undefined, configurable: true });
+    try {
+      expect(() => stop()).not.toThrow();
+    } finally {
+      Object.defineProperty(window, "removeEventListener", { value: remove, configurable: true });
+    }
+  });
 });
