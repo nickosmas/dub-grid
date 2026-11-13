@@ -86,6 +86,56 @@ describe("mobileApiRequest", () => {
       await expect(sentBearer(token)).resolves.toBe(`Bearer ${token}`);
     });
 
+    it("is resent once with the refreshed session after a refusal", async () => {
+      const sent = tokenWithClaims({ sub: "user-1", org_id: "org-1", exp: nowSeconds() + 3600 });
+      const live = tokenWithClaims({
+        sub: "user-1",
+        org_id: "org-1",
+        exp: nowSeconds() + 7200,
+        iat: nowSeconds(),
+      });
+      const refused = {
+        ok: false,
+        status: 401,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({ error: "Invalid session" }),
+      };
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(refused)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+      vi.stubGlobal("fetch", fetchMock);
+      handleRejectedMobileToken.mockResolvedValue(undefined);
+      getSession.mockResolvedValue({ data: { session: { access_token: live } }, error: null });
+      const { mobileApiRequest } = await import("./api");
+
+      await expect(
+        mobileApiRequest("/api/mobile/v1/ping", sent, { method: "GET" }, (value) => value),
+      ).resolves.toEqual({ ok: true });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const retried = fetchMock.mock.calls[1]?.[1] as RequestInit;
+      expect(new Headers(retried.headers).get("Authorization")).toBe(`Bearer ${live}`);
+    });
+
+    it("is not resent when the session was signed out", async () => {
+      const sent = tokenWithClaims({ sub: "user-1", org_id: "org-1", exp: nowSeconds() + 3600 });
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({ error: "Invalid session" }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      handleRejectedMobileToken.mockResolvedValue(undefined);
+      getSession.mockResolvedValue({ data: { session: null }, error: null });
+      const { mobileApiRequest } = await import("./api");
+
+      await expect(
+        mobileApiRequest("/api/mobile/v1/ping", sent, { method: "GET" }, (value) => value),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it("leaves a token that is still valid alone", async () => {
       const token = tokenWithClaims({ sub: "user-1", org_id: "org-1", exp: nowSeconds() + 3600 });
 
@@ -501,9 +551,10 @@ describe("mobileApiRequest", () => {
       email: "mina@dubgrid.com",
       password: "super-secret",
     });
-    const assertion = expect(loginPromise).rejects.toThrow(
-      "This is taking longer than expected. Check your internet connection and try again.",
-    );
+    const assertion = expect(loginPromise).rejects.toMatchObject({
+      name: "MobileRequestTimeoutError",
+      message: "This is taking longer than it should. Try again in a moment.",
+    });
 
     await vi.advanceTimersByTimeAsync(15_000);
 

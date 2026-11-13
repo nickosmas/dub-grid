@@ -118,10 +118,24 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && (error.name === "AbortError" || /aborted/i.test(error.message));
 }
 
+// A request past its deadline is a slow server far more often than a lost
+// connection (2026-11-13: production queued requests for 15s and more while
+// the phone was online), so it doesn't blame the connection.
+export const MOBILE_REQUEST_TIMEOUT_MESSAGE =
+  "This is taking longer than it should. Try again in a moment.";
+
+/** The app gave up waiting on the server. Not retried: it would only add to the queue. */
+export class MobileRequestTimeoutError extends Error {
+  constructor() {
+    super(MOBILE_REQUEST_TIMEOUT_MESSAGE);
+    this.name = "MobileRequestTimeoutError";
+  }
+}
+
 function createMobileTransportErrorMessage(baseUrl: string, error: unknown): string {
   void baseUrl;
   if (isAbortError(error)) {
-    return "This is taking longer than expected. Check your internet connection and try again.";
+    return MOBILE_REQUEST_TIMEOUT_MESSAGE;
   }
 
   return "We couldn't connect right now. Check your internet connection and try again.";
@@ -184,20 +198,31 @@ export async function mobileApiRequest<T>(
   const accessToken = isExpiringAccessToken(requestedToken)
     ? await resolveLiveAccessToken(requestedToken)
     : requestedToken;
-  const headers = createHeaders(init, {
-    Authorization: `Bearer ${accessToken}`,
-    "Content-Type": init.body !== undefined ? "application/json" : undefined,
-  });
+  const send = (token: string) =>
+    mobileRequest(
+      path,
+      {
+        ...init,
+        headers: createHeaders(init, {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": init.body !== undefined ? "application/json" : undefined,
+        }),
+      },
+      parse,
+      token,
+    );
 
-  return mobileRequest(
-    path,
-    {
-      ...init,
-      headers,
-    },
-    parse,
-    accessToken,
-  );
+  try {
+    return await send(accessToken);
+  } catch (error) {
+    // Refused while a refresh was finishing: the session is fine, so ask
+    // once more with it rather than show "Your session expired". A session
+    // that is really gone was signed out before this point and has no token.
+    if (!(error instanceof ApiResponseError) || error.status !== 401) throw error;
+    const liveToken = await resolveLiveAccessToken(accessToken);
+    if (liveToken === accessToken) throw error;
+    return send(liveToken);
+  }
 }
 
 async function mobilePublicApiRequest<T>(
@@ -240,7 +265,9 @@ async function mobileRequest<T>(
   } else {
     callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
   }
+  let timedOut = false;
   let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+    timedOut = true;
     timeoutController.abort();
   }, MOBILE_REQUEST_TIMEOUT_MS);
 
@@ -266,6 +293,9 @@ async function mobileRequest<T>(
         serverTiming = response.headers?.get?.("server-timing") ?? null;
       },
     });
+  } catch (error) {
+    if (timedOut) throw new MobileRequestTimeoutError();
+    throw error;
   } finally {
     if (measurementRequestKind) {
       const measurementEndedAt = globalThis.performance?.now() ?? Date.now();
