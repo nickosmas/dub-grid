@@ -422,7 +422,7 @@ export async function requireAuthenticatedUserWithClaims(
   if (sandboxCookieValue) {
     const sb = getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`);
     if (!sb || sb.userId !== auth.user.id || sb.sessionId !== auth.sessionId) {
-      return { response: sandboxEndedResponse() };
+      return { response: sandboxEndedResponse(req.nextUrl.protocol) };
     }
     try {
       const serviceClient = getServiceClient();
@@ -432,7 +432,7 @@ export async function requireAuthenticatedUserWithClaims(
         sessionId: auth.sessionId,
       });
       if (!ownedSandbox) {
-        return { response: sandboxEndedResponse() };
+        return { response: sandboxEndedResponse(req.nextUrl.protocol) };
       }
       return {
         ...auth,

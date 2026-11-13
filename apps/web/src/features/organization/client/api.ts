@@ -47,6 +47,12 @@ const ORGANIZATION_ACCESS_STATUS_TIMEOUT_MS = 8_000;
 export interface OrganizationBootstrap {
   org: Organization | null;
   isGridmaster: boolean;
+  /**
+   * In a Test Sandbox, the caller's role in the organization it was copied
+   * from. Inside the copy everyone is a Super Admin, but billing belongs to
+   * the source, so what the header shows of it follows this role.
+   */
+  sandboxSourceRole?: "super_admin" | "admin" | "user" | null;
   entryGate: {
     onboardingCompleted: boolean;
     /** Org-wide: a super admin has finished their own onboarding, so the

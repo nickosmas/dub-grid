@@ -187,7 +187,10 @@ export async function POST(req: NextRequest) {
         // so HttpOnly closes the JS-readability gap with no functional cost.
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        // Secure over https only, as the auth cookies (authCookieOptions):
+        // WebKit refuses a Secure cookie set over plain http, even on
+        // localhost, so the sandbox never opened there.
+        secure: req.nextUrl.protocol === "https:",
         maxAge: SANDBOX_COOKIE_MAX_AGE_SECONDS,
       },
     );

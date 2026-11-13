@@ -41,3 +41,17 @@ export function useSandboxSourceOrgId(): string | null {
   if (!org || org.workspaceKind !== "sandbox") return null;
   return org.sandboxSourceOrgId ?? null;
 }
+
+/**
+ * Whether the caller sees billing: a Super Admin outside a sandbox, or inside
+ * one, a Super Admin of the organization it was copied from. Billing in a
+ * sandbox is always the source organization's.
+ */
+export function useCanSeeBilling(isSuperAdmin: boolean): boolean {
+  const { data } = useQuery<OrganizationBootstrap>({
+    queryKey: queryKeys.org.bootstrap(),
+    ...getOrganizationBootstrapQueryPolicy(),
+  });
+  if (data?.org?.workspaceKind !== "sandbox") return isSuperAdmin;
+  return data.sandboxSourceRole === "super_admin";
+}
