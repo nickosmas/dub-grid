@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:df548e48937b8669a62da71e02914651d2d8960c8e470c5f8cbe309af14b4419",
+  "sourceDigest": "sha256:985fa1da161db34ac0ac84d432fda956541cf17f09d3807d26328262be7b3273",
   "webRoutes": [
     {
       "id": "web:/",
@@ -1237,6 +1237,15 @@
       }
     },
     {
+      "id": "http:GET:/api/cron/purge-archived-organizations",
+      "method": "GET",
+      "path": "/api/cron/purge-archived-organizations",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/cron/purge-archived-organizations/route.ts"
+      }
+    },
+    {
       "id": "http:GET:/api/cron/return-from-away",
       "method": "GET",
       "path": "/api/cron/return-from-away",
@@ -1405,6 +1414,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/gridmaster/org-health/route.ts"
+      }
+    },
+    {
+      "id": "http:GET:/api/gridmaster/organizations/export",
+      "method": "GET",
+      "path": "/api/gridmaster/organizations/export",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/gridmaster/organizations/export/route.ts"
       }
     },
     {
@@ -1822,6 +1840,15 @@
       "scope": "api",
       "source": {
         "path": "apps/web/src/app/api/organization/employee-count/route.ts"
+      }
+    },
+    {
+      "id": "http:GET:/api/organizations/export",
+      "method": "GET",
+      "path": "/api/organizations/export",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/organizations/export/route.ts"
       }
     },
     {
@@ -5272,6 +5299,16 @@
       "source": {
         "path": "supabase/migrations/141_postgres_changes_publication_empty.sql"
       }
+    },
+    {
+      "id": "migration:142_purge_archived_organizations.sql",
+      "version": "142",
+      "name": "purge_archived_organizations",
+      "file": "142_purge_archived_organizations.sql",
+      "sha256": "e741e82373b7b039d8dfbdd26efec19a72f2fe10a71c2e6b091e337d24984f02",
+      "source": {
+        "path": "supabase/migrations/142_purge_archived_organizations.sql"
+      }
     }
   ],
   "rlsTables": [
@@ -7562,6 +7599,19 @@
       "category": "repository-maintenance",
       "source": {
         "path": ".github/workflows/e2e.yml"
+      }
+    },
+    {
+      "id": "schedule:vercel:/api/cron/purge-archived-organizations",
+      "provider": "vercel",
+      "schedule": "0 9 * * *",
+      "target": {
+        "kind": "http",
+        "path": "/api/cron/purge-archived-organizations"
+      },
+      "category": "product",
+      "source": {
+        "path": "apps/web/vercel.json"
       }
     },
     {

@@ -52,7 +52,7 @@ export default function PrivacyPolicyPage() {
             marginBottom: "40px",
           }}
         >
-          Last updated: October 2026
+          Last updated: November 2026
         </p>
 
         <section style={{ marginBottom: "32px" }}>
@@ -306,9 +306,11 @@ export default function PrivacyPolicyPage() {
             We retain your account and profile data for as long as your account is active and as
             needed to provide the Service. Organization data, employee rosters, shifts, and notes
             are retained while the organization uses the Service. Organizations can configure a
-            retention period for archived records (365 days by default). We may retain data for a
-            limited period where needed for backups, security, legal obligations, or dispute
-            resolution.
+            retention period for archived records (365 days by default). When an organization is
+            deleted, we keep its data for 90 days so it can be restored, then delete it, together
+            with the accounts of people who belong to no other organization. Copies in our database
+            backups expire within 7 days after that. We may retain data for a limited period where
+            needed for security, legal obligations, or dispute resolution.
           </p>
           <p
             style={{

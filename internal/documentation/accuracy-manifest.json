@@ -1660,7 +1660,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:854a32a2615835226755694ed1f2107bb4b0667df3b3cc84e1eb5cbdd27d5456"
+      "evidenceFingerprint": "sha256:e24516fc45a3f56300ee78ea2109e46dd0233f50822d83a69f1f81cd8320ca00"
     },
     {
       "id": "schedule-rules-display",
@@ -1796,8 +1796,9 @@
             "both Super Admin only",
             "Activity Log scope, periods, search, type filter, details, 200 per page",
             "delete closes the organization, cancels the subscription, removes access",
+            "Download your data: a ZIP of staff, published days, requests and activity log, after an identity check",
             "typed DELETE confirmation and identity check",
-            "signs you out; not reversible in the product; support restores"
+            "signs you out; support restores or sends the export for 90 days, then it is purged with orphan accounts"
           ],
           "sourceFiles": [
             "apps/web/src/components/settings/nav-config.tsx",
@@ -1810,7 +1811,11 @@
             "apps/web/src/lib/audit/registry.ts",
             "apps/web/src/lib/activity-period.ts",
             "apps/web/src/components/settings/DangerZone.tsx",
-            "apps/web/src/app/api/organizations/delete/route.ts"
+            "apps/web/src/app/api/organizations/delete/route.ts",
+            "apps/web/src/app/api/organizations/export/route.ts",
+            "apps/web/src/features/organization/server/archive-export.ts",
+            "apps/web/src/app/api/cron/purge-archived-organizations/route.ts",
+            "supabase/migrations/142_purge_archived_organizations.sql"
           ],
           "testFiles": [
             "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
@@ -1819,13 +1824,16 @@
             "apps/web/src/components/settings/__tests__/ActivityLog.test.tsx",
             "apps/web/src/lib/activity-period.test.ts",
             "apps/web/src/components/settings/__tests__/DangerZone.test.tsx",
-            "apps/web/src/app/api/organizations/delete/route.test.ts"
+            "apps/web/src/app/api/organizations/delete/route.test.ts",
+            "apps/web/src/app/api/organizations/export/route.test.ts",
+            "apps/web/src/app/api/cron/purge-archived-organizations/route.test.ts",
+            "apps/web/src/__tests__/migration-142-purge-archived-organizations.integration.test.ts"
           ],
           "runtimeScenarios": [],
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:050055d9a4cfa9f1dce8a8bf7a4d26df3ed355334988d561167e08c8d0404030"
+      "evidenceFingerprint": "sha256:d638e6d1e948086d8a5d3369f1613c9ca43c27127c77370d387509af99fbc05c"
     },
     {
       "id": "departments-focus-areas",
@@ -2152,7 +2160,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:5a95566105e3fd6dcfba3f3bf7b98cf85cdd289946a66444334fe9498c218b30"
+      "evidenceFingerprint": "sha256:47b5f1e46464f4bb9f61233d6f2a337ccb7652d188556f904e29fec56d1b7f5c"
     }
   ],
   "surfaceExclusions": [

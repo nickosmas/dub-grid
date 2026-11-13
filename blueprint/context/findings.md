@@ -752,7 +752,7 @@
 **Update 2026-11-07 (review):** the lint rule passes `.upsert`, `.insert`, `.rpc`, a table name in a variable or template, a query split across statements, any `user_id` filter beside `.eq("id", id)`, and `.eq("org_id", body.orgId)`. It leaves out `organizations`, `notifications`, `audit_log`, `user_sessions`, `mobile_device_tokens` and others, and doesn't cover `apps/web/src/lib` or `packages/*`. A scan of all 285 write chains found no service-client update or delete whose only filter is a client-supplied id.
 **Update 2026-11-13 (re-check against dev):** the lint rule shipped (#383); the `orgDb` helper and the cross-organization route test are still open.
 
-### F-203 [P2] open - Deleted organizations' data is kept indefinitely and the retention jobs never run
+### F-203 [P2] fixed - Deleted organizations' data is kept indefinitely and the retention jobs never run
 
 **File:** `purge_expired_data`, `purge_scheduled_accounts`, `flag_inactive_accounts` (no caller in `apps/`, `packages/`, `.github/` or `apps/web/vercel.json`, no `pg_cron`); `apps/web/src/app/api/organizations/delete/route.ts:107`; `apps/web/src/app/privacy/page.tsx:308`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
@@ -760,6 +760,7 @@
 **Suggested fix:** Schedule the jobs, define a hard-delete window after archive with a verified per-organization export before it, and align the policy text.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** owner decision (2026-11-13): an archived organization stays restorable by a Gridmaster for 90 days, then a scheduled job deletes it and its staff data; the Super Admin is offered an export in that window, and the Privacy Policy states the 90 days and the backup window. Needs its own spec.
+**Resolution:** Fixed on feature/archived-org-purge (2026-11-13), with the owner's answers that day: accounts that belong to no other organization are deleted, the export is offered when deleting, and the organization's activity log goes with it. Migration 142 adds `purge_archived_organization` (service role only), which refuses anything not a real organization archived 90 days ago, deletes the organization's own activity rows (DubGrid support's stay), deletes the organization so its 36 cascades remove the rest, records `org.purged`, and returns the people it had. The daily `/api/cron/purge-archived-organizations` (switch `cron_purge_archived_orgs`) runs it for up to five organizations and deletes each account left with no membership anywhere, never a Gridmaster's or an internal one. **Delete organization** offers **Download your data**, a ZIP of the staff list, every published day, every shift request and the activity log, and a Gridmaster's archived-organization card names the purge date and offers the same download. The Privacy Policy states the 90 days and a 7-day backup expiry, which the owner should confirm against the database plan. Not done: the other retention functions (`purge_expired_data`, `purge_scheduled_accounts`, `flag_inactive_accounts`) stay unscheduled, since running them for the first time could delete data no one has reviewed.
 
 ### F-204 [P2] open - Auth cookies are readable by script, and sign-in pages allow inline scripts
 
