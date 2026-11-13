@@ -150,7 +150,7 @@
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** the suggested fix now conflicts with later work. The layout verifies the session on the server to paint at once (F-131) and reads client flags (F-158), and the sign-in pages moved onto the nonce policy (F-204). Prerendering would lose the first and need `'unsafe-inline'` again. Measure cold starts before pursuing it.
 
-### F-134 [P2] open - Sentry's full SDK, Session Replay included, downloads and parses on every page at boot
+### F-134 [P2] fixed - Sentry's full SDK, Session Replay included, downloads and parses on every page at boot
 
 **File:** `apps/web/src/lib/sentry.ts:84` (`void import("@sentry/nextjs")` at module load); `apps/web/src/instrumentation-client.ts:60-68`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
@@ -162,6 +162,7 @@
 - Add Sentry's `bundleSizeOptimizations` (exclude the replay iframe, shadow DOM and worker).
   **Resolution:**
   **Update 2026-11-13 (re-check against dev):** still open. Don't use `lazyLoadIntegration`: it loads from Sentry's CDN, which the CSP doesn't allow. Import the SDK on idle or `load` and add `bundleSizeOptimizations`; Replay stays in the one SDK chunk on purpose.
+  **Update 2026-11-13 (fix/web-page-weight):** fixed as the re-check suggested. `lib/sentry.ts` starts the SDK import after the page's load event and an idle callback (a 500ms timer where Safari has none), and until it loads an uncaught error or rejection is queued for it (`bufferEarlyErrors`), so nothing thrown at startup is lost. On a local production build the page's chunks finished at 0.66s, load at 0.70s, and the 158 KB gzip Sentry chunk was requested at 3.7s. Tested in `sentry-loading.test.ts`. `bundleSizeOptimizations` not added.
 
 ### F-135 [P2] fixed - Each staff-search keystroke re-renders every Schedule grid section
 
@@ -238,6 +239,7 @@
 - Preload only Inter in the root layout.
   **Resolution:**
   **Update 2026-11-13 (re-check against dev):** every part is still present. Narrow the font advice: keep the DM Sans preload (every header's wordmark uses it) and drop only DM Mono if it isn't above the fold.
+  **Update 2026-11-13 (fix/web-page-weight, measured):** a production build of dev puts first-load JS at 585 KB gzip on `/schedule`, 579 on `/people/[id]`, 556 on `/people` and 384 on `/dashboard`; 371 KB is shared by every app page (React DOM 72, Supabase auth and realtime 65, Next runtime 41, React Query and zod). Loading Schedule's Month view, history panel and modals, the person page's dialogs and the sandbox dialog on demand saved only 6, 2 and about 1 KB, so those were left static; Settings' billing-only screen loads `BillingSettings` on demand (-14 KB). The remaining weight is the pages' own grid and editors, not on-click code.
 
 ### F-141 [P2] unverified - RLS policies call SECURITY DEFINER helpers per row instead of once per query
 
