@@ -18,6 +18,7 @@ import { endUserSessions } from "@/lib/auth/revocation";
 import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 // Runs daily via the vercel.json crons block, at 08:00 UTC so it lands just
 // after midnight across US timezones. First anyone whose planned Away (51g1)

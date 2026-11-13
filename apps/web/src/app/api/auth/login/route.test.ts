@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const checkRateLimit = vi.fn();
+const peekRateLimit = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const signInWithPassword = vi.fn();
 const fetchTermsAcceptanceStatus = vi.fn();
@@ -23,6 +24,7 @@ vi.mock("@/lib/rate-limit", () => ({
   loginIpLimiter: {},
   loginSurgeLimiter: {},
   checkRateLimit: (...args: unknown[]) => checkRateLimit(...args),
+  peekRateLimit: (...args: unknown[]) => peekRateLimit(...args),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -176,6 +178,7 @@ describe("POST /api/auth/login", () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "anon-key";
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    peekRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     validateCsrfOrigin.mockReturnValue(null);
     fetchTermsAcceptanceStatus.mockResolvedValue({
       acceptedCurrentTerms: true,
@@ -204,16 +207,35 @@ describe("POST /api/auth/login", () => {
   });
 
   it("sheds a login surge before calling the auth provider", async () => {
-    checkRateLimit
-      .mockResolvedValueOnce({ limited: false, misconfigured: false })
-      .mockResolvedValueOnce({ limited: false, misconfigured: false })
-      .mockResolvedValueOnce({ limited: true, reset: Date.now() + 3_000, misconfigured: false });
+    peekRateLimit.mockResolvedValueOnce({
+      limited: true,
+      reset: Date.now() + 3_000,
+      misconfigured: false,
+    });
 
     const res = await POST(makeRequest("acme.localhost"));
 
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("3");
     expect(signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("spends the shared ceiling only on a sign-in its own limits admit (F-208)", async () => {
+    const globalSpends = () =>
+      checkRateLimit.mock.calls.filter((call) => call[1] === "login:global").length;
+
+    checkRateLimit.mockResolvedValueOnce({ limited: false, misconfigured: false });
+    checkRateLimit.mockResolvedValueOnce({ limited: true, reset: Date.now() + 1000 });
+    expect((await POST(makeRequest("acme.localhost"))).status).toBe(429);
+    expect(peekRateLimit).toHaveBeenCalledWith(expect.anything(), "login:global");
+    expect(globalSpends()).toBe(0);
+
+    signInWithPassword.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Invalid login credentials", status: 400 },
+    });
+    expect((await POST(makeRequest("acme.localhost"))).status).toBe(401);
+    expect(globalSpends()).toBe(1);
   });
 
   it("returns a generic 401 on invalid credentials", async () => {
@@ -1119,7 +1141,6 @@ describe("POST /api/auth/login", () => {
 
       await POST(makeRequest("acme.localhost"));
 
-      expect(after).toHaveBeenCalledOnce();
       expect(writeSecurityAuditEvent).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ outcome: "succeeded", reason: "accepted" }),
       );

@@ -4,7 +4,6 @@ import {
   cacheDel,
   CacheKey,
   TTL,
-  logAudit,
   parseHost,
   ORGANIZATION_COLS,
 } from "./shared";
@@ -18,10 +17,9 @@ import type {
   OrganizationRole,
   OrganizationUser,
 } from "@/types";
-import { composeOrganizationAddress } from "@/lib/organization-profile";
 import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
 import { updateOrganizationInvitationGuarded, updateOrganizationMembershipGuarded } from "./access";
-import { changedElsewhereMessage, storedOrganizationLabel } from "@dubgrid/domain";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export async function fetchUserOrganization(): Promise<Organization | null> {
   let query = supabase.from("organizations").select(ORGANIZATION_COLS);
@@ -60,39 +58,6 @@ export async function fetchOrganizationById(orgId: string): Promise<Organization
     if (!data) return null;
     return rowToOrganization(data as DbOrganization);
   });
-}
-
-export async function updateOrganization(org: Organization): Promise<void> {
-  const address = composeOrganizationAddress(org);
-  const { error } = await supabase
-    .from("organizations")
-    .update({
-      name: org.name,
-      address,
-      address_line_1: org.addressLine1,
-      address_line_2: org.addressLine2,
-      address_city: org.addressCity,
-      address_state: org.addressState,
-      address_postal_code: org.addressPostalCode,
-      address_country: org.addressCountry,
-      phone: org.phone,
-      focus_area_label: storedOrganizationLabel("focusArea", org.focusAreaLabel),
-      certification_label: storedOrganizationLabel("certification", org.certificationLabel),
-      role_label: storedOrganizationLabel("role", org.roleLabel),
-      department_label: storedOrganizationLabel("department", org.departmentLabel),
-      shift_display_mode: org.shiftDisplayMode || "code",
-      timezone: org.timezone || null,
-      pay_period_start_date: org.payPeriodStartDate || null,
-      enforce_conflict_prevention: org.enforceConflictPrevention ?? false,
-      default_shift_enabled: org.defaultShiftEnabled ?? true,
-      coverage_rule_config: org.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
-      data_retention_days: org.dataRetentionDays ?? 365,
-      feature_overrides: org.featureOverrides ?? {},
-    })
-    .eq("id", org.id);
-  if (error) throw error;
-  await cacheDel(CacheKey.organization(org.id), CacheKey.allOrganizations());
-  void logAudit("org.updated", "organization", org.id, { name: org.name, address }, org.id);
 }
 
 export interface UpdateOrganizationSettingsInput extends Partial<OrganizationSettingsEditable> {

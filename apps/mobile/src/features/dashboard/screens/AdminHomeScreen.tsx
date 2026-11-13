@@ -99,14 +99,14 @@ export function AdminHomeScreen() {
   // a background refetch of the week already shown, from a pull or a realtime
   // nudge, is not.
   const isRefetching = dashboardQuery.isPlaceholderData || mine.isPlaceholderData;
-  // The weeks either side are fetched alongside this one, so the stepper
+  // The weeks either side are fetched shortly after this one, so the stepper
   // usually finds them in cache and moves without a spinner.
   usePrefetchAdjacentDashboardWeeks({
     accessToken,
     range,
     includeSchedule: !managementOnly,
     ready: bootstrapQuery.data !== undefined,
-    currentUpdatedAt: dashboardQuery.dataUpdatedAt,
+    currentLoaded: dashboardQuery.data !== undefined && !dashboardQuery.isPlaceholderData,
   });
   // The web build keeps the login page's aurora in the period's coverage
   // colour behind everything; on device the page is the plain grouped gray.
@@ -194,6 +194,9 @@ export function AdminHomeScreen() {
   }
 
   const data = dashboardQuery.data;
+  // The server leaves approvals empty for an admin who can't approve, so the
+  // card and the figure would only say "none waiting".
+  const canApprove = Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests);
   const openExpanded = (pathname: `/(tabs)/home/${string}`) => () =>
     router.push({ pathname, params: { weekOf: range.startDate } });
 
@@ -212,18 +215,23 @@ export function AdminHomeScreen() {
             data.coverageBySection.length > 0 ? openExpanded("/(tabs)/home/coverage") : undefined
           }
           onOpenGaps={openExpanded("/(tabs)/home/open-shifts")}
+          showPendingApprovals={canApprove}
         />
       ),
     },
-    {
-      key: "approvals",
-      node: (
-        <ActionQueueCard
-          requests={data.actionQueue}
-          onSeeAll={openExpanded("/(tabs)/home/pending-approvals")}
-        />
-      ),
-    },
+    ...(canApprove
+      ? [
+          {
+            key: "approvals",
+            node: (
+              <ActionQueueCard
+                requests={data.actionQueue}
+                onSeeAll={openExpanded("/(tabs)/home/pending-approvals")}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       key: "staff-hours",
       node: (

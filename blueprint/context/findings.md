@@ -163,13 +163,13 @@
   **Resolution:**
   **Update 2026-11-13 (re-check against dev):** still open. Don't use `lazyLoadIntegration`: it loads from Sentry's CDN, which the CSP doesn't allow. Import the SDK on idle or `load` and add `bundleSizeOptimizations`; Replay stays in the one SDK chunk on purpose.
 
-### F-135 [P2] open - Each staff-search keystroke re-renders every Schedule grid section
+### F-135 [P2] fixed - Each staff-search keystroke re-renders every Schedule grid section
 
 **File:** `apps/web/src/components/ScheduleGrid.tsx:1076-1090` (`sectionBlockPropsAreEqual`); `apps/web/src/app/(app)/schedule/SchedulePageClient.tsx:2920-2930`; `Toolbar.tsx:636`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** `searchMatchedEmployeeIds` is a new Set per keystroke and reaches every section as `highlightEmpIds`. The comparator returns false for any changed prop outside `CELL_READ_KEYS` and `CONTENT_COMPARED_KEYS`, and this one is in neither. Rows and cells are not memoized, and React Compiler is off, so every cell re-renders while typing. `MonthView` is not memoized either. This is a likely part of the 360ms p75 INP.
 **Suggested fix:** Pass `useDeferredValue(staffSearch)` (or a 150ms debounce) to the grid. Compare `highlightEmpIds` by membership for the section's own employees. Wrap `MonthView` in `memo`.
-**Resolution:**
+**Resolution:** Fixed on fix/performance-quick-wins (2026-11-13), as suggested: the grid and Month view highlight from `useDeferredValue(staffSearch)`, so the field updates at once and the grid follows in a render React can interrupt. `sectionBlockPropsAreEqual` compares the highlight with `sameSearchHighlight` (whether anyone matched, and which of the section's own people did), and `MonthView` is memoized. Tested in `schedule-grid/searchHighlight.test.ts`; the INP change is not measured.
 
 ### F-136 [P2] open - The Schedule Builder's suggestion engine re-runs synchronously in render every 30s and on every edit
 
@@ -247,7 +247,7 @@
 **Suggested fix:** EXPLAIN ANALYZE a grid read on a seeded large org. If the helpers appear per row, add a migration recreating the hot policies with `(SELECT public.caller_org_id())` and the like.
 **Resolution:**
 
-### F-142 [P2] open - The hourly expiry cron re-dispatches every lapsed invitation, forever
+### F-142 [P2] fixed - The hourly expiry cron re-dispatches every lapsed invitation, forever
 
 **File:** `apps/web/src/app/api/cron/expire-requests/route.ts:85-105`; `apps/web/src/app/api/cron/trial-expiry/route.ts:111-145` (pass 2, daily)
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
@@ -259,7 +259,7 @@
 - The cron routes set no `maxDuration`.
 - Trial-expiry pass 2 re-dispatches every expired, never-paid organization daily.
   **Suggested fix:** Bound the window (`expires_at > now() - interval '2 hours'`) or add an `expiry_notified_at`. Add an ORDER BY. Dedupe before the lookups. Set `maxDuration`.
-  **Resolution:**
+  **Resolution:** Fixed on fix/performance-quick-wins (2026-11-13): the invitation pass reads only invitations that lapsed in the last six hours, oldest first. Six hours rather than two because the hourly run comes from GitHub Actions, whose schedules can run late or be skipped, and the dedupe makes the repeats harmless. Every cron route sets `maxDuration = 60`, which the Hobby plan allows with or without Fluid compute. Tested in `expire-requests/route.test.ts`, which fails on the old query. Left alone: dedupe before the lookups, and trial-expiry pass 2, which needs organizations whose trial ended up to the longest grace before it to raise lock alerts, so bounding it is a separate change.
 
 ### F-143 [P2] unverified - The notification dedupe has no index to use, and notifications are never pruned
 
@@ -270,13 +270,13 @@
 **Resolution:** Re-examined 2026-10-30 (second /audit pass): no notifications index leads with `org_id` (`001:1432-1436`), so the dedupe can only filter after reading across organizations; five overlapping `user_id` indexes also slow every insert. Still needs EXPLAIN.
 **Update 2026-11-13 (re-check against dev):** still open. Add the `(org_id, type)` index; don't dedupe per recipient, which would send a duplicate to someone added after the first alert.
 
-### F-144 [P2] open - Creating or answering a shift request waits for every approver's alert to send
+### F-144 [P2] fixed - Creating or answering a shift request waits for every approver's alert to send
 
 **File:** `apps/web/src/app/api/schedule/requests/route.ts:238, 256, 562, 606, 663`; `packages/mobile-api-core/src/shift-requests.ts:168, 180, 550, 573, 594`; `apps/web/src/features/notifications/server/sender.ts:152-300`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** These handlers `await` the dispatch. Per recipient, `sendNotification` makes 6-8 sequential calls (facts, insert, Expo push, preferences, throttle, dedupe, `getUserById`, org name, Resend, insert) before the requester gets a response.
 **Suggested fix:** `after(() => dispatchNotificationEvent(...))`, as `shifts/publish/route.ts:149` already does.
-**Resolution:**
+**Resolution:** Fixed on fix/performance-quick-wins (2026-11-13): `dispatchNotificationEventAfterResponse` (`features/notifications/server/after-response.ts`) hands the send to `after()`. The web requests route uses it for every action, and the mobile routes pass it to `mobile-api-core` as the injected dispatcher, so the package stays free of Next. `settleOrNotify` still settles and picks the alert before answering, since the response reports the settlement. Route tests show the response comes back before the alert is sent.
 **Update 2026-11-13 (re-check against dev):** still open: #286 moved other routes to `after()` but not these. Keep `settleOrNotify`'s choice of event synchronous and defer only the dispatch.
 
 ### F-146 [P2] open - Publish alerts fan out with no concurrency limit and a query chain per recipient
@@ -357,13 +357,13 @@
   **Resolution:**
   **Update 2026-11-13 (re-check against dev):** one invalidation per flush with `cancelRefetch: false` is fixed. Draft tables for every user, the fixed 150ms window, no `publish_history` keying for non-editors and the `audit_log` subscription are still open. Plan with F-199.
 
-### F-151 [P2] open - Mobile schedule endpoints load every publish change in the organization and scan it per entry
+### F-151 [P2] fixed - Mobile schedule endpoints load every publish change in the organization and scan it per entry
 
 **File:** `packages/data-access/src/mobile.ts:917-918` (unfiltered `schedule_publish_changes` embed); `apps/web/src/features/mobile/server/data.ts:1012` (`findPublishedChangeForCell` per row), `:867`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance)
 **Why it matters:** One person's week on `/me/schedule`, `/org/schedule` or `/shift-requests` pays for every employee's changes in every overlapping publish. That is O(rows × changes), with two Zod parses per change. F-150 makes these calls frequent.
 **Suggested fix:** Filter the embed by `emp_id` (when scoped) and date, and index changes in a `Map` keyed `emp:date` before the loop.
-**Resolution:**
+**Resolution:** Fixed on fix/performance-quick-wins (2026-11-13): `fetchMobilePublishHistoryRows` takes `changesInRange`, which filters the embedded changes to the range's dates and, when set, one person. The schedule entries pass it with their person, the coverage inputs (which read only published dates) pass it too, and the dashboard leaves it out because its activity line counts a publish's whole set of changes. `fetchMobileScheduleEntries` builds one `emp:date` map (`indexPublishedChangesByCell`) and both per-cell lookups read it. Tests show the map returns the same change as the old scan, and that the filters apply only when asked.
 
 ### F-152 [P2] open - Mobile fetches the same data under several keys and refetches more than it needs
 
@@ -582,14 +582,15 @@
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open, with less to gain: Offboard and Away with no return take the organization publish lock (114/116), so they run one at a time anyway. Cap concurrency for the rest and add `maxDuration`.
 
-### F-176 [P2] open - The hidden-people filter scans every profile on the platform, unindexed, before most schedule and people reads
+### F-176 [P2] fixed - The hidden-people filter scans every profile on the platform, unindexed, before most schedule and people reads
 
 **File:** `packages/data-access/src/internal-people.ts:17-23`, then `:37-50`; for example `apps/web/src/app/api/schedule/manage/route.ts:1134`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
 **Why it matters:** `profiles where is_internal = true` has no index, so it reads every user across every organization, serially before `fetchHiddenEmployeeIds`, on about 40 call sites. It grows with the platform, not the organization.
 **Suggested fix:** A partial index on `profiles (id) WHERE is_internal`, plus a 30s in-process memo, since the list is platform-wide.
-**Resolution:**
+**Resolution:** Fixed (2026-11-13): the 30-second memo shipped with F-185, and migration 138 on fix/performance-quick-wins adds the partial index `idx_profiles_internal` on `profiles (id) WHERE is_internal`, so the internal-accounts lookup no longer scans every profile. Checked in a rolled-back transaction on the local stack: the lookup used an Index Only Scan.
 **Update 2026-11-13 (re-check against dev):** half fixed: the 30-second memo shipped with F-185. The partial index on `profiles (id) WHERE is_internal` is still missing.
+**Update 2026-11-13 (fix/performance-quick-wins):** the index is written as `138_internal_profiles_index.sql` (`CREATE INDEX IF NOT EXISTS idx_profiles_internal ON public.profiles (id) WHERE is_internal`), and in a rolled-back transaction the lookup used it (Index Only Scan). It isn't committed yet: migration 137 is on another branch, and the migration and documentation checks refuse a gap in the numbering. Commit it once 137 is on `dev`.
 
 ### F-178 [P3] open - Gridmaster oversight reads whole platform tables with unordered offset paging
 
@@ -711,13 +712,13 @@
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. The fix also has to move the mobile invalidation hook. Plan with F-150, F-163 and F-179.
 
-### F-200 [P2] open - Super Admins can change write-once organization fields directly, including the subdomain
+### F-200 [P2] fixed - Super Admins can change write-once organization fields directly, including the subdomain
 
 **File:** column UPDATE grants on `organizations` to `authenticated` (`slug`, `feature_overrides`, `employee_count`, `data_retention_days`, among others); `admin_update_organization`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** Confirmed on the throwaway stack: an org A Super Admin updated their own `slug`, `feature_overrides` and `employee_count` through the table. I found no customer path that changes `slug`, which the app treats as permanent. Changing it frees the old subdomain, which another organization's Super Admin can then claim the same way, serving their sign-in page at a name the first organization's staff trust. Taking a name in use and the reserved names were refused.
 **Suggested fix:** Revoke UPDATE on `slug`, `employee_count` and any Gridmaster-owned field, or all columns and route writes through `organizations/settings`.
-**Resolution:**
+**Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 revokes INSERT, UPDATE, DELETE and TRUNCATE on `organizations` from `authenticated`, which also removes 004's column grants, so no write-once field (the subdomain among them) can be changed through the data API. Every organization write already went through the service client; the unused browser `updateOrganization` is deleted. The live test `migration-137-leftover-direct-writes.integration.test.ts` checks no table or column privilege is left.
 **Update 2026-11-13 (re-check against dev):** still open. Revoking every column is safe (settings write through the service client); delete the unused `updateOrganization` in `lib/db/organizations.ts` with it.
 
 ### F-201 [P2] open - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
@@ -784,21 +785,21 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** partly fixed: #515 blanks colleague status in the list and detail and drops admin permissions from the list. Still open: the detail route returns `adminPermissions`, has no internal-account filter, swap options skip `withScheduleVisibility`, and open shifts come from draft rows. An allowed-fields list must keep `orgRole`, roles and departments (#515, 56e).
 
-### F-207 [P2] open - Telemetry sends staff emails to third parties and can't be tied to an organization
+### F-207 [P2] fixed - Telemetry sends staff emails to third parties and can't be tied to an organization
 
 **File:** `apps/web/src/components/AuthProvider.tsx:100`; `apps/web/src/components/PostHogProvider.tsx:44`; `apps/web/src/lib/sentry.ts:260`; `apps/web/sentry.server.config.ts`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** `setSentryUser` sends the email with no consent gate, despite `sendDefaultPii: false`. `orgId` is never passed, so the `org_id` tag is never set and one customer's events can't be found or removed. PostHog identifies by email (consent-gated) with no organization group. The server config has no `beforeSend`, and `redactSecurityValue` removes secrets, not names or emails.
 **Suggested fix:** Send the user id only, set the `org_id` tag, add a server `beforeSend` that drops bodies and emails, and identify in PostHog by id with an organization group.
-**Resolution:**
+**Resolution:** Fixed on fix/route-permission-gaps (2026-11-13): Sentry receives the user's id and an `org_id` tag (reset on sign-out), never the email, and server and edge events go through `scrubServerEvent`, which keeps only the user's id and drops request bodies. PostHog already identifies by id and sends the email only with analytics consent, so it is unchanged.
 
-### F-208 [P2] open - One attacker can trip the shared login limit for every organization
+### F-208 [P2] fixed - One attacker can trip the shared login limit for every organization
 
 **File:** `apps/web/src/app/api/auth/login/route.ts:413`; `apps/web/src/lib/rate-limit.ts:134`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
 **Why it matters:** The email, IP and `login:global` limiters run together in `Promise.all`, so a request the IP limiter refuses may still count against the global 500 per 10 seconds, which is about 50 requests a second from one address. Mobile shares the key, and recovery has the same shape at 100 per 10 seconds. Upstash's counting wasn't run, so this needs a test.
 **Suggested fix:** Check the IP limiter first and only then consume the global one.
-**Resolution:**
+**Resolution:** Fixed on fix/route-permission-gaps (2026-11-13), keeping one Redis round trip: web sign-in, mobile sign-in and recovery read the global ceiling with `peekRateLimit` (Upstash `getRemaining`, same fail-closed policy) alongside the email and IP limits, and spend it in `after()` only for a request those limits admit. A source the IP limit refuses no longer counts against everyone. A burst inside one round trip can pass the ceiling slightly. Route and unit tests cover the read, the spend only on admission, and the refusal when the ceiling is used up.
 **Update 2026-11-13 (re-check against dev):** still open, in three places: web login, mobile login and recovery.
 
 ### F-209 [P3] open - Smaller multi-tenancy gaps
@@ -822,31 +823,31 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** per item: (2) owner decision (2026-11-13): suspending or offboarding someone ends only their sessions in that organization, as Move email does, replacing 51c and 51k's "everywhere". (9) `job_shift_overrides` now has composite foreign keys (124). Everything else is still open.
 
-### F-214 [P2] open - An Admin who can edit notes can publish or delete published notes directly
+### F-214 [P2] fixed - An Admin who can edit notes can publish or delete published notes directly
 
 **File:** `003:391-403` (policies on `canEditNotes`, any status), `004:59`; `apps/web/src/app/api/schedule/manage/route.ts:2528` (published status taken from the client's `existingStatus`)
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security)
 **Why it matters:** F-197's hole on `schedule_notes`. On the stack an Admin with only `canEditNotes` inserted a `published` note directly, past publish, the audit log and alerts. Sending `draft_deleted` to the route reaches the same result, traced only. `authenticated` also holds TRUNCATE on the table, which PostgREST can't reach.
 **Suggested fix:** Revoke writes as 122 does, after confirming no client writes remain, and read the note's status from the database in the route.
-**Resolution:**
+**Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 revokes every write on `schedule_notes` from `authenticated` (all note writes are service-client route writes), and the route reads the note's stored status before saving or deleting instead of trusting the client's `existingStatus`. Route tests fail on the old code: a claimed draft no longer deletes a published note, a claimed `draft_deleted` no longer publishes a new one, and a note already gone writes nothing.
 **Update 2026-11-13 (re-check against dev):** still open. Every note write is a service-client route write, so revoking is safe.
 
-### F-215 [P2] open - Deleting a focus area, shift or job directly rewrites published schedule rows
+### F-215 [P2] fixed - Deleting a focus area, shift or job directly rewrites published schedule rows
 
 **File:** `003:210, 306, 330` (delete policies), `004:59`; `001` (`ON DELETE SET NULL` on `schedule_cells.focus_area_id`); `schedule_cell_segments` (no foreign key)
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: security)
 **Why it matters:** Referential actions run as the owner, so 122 doesn't stop them. On the stack a Super Admin's direct `DELETE` on `focus_areas` cleared the focus area from its published cells, past days included, past the settings route's in-use checks. Direct deletes on `shift_categories` or `jobs` should leave segments pointing at nothing, traced only.
 **Suggested fix:** Revoke DELETE on these tables from `authenticated`, since the settings route archives or checks use through the service client.
-**Resolution:**
+**Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 revokes DELETE and TRUNCATE on `focus_areas`, `shift_categories` and `jobs` from `authenticated`, so their ON DELETE actions can only run through the settings route's service-client deletes, after its in-use checks.
 **Update 2026-11-13 (re-check against dev):** still open. The only hard deletes are service-client calls in the settings route, so revoking is safe.
 
-### F-216 [P2] open - Archiving a focus area leaves it on every person
+### F-216 [P2] fixed - Archiving a focus area leaves it on every person
 
 **File:** `apps/web/src/app/api/settings/config/route.ts:651`; `remove_focus_area_from_employees` (`002:7533-7536`)
 **Found:** 2026-11-07 by /audit (scope: repairs of F-190 to F-198; lens: quality)
 **Why it matters:** The route calls the function with the service client, and the function filters on `caller_org_id()`, which is NULL there. On the stack it ran with no error and all 15 people stayed on the area. The route's test mocks the RPC. `validateStaffOrgReferences` should then reject the archived id on that person's next save, traced only. It fails closed, so it isn't a tenant leak.
 **Suggested fix:** Pass the organization into the function, and filter on it.
-**Resolution:**
+**Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 replaces `remove_focus_area_from_employees(BIGINT)` with `(BIGINT, UUID)`, which removes the area only from that organization's people. The service role may name any organization; any other caller must be signed in to it (`refuse_caller_outside_org`) and allowed to manage focus areas. The settings route passes the effective organization (tested against a sandbox), and the live test proves another organization's people are untouched.
 **Update 2026-11-13 (re-check against dev):** still open. When adding `p_org_id`, keep checking it against `caller_org_id()` for non-service-role callers.
 
 ### F-217 [P2] open - Self-service routes have no session or suspension check
@@ -919,13 +920,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Update 2026-11-07 (review):** `shift-request-settlement.ts:47` swallows `auto_approve_shift_request`'s refusal as `reason: "error"`. Migration 126's `refuse_caller_outside_org` comment also says a Gridmaster is held by `refuse_gridmaster_outside_org`, which `change_user_role` doesn't call; that is F-201's gap, not a new one.
 **Resolution:** Fixed on claude/sandbox-followups (2026-11-12), as suggested: migration 135 copies `resolve_shift_request_unchecked` (from 117) and `auto_approve_shift_request` (from 030) unchanged apart from their organization check, which now calls `is_authorized_org` (the session's organization or its own sandbox, NULL-safe). Every caller runs as the signed-in user, so no tokenless path loses access. The live test in `session-bound-functions.integration.test.ts` has the owner reject a sandbox request and another session refused.
 
-### F-225 [P2] open - A Super Admin keeps managing staff in a suspended organization
+### F-225 [P2] fixed - A Super Admin keeps managing staff in a suspended organization
 
 **File:** `apps/web/src/app/api/employees/shared.ts:130`; `packages/domain/src/billing.ts:99`
 **Found:** 2026-11-07 by /audit (scope: repairs #397, #399, #401; lens: security)
 **Why it matters:** `canManageEmployees` exempts Super Admins from `isLocked`, which is right for a billing lock but also covers an organization a Gridmaster suspended. Run through real HTTP: with the organization suspended, a live token created an invitation (200), while a route on `requireOrgPermissions` answered 403 for the same token. It predates this work.
 **Suggested fix:** Refuse on `organization.suspended_at` in `canManageEmployees`, and keep the Super Admin exemption for billing only.
-**Resolution:**
+**Resolution:** Fixed on fix/route-permission-gaps (2026-11-13): `canManageEmployees` lets a Super Admin through a billing lock (to bring seats down) but not a suspension, matching `requireOrgPermissions`. Tested in `employees/shared.test.ts`: a suspended organization refuses its Super Admin, an `unpaid` one still admits them.
 
 ### F-226 [P3] open - `escapeLikePattern` leaves `*`, which PostgREST reads as `%`
 
@@ -1008,13 +1009,13 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Check whether any `BottomSheetModal.native` sheet opens on Android, then whether 56d's `sheetOpenSize` refactor changed the Android first render (it now reads `androidResizableRef` before setting it).
 **Update 2026-11-13 (re-check against dev):** still unknown. Nothing since 2026-11-10 changed `HeaderFilterAction` or `sheet-open-size.ts`, and #506's People filter change wasn't run on Android.
 
-### F-241 [P2] open - The mobile admin dashboard ignores Dashboard: View
+### F-241 [P2] fixed - The mobile admin dashboard ignores Dashboard: View
 
 **File:** `packages/mobile-api-core/src/dashboard.ts:604`; `apps/web/src/features/mobile/server/routes/dashboard.ts:83`
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
 **Why it matters:** It checks only that the caller is an Admin or Super Admin, while web's `/api/dashboard/analytics` requires `canViewDashboardAnalytics`. An Admin with every view off still gets org-wide coverage, every shift request in the range, publish history and staff hours on the phone. The comment assumes approvals default on; `ADMIN_DEFAULT_PERMS` has them off.
 **Suggested fix:** Require the resolved `canViewDashboardAnalytics` (and per-section keys where web has them), and add a contract test that web and mobile refuse the same Admin.
-**Resolution:**
+**Resolution:** Fixed on fix/mobile-dashboard-permissions (2026-11-13), section by section rather than by refusing the dashboard, since web shows every Admin its dashboard and gates cards one at a time. The loader now takes the resolved permissions (`resolveDashboardSections`): pending approvals and the queue need `canApproveShiftRequests`, publishes in the activity feed need `canViewDashboardAnalytics`, sign-ups need `canManageEmployees`, and drafts (the draft summary, and drafts counted in coverage, open shifts and staff hours) need `canEditShifts`; without it the coverage summary reads published cells only. Request events cover the whole organization only for someone who can approve, edit shifts or edit staff, otherwise their own requests and open pickups, as web's request list does. Coverage, open shifts and staff hours stay for every Admin, as on web, where the schedule is always readable. A Super Admin keeps everything. The app hides the approvals card and figure for an Admin who can't approve, reading the bootstrap's permissions. Tests in `dashboard.test.ts` (package and route), `data.test.ts`, `DashboardHeroCard.test.tsx` and `AdminHomeScreen.test.tsx`; the package tests fail against the old loader. Not run on a device.
 **Update 2026-11-13 (re-check against dev):** still open. Use the resolved `canViewDashboardAnalytics`, not the stored key.
 
 ### F-242 [P2] unverified - A non-approver Admin may get a request approved, and published, in an approver's name

@@ -47,6 +47,18 @@ describe("DashboardHeroCard", () => {
     expect(onOpenApprovals).not.toHaveBeenCalled();
   });
 
+  it("leaves the approvals figure out for an admin who can't approve", () => {
+    render(
+      <DashboardHeroCard
+        metrics={{ coveragePct: 86, openGapCount: 2, pendingApprovalsCount: 0, draftSummary: null }}
+        showPendingApprovals={false}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "2 open gaps" })).toBeInTheDocument();
+    expect(screen.queryByText(/pending approval/)).not.toBeInTheDocument();
+  });
+
   it("asks for coverage setup and hides the open-gap count when coveragePct is null", () => {
     render(
       <DashboardHeroCard
