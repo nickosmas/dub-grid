@@ -344,7 +344,7 @@ describe("mobile auth server boundaries", () => {
     expect(await result.response.json()).toEqual({
       error: orgId
         ? "You're no longer in this organization. Sign in again to pick another."
-        : "Your session is not tied to an organization. Sign in again to pick one.",
+        : "Sign in again and choose an organization.",
     });
     if (!orgId) expect(fetchMobileOrganizationRowById).not.toHaveBeenCalled();
   });

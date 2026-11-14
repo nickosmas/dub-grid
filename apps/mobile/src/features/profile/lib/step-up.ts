@@ -20,7 +20,7 @@ export function getMobileStepUpMethod(error: unknown): MobileStepUpMethod | null
 export function getMobileStepUpContextKey(accessToken: string): string {
   const identity = getMobileAuthIdentityKey(accessToken);
   if (identity[0] !== "authenticated") {
-    throw new Error("Refresh your session before trying again.");
+    throw new Error("Sign in again, then try again.");
   }
   return JSON.stringify(identity);
 }
@@ -55,7 +55,7 @@ export async function confirmMobileStepUp(
     (entry: Factor) => entry.factor_type === "totp" && entry.status === "verified",
   );
   if (!factor) {
-    throw new Error("Your two-factor settings changed. Cancel and try the action again.");
+    throw new Error("Your two-factor settings changed. Cancel and try again.");
   }
 
   const { data: verifiedSession, error } = await withMfaDeadline(
@@ -65,7 +65,7 @@ export async function confirmMobileStepUp(
     throw error ?? new Error("We couldn't confirm that code. Enter a new code and try again.");
   }
   if (!replaceAuthSession(verifiedSession)) {
-    throw new Error("We couldn't update your verified session. Try again.");
+    throw new Error("We couldn't confirm it's you. Try again.");
   }
   return verifiedSession.access_token;
 }

@@ -2054,7 +2054,7 @@ describe("ShiftDetailScreen", () => {
 
     render(<ShiftDetailScreen />);
 
-    expect(screen.getByText("Request already in progress")).toBeInTheDocument();
+    expect(screen.getByText("You already asked about this shift")).toBeInTheDocument();
     expect(screen.getByText("Manager note: Reviewing coverage now.")).toBeInTheDocument();
     expect(screen.queryByText("Drop shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();

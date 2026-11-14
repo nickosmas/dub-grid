@@ -22,7 +22,7 @@ async function fetchClientFeatureFlags(signal?: AbortSignal): Promise<ClientFeat
     throw new Error(
       formatClientErrorMessage(
         body?.error,
-        "We couldn't load feature flags. Refresh and try again.",
+        "We couldn't load some settings. Refresh and try again.",
       ),
     );
   }

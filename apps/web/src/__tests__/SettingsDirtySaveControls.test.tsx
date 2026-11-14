@@ -51,7 +51,7 @@ vi.mock("@/features/organization/client", () => ({
     latestOrganization: Organization;
 
     constructor(latestOrganization: Organization) {
-      super("Organization settings were updated by someone else.");
+      super("Someone else changed these settings. Refresh to see their changes, then try again.");
       this.latestOrganization = latestOrganization;
       this.name = "OrganizationSettingsConflictError";
     }

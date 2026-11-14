@@ -185,6 +185,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "create-checkout" } });
     logger.error({ error: err }, "Failed to create checkout session");
-    return NextResponse.json({ error: "We couldn't start checkout. Try again." }, { status: 500 });
+    return NextResponse.json({ error: "We couldn't open checkout. Try again." }, { status: 500 });
   }
 }

@@ -16,10 +16,10 @@ describe("ScheduleSessionDialogs", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("2 other tabs or devices");
     expect(screen.getByRole("alert")).toHaveClass("dg-draft-banner--danger");
-    expect(screen.getByText(/devices will stay signed in/i)).toBeTruthy();
+    expect(screen.getByText(/devices stay signed in/i)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Sign out this device" }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "End other schedule sessions" }));
+      fireEvent.click(screen.getByRole("button", { name: "Close it there" }));
     });
 
     expect(signOut).toHaveBeenCalledTimes(1);
@@ -41,6 +41,6 @@ describe("ScheduleSessionDialogs", () => {
   it("warns the ended editor that unsaved work was not saved", () => {
     render(<ScheduleSessionEndedDialog onClose={vi.fn()} />);
 
-    expect(screen.getByText(/unsaved changes in this tab were not saved/i)).toBeTruthy();
+    expect(screen.getByText(/changes you hadn't saved are\s+lost/i)).toBeTruthy();
   });
 });

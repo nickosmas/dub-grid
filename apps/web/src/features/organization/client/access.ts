@@ -44,7 +44,7 @@ export class InvitationAccessConflictError extends Error {
 
 export class OrganizationSettingsConflictError extends Error {
   constructor(public readonly latestOrganization: Organization) {
-    super("Organization settings were updated by someone else.");
+    super("Someone else changed these settings. Refresh to see their changes, then try again.");
     this.name = "OrganizationSettingsConflictError";
   }
 }
@@ -423,7 +423,7 @@ export async function resendOrganizationInvitationGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation || !body.expiresAt) {
-    throw new Error(getErrorMessage(body, "We couldn't resend invitation. Try again."));
+    throw new Error(getErrorMessage(body, "We couldn't resend the invitation. Try again."));
   }
 
   return {

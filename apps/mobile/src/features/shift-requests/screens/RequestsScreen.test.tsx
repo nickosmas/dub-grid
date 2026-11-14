@@ -466,8 +466,7 @@ describe("RequestsScreen", () => {
             focusAreaName: "Skilled Nursing",
             needed: 1,
             canVolunteer: false,
-            volunteerBlockReason:
-              "You are not assigned to the schedule area required for this shift.",
+            volunteerBlockReason: "You aren't in the schedule area this shift needs.",
             state: {
               kind: "worked",
               segments: [{ shiftId: 1, jobId: 20, position: 0 }],
@@ -504,7 +503,7 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(
-      screen.getByText("You are not assigned to the schedule area required for this shift."),
+      screen.getByText("You aren't in the schedule area this shift needs."),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByText("Claim"));
 

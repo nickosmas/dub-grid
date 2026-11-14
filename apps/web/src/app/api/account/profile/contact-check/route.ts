@@ -72,7 +72,10 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof EmployeeContactLookupError) {
       logger.error({ error: error.cause }, error.message);
-      return NextResponse.json({ error: "We couldn't check that. Try again." }, { status: 500 });
+      return NextResponse.json(
+        { error: "We couldn't check whether that's free. Try again." },
+        { status: 500 },
+      );
     }
     throw error;
   }

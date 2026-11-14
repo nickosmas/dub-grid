@@ -153,7 +153,7 @@ describe("GET mobile org-status route", () => {
 
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
-      error: "We're having trouble completing that right now. Try again in a moment.",
+      error: "We can't do that right now. Try again in a moment.",
     });
   });
 

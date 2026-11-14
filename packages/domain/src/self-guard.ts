@@ -1,7 +1,7 @@
 export const SELF_ACTION_FORBIDDEN_CODE = "SELF_ACTION_FORBIDDEN";
 
 export const SELF_ACTION_FORBIDDEN_MESSAGE =
-  "You can't perform this action on your own account. Ask another admin.";
+  "You can't do that to your own account. Ask another admin.";
 
 export class SelfActionForbiddenError extends Error {
   readonly code = SELF_ACTION_FORBIDDEN_CODE;

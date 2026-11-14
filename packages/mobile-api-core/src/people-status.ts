@@ -762,7 +762,7 @@ async function changePlan(
     if (!latestEmployee) {
       return {
         kind: "latest_unavailable",
-        error: "We couldn't load the latest employee state.",
+        error: "We couldn't get their latest details. Refresh and try again.",
         status: 500,
       };
     }
@@ -943,7 +943,7 @@ async function changeStatus(
     if (!latestEmployee) {
       return {
         kind: "latest_unavailable",
-        error: "We couldn't load the latest employee state.",
+        error: "We couldn't get their latest details. Refresh and try again.",
         status: 500,
       };
     }
@@ -1057,7 +1057,7 @@ async function setReturnDate(
     if (!latestEmployee) {
       return {
         kind: "latest_unavailable",
-        error: "We couldn't load the latest employee state.",
+        error: "We couldn't get their latest details. Refresh and try again.",
         status: 500,
       };
     }
@@ -1191,7 +1191,7 @@ async function conflictOrMissing(
   if (!latestEmployee) {
     return {
       kind: "latest_unavailable",
-      error: "We couldn't load the latest employee state.",
+      error: "We couldn't get their latest details. Refresh and try again.",
       status: 500,
     };
   }
@@ -1275,7 +1275,7 @@ async function changeSuspension(
     if (!latestEmployee) {
       return {
         kind: "latest_unavailable",
-        error: "We couldn't load the latest employee state.",
+        error: "We couldn't get their latest details. Refresh and try again.",
         status: 500,
       };
     }

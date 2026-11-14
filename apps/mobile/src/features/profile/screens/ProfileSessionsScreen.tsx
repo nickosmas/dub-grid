@@ -143,8 +143,8 @@ export default function ProfileSessionsScreen() {
     } catch (error) {
       pushClientFriendlyErrorToast(pushToast, {
         error,
-        title: "Couldn't update sessions",
-        fallbackMessage: "We couldn't update your sessions right now.",
+        title: "Couldn't sign out",
+        fallbackMessage: "We couldn't sign out that device. Try again.",
       });
     } finally {
       setSessionScopeLoading(null);
@@ -219,7 +219,7 @@ export default function ProfileSessionsScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Couldn't load sessions"
+          title="Couldn't load your devices"
           variant="centered"
           onAction={() => {
             void sessionsQuery.refetch();

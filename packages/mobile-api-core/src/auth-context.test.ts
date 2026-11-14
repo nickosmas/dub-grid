@@ -173,12 +173,7 @@ describe("resolveMobileAuthContext decisions", () => {
       403,
       "You're no longer in an organization. Ask an Admin if that's a mistake.",
     ],
-    [
-      "no org claim",
-      { claims: { aal: "aal1" } },
-      403,
-      "Your session is not tied to an organization. Sign in again to pick one.",
-    ],
+    ["no org claim", { claims: { aal: "aal1" } }, 403, "Sign in again and choose an organization."],
     [
       "an org claim the user is not a member of",
       { memberships: [membershipRow(OTHER_ORG_ID)] },

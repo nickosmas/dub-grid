@@ -12,10 +12,7 @@ async function requestBillingJson<T>(input: string, init?: RequestInit): Promise
 
   if (!response.ok) {
     throw new Error(
-      formatClientErrorMessage(
-        body?.error,
-        "We couldn't complete that billing request. Try again.",
-      ),
+      formatClientErrorMessage(body?.error, "We couldn't update your billing. Try again."),
     );
   }
 

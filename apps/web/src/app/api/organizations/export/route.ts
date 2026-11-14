@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     logger.error({ error, orgId }, "Organization export failed");
     return NextResponse.json(
-      { error: "We couldn't prepare your organization's data. Try again." },
+      { error: "We couldn't export your organization's data. Try again." },
       { status: 500 },
     );
   }

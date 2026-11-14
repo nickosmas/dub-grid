@@ -113,7 +113,10 @@ async function postLinkRequest(
   if (mismatchError) throw mismatchError;
   if (!response.ok) {
     throw new Error(
-      formatClientErrorMessage(payload?.error, "We couldn't link employee to user. Try again."),
+      formatClientErrorMessage(
+        payload?.error,
+        "We couldn't connect your account to your profile. Try again.",
+      ),
     );
   }
   return { status: payload?.status ?? "linked" };
