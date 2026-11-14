@@ -123,19 +123,19 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       fold. _Done when:_ both cases render as on the canvas in the browser,
       the outline is not clickable as a shift, and nothing on the pill is
       covered.
-- [ ] **Step 5 - Claimed call-off open shift stays visible** - the Open
+- [x] **Step 5 - Claimed call-off open shift stays visible** - the Open
       shifts row keeps a call-off's open shift while a claim on it waits, with
       the amber fold. _Done when:_ claiming one in the browser leaves it in
       the row with the fold, approving or declining the claim updates the row
       as today, and the open-shift tests cover the claimed case.
-- [ ] **Step 6 - Hover card request block** - the hover card lists each mark's
+- [x] **Step 6 - Hover card request block** - the hover card lists each mark's
       request block from Step 2. _Done when:_ hovering each marked day in the
       browser matches the canvas's hover cards, with only the asked time.
-- [ ] **Step 7 - Panel request card** - the shift panel shows a request card
+- [x] **Step 7 - Panel request card** - the shift panel shows a request card
       for each mark on the cell (read-only for everyone), replacing the asker's
       "A request is already active" banner. _Done when:_ opening each marked
       day in the browser matches the canvas panel, without action buttons.
-- [ ] **Step 8 - Approve and Decline in the panel** - for someone who can
+- [x] **Step 8 - Approve and Decline in the panel** - for someone who can
       approve and a request awaiting approval, the card offers Decline
       (secondary) and Approve (primary) side by side, with the board's note
       field, `loadApprovalDraftWarning` warning and confirmation. _Done when:_

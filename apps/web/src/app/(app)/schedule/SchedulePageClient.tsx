@@ -183,6 +183,7 @@ import { buildSchedulableOn } from "./_lib/schedulable-on";
 import {
   CORRECTION_ADMIN_WINDOW_DAYS,
   describeClaimApproval,
+  describeShiftRequestNoteRecipients,
   singularLabelNoun,
   DEFAULT_ORGANIZATION_LABELS,
   orderFocusAreasByDepartment,
@@ -409,6 +410,8 @@ import {
   type RequestCellMark,
 } from "./_lib/request-marks";
 import { describeRequestMark } from "./_lib/request-mark-text";
+import type { PanelRequestCard } from "@/components/shift-panel/ShiftPanelView";
+import { loadApprovalDraftWarning } from "@/components/shift-requests/approval-draft-warning";
 import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
@@ -3941,13 +3944,21 @@ function SchedulerContent({
           visible.push({
             ...openShift,
             viewerEligible,
-            viewerAction: canEditShifts ? "assign" : viewerEligible ? "volunteer" : "details",
+            // A claimed one waits for a manager; nobody else fills it meanwhile.
+            viewerAction: openShift.claimedBy
+              ? "details"
+              : canEditShifts
+                ? "assign"
+                : viewerEligible
+                  ? "volunteer"
+                  : "details",
           });
           return visible;
         }
 
-        // Plain staff only ever see shifts they're personally eligible for.
-        if (!viewerEligible) return visible;
+        // Plain staff only ever see shifts they're personally eligible for,
+        // and never one already claimed.
+        if (!viewerEligible || openShift.claimedBy) return visible;
 
         const mode =
           openShift.source === "calloff"
@@ -4052,12 +4063,16 @@ function SchedulerContent({
         const request = requestsById.get(mark.requestId);
         return request
           ? [
-              describeRequestMark({
-                mark,
-                request,
-                resolvers: requestMarkResolvers,
-                timeZone: org?.timezone ?? null,
-              }),
+              {
+                requestId: mark.requestId,
+                waitingOn: mark.waitingOn,
+                ...describeRequestMark({
+                  mark,
+                  request,
+                  resolvers: requestMarkResolvers,
+                  timeZone: org?.timezone ?? null,
+                }),
+              },
             ]
           : [];
       });
@@ -4095,6 +4110,25 @@ function SchedulerContent({
       summarizeRequestMarks(requestMarks.byCell.get(`${empId}_${formatDateKey(date)}`)),
     [requestMarks, summarizeRequestMarks],
   );
+
+  // The waiting requests on the open panel's day, for its request cards.
+  const panelRequestCards = useMemo<PanelRequestCard[]>(() => {
+    if (!editPanel) return [];
+    const summary = summarizeRequestMarks(
+      requestMarks.byCell.get(`${editPanel.empId}_${formatDateKey(editPanel.date)}`),
+    );
+    const requestsById = new Map(shiftRequests.requests.map((request) => [request.id, request]));
+    return (summary?.requests ?? []).map((line) => {
+      const request = requestsById.get(line.requestId);
+      return {
+        ...line,
+        awaitingApproval: line.waitingOn === "manager",
+        notePlaceholder: request
+          ? `Note to ${describeShiftRequestNoteRecipients(request)}? (Optional)`
+          : "Note (Optional)",
+      };
+    });
+  }, [editPanel, requestMarks, shiftRequests.requests, summarizeRequestMarks]);
 
   /** Whether the person's own shift that day already has a request they made. */
   const hasActiveRequestForShift = useCallback(
@@ -7147,6 +7181,10 @@ function SchedulerContent({
   // an ineligible shift in the first place, per the openShifts memo above).
   const handleOpenShiftClick = useCallback(
     (openShift: GridOpenShift) => {
+      if (openShift.claimedBy) {
+        setOpenShiftDetails(openShift);
+        return;
+      }
       const action = resolveOpenShiftClickAction({
         canEditShifts,
         canSeeAllOpenShifts,
@@ -9734,12 +9772,18 @@ function SchedulerContent({
                   {openShiftDetails.calledOffBy && (
                     <div>Called off by {openShiftDetails.calledOffBy}</div>
                   )}
-                  <div>{openShiftDetails.needed ?? 1} needed</div>
-                  <div style={{ color: "var(--dg-color-text-muted)" }}>
-                    {openShiftDetailsReasons.length > 0
-                      ? `You can't personally claim this shift: it requires ${openShiftDetailsReasons.join(", ")}.`
-                      : "You aren't personally eligible to claim this shift."}
-                  </div>
+                  {openShiftDetails.claimedBy ? (
+                    <div>Claimed by {openShiftDetails.claimedBy}, awaiting approval</div>
+                  ) : (
+                    <>
+                      <div>{openShiftDetails.needed ?? 1} needed</div>
+                      <div style={{ color: "var(--dg-color-text-muted)" }}>
+                        {openShiftDetailsReasons.length > 0
+                          ? `You can't personally claim this shift: it requires ${openShiftDetailsReasons.join(", ")}.`
+                          : "You aren't personally eligible to claim this shift."}
+                      </div>
+                    </>
+                  )}
                 </div>
               </Modal>
             )}
@@ -9903,6 +9947,16 @@ function SchedulerContent({
               historicalAssignments={allAssignmentDefinitions}
               resolvePublisherName={(userId) => auditNames.get(userId) ?? null}
               publicationTimeZone={org?.timezone ?? null}
+              requestCards={panelRequestCards}
+              onResolveRequest={
+                canApproveShiftRequests
+                  ? (requestId, approved, note) => shiftRequests.resolve(requestId, approved, note)
+                  : undefined
+              }
+              loadRequestApprovalWarning={async (requestId) => {
+                const request = shiftRequests.requests.find((item) => item.id === requestId);
+                return request ? loadApprovalDraftWarning(orgId ?? org?.id ?? null, request) : [];
+              }}
               isStale={editSessionDraft?.isStale ?? false}
               auditInfo={canEditShifts && canRenderAuthorNames ? auditInfo : undefined}
               overlapWarnings={overnightOverlapWarnings}

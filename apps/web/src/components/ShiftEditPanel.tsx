@@ -65,6 +65,7 @@ import { AbsenceDayBar } from "./AbsenceDayBar";
 import { SpanTabs } from "@/components/ui/span-tabs";
 import { buildAssignableShiftDisplayMap, buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import ConfirmDialog from "./ConfirmDialog";
+import { ApprovalDraftWarning } from "@/components/shift-requests/approval-draft-warning";
 import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -96,7 +97,9 @@ import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import {
   CorrectedDayCard,
   PublishedChangeCard,
+  RequestCard,
   ShiftPanelView,
+  type PanelRequestCard,
   type PanelViewDetail,
   type PanelViewStatus,
 } from "@/components/shift-panel/ShiftPanelView";
@@ -215,6 +218,12 @@ interface ShiftEditPanelProps {
   resolvePublisherName?: (userId: string) => string | null;
   /** The organization's time zone for the publication time. */
   publicationTimeZone?: string | null;
+  /** The waiting requests on this day, each with what would happen (item 57a). */
+  requestCards?: PanelRequestCard[];
+  /** Approves or rejects a request awaiting approval; absent for someone who can't approve. */
+  onResolveRequest?: (requestId: string, approved: boolean, note?: string) => Promise<boolean>;
+  /** The draft warning read before an approval is confirmed, as on the Requests board. */
+  loadRequestApprovalWarning?: (requestId: string) => Promise<string[]>;
   /** Commits the current local draft to the server. */
   onConfirmDraft?: (seriesScope?: SeriesScope) => void | Promise<boolean>;
   /**
@@ -486,6 +495,9 @@ export default function ShiftEditPanel({
   historicalAssignments,
   resolvePublisherName,
   publicationTimeZone = null,
+  requestCards = [],
+  onResolveRequest,
+  loadRequestApprovalWarning,
   onConfirmDraft,
   correction = null,
   pastDayNotice = null,
@@ -624,6 +636,13 @@ export default function ShiftEditPanel({
     | null
   >(null);
   const [isSubmittingRequestConfirmation, setIsSubmittingRequestConfirmation] = useState(false);
+  const [requestNotes, setRequestNotes] = useState<Record<string, string>>({});
+  const [requestDecision, setRequestDecision] = useState<{
+    requestId: string;
+    approved: boolean;
+    warning: string[];
+  } | null>(null);
+  const [isResolvingRequest, setIsResolvingRequest] = useState(false);
   const repeatFormRef = useRef<RepeatFormHandle | null>(null);
   // Time off stands in for a colleague's absence; nobody calls off with it.
   const activeAbsenceTypes = absenceTypes.filter(
@@ -4628,6 +4647,81 @@ export default function ShiftEditPanel({
               detail={correctedLabel}
             />
           )}
+          {requestCards.map((card) => (
+            <RequestCard
+              key={card.requestId}
+              card={card}
+              actions={
+                onResolveRequest && card.awaitingApproval ? (
+                  <>
+                    <textarea
+                      aria-label={card.notePlaceholder}
+                      placeholder={card.notePlaceholder}
+                      value={requestNotes[card.requestId] ?? ""}
+                      onChange={(event) =>
+                        setRequestNotes((notes) => ({
+                          ...notes,
+                          [card.requestId]: event.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        minHeight: 56,
+                        padding: "8px 10px",
+                        border: "1px solid var(--dg-color-border)",
+                        borderRadius: "var(--dg-radius-md)",
+                        fontSize: "var(--dg-fs-caption)",
+                        fontFamily: "inherit",
+                        color: "var(--dg-color-text-primary)",
+                        background: "var(--dg-color-field)",
+                        resize: "vertical",
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                        gap: 8,
+                      }}
+                    >
+                      <Button
+                        type="button"
+                        className="dg-btn dg-btn-secondary"
+                        disabled={requestDecision != null}
+                        onClick={() =>
+                          setRequestDecision({
+                            requestId: card.requestId,
+                            approved: false,
+                            warning: [],
+                          })
+                        }
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        type="button"
+                        className="dg-btn dg-btn-primary"
+                        disabled={requestDecision != null}
+                        onClick={async () => {
+                          const warning =
+                            (await loadRequestApprovalWarning?.(card.requestId)) ?? [];
+                          setRequestDecision({
+                            requestId: card.requestId,
+                            approved: true,
+                            warning,
+                          });
+                        }}
+                      >
+                        Approve
+                      </Button>
+                    </div>
+                  </>
+                ) : undefined
+              }
+            />
+          ))}
           {publishedChangeLabel && (
             <PublishedChangeCard
               change={publishedChangeView}
@@ -5012,7 +5106,7 @@ export default function ShiftEditPanel({
                     {renderRequestControls({ standalone: false })}
                   </div>
                 )}
-              {isOwnShift && hasActiveRequest && (
+              {isOwnShift && hasActiveRequest && requestCards.length === 0 && (
                 <Banner tone="warning" icon={Hourglass} className="mt-4">
                   A request is already active for this shift
                 </Banner>
@@ -5292,6 +5386,65 @@ export default function ShiftEditPanel({
       </div>
 
       {renderPendingRequestConfirmation()}
+
+      {requestDecision &&
+        (() => {
+          const card = requestCards.find((item) => item.requestId === requestDecision.requestId);
+          if (!card) return null;
+          const note = requestNotes[card.requestId]?.trim() || undefined;
+          const verb = requestDecision.approved ? "Approve" : "Reject";
+          return (
+            <ConfirmDialog
+              title={`${verb} this request?`}
+              confirmLabel={verb}
+              variant={
+                !requestDecision.approved || requestDecision.warning.length ? "warning" : "info"
+              }
+              isLoading={isResolvingRequest}
+              message={
+                <>
+                  <div>
+                    <strong>{card.status}</strong>
+                  </div>
+                  {requestDecision.approved ? (
+                    card.body ? (
+                      <div>{card.body}</div>
+                    ) : null
+                  ) : (
+                    <div>The original schedule stays in place.</div>
+                  )}
+                  {note ? (
+                    <div>
+                      Your note: <em>{note}</em>
+                    </div>
+                  ) : null}
+                  {requestDecision.approved ? (
+                    <ApprovalDraftWarning lines={requestDecision.warning} />
+                  ) : null}
+                </>
+              }
+              onCancel={() => {
+                if (!isResolvingRequest) setRequestDecision(null);
+              }}
+              onConfirm={async () => {
+                if (!onResolveRequest) return;
+                setIsResolvingRequest(true);
+                try {
+                  const done = await onResolveRequest(
+                    card.requestId,
+                    requestDecision.approved,
+                    note,
+                  );
+                  setRequestDecision(null);
+                  // The day changes under the panel once a manager decides.
+                  if (done) forceClose();
+                } finally {
+                  setIsResolvingRequest(false);
+                }
+              }}
+            />
+          );
+        })()}
 
       {/* Confirm delete dialog */}
       {pendingDelete && pendingDelete.type === "all" && seriesId && (

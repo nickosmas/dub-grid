@@ -37,6 +37,7 @@ import {
   PublishChange,
 } from "@/types";
 import type { MockFn } from "./helpers/mock-fn";
+import type { PanelRequestCard } from "@/components/shift-panel/ShiftPanelView";
 
 vi.mock("@/features/schedule/client", () => ({
   fetchRepeatOverwriteCount: vi.fn(),
@@ -294,6 +295,9 @@ function renderPanel(
     absenceRun?: { dateKeys: string[] } | null;
     onRemoveAbsenceRun?: MockFn;
     publishChange?: (PublishChange & { publishedAt: string; publishedBy: string | null }) | null;
+    requestCards?: PanelRequestCard[];
+    onResolveRequest?: (requestId: string, approved: boolean, note?: string) => Promise<boolean>;
+    loadRequestApprovalWarning?: (requestId: string) => Promise<string[]>;
     resolvePublisherName?: (userId: string) => string | null;
     correctedLabel?: string | null;
     correctedChange?: {
@@ -324,6 +328,9 @@ function panelElement(
       correctedLabel={overrides.correctedLabel}
       correctedChange={overrides.correctedChange}
       publishChange={overrides.publishChange}
+      requestCards={overrides.requestCards}
+      onResolveRequest={overrides.onResolveRequest}
+      loadRequestApprovalWarning={overrides.loadRequestApprovalWarning}
       resolvePublisherName={overrides.resolvePublisherName}
       modal={overrides.modalOverride ?? modal}
       currentShift={overrides.currentShift ?? null}
@@ -2089,6 +2096,64 @@ describe("ShiftEditPanel", () => {
       const card = document.querySelector("[data-published-change]");
       expect(card).toHaveTextContent(/^Published .* by Mina\.$/);
       expect(card).not.toHaveTextContent("Added");
+    });
+
+    const swapCard: PanelRequestCard = {
+      requestId: "req-swap",
+      waitingOn: "manager",
+      status: "Swap with Carol Henderson · awaiting approval",
+      body: "Laura would work Carol's Evening Shift. Carol would work Laura's Day Shift · Supervisor.",
+      asked: "Asked Nov 14, 2026, 8:02 AM PST.",
+      awaitingApproval: true,
+      notePlaceholder: "Note to Laura Marshall and Carol Henderson? (Optional)",
+    };
+
+    it("shows each waiting request on the day, read-only for someone who can't approve", () => {
+      renderDay({ requestCards: [swapCard] });
+      const card = document.querySelector("[data-request-card]");
+      expect(card).toHaveAttribute("data-request-card", "manager");
+      expect(card).toHaveTextContent("Swap with Carol Henderson · awaiting approval");
+      expect(card).toHaveTextContent("Asked Nov 14, 2026, 8:02 AM PST.");
+      expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
+    });
+
+    it("approves from the panel through the board's draft warning and confirmation", async () => {
+      const user = userEvent.setup();
+      const onResolveRequest = vi.fn().mockResolvedValue(true);
+      const loadRequestApprovalWarning = vi
+        .fn()
+        .mockResolvedValue(["Approving replaces Carol Henderson's unpublished change on Thu."]);
+      renderDay({ requestCards: [swapCard], onResolveRequest, loadRequestApprovalWarning });
+
+      await user.type(screen.getByLabelText(swapCard.notePlaceholder), "Thanks");
+      await user.click(screen.getByRole("button", { name: "Approve" }));
+      expect(loadRequestApprovalWarning).toHaveBeenCalledWith("req-swap");
+      const dialog = await screen.findByRole("alertdialog");
+      expect(dialog).toHaveTextContent("Approve this request?");
+      expect(dialog).toHaveTextContent(
+        "Approving replaces Carol Henderson's unpublished change on Thu.",
+      );
+      expect(dialog).toHaveTextContent("Your note: Thanks");
+      expect(onResolveRequest).not.toHaveBeenCalled();
+
+      await user.click(within(dialog).getByRole("button", { name: "Approve" }));
+      expect(onResolveRequest).toHaveBeenCalledWith("req-swap", true, "Thanks");
+    });
+
+    it("offers no actions on a request still waiting for a teammate", () => {
+      renderDay({
+        requestCards: [
+          {
+            ...swapCard,
+            waitingOn: "teammate",
+            awaitingApproval: false,
+            status: "Swap with Carol Henderson · waiting for Carol",
+          },
+        ],
+        onResolveRequest: vi.fn(),
+      });
+      expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     });
 
     it("repeats nothing the two shift cards already show when a repeating day opens", () => {

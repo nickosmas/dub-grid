@@ -305,8 +305,8 @@ export function RequestCornerFold({
 
 /**
  * The shift a claimer or volunteer would get, on a day that has nothing yet:
- * a dashed outline with the shift's label and the request's fold. It takes no
- * pointer events, so the cell under it opens as an empty day does.
+ * a dashed outline with the shift's label and the request's fold. A click
+ * reaches the cell, which opens as an empty day does.
  */
 export function RequestWouldGetOutline({
   label,
@@ -331,7 +331,6 @@ export function RequestWouldGetOutline({
         justifyContent: "center",
         padding: "0 6px",
         overflow: "hidden",
-        pointerEvents: "none",
       }}
     >
       <RequestCornerFold waitingOn={waitingOn} label={hint} />

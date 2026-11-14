@@ -200,6 +200,71 @@ function ChangeCard({
   );
 }
 
+/** One waiting request on the day, as the grid's hover card lists it (item 57a). */
+export interface PanelRequestCard {
+  requestId: string;
+  waitingOn: "teammate" | "manager";
+  status: string;
+  body: string | null;
+  asked: string;
+  /** True while it waits for a manager, the only time Approve and Reject apply. */
+  awaitingApproval: boolean;
+  /** The note field's prompt, naming who the note goes to, as on the Requests board. */
+  notePlaceholder: string;
+}
+
+/**
+ * A waiting request on this day: who acts next (the fold), what would happen
+ * and when it was asked, with any actions the viewer may take below.
+ */
+export function RequestCard({ card, actions }: { card: PanelRequestCard; actions?: ReactNode }) {
+  return (
+    <div data-request-card={card.waitingOn} style={{ ...statusCard, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 0,
+            height: 0,
+            borderTop: `12px solid ${
+              card.waitingOn === "manager"
+                ? "var(--dg-color-warning)"
+                : "var(--dg-color-text-muted)"
+            }`,
+            borderRight: "12px solid transparent",
+          }}
+        />
+        <div
+          style={{
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            color: "var(--dg-color-text-primary)",
+          }}
+        >
+          {card.status}
+        </div>
+      </div>
+      {card.body ? (
+        <p
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--dg-color-text-secondary)",
+            lineHeight: 1.45,
+          }}
+        >
+          {card.body}
+        </p>
+      ) : null}
+      <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
+        {card.asked}
+      </div>
+      {actions}
+    </div>
+  );
+}
+
 /** What a repeating item holds and how it repeats, before anything is edited. */
 export function ShiftPanelView({
   header,

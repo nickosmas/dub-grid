@@ -1401,7 +1401,13 @@ export interface ActiveShiftRequestSummary {
   /** A manager's turn colors the fold when any request on the day waits for one. */
   waitingOn: RequestWaitingOn;
   /** Each request on the day, a manager's turn first. */
-  requests: Array<{ status: string; body: string | null; asked: string }>;
+  requests: Array<{
+    requestId: string;
+    waitingOn: RequestWaitingOn;
+    status: string;
+    body: string | null;
+    asked: string;
+  }>;
   /**
    * The shift a claimer or volunteer would get, as the grid labels it, for the
    * dashed outline on an empty day; null when nobody here would gain a shift.
@@ -1430,6 +1436,8 @@ export interface GridOpenShift {
   customStartTime: string | null;
   customEndTime: string | null;
   calledOffBy?: string;
+  /** Who claimed a call-off's open shift, while that claim waits for a manager. */
+  claimedBy?: string;
   requestId?: string;
   /** Number of staff still needed for this open shift. */
   needed?: number;

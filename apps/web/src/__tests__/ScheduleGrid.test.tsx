@@ -3394,6 +3394,8 @@ describe("ScheduleGrid", () => {
         waitingOn: "teammate",
         requests: [
           {
+            requestId: "r",
+            waitingOn: "teammate",
             status: "Offered for pickup · waiting for a teammate",
             body: null,
             asked: "Offered Nov 14.",
@@ -3417,8 +3419,20 @@ describe("ScheduleGrid", () => {
       activeRequestForKey: () => ({
         waitingOn: "manager",
         requests: [
-          { status: "Swap with Carol Henderson · awaiting approval", body: null, asked: "Asked." },
-          { status: "Offered for pickup · waiting for a teammate", body: null, asked: "Offered." },
+          {
+            requestId: "r",
+            waitingOn: "teammate",
+            status: "Swap with Carol Henderson · awaiting approval",
+            body: null,
+            asked: "Asked.",
+          },
+          {
+            requestId: "r",
+            waitingOn: "teammate",
+            status: "Offered for pickup · waiting for a teammate",
+            body: null,
+            asked: "Offered.",
+          },
         ],
       }),
     });
@@ -3442,7 +3456,13 @@ describe("ScheduleGrid", () => {
       activeRequestForKey: () => ({
         waitingOn: "manager",
         requests: [
-          { status: "Claiming Laura Marshall's shift · awaiting approval", body: null, asked: "" },
+          {
+            requestId: "r",
+            waitingOn: "teammate",
+            status: "Claiming Laura Marshall's shift · awaiting approval",
+            body: null,
+            asked: "",
+          },
         ],
         wouldGetLabel: "D",
       }),
@@ -3453,7 +3473,6 @@ describe("ScheduleGrid", () => {
 
     expect(outline?.getAttribute("data-request-would-get")).toBe("manager");
     expect(outline?.textContent).toBe("D");
-    expect(outline?.style.pointerEvents).toBe("none");
     expect(outline?.querySelector("[data-request-fold]")?.getAttribute("aria-label")).toBe(
       "Claiming Laura Marshall's shift · awaiting approval",
     );
@@ -3465,7 +3484,15 @@ describe("ScheduleGrid", () => {
     renderGrid({
       activeRequestForKey: () => ({
         waitingOn: "manager",
-        requests: [{ status: "Claiming a shift · awaiting approval", body: null, asked: "" }],
+        requests: [
+          {
+            requestId: "r",
+            waitingOn: "teammate",
+            status: "Claiming a shift · awaiting approval",
+            body: null,
+            asked: "",
+          },
+        ],
         wouldGetLabel: "E",
       }),
     });
@@ -3473,6 +3500,49 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     expect(firstCell.querySelector("[data-request-would-get]")).toBeNull();
     expect(firstCell.querySelector("[data-request-fold]")).not.toBeNull();
+  });
+
+  it("lists each waiting request in the hover card, with what would happen and when it was asked", async () => {
+    observedWidth = 1600;
+    renderGrid({
+      showShiftDetailHoverCards: true,
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        requests: [
+          {
+            requestId: "r",
+            waitingOn: "manager",
+            status: "Swap with Carol Henderson · awaiting approval",
+            body: "Laura would work Carol's Evening Shift. Carol would work Laura's Day Shift.",
+            asked: "Asked Nov 14, 2026, 8:02 AM PST.",
+          },
+          {
+            requestId: "r",
+            waitingOn: "teammate",
+            status: "Offered for pickup · waiting for a teammate",
+            body: "Laura keeps this shift until a claim is approved.",
+            asked: "Offered Nov 13, 2026, 9:00 AM PST.",
+          },
+        ],
+      }),
+    });
+
+    const pill = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector("[data-shift-pill]") as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(screen.getByText("Swap with Carol Henderson · awaiting approval")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(
+        "Laura would work Carol's Evening Shift. Carol would work Laura's Day Shift.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Asked Nov 14, 2026, 8:02 AM PST.")).toBeInTheDocument();
+    expect(screen.getByText("Offered for pickup · waiting for a teammate")).toBeInTheDocument();
+    expect(screen.queryByText(/^Request: /)).toBeNull();
   });
 
   it("leaves a shift with no request unfolded", () => {
@@ -3493,7 +3563,13 @@ describe("ScheduleGrid", () => {
       activeRequestForKey: () => ({
         waitingOn: "teammate",
         requests: [
-          { status: "Offered for pickup · waiting for a teammate", body: null, asked: "" },
+          {
+            requestId: "r",
+            waitingOn: "teammate",
+            status: "Offered for pickup · waiting for a teammate",
+            body: null,
+            asked: "",
+          },
         ],
       }),
       draftKindForKey: () => "modified",

@@ -732,7 +732,7 @@ function ShiftDetailHoverCard({
   date,
   entries,
   indicators,
-  requestLabel,
+  request = null,
   status,
   changeDetails,
   changes = [],
@@ -747,7 +747,8 @@ function ShiftDetailHoverCard({
   date: Date;
   entries: ShiftDetailEntry[];
   indicators: string[];
-  requestLabel: string | null;
+  /** The waiting requests on this day, each with what would happen. */
+  request?: ActiveShiftRequestSummary | null;
   status: string | null;
   /** Per-cell change explanations, already scoped to the affected segment(s). */
   changeDetails: string[];
@@ -900,6 +901,68 @@ function ShiftDetailHoverCard({
                   ) : null}
                 </div>
               ))}
+              {request && request.requests.length > 0 ? (
+                <div
+                  data-request-detail
+                  style={{
+                    paddingTop: 10,
+                    borderTop: "1px solid var(--dg-color-border-light)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  {request.requests.map((line, index) => (
+                    <div key={index} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: "var(--dg-color-text-primary)",
+                        }}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            flexShrink: 0,
+                            width: 0,
+                            height: 0,
+                            borderTop: `12px solid ${
+                              line.waitingOn === "manager"
+                                ? "var(--dg-color-warning)"
+                                : "var(--dg-color-text-muted)"
+                            }`,
+                            borderRight: "12px solid transparent",
+                          }}
+                        />
+                        <span>{line.status}</span>
+                      </div>
+                      {line.body ? (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-secondary)",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {line.body}
+                        </div>
+                      ) : null}
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--dg-color-text-muted)",
+                        }}
+                      >
+                        {line.asked}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {hasRichChanges ? (
                 <div
                   style={{
@@ -993,7 +1056,6 @@ function ShiftDetailHoverCard({
               ) : null}
               {!hasRichChanges &&
                 (indicators.length > 0 ||
-                  requestLabel ||
                   status ||
                   changeDetails.length > 0 ||
                   publicationLabel ||
@@ -1013,9 +1075,6 @@ function ShiftDetailHoverCard({
                       beside a change's details rather than giving way to them. */}
                     {indicators.length > 0 ? (
                       <div>Schedule notes: {indicators.join(", ")}</div>
-                    ) : null}
-                    {changeDetails.length === 0 && requestLabel ? (
-                      <div>Request: {requestLabel}</div>
                     ) : null}
                     {changeDetails.length === 0 && status ? <div>Status: {status}</div> : null}
                     {changeDetails.map((detail) => (
@@ -2187,9 +2246,11 @@ const SectionBlock = memo(function SectionBlock({
                             : viewerAction === "details"
                               ? "click for details"
                               : "click to volunteer";
-                        const openShiftHint = os.calledOffBy
-                          ? `Called off by ${os.calledOffBy}, ${actionHint}`
-                          : `${needed} needed, ${actionHint}`;
+                        const openShiftHint = os.claimedBy
+                          ? `Claimed by ${os.claimedBy}, awaiting approval, ${actionHint}`
+                          : os.calledOffBy
+                            ? `Called off by ${os.calledOffBy}, ${actionHint}`
+                            : `${needed} needed, ${actionHint}`;
                         return (
                           <MaybeHint key={os.id} content={openShiftHint} side="top">
                             <Button
@@ -2218,6 +2279,9 @@ const SectionBlock = memo(function SectionBlock({
                                 overflow: "hidden",
                               }}
                             >
+                              {os.claimedBy ? (
+                                <RequestCornerFold waitingOn="manager" label={openShiftHint} />
+                              ) : null}
                               {isMentoredOpenShift ? <MentoredShiftBadge compact /> : null}
                               <span
                                 style={{
@@ -3595,7 +3659,7 @@ const SectionBlock = memo(function SectionBlock({
                                             date={date}
                                             entries={hoverDetailEntries}
                                             indicators={hoverIndicatorNames}
-                                            requestLabel={activeRequestLabel}
+                                            request={activeRequest}
                                             status={hoverStatus}
                                             changeDetails={singleHoverChangeDetails}
                                             changes={hoverChanges}
@@ -4073,7 +4137,7 @@ const SectionBlock = memo(function SectionBlock({
                                           date={date}
                                           entries={hoverDetailEntries}
                                           indicators={hoverIndicatorNames}
-                                          requestLabel={activeRequestLabel}
+                                          request={activeRequest}
                                           status={hoverStatus}
                                           changeDetails={multiHoverChangeDetails}
                                           changes={hoverChanges}
@@ -4915,7 +4979,7 @@ const SectionBlock = memo(function SectionBlock({
                                       date={date}
                                       entries={deletedHoverEntries}
                                       indicators={hoverIndicatorNames}
-                                      requestLabel={null}
+                                      request={null}
                                       status="Removed"
                                       changeDetails={[deletedTooltip ?? `Removed ${deletedLabel}.`]}
                                       changes={hoverChanges}
@@ -4950,11 +5014,34 @@ const SectionBlock = memo(function SectionBlock({
                                   );
                                 })()
                               ) : activeRequest?.wouldGetLabel && activeRequestLabel ? (
-                                <RequestWouldGetOutline
-                                  label={activeRequest.wouldGetLabel}
-                                  waitingOn={activeRequest.waitingOn}
-                                  hint={activeRequestLabel}
-                                />
+                                <ShiftDetailHoverCard
+                                  enabled={showShiftDetailHoverCards}
+                                  employeeName={getEmployeeDisplayName(emp)}
+                                  date={date}
+                                  entries={[
+                                    {
+                                      label: "Nothing scheduled",
+                                      jobName: null,
+                                      focusAreaName: null,
+                                      timeLabel: null,
+                                      isCustomTime: false,
+                                      isMentored: false,
+                                    },
+                                  ]}
+                                  indicators={[]}
+                                  request={activeRequest}
+                                  status={null}
+                                  changeDetails={[]}
+                                  publicationLabel={null}
+                                >
+                                  <div style={{ position: "absolute", inset: 0 }}>
+                                    <RequestWouldGetOutline
+                                      label={activeRequest.wouldGetLabel}
+                                      waitingOn={activeRequest.waitingOn}
+                                      hint={activeRequestLabel}
+                                    />
+                                  </div>
+                                </ShiftDetailHoverCard>
                               ) : (
                                 <div
                                   style={{
