@@ -60,19 +60,21 @@ describe("syncSubscriptionToDb", () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SECRET_KEY = "service-role-key";
 
-    stripeConstructor.mockImplementation(() => ({
-      checkout: {
-        sessions: {
-          create: checkoutSessionsCreate,
-          retrieve: checkoutSessionsRetrieve,
+    stripeConstructor.mockImplementation(function () {
+      return {
+        checkout: {
+          sessions: {
+            create: checkoutSessionsCreate,
+            retrieve: checkoutSessionsRetrieve,
+          },
         },
-      },
-      subscriptions: {
-        list: subscriptionsList,
-        retrieve: subscriptionsRetrieve,
-        update: subscriptionsUpdate,
-      },
-    }));
+        subscriptions: {
+          list: subscriptionsList,
+          retrieve: subscriptionsRetrieve,
+          update: subscriptionsUpdate,
+        },
+      };
+    });
     createClient.mockReturnValue({ from: serviceFrom });
     organizationSingle.mockResolvedValue({
       data: { stripe_customer_id: "cus_123" },
@@ -473,9 +475,11 @@ describe("createStripeCustomer", () => {
     vi.resetModules();
     vi.clearAllMocks();
     process.env.STRIPE_SECRET_KEY = "sk_test_mock";
-    stripeConstructor.mockImplementation(() => ({
-      customers: { search: customersSearch, create: customersCreate },
-    }));
+    stripeConstructor.mockImplementation(function () {
+      return {
+        customers: { search: customersSearch, create: customersCreate },
+      };
+    });
   });
 
   afterEach(() => {

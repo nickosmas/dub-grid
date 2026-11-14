@@ -37,6 +37,7 @@ type OrgRealtimeTable =
   | "role_change_log";
 
 const ORG_FILTER_TABLES: OrgRealtimeTable[] = [
+  "organizations",
   "focus_areas",
   "jobs",
   "absence_types",
@@ -60,6 +61,14 @@ const ORG_FILTER_TABLES: OrgRealtimeTable[] = [
   "publish_history",
   "audit_log",
   "role_change_log",
+];
+
+/** What the drafts topic carries: draft cells, snapshots and notes (140). */
+const DRAFT_TABLES: OrgRealtimeTable[] = [
+  "schedule_cells",
+  "schedule_cell_snapshots",
+  "schedule_cell_segments",
+  "schedule_notes",
 ];
 
 export function getOrgRealtimeInvalidationKeys(
@@ -176,15 +185,13 @@ export function getOrgRealtimeInvalidationKeys(
  * Whether an event changed what was published. Every publish, approval and
  * past-day correction upserts the cell's published snapshot, and a correction
  * writes no publish_history row, so this is the report's only signal for one.
- * A DELETE carries only the id, so it counts.
+ * A draft snapshot arrives on the drafts topic instead (migration 140).
  */
 export function changesPublishedSchedule(
   table: OrgRealtimeTable,
   payload: RealtimeChangePayload,
 ): boolean {
-  if (table !== "schedule_cell_snapshots") return false;
-  if (payload.eventType === "DELETE" || !payload.new) return true;
-  return payload.new.snapshot_kind === "published";
+  return table === "schedule_cell_snapshots" && payload.scope !== "drafts";
 }
 
 export function getOrgRealtimeFlushKeys(
@@ -224,84 +231,59 @@ function isTimestampWithOffset(value: unknown): value is string {
   );
 }
 
-function sameIds(cached: readonly number[], value: unknown): boolean {
-  return (
-    Array.isArray(value) &&
-    value.length === cached.length &&
-    value.every((id, index) => Number(id) === cached[index])
-  );
-}
-
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value ?? null);
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-    a < b ? -1 : a > b ? 1 : 0,
-  );
-  return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(",")}}`;
-}
-
 /**
  * Opening Schedule stamps schedule_last_viewed_at on the viewer's membership,
- * which also moves its updated_at. The payload carries no old values, so the
- * new row is compared with the person the cached directory holds: when every
- * field the directory takes from the membership still matches, only the stamp
- * moved, and the cached version is moved forward in place (role and permission
- * edits send it back for their conflict check) instead of refetching the
- * directory in every tab. Any doubt answers false, and the event is flushed.
+ * which also moves its updated_at. The database says when a statement changed
+ * nothing else (140), so the cached directory moves those people's version
+ * forward in place (role and permission edits send it back for their conflict
+ * check) instead of refetching in every tab. Anyone it doesn't hold sends the
+ * event on to a refetch.
  */
 export function absorbMembershipViewStamp(
   queryClient: QueryClient,
   orgId: string,
   payload: RealtimeChangePayload,
 ): boolean {
-  const row = payload.new;
-  if (payload.eventType !== "UPDATE" || !row) return false;
-  if (typeof row.user_id !== "string" || !isTimestampWithOffset(row.updated_at)) return false;
-  if (row.org_id !== orgId || row.archived_at !== null) return false;
+  const stamps = payload.viewStamps;
+  if (payload.eventType !== "UPDATE" || !stamps || stamps.length === 0) return false;
+  if (!stamps.every((stamp) => isTimestampWithOffset(stamp.updatedAt))) return false;
 
   const directoryKey = queryKeys.org.directory(orgId);
   const directory = queryClient.getQueryData<DirectoryPerson[]>(directoryKey);
-  const person = directory?.find(
-    (entry) => entry.userId === row.user_id && entry.source !== "pending_invite",
+  if (!directory) return false;
+  const stampByUser = new Map(stamps.map((stamp) => [stamp.userId, stamp.updatedAt]));
+  const held = (entry: DirectoryPerson) =>
+    entry.userId != null && entry.source !== "pending_invite" && stampByUser.has(entry.userId);
+  if (directory.filter(held).length < stampByUser.size) return false;
+
+  queryClient.setQueryData<DirectoryPerson[]>(directoryKey, (current) =>
+    current?.map((entry) =>
+      held(entry) && entry.membershipUpdatedAt != null
+        ? { ...entry, membershipUpdatedAt: stampByUser.get(entry.userId as string) as string }
+        : entry,
+    ),
   );
-  if (!person) return false;
-
-  const membershipPhone = typeof row.phone === "string" ? row.phone : "";
-  const unchanged =
-    person.orgRole === row.org_role &&
-    sameIds(person.managementDepartmentIds, row.department_ids) &&
-    sameIds(person.managementDeptAdminIds, row.dept_admin_ids) &&
-    (membershipPhone === "" || membershipPhone === person.phone) &&
-    canonicalJson(person.adminPermissions ?? null) === canonicalJson(row.admin_permissions);
-  if (!unchanged) return false;
-
-  if (person.membershipUpdatedAt != null && person.membershipUpdatedAt !== row.updated_at) {
-    const updatedAt = row.updated_at;
-    queryClient.setQueryData<DirectoryPerson[]>(directoryKey, (current) =>
-      current?.map((entry) =>
-        entry.personId === person.personId ? { ...entry, membershipUpdatedAt: updatedAt } : entry,
-      ),
-    );
-  }
   return true;
 }
 
 /**
- * One shared subscription per org, reference-counted.
+ * One shared subscription per organization and topic, reference-counted.
  *
  * useOrgRealtimeInvalidation is called from useOrganizationData and
  * useEmployees, which between them have 21 call sites and several mount
- * simultaneously on one page. Each instance used to open its own channel over
- * all 23 tables, so a single CDC event ran the full invalidation set — and its
- * cross-tab broadcast — once per mounted instance. Debouncing did not help:
- * it is per subscription, so it coalesced within a channel, never across them.
- *
+ * simultaneously on one page; one subscription runs each change's
+ * invalidation, and its cross-tab broadcast, once. The drafts topic is its
+ * own subscription, held only by people who edit the schedule.
  */
 const orgSubscriptions = new Map<string, { count: number; unsubscribe: () => void }>();
 
-function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => void {
-  const existing = orgSubscriptions.get(orgId);
+function acquireOrgSubscription(
+  orgId: string,
+  queryClient: QueryClient,
+  drafts: boolean,
+): () => void {
+  const key = drafts ? `${orgId}:drafts` : orgId;
+  const existing = orgSubscriptions.get(key);
   if (existing) {
     existing.count += 1;
   } else {
@@ -309,16 +291,11 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
     const unsubscribe = subscribeOrgScopedRealtime<OrgRealtimeTable>({
       client: getBrowserSupabaseClient(),
       orgId,
-      tables: ORG_FILTER_TABLES,
-      rowScopedTable: "organizations",
-      // Coalesce bursts: a bulk save (e.g. saving N departments) emits one
-      // postgres_changes event per row. Rather than running the full
-      // invalidation set N times — and broadcasting it to every other tab N
-      // times — accumulate the affected tables and flush once on a short
-      // debounce. Correctness is unchanged: each changed table is still
-      // invalidated, just once per burst.
+      tables: drafts ? DRAFT_TABLES : ORG_FILTER_TABLES,
+      includeDrafts: drafts,
+      // A bulk save sends one change per statement, and a save touches
+      // several tables at once: collect them and invalidate once per burst.
       debounceMs: 150,
-      channelNamePrefix: `org-freshness:${orgId}`,
       skipEvent: (table, payload) => {
         if (changesPublishedSchedule(table, payload)) publishedChanged = true;
         return (
@@ -332,6 +309,10 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
         invalidateOrgRealtimeQueries(queryClient, orgId, tables, published);
       },
       onReconnectAfterError: () => {
+        if (drafts) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.shifts.all(orgId) });
+          return;
+        }
         void queryClient.invalidateQueries({
           queryKey: queryKeys.org.bootstrap(),
         });
@@ -346,7 +327,7 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
         Sentry.captureException(error);
       },
     });
-    orgSubscriptions.set(orgId, { count: 1, unsubscribe });
+    orgSubscriptions.set(key, { count: 1, unsubscribe });
   }
 
   let released = false;
@@ -355,11 +336,11 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
     // and decrementing twice would tear down a channel other consumers hold.
     if (released) return;
     released = true;
-    const entry = orgSubscriptions.get(orgId);
+    const entry = orgSubscriptions.get(key);
     if (!entry) return;
     entry.count -= 1;
     if (entry.count <= 0) {
-      orgSubscriptions.delete(orgId);
+      orgSubscriptions.delete(key);
       entry.unsubscribe();
     }
   };
@@ -368,12 +349,20 @@ function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => 
 export function useOrgRealtimeInvalidation({
   orgId,
   queryClient,
+  includeDrafts = false,
 }: {
   orgId: string | null;
   queryClient: QueryClient;
+  /** Also follow draft edits; only someone who edits the schedule may. */
+  includeDrafts?: boolean;
 }) {
   useEffect(() => {
     if (!orgId) return;
-    return acquireOrgSubscription(orgId, queryClient);
+    return acquireOrgSubscription(orgId, queryClient, false);
   }, [orgId, queryClient]);
+
+  useEffect(() => {
+    if (!orgId || !includeDrafts) return;
+    return acquireOrgSubscription(orgId, queryClient, true);
+  }, [orgId, queryClient, includeDrafts]);
 }

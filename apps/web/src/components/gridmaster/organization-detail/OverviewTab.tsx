@@ -32,6 +32,7 @@ import { type Employee, type Organization } from "@/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useStepUpAction } from "@/hooks/useStepUpAction";
 import { changedElsewhereMessage, DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 
 // Overview tab for the gridmaster OrganizationDetail view.
@@ -73,6 +74,8 @@ export function OverviewTab({
   );
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const stepUp = useStepUpAction();
   const [suspendConfirm, setSuspendConfirm] = useState(false);
   const [unsuspendConfirm, setUnsuspendConfirm] = useState(false);
   const [suspending, setSuspending] = useState(false);
@@ -235,6 +238,38 @@ export function OverviewTab({
       toast.error(formatClientErrorMessage(err, "That didn't work. Try again."));
     } finally {
       setArchiving(false);
+    }
+  }
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      await stepUp.run(async (accessToken) => {
+        const res = await fetch(
+          `/api/gridmaster/organizations/export?orgId=${encodeURIComponent(organization.id)}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw Object.assign(
+            new Error(data?.error || "We couldn't prepare that organization's data. Try again."),
+            { status: res.status, code: data?.code, method: data?.method },
+          );
+        }
+        const filename =
+          /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ??
+          "dubgrid-export.zip";
+        const url = URL.createObjectURL(await res.blob());
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+    } catch (err: unknown) {
+      toast.error(formatClientErrorMessage(err, "We couldn't prepare that organization's data."));
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -560,17 +595,27 @@ export function OverviewTab({
             </div>
             <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
               {organization.archivedAt
-                ? "Restoring reopens the organization. If its billing was canceled, it stays locked until billing is set up again."
+                ? `Restoring reopens the organization. If its billing was canceled, it stays locked until billing is set up again. Unless restored, it's deleted for good on ${purgeDate(organization.archivedAt)}, with its staff data.`
                 : "Archiving hides the organization from active listings. Data is preserved."}
             </div>
           </div>
-          <Button
-            className={organization.archivedAt ? "dg-btn dg-btn-primary" : "dg-btn dg-btn-danger"}
-            onClick={() => setArchiveConfirm(true)}
-            style={{ flexShrink: 0 }}
-          >
-            {organization.archivedAt ? "Restore" : "Archive"}
-          </Button>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {organization.archivedAt ? (
+              <Button
+                className="dg-btn dg-btn-secondary"
+                onClick={handleDownload}
+                disabled={downloading}
+              >
+                <ButtonLoading loading={downloading}>Download data</ButtonLoading>
+              </Button>
+            ) : null}
+            <Button
+              className={organization.archivedAt ? "dg-btn dg-btn-primary" : "dg-btn dg-btn-danger"}
+              onClick={() => setArchiveConfirm(true)}
+            >
+              {organization.archivedAt ? "Restore" : "Archive"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -762,6 +807,14 @@ export function OverviewTab({
           onConfirm={() => handleSave()}
         />
       ) : null}
+      {stepUp.dialog}
     </div>
   );
+}
+
+/** An archived organization is purged 90 days after it was deleted (F-203). */
+function purgeDate(archivedAt: string): string {
+  const date = new Date(archivedAt);
+  date.setUTCDate(date.getUTCDate() + 90);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }

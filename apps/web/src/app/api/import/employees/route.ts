@@ -44,7 +44,7 @@ const rowSchema = z.object({
 });
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   rows: z.array(rowSchema).min(1).max(STAFF_IMPORT_MAX_ROWS),
 });
 

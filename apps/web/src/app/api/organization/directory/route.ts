@@ -6,7 +6,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
 
 const searchSchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 });

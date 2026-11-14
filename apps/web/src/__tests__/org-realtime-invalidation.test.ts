@@ -64,43 +64,21 @@ describe("getOrgRealtimeInvalidationKeys", () => {
 });
 
 describe("changesPublishedSchedule", () => {
-  it("counts a published snapshot written by a publish, an approval or a correction", () => {
-    expect(
-      changesPublishedSchedule("schedule_cell_snapshots", {
-        eventType: "UPDATE",
-        new: { snapshot_kind: "published" },
-      }),
-    ).toBe(true);
-    expect(
-      changesPublishedSchedule("schedule_cell_snapshots", {
-        eventType: "INSERT",
-        new: { snapshot_kind: "published" },
-      }),
-    ).toBe(true);
+  it("counts a snapshot change on the organization's topic, which is a published one", () => {
+    for (const eventType of ["INSERT", "UPDATE", "DELETE"] as const) {
+      expect(changesPublishedSchedule("schedule_cell_snapshots", { eventType, scope: "org" })).toBe(
+        true,
+      );
+    }
   });
 
   it("ignores a draft snapshot and every other table", () => {
     expect(
-      changesPublishedSchedule("schedule_cell_snapshots", {
-        eventType: "UPDATE",
-        new: { snapshot_kind: "draft" },
-      }),
+      changesPublishedSchedule("schedule_cell_snapshots", { eventType: "UPDATE", scope: "drafts" }),
     ).toBe(false);
-    expect(
-      changesPublishedSchedule("schedule_cells", {
-        eventType: "UPDATE",
-        new: { snapshot_kind: "published" },
-      }),
-    ).toBe(false);
-  });
-
-  it("counts a delete, whose payload carries only the id", () => {
-    expect(
-      changesPublishedSchedule("schedule_cell_snapshots", {
-        eventType: "DELETE",
-        old: { id: "snap-1" },
-      }),
-    ).toBe(true);
+    expect(changesPublishedSchedule("schedule_cells", { eventType: "UPDATE", scope: "org" })).toBe(
+      false,
+    );
   });
 });
 

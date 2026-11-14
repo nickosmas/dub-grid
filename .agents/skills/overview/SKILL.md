@@ -121,6 +121,14 @@ overview.
   use them. This is the most valuable thing the overview adds.
 - **Tie features to build order.** List the features with a one-line purpose
   each, in build-plan order, so the AI knows what exists and what's next.
+  Keep it to one line per item. A split item's parts, what each shipped and its
+  migrations stay in `build-plan.md` and `blueprint/history/`; the overview
+  names only the part in progress.
+- **Keep the rules, not the history.** Owner decisions that bind later work go
+  in a short Product rules section, grouped by area, each with its date. Drop
+  the narrative of how an item got there. Project instructions load this file
+  in every session, so every line costs context on every task: aim for well
+  under 30 KB.
 - **Carry deployment constraints forward.** If the plan names Render, Vercel,
   build commands, env vars, health checks, or provider constraints, include them
   in a short Deployment section. If deployment is unknown, mark it `> TODO`.

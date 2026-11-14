@@ -7,7 +7,7 @@ import { loadGridmasterOrgHealth } from "@/app/api/gridmaster/_lib/oversight";
 import logger from "@/lib/logger";
 
 const querySchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.guid().optional(),
 });
 
 export async function GET(req: NextRequest) {
