@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:1661420bf43abb3879c062626bf06207f74c8fa4c08d9d6cc510abfb350aa2c2",
+  "sourceDigest": "sha256:c9ecc322b06c8f4b91c0fa6dd177020aff1e403eb18b696b999a8f3939167d37",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5305,7 +5305,7 @@
       "version": "142",
       "name": "purge_archived_organizations",
       "file": "142_purge_archived_organizations.sql",
-      "sha256": "e741e82373b7b039d8dfbdd26efec19a72f2fe10a71c2e6b091e337d24984f02",
+      "sha256": "d2523940f7665524c97fde5083ec49865147c134e20df92b82c9b0415f425bb8",
       "source": {
         "path": "supabase/migrations/142_purge_archived_organizations.sql"
       }

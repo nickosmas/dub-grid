@@ -19,7 +19,7 @@ CREATE OR REPLACE FUNCTION public.purge_archived_organization(p_org_id UUID)
 RETURNS UUID[]
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = public
 AS $$
 DECLARE
   v_org public.organizations;
