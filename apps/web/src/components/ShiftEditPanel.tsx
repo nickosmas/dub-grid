@@ -3294,10 +3294,13 @@ export default function ShiftEditPanel({
         data-shift-diff-source={badge.source}
         data-shift-diff-index={index != null ? String(index) : undefined}
         aria-label={`${badge.text}: ${badge.detail}`}
+        // On the shift's own top-left corner, centered on its edge, as on the grid.
         style={{
           position: "absolute",
-          top: -10,
-          left: 12,
+          top: 0,
+          left: 8,
+          transform: "translateY(-50%)",
+          whiteSpace: "nowrap",
           fontSize: "var(--dg-fs-badge)",
           fontWeight: 600,
           letterSpacing: "0.05em",
@@ -3541,7 +3544,6 @@ export default function ShiftEditPanel({
                 background: "var(--dg-color-surface)",
               }}
             >
-              {renderShiftDiffBadge(pillChangeBadges[i] ?? null, i)}
               {/* Pill header */}
               <div
                 data-shift-edit-card-header={i}
@@ -3558,6 +3560,7 @@ export default function ShiftEditPanel({
                   gap: 2,
                 }}
               >
+                {renderShiftDiffBadge(pillChangeBadges[i] ?? null, i)}
                 <div
                   style={{ textAlign: "center", maxWidth: "calc(100% - 48px)", overflow: "hidden" }}
                 >
@@ -4013,9 +4016,6 @@ export default function ShiftEditPanel({
           background: "var(--dg-color-surface)",
         }}
       >
-        {renderShiftDiffBadge(
-          restOfDayPillIndex != null ? (pillChangeBadges[restOfDayPillIndex] ?? null) : null,
-        )}
         <div
           style={{
             background: colors.background,
@@ -4028,6 +4028,9 @@ export default function ShiftEditPanel({
             position: "relative",
           }}
         >
+          {renderShiftDiffBadge(
+            restOfDayPillIndex != null ? (pillChangeBadges[restOfDayPillIndex] ?? null) : null,
+          )}
           <MaybeHint content={absenceLabel} side="top">
             <span
               style={{

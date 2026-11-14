@@ -2092,6 +2092,11 @@ describe("ShiftEditPanel", () => {
       expect(badges[0]).toHaveAttribute("data-shift-diff-source", "publish");
       expect(badges[0]).toHaveAttribute("data-shift-diff-index", "1");
       expect(badges[0]).toHaveTextContent("New");
+      // On the corner of the shift it marks, not on the card around it.
+      expect(badges[0]?.closest("[data-shift-edit-card-header]")).toHaveAttribute(
+        "data-shift-edit-card-header",
+        "1",
+      );
 
       const card = document.querySelector("[data-published-change]");
       expect(card).toHaveTextContent(/^Published .* by Mina\.$/);
