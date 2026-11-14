@@ -192,8 +192,14 @@ export async function checkEmployeePhoneConflict(
 /**
  * Whether someone else holds the email or phone a person is about to give
  * themselves. A sign-in email reaches every organization they belong to, so it
- * has to be free in each one, the way the Gridmaster change checks it. A phone
- * lives on one staff record, so only that organization matters.
+ * has to be free in each one. A phone lives on one staff record, so only that
+ * organization matters.
+ *
+ * An email counts as taken only by someone in one of those organizations: a
+ * staff record there, or the sign-in of one of their members. An account
+ * anywhere else, a Gridmaster's included, reads as free here (owner,
+ * 2026-11-13); Supabase still refuses the change, and the screen says so
+ * without saying why.
  */
 export async function checkOwnContact(
   serviceClient: SupabaseClient,
@@ -209,24 +215,13 @@ export async function checkOwnContact(
   }
   const ownRecords = (data ?? []) as Array<{ id: string; org_id: string }>;
 
-  let emailTaken = false;
-  if (input.email) {
-    const account = await findAuthUserByEmail(input.email);
-    emailTaken = Boolean(account && account.id !== input.userId);
-    if (!emailTaken) {
-      const checks = await Promise.all(
-        ownRecords.map((record) =>
-          checkEmployeeEmailConflict(serviceClient, {
-            orgId: record.org_id,
-            email: input.email as string,
-            excludeEmployeeId: record.id,
-            currentUserId: input.userId,
-          }),
-        ),
-      );
-      emailTaken = checks.some((check) => check.conflict);
-    }
-  }
+  const emailTaken = input.email
+    ? await isEmailHeldInOwnOrganizations(serviceClient, {
+        userId: input.userId,
+        email: input.email,
+        ownRecords,
+      })
+    : false;
 
   const recordHere = ownRecords.find((record) => record.org_id === input.orgId);
   let phoneTaken = false;
@@ -240,4 +235,66 @@ export async function checkOwnContact(
   }
 
   return { emailTaken, phoneTaken };
+}
+
+async function isEmailHeldInOwnOrganizations(
+  serviceClient: SupabaseClient,
+  input: { userId: string; email: string; ownRecords: Array<{ id: string; org_id: string }> },
+): Promise<boolean> {
+  const { data: memberships, error: membershipError } = await serviceClient
+    .from("organization_memberships")
+    .select("org_id")
+    .eq("user_id", input.userId)
+    .is("archived_at", null);
+  if (membershipError) {
+    throw new EmployeeContactLookupError("own contact membership lookup failed", membershipError);
+  }
+  const orgIds = [
+    ...new Set([
+      ...input.ownRecords.map((record) => record.org_id),
+      ...((memberships ?? []) as Array<{ org_id: string }>).map((row) => row.org_id),
+    ]),
+  ];
+  if (orgIds.length === 0) return false;
+
+  const normalized = input.email.trim().toLowerCase();
+  const ownRecordIds = new Set(input.ownRecords.map((record) => record.id));
+  const { data: staff, error: staffError } = await serviceClient
+    .from("employees")
+    .select("id, user_id")
+    .in("org_id", orgIds)
+    .ilike("email", escapeLikePattern(normalized))
+    .is("archived_at", null)
+    .limit(10);
+  if (staffError) {
+    throw new EmployeeContactLookupError("own contact staff lookup failed", staffError);
+  }
+  const heldByStaff = ((staff ?? []) as Array<{ id: string; user_id: string | null }>).some(
+    (row) => !ownRecordIds.has(row.id) && row.user_id !== input.userId,
+  );
+  if (heldByStaff) return true;
+
+  const account = await findAuthUserByEmail(normalized);
+  if (!account || account.id === input.userId) return false;
+  const [memberMatch, staffMatch] = await Promise.all([
+    serviceClient
+      .from("organization_memberships")
+      .select("org_id")
+      .eq("user_id", account.id)
+      .in("org_id", orgIds)
+      .is("archived_at", null)
+      .limit(1),
+    serviceClient
+      .from("employees")
+      .select("id")
+      .eq("user_id", account.id)
+      .in("org_id", orgIds)
+      .is("archived_at", null)
+      .limit(1),
+  ]);
+  const lookupError = memberMatch.error ?? staffMatch.error;
+  if (lookupError) {
+    throw new EmployeeContactLookupError("own contact account lookup failed", lookupError);
+  }
+  return (memberMatch.data ?? []).length > 0 || (staffMatch.data ?? []).length > 0;
 }

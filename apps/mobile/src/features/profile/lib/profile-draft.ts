@@ -1,4 +1,4 @@
-import { normalizeOptionalUsPhone, type MobileProfileResponse } from "@dubgrid/contracts";
+import { comparablePhone, type MobileProfileResponse } from "@dubgrid/contracts";
 import { sameIds } from "../../../shared/lib/same-ids";
 
 export type LinkedEmployee = NonNullable<MobileProfileResponse["linkedEmployee"]>;
@@ -49,15 +49,6 @@ function nameKey(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ");
 }
 
-function phoneKey(value: string | null | undefined): string {
-  const trimmed = (value ?? "").trim();
-  try {
-    return normalizeOptionalUsPhone(trimmed);
-  } catch {
-    return trimmed;
-  }
-}
-
 export function profileFirstNameChanged(draft: ProfileDraft, profile: MobileProfileResponse) {
   return nameKey(draft.firstName) !== nameKey(profile.user.firstName);
 }
@@ -78,7 +69,9 @@ export function profilePhoneChanged(
   draft: ProfileDraft,
   linkedEmployee: LinkedEmployee | null,
 ): boolean {
-  return linkedEmployee != null && phoneKey(draft.phone) !== phoneKey(linkedEmployee.phone);
+  return (
+    linkedEmployee != null && comparablePhone(draft.phone) !== comparablePhone(linkedEmployee.phone)
+  );
 }
 
 /**

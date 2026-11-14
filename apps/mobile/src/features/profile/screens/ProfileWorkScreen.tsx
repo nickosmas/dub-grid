@@ -46,6 +46,7 @@ import {
   updateProfilePhone,
 } from "../../../shared/lib/api";
 import { getDepartmentNames, getScheduledDepartmentNames } from "../../../shared/lib/departments";
+import { EMAIL_UNAVAILABLE_MESSAGE, translateErrorMessage } from "@dubgrid/client-errors";
 import { getMobileAuthIdentityKey } from "../../../shared/lib/access-token";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
@@ -321,10 +322,19 @@ export default function ProfileWorkScreen() {
           email: normalizedEmail,
         });
         if (result.error) {
-          emailFailure =
-            nameChanged || phoneChanged || workChanged
-              ? "Your profile was saved, but we couldn't start the email change. Try the email again."
-              : "We couldn't start the email change. Try again.";
+          const savedOthers = nameChanged || phoneChanged || workChanged;
+          // An address another account signs in with can't be taken, so "try
+          // again" would only fail the same way. Whose it is stays unsaid.
+          const taken =
+            result.error.code === "email_exists" ||
+            translateErrorMessage(result.error.message ?? "") === EMAIL_UNAVAILABLE_MESSAGE;
+          emailFailure = taken
+            ? savedOthers
+              ? "Your other changes were saved, but we can't use that email. Try a different one."
+              : EMAIL_UNAVAILABLE_MESSAGE
+            : savedOthers
+              ? "Your other changes were saved, but we couldn't change your email. Try again."
+              : "We couldn't change your email. Try again.";
         }
       }
 

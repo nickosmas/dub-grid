@@ -783,4 +783,47 @@ describe("ProfileWorkScreen", () => {
     await waitFor(() => expect(updateProfilePhone).toHaveBeenCalledTimes(1));
     expect(createProfileChangeRequest).not.toHaveBeenCalled();
   });
+  it("refuses an email another account uses without saying whose, or to try again", async () => {
+    updateUser.mockResolvedValue({
+      error: {
+        code: "email_exists",
+        message: "A user with this email address has already been registered",
+      },
+    });
+    useMutation.mockImplementation(
+      (options: {
+        mutationFn: (variables?: unknown) => Promise<unknown>;
+        onSuccess?: (result: unknown) => unknown;
+      }) => ({
+        isPending: false,
+        mutate: vi.fn(),
+        mutateAsync: vi.fn(async (variables?: unknown) => {
+          const result = await options.mutationFn(variables);
+          await options.onSuccess?.(result);
+          return result;
+        }),
+      }),
+    );
+    useQuery.mockReturnValue({
+      data: profileData,
+      error: null,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue({ data: profileData }),
+    });
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "taken@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(
+      within(screen.getByRole("alert")).getByRole("button", { name: "Request changes" }),
+    );
+
+    await waitFor(() =>
+      expect(pushToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Email not changed",
+          message: "We can't use that email. Try a different one.",
+        }),
+      ),
+    );
+  });
 });

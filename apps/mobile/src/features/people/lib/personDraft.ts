@@ -1,4 +1,4 @@
-import { normalizeOptionalUsPhone, type MobilePerson } from "@dubgrid/contracts";
+import { comparablePhone, type MobilePerson } from "@dubgrid/contracts";
 import { sameIds } from "../../../shared/lib/same-ids";
 
 /** What the person page's edit panel holds while it is open. */
@@ -42,14 +42,6 @@ export function makePersonDraft(person: MobilePerson): PersonEditDraft {
 // "555-123-4567" is not an edit.
 const nameKey = (value: string) => value.trim().replace(/\s+/g, " ");
 const emailKey = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
-function phoneKey(value: string | null | undefined): string {
-  const trimmed = (value ?? "").trim();
-  try {
-    return normalizeOptionalUsPhone(trimmed);
-  } catch {
-    return trimmed;
-  }
-}
 
 /** Whether the draft changes the person's email, which is also their sign-in. */
 export function personEmailChanged(draft: PersonEditDraft, person: MobilePerson): boolean {
@@ -78,7 +70,7 @@ export function personDraftHasChanges(draft: PersonEditDraft, person: MobilePers
     nameKey(draft.firstName) !== nameKey(saved.firstName) ||
     nameKey(draft.lastName) !== nameKey(saved.lastName) ||
     draft.employmentType !== saved.employmentType ||
-    phoneKey(draft.phone) !== phoneKey(saved.phone) ||
+    comparablePhone(draft.phone) !== comparablePhone(saved.phone) ||
     personEmailChanged(draft, person) ||
     differs(draft.contactNotes, saved.contactNotes) ||
     draft.certificationId !== saved.certificationId ||
