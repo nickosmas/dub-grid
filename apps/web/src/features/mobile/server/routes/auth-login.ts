@@ -124,7 +124,7 @@ async function handlePOST(req: NextRequest, timer: Timer) {
   try {
     body = await req.json();
   } catch {
-    return json({ error: "We couldn't read that sign-in request. Try again." }, { status: 400 });
+    return json({ error: "We couldn't sign you in. Try again." }, { status: 400 });
   }
 
   const parsed = mobileAuthLoginBodySchema.safeParse(body);
@@ -265,7 +265,7 @@ async function handlePOST(req: NextRequest, timer: Timer) {
       });
       return json(
         {
-          error: formatClientErrorMessage(error, "We could not finish signing you in right now."),
+          error: formatClientErrorMessage(error, "We couldn't sign you in. Try again in a moment."),
           ...(error.code ? { code: error.code } : {}),
           ...error.details,
         },
@@ -279,7 +279,7 @@ async function handlePOST(req: NextRequest, timer: Timer) {
       reason: "service_unavailable",
       metadata: { targetHash: emailHash, sourceHash, surface: "mobile" },
     });
-    return json({ error: "We could not finish signing you in right now." }, { status: 503 });
+    return json({ error: "We couldn't sign you in. Try again in a moment." }, { status: 503 });
   }
 }
 

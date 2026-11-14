@@ -158,7 +158,7 @@ export async function resendOrganizationInvitationGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation || !body.expiresAt) {
-    throw new Error(getErrorMessage(body, "We couldn't resend invitation. Try again."));
+    throw new Error(getErrorMessage(body, "We couldn't resend the invitation. Try again."));
   }
 
   return {

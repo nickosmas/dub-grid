@@ -49,6 +49,9 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    return apiErrorResponse(error, "We couldn't load published ranges. Refresh and try again.");
+    return apiErrorResponse(
+      error,
+      "We couldn't load which dates are published. Refresh and try again.",
+    );
   }
 }

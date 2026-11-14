@@ -2388,7 +2388,7 @@ export function MembersSection({
               if (selectedPerson.source === "employee" && selectedPerson.employeeId) {
                 const currentEmployee = findEmployeeById(selectedPerson.employeeId);
                 if (!currentEmployee) {
-                  toast.error("Could not load the latest employee record. Refresh and try again.");
+                  toast.error("We couldn't load their latest details. Refresh and try again.");
                   return false;
                 }
                 // Compared as the save writes it: a stored "Jane@X.com" left

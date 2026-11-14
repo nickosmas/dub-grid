@@ -160,7 +160,7 @@ export async function PATCHAccount(req: NextRequest) {
   if (!auth.permissions.canManageEmployees) {
     return NextResponse.json(
       {
-        error: "Profile details are changed by admins. Submit a profile change request instead.",
+        error: "Only an admin can change these details. Ask for a change instead.",
       },
       { status: 403 },
     );
@@ -246,10 +246,7 @@ export async function PATCHMfaStatus(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: "We couldn't read that request. Try again." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "That didn't go through. Try again." }, { status: 400 });
   }
 
   const parsed = mobileProfileMfaStatusUpdateBodySchema.safeParse(body);

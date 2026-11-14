@@ -91,7 +91,7 @@ export function OrganizationLockedScreen({
   const body =
     isSuperAdmin || (statusQuery.isError && !status)
       ? formatLockedMessage(message)
-      : "This organization isn't available right now. Try again later.";
+      : "This organization isn't available right now. Contact your admin.";
   const detailLine = isSuperAdmin ? getDetailLine(status) : null;
   const graceDate =
     isSuperAdmin && status?.state === "trial_grace"

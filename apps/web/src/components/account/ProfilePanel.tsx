@@ -626,7 +626,7 @@ export function ProfilePanel({
       setRequestingNameChange(false);
       toast.success("Name change request sent.");
     } catch (err) {
-      toast.error(extractErrorMessage(err, "We couldn't send name change request. Try again."));
+      toast.error(extractErrorMessage(err, "We couldn't send your name change. Try again."));
     } finally {
       setSubmittingRequest(false);
     }

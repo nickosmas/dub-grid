@@ -175,7 +175,7 @@ export function useShiftRequests(
   const requests = useMemo(() => (orgId ? (query.data ?? []) : []), [orgId, query.data]);
   const loading = Boolean(orgId) && query.isPending;
   const error = query.error
-    ? errMsg(query.error, "We couldn't fetch shift requests. Try again.")
+    ? errMsg(query.error, "We couldn't load shift requests. Try again.")
     : null;
 
   useEffect(() => {
@@ -402,7 +402,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "We couldn't respond. Try again."));
+        toast.error(errMsg(err, "We couldn't send your answer. Try again."));
         return false;
       }
     },
@@ -435,7 +435,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "We couldn't cancel. Try again."));
+        toast.error(errMsg(err, "We couldn't cancel that request. Try again."));
         return false;
       }
     },

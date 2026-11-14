@@ -297,7 +297,7 @@ export default function LoginScreen() {
         authEntryRecorder.cancel("cold_sign_in");
         const nextError = getInlineErrorMessageOrToast(pushToast, {
           error: sessionError,
-          fallbackMessage: "We couldn't finish signing you in. Try again in a moment.",
+          fallbackMessage: "We couldn't sign you in. Try again in a moment.",
         });
         setError(nextError);
         return false;

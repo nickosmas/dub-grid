@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       : null;
   if (!claimOrgId) {
     return NextResponse.json(
-      { error: "Your session is not tied to an organization. Sign in again to pick one." },
+      { error: "Sign in again and choose an organization." },
       { status: 403 },
     );
   }

@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     );
   } catch {
     return NextResponse.json(
-      { error: "We couldn't load your mobile notifications right now." },
+      { error: "We couldn't load your alerts. Try again." },
       { status: 500 },
     );
   }

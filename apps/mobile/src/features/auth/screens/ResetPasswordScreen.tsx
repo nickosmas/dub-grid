@@ -282,7 +282,7 @@ export default function ResetPasswordScreen() {
       pushToast({ message: "Password updated. Sign in with your new password!", tone: "success" });
     } else {
       pushToast({
-        message: "Password updated. Sign in and review your active sessions.",
+        message: "Your password changed. Sign in and check which devices are signed in.",
         tone: "info",
       });
     }

@@ -40,6 +40,9 @@ export async function GET(req: NextRequest) {
       }),
     );
   } catch {
-    return json({ error: "We could not verify that organization right now." }, { status: 503 });
+    return json(
+      { error: "We couldn't find that organization right now. Try again in a moment." },
+      { status: 503 },
+    );
   }
 }

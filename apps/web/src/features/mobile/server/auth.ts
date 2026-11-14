@@ -133,7 +133,12 @@ async function resolveMobileRequestAuth(
     if (error instanceof MobileApiRequestError) {
       return {
         response: NextResponse.json(
-          { error: formatClientErrorMessage(error, "We could not verify this session right now.") },
+          {
+            error: formatClientErrorMessage(
+              error,
+              "We couldn't confirm you're signed in. Try again in a moment.",
+            ),
+          },
           { status: error.status },
         ),
       };
@@ -141,7 +146,7 @@ async function resolveMobileRequestAuth(
 
     return {
       response: NextResponse.json(
-        { error: "We could not verify this session right now." },
+        { error: "We couldn't confirm you're signed in. Try again in a moment." },
         { status: 503 },
       ),
     };

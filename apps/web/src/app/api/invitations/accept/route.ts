@@ -64,6 +64,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     if (isDeadInvitationError(error)) return deadInvitationResponse();
-    return apiErrorResponse(error, "We couldn't accept invitation. Try again.");
+    return apiErrorResponse(error, "We couldn't accept your invitation. Try again.");
   }
 }

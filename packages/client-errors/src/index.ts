@@ -35,12 +35,12 @@ export const DEFAULT_ERROR_FALLBACK = "That didn't work. Try again.";
  */
 export const API_ERRORS = {
   INVALID_INPUT: "Some of those details look off. Review them and try again.",
-  INVALID_BODY: "We couldn't read that request. Try again.",
+  INVALID_BODY: "That didn't go through. Try again.",
   /**
    * A malformed request the user never typed (bad query params, a stale link).
    * Distinct from INVALID_INPUT, which points at something they can fix.
    */
-  INVALID_REQUEST: "We couldn't complete that request. Refresh the page and try again.",
+  INVALID_REQUEST: "That didn't work. Refresh the page and try again.",
   UNAUTHORIZED: "Sign in to continue.",
   /** Something broke on our side. Never expose the underlying cause. */
   UNEXPECTED: "Something went wrong on our end. Try again in a moment.",
@@ -49,15 +49,14 @@ export const API_ERRORS = {
    * limiter, a dependency it can't reach. "Service temporarily unavailable"
    * named the mechanism and left the reader with nothing to do.
    */
-  SERVICE_UNAVAILABLE: "We're having trouble completing that right now. Try again in a moment.",
+  SERVICE_UNAVAILABLE: "We can't do that right now. Try again in a moment.",
   RATE_LIMITED: "Too many tries in a short time. Wait a minute and try again.",
   // Generic fallback — used by CLIENT_FRIENDLY_ERROR_PATTERNS' catch-all regex
   // for any forbidden/unauthorized error that isn't one of the specific
   // causes below. Prefer a specific constant at new call sites.
   FORBIDDEN: "You don't have permission to do that.",
   NOT_ORG_MEMBER: "You don't have access to this organization.",
-  INSUFFICIENT_PERMISSION:
-    "You don't have permission to perform this action. Ask an admin for help.",
+  INSUFFICIENT_PERMISSION: "You don't have permission to do that. Ask an admin for help.",
   CANNOT_MANAGE_EMPLOYEES:
     "You don't have permission to manage employees. Ask an admin to make this change.",
   CANNOT_ASSIGN_SUPER_ADMIN: "Only a Super Admin can make someone a Super Admin.",
@@ -129,12 +128,12 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   },
   {
     pattern: SESSION_EXPIRED_PATTERN,
-    message: "Your session expired. Sign in again to continue.",
+    message: "You've been signed out. Sign in again to continue.",
   },
   {
     pattern:
       /can't perform this action on your own account|cannot perform this action on your own account/i,
-    message: "You can't perform this action on your own account. Ask another admin.",
+    message: "You can't do that to your own account. Ask another admin.",
   },
   {
     // Raised by the database guards in migration 021 whenever an organization
@@ -165,7 +164,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   },
   {
     pattern: /not assigned to the focus area|required focus area/i,
-    message: "You are not assigned to the schedule area required for this shift.",
+    message: "You aren't in the schedule area this shift needs.",
   },
   {
     pattern: /already been registered|email_exists/i,

@@ -131,7 +131,7 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
               ? "Your password changed, but we couldn't sign out every device. Sign in with your new password and review your sessions."
               : reason === "password-unconfirmed"
                 ? "We couldn't confirm your new password or sign out every device. Sign in with your new password, or your previous one if it doesn't work, then review your sessions."
-                : "We couldn't confirm sign-out on every device. Sign back in to review your sessions.",
+                : "Some devices may still be signed in. Sign in to check your devices.",
           );
         }
         // Best-effort. User is on /goodbye and the session is at least

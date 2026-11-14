@@ -198,7 +198,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       }
     } catch {
       toast.error(
-        "We couldn't finish signing out those devices. Check your sessions before trying again.",
+        "We couldn't sign out every device. Check which devices are still signed in, then try again.",
       );
     } finally {
       setSigningOut(null);

@@ -60,16 +60,13 @@ export async function DELETE(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: "We couldn't read that request. Try again." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "That didn't go through. Try again." }, { status: 400 });
   }
 
   const parsed = mobileProfileSessionRevokeBodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Check the request details and try again." },
+      { error: "Some of those details look off. Review them and try again." },
       { status: 400 },
     );
   }

@@ -341,7 +341,7 @@ describe("ProfilePasswordScreen", () => {
     const dialog = screen.getByRole("alert");
     expect(
       within(dialog).getByText(
-        "Your password changed, but we couldn't sign out every session. Try again.",
+        "Your password changed, but we couldn't sign out every device. Try again.",
       ),
     ).toBeInTheDocument();
     expect(within(dialog).getByText("Finish signing out?")).toBeInTheDocument();

@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     logger.error({ error }, "schedule editor session status failed");
     return NextResponse.json(
-      { error: "We couldn't verify this schedule session. Try again." },
+      { error: "We couldn't confirm this tab can edit the schedule. Refresh and try again." },
       { status: 500 },
     );
   }
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     logger.error({ error }, "schedule editor session termination failed");
     return NextResponse.json(
-      { error: "We couldn't end the other schedule session. Try again." },
+      { error: "We couldn't close the schedule in your other tab. Try again." },
       { status: 500 },
     );
   }

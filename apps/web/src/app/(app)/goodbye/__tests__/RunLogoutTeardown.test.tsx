@@ -188,7 +188,7 @@ describe("RunLogoutTeardown", () => {
     renderWithClient(<RunLogoutTeardown scope="global" />);
     await screen.findByRole("link", { name: /sign back in/i });
     expect(mockToastError).toHaveBeenCalledWith(
-      "We couldn't confirm sign-out on every device. Sign back in to review your sessions.",
+      "Some devices may still be signed in. Sign in to check your devices.",
     );
     expect(sessionStorage.getItem("dg_user_name")).toBeNull();
     expect(mockSignOutFromBrowser).toHaveBeenCalledOnce();
