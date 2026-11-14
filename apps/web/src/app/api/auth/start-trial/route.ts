@@ -6,7 +6,7 @@ import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const startTrialSchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
 });
 
 // Starts an org's 14-day trial on the first super_admin login. Called from the

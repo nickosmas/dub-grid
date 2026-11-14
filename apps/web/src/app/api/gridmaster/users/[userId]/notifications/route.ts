@@ -6,7 +6,7 @@ import logger from "@/lib/logger";
 import { loadPersonNotifications } from "@/features/gridmaster/server/person-notifications";
 import { loadPersonTarget } from "@/features/gridmaster/server/person-target";
 
-const paramsSchema = z.object({ userId: z.string().uuid() });
+const paramsSchema = z.object({ userId: z.guid() });
 
 export async function GET(req: NextRequest, context: { params: Promise<{ userId: string }> }) {
   try {

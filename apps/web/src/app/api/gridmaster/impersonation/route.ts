@@ -20,22 +20,22 @@ const historyQuerySchema = z.object({
 
 const startSchema = z.object({
   action: z.literal("start"),
-  targetUserId: z.string().uuid(),
+  targetUserId: z.guid(),
   justification: z.string().trim().min(10),
-  targetOrgId: z.string().uuid().optional(),
+  targetOrgId: z.guid().optional(),
   userAgent: z.string().optional(),
 });
 
 const endSchema = z.object({
   action: z.literal("end"),
-  sessionId: z.string().uuid(),
+  sessionId: z.guid(),
   // A subset of impersonation_sessions.end_reason's check constraint, so an
   // unknown value is a 400 here rather than a constraint violation in the RPC.
   // 'navigation' is the middleware's /gridmaster escape alone, which the RPC
   // records itself (060); accepting it here would record that end twice.
   reason: z.enum(["manual", "expired"]).optional(),
   // Older clients still send it; the organization comes from the session row.
-  targetOrgId: z.string().uuid().nullable().optional(),
+  targetOrgId: z.guid().nullable().optional(),
 });
 
 /**
@@ -208,27 +208,13 @@ export async function POST(req: NextRequest) {
           return null;
         },
       );
-      // Before the audit write, which throws on failure: the session is
-      // running either way, and the person must hear about it.
+      // start_impersonation writes the audit row itself (139), so a direct
+      // call through the data API is recorded too.
       scheduleImpersonationNotice({
         kind: "start",
         targetUserId: parsed.data.targetUserId,
         targetOrgId: started?.target_org_id ?? null,
         expiresAt: result.expires_at,
-      });
-
-      await writeGridmasterAuditLog({
-        serviceClient: service,
-        actor: auth.user,
-        action: "impersonation.started",
-        resourceType: "impersonation_session",
-        resourceId: result.session_id,
-        orgId: started?.target_org_id ?? null,
-        details: {
-          targetUserId: parsed.data.targetUserId,
-          justification: parsed.data.justification,
-        },
-        request: req,
       });
 
       return NextResponse.json({

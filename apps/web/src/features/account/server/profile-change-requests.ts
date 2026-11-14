@@ -33,7 +33,7 @@ export const profileRequestedChangesSchema = z
 
 export const createProfileChangeRequestSchema = z
   .object({
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     type: z.enum(["profile_update", "account_deletion"]),
     requestedChanges: profileRequestedChangesSchema.optional(),
     requestNote: z.string().trim().max(1000).optional(),

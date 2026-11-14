@@ -15,13 +15,13 @@ import {
   revokePersonCalendarFeed,
 } from "@/features/gridmaster/server/person-security";
 
-const paramsSchema = z.object({ userId: z.string().uuid() });
+const paramsSchema = z.object({ userId: z.guid() });
 
 const bodySchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("endSession"), sessionId: z.string().uuid() }),
-  z.object({ action: z.literal("forgetDevice"), deviceId: z.string().uuid() }),
-  z.object({ action: z.literal("disablePushDevice"), deviceId: z.string().uuid() }),
-  z.object({ action: z.literal("revokeCalendarFeed"), feedId: z.string().uuid() }),
+  z.object({ action: z.literal("endSession"), sessionId: z.guid() }),
+  z.object({ action: z.literal("forgetDevice"), deviceId: z.guid() }),
+  z.object({ action: z.literal("disablePushDevice"), deviceId: z.guid() }),
+  z.object({ action: z.literal("revokeCalendarFeed"), feedId: z.guid() }),
   z.object({ action: z.literal("clearLoginLock") }),
 ]);
 

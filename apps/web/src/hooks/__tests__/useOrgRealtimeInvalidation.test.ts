@@ -67,18 +67,7 @@ describe("absorbMembershipViewStamp", () => {
     adminPermissions: { canEditShifts: true, canViewReports: false },
   } as unknown as DirectoryPerson;
 
-  const row = {
-    org_id: ORG,
-    user_id: "user-1",
-    org_role: "admin",
-    archived_at: null,
-    department_ids: [3, 4],
-    dept_admin_ids: [4],
-    phone: null,
-    admin_permissions: { canViewReports: false, canEditShifts: true },
-    schedule_last_viewed_at: "2026-11-13T09:00:00.123456+00:00",
-    updated_at: "2026-11-13T09:00:00.123456+00:00",
-  };
+  const stamp = { userId: "user-1", updatedAt: "2026-11-13T09:00:00.123456+00:00" };
 
   function clientWithDirectory(directory: DirectoryPerson[] | undefined) {
     const client = new QueryClient();
@@ -86,49 +75,38 @@ describe("absorbMembershipViewStamp", () => {
     return client;
   }
 
-  it("absorbs a stamp that leaves every directory field alone, moving the cached version forward", () => {
+  it("moves the cached version forward for a stamp the database says changed nothing else", () => {
     const client = clientWithDirectory([person]);
 
-    expect(absorbMembershipViewStamp(client, ORG, { eventType: "UPDATE", new: row })).toBe(true);
+    expect(
+      absorbMembershipViewStamp(client, ORG, { eventType: "UPDATE", viewStamps: [stamp] }),
+    ).toBe(true);
     expect(
       client.getQueryData<DirectoryPerson[]>(queryKeys.org.directory(ORG))?.[0]
         ?.membershipUpdatedAt,
-    ).toBe(row.updated_at);
+    ).toBe(stamp.updatedAt);
   });
 
-  it.each([
-    ["a role change", { org_role: "user" }],
-    ["a permission change", { admin_permissions: { canEditShifts: false } }],
-    ["a management department change", { department_ids: [3] }],
-    ["a department admin change", { dept_admin_ids: [] }],
-    ["an archive", { archived_at: "2026-11-13T09:00:00+00:00" }],
-    ["a membership phone the directory does not show", { phone: "555-0199" }],
-    ["a timestamp without an offset", { updated_at: "2026-11-13T09:00:00.123456" }],
-  ])("refetches on %s", (_label, change) => {
-    const client = clientWithDirectory([person]);
-
+  it("refetches when it cannot absorb: no stamps, no cached directory, an unknown person, or a timestamp without an offset", () => {
     expect(
-      absorbMembershipViewStamp(client, ORG, { eventType: "UPDATE", new: { ...row, ...change } }),
+      absorbMembershipViewStamp(clientWithDirectory([person]), ORG, { eventType: "UPDATE" }),
     ).toBe(false);
-  });
-
-  it("refetches when it cannot compare: no cached directory, an unknown person, or not an update", () => {
     expect(
       absorbMembershipViewStamp(clientWithDirectory(undefined), ORG, {
         eventType: "UPDATE",
-        new: row,
+        viewStamps: [stamp],
       }),
     ).toBe(false);
     expect(
       absorbMembershipViewStamp(clientWithDirectory([{ ...person, userId: null }]), ORG, {
         eventType: "UPDATE",
-        new: row,
+        viewStamps: [stamp],
       }),
     ).toBe(false);
     expect(
       absorbMembershipViewStamp(clientWithDirectory([person]), ORG, {
-        eventType: "INSERT",
-        new: row,
+        eventType: "UPDATE",
+        viewStamps: [{ ...stamp, updatedAt: "2026-11-13T09:00:00.123456" }],
       }),
     ).toBe(false);
   });

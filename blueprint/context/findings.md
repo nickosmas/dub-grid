@@ -74,7 +74,7 @@
 **Update 2026-10-31 (56a):** Expo SDK 57 still brings query-string 7.1.3 and decode-uri-component 0.2.2, so the allowlist entry stays.
 **Resolution:**
 
-### F-125 [P3] open - Vitest's mocker advisory needs the Vitest 4 major
+### F-125 [P3] fixed - Vitest's mocker advisory needs the Vitest 4 major
 
 **File:** `package.json` (`vitest` ^3.2.7, `@vitest/coverage-v8` ^3.2.7) and each workspace's Vitest config; Dependabot alerts 185, 186
 **Found:** 2026-09-28 while clearing the open Dependabot alerts
@@ -82,7 +82,7 @@
 **Suggested fix:** Upgrade `vitest` and `@vitest/coverage-v8` to 4.1.11 or later in one change across web, mobile and the packages, following Vitest's 4.0 migration notes, and run every workspace's suite. Medium severity, below the `deps:audit` gate.
 **Update 2026-10-13:** two critical tinypool advisories (GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr, prototype-pollution gadgets reaching code execution through worker options) now put Vitest 3 above the gate. tinypool 2.1.2 fixes them and Vitest 3 cannot take it. All three are allowlisted in `scripts/audit-check.mjs` until 2026-11-15 (fix/dependency-audit); do the upgrade (Vitest 5.0.4 is current) before then rather than re-dating the entry.
 **Update 2026-10-31:** a fourth advisory, GHSA-qxg6-89mg-rqv8 (mock registration code injection, fixed in 4.1.12), joined the Vitest entry; its date stays 2026-11-15.
-**Resolution:**
+**Resolution:** Fixed on fix/vitest-4 (2026-11-13): `vitest` and `@vitest/coverage-v8` go to 4.1.12, which fixes the mocker advisories and drops tinypool, so the allowlist entry is removed and `deps:audit` passes. npm 10.9.2 crashed resolving Vitest 4's own `vite` dependency (an arborist peer-set bug through vite 8's optional devtools peers); an override (`"vitest": { "vite": "$vite" }`) keeps Vitest on the root vite 7, and a second lock-only install is byte-identical. `minWorkers` is gone from the web config, and four tests moved to Vitest 4's mock rules: a constructor mock is a `function`, and `restoreAllMocks` no longer clears `vi.fn()` mocks. Every workspace's suite passes in a worktree with its own `npm ci`.
 
 ### F-126 [P3] open - Faker's code-execution advisory waits on @snaplet/copycat
 
@@ -358,6 +358,7 @@
 - Drop `audit_log` from the mobile subscription.
   **Resolution:**
   **Update 2026-11-13 (re-check against dev):** one invalidation per flush with `cancelRefetch: false` is fixed. Draft tables for every user, the fixed 150ms window, no `publish_history` keying for non-editors and the `audit_log` subscription are still open. Plan with F-199.
+  **Update 2026-11-13 (fix/realtime-private-broadcast):** with F-199, draft cells, snapshots and notes reach only schedule editors (the drafts topic), a bulk write arrives as one message per statement, and the mobile subscription no longer lists `audit_log`. Still open: the fixed 150ms window and keying non-editors' schedule refetches off `publish_history`, which matter far less now.
 
 ### F-151 [P2] fixed - Mobile schedule endpoints load every publish change in the organization and scan it per entry
 
@@ -481,6 +482,7 @@
 **Suggested fix:** Collect the union of keys per flush and invalidate each once with `{ cancelRefetch: false }`; don't re-broadcast keys that came from realtime; make the flusher trailing with a 1-2s max wait.
 **Resolution:**
 **Update 2026-11-13 (fix/report-refresh-published-only):** the web org channel now invalidates the union of a flush's keys once each with `cancelRefetch: false` (`getOrgRealtimeFlushKeys`). Still open: the re-broadcast to other tabs and the fixed 150ms window, which move with F-199.
+**Update 2026-11-13 (fix/realtime-private-broadcast):** each statement now sends one message, so a paste or Auto-build Apply arrives as a handful of messages rather than one per row, and the flush invalidates each key once. Still open: the cross-tab re-broadcast.
 
 ### F-164 [P2] fixed - Draft edits regenerate the published-only operations report
 
@@ -516,6 +518,7 @@
 **Why it matters:** Mark all read or a bulk archive updates N rows, so N realtime events arrive with no debounce. Per event the bell and the inbox each invalidate `notifications.all`, the inbox re-runs `refreshFacets()` per cached query, and `realtimeTick` re-runs the full search (the response is dropped, the request is not). Fifty events become roughly 50 searches and a few hundred count and facet requests.
 **Suggested fix:** Debounce the shared listener fan-out (about 300ms, trailing), invalidate once per subscription, and debounce `refreshFacets`.
 **Resolution:**
+**Update 2026-11-13 (fix/realtime-private-broadcast):** Mark all read or a bulk archive is one statement, so it now arrives as one message rather than one per alert, which removes the storm's cause. The facet refresh per cached query is unchanged.
 
 ### F-168 [P3] open - The staff page fetches the same month twice and keeps the person outside the query cache
 
@@ -605,7 +608,7 @@
 **Suggested fix:** Aggregate in SQL views or RPCs; if paging stays, order by id.
 **Resolution:**
 
-### F-179 [P3] unverified - Realtime publishes 29 tables, most with `REPLICA IDENTITY FULL`
+### F-179 [P3] fixed - Realtime publishes 29 tables, most with `REPLICA IDENTITY FULL`
 
 **File:** `supabase/migrations/001_schema.sql:1604-1632`
 **Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
@@ -613,6 +616,7 @@
 **Suggested fix:** Remove tables no client subscribes to from the publication, use default replica identity where old values aren't read, and merge the per-user channels.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. Do it with F-199 so the publication is reworked once.
+**Resolution:** Fixed on fix/realtime-private-broadcast (2026-11-13) with F-199: migration 141 takes every table out of the publication and sets each `REPLICA IDENTITY FULL` table back to its primary key, and the per-user channels share one `user:<id>` topic.
 
 ### F-180 [P3] open - Smaller schedule read costs
 
@@ -700,15 +704,15 @@
 **Suggested fix:** Defer presence until the splash lifts and persist its mark; overlap the org lookup and run the trial start in `after()`; allow submit while the org confirms; prefetch `/org/schedule` when the person can view it; embed the fonts through the `expo-font` plugin.
 **Resolution:**
 
-### F-189 [P2] open - zod 3 can exhaust memory validating an oversized constrained collection, and the fix is zod 4
+### F-189 [P2] fixed - zod 3 can exhaust memory validating an oversized constrained collection, and the fix is zod 4
 
 **File:** `package.json`, `apps/web/package.json`, `packages/contracts/package.json` (`zod` 3.24.4); 104 files import it in `apps/web/src` and `packages/contracts/src`; `scripts/audit-check.mjs` allowlist
 **Found:** 2026-10-31 while clearing the Dependency Audit gate (fix/dependency-audit-gate)
 **Why it matters:** GHSA-mrhx-c7xc-m3w5 (high): a huge array posted against a schema with a length or size constraint walks every element before the constraint fails, so request validation in the web routes and the mobile API can be pushed into memory exhaustion. Vercel caps a request body at 4.5 MB, which bounds what one request supplies. Fixed only in zod 4.6.6.
 **Suggested fix:** Upgrade to zod 4 across web, mobile and the packages in one change (Dependabot #190 has the version bump; the schema API changes need the code), keeping one zod copy so `instanceof` checks hold (see the identical-specifier note). The allowlist entry holds until 2026-12-01.
-**Resolution:**
+**Resolution:** Fixed on fix/zod-4 (2026-11-13): web, the contracts package and the root go to zod 4.6.7, one copy, and overrides pin the zod 4 copies under eslint-plugin-react-hooks and the shadcn MCP server to it. zod 4 changed `.uuid()` to accept only RFC 9562 UUIDs, which would refuse ids Postgres accepts (fixed seed and test ids such as `00000000-0000-0000-0000-000000000001`), so every `z.string().uuid()` became `z.guid()`, which keeps zod 3's rule. The three `z.record` calls with one argument name their string keys. No schema uses `.default()` inside `.optional()` or an enum-keyed record, the two other changes that pass type-check silently. In the browser zod runs jitless (`lib/zod-jitless.ts`, the first import of `instrumentation-client.ts`): its `new Function` probe breaks the CSP, which forbids eval, and Firefox logged that as an error on every page that parses a schema. The allowlist entry stays, narrowed to zod 3.25.76 inside `@expo/cli`, `@snaplet/seed` and the shadcn CLI, which require zod 3 and validate only our own config and seed templates.
 
-### F-199 [P2] open - Realtime sends every signed-in user the ids of rows deleted in other organizations
+### F-199 [P2] fixed - Realtime sends every signed-in user the ids of rows deleted in other organizations
 
 **File:** `supabase/migrations/001_schema.sql:1604` (the `supabase_realtime` publication, 29 tables); `apps/web/src/hooks/useOrgRealtimeInvalidation.ts`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security, multi-tenancy)
@@ -716,6 +720,7 @@
 **Suggested fix:** Move invalidation to Broadcast from the database (`realtime.broadcast_changes`) on the private per-organization channels already in use, then remove these tables from the publication. Until then remove tables no client subscribes to, and check the dashboard's "Allow public access" Realtime setting is off.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. The fix also has to move the mobile invalidation hook. Plan with F-150, F-163 and F-179.
+**Update 2026-11-13 (fix/realtime-private-broadcast):** fixed as suggested. Migration 140 adds statement-level triggers on the 29 tables that send one Broadcast message per statement, topic and organization through `realtime.send`. A message carries the table and operation, never row data, on private topics: `org:<id>` for members, `org:<id>:drafts` for schedule editors, `user:<id>` for the person, and `platform` for Gridmasters. Policies on `realtime.messages` decide who may listen, and no client may send on them. Migration 141 empties the `supabase_realtime` publication, so Postgres Changes has nothing to leak. Every web and mobile subscriber listens through `subscribeToTableChanges` in realtime-core, which shares one channel per topic. Live test: `migration-140-realtime-private-broadcast.integration.test.ts`. Not checked: the production dashboard's Realtime "Allow public access" setting, which no longer matters for these topics since they are private.
 
 ### F-200 [P2] fixed - Super Admins can change write-once organization fields directly, including the subdomain
 
@@ -726,7 +731,7 @@
 **Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 revokes INSERT, UPDATE, DELETE and TRUNCATE on `organizations` from `authenticated`, which also removes 004's column grants, so no write-once field (the subdomain among them) can be changed through the data API. Every organization write already went through the service client; the unused browser `updateOrganization` is deleted. The live test `migration-137-leftover-direct-writes.integration.test.ts` checks no table or column privilege is left.
 **Update 2026-11-13 (re-check against dev):** still open. Revoking every column is safe (settings write through the service client); delete the unused `updateOrganization` in `lib/db/organizations.ts` with it.
 
-### F-201 [P2] open - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
+### F-201 [P2] fixed - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
 
 **File:** `apps/web/src/app/api/employees/manage`, `organizations/settings`, `import/employees`, `shifts/discard`, `employees/status`, `employees/identity` (none set `gridmasterNeedsImpersonation`); `start_impersonation` (migration 057)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security)
@@ -734,6 +739,7 @@
 **Suggested fix:** Make the impersonation requirement the default for any Gridmaster write in `requireOrgPermissions`, with named exceptions, and apply it in `canManageEmployees`. Write the audit row inside `start_impersonation`, as migration 071 does elsewhere.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** employee import now requires impersonation. Owner decision (2026-11-13): keep 075's rule as it is (schedule, requests, publish and settings need an impersonation) and don't extend it to staff, organization settings or discard. Impersonating never narrows a Gridmaster's powers (see F-250). Still worth doing: `start_impersonation` should write its own audit row.
+**Update 2026-11-13 (fix/impersonation-start-audit-row):** migration 139 has `start_impersonation` write the `impersonation.started` row itself, in the same transaction as the session, with the caller's address and user agent, so a direct call through the data API is recorded; the route no longer writes its own. Live test: `migration-139-impersonation-start-audit.integration.test.ts`. With the owner's decision above, nothing else in this finding remains, so it is fixed.
 
 ### F-202 [P2] open - The server code has no enforced tenant boundary: 196 files can reach the service client
 
@@ -1076,7 +1082,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Require `requireSensitiveActionAuth` for any role change and any permission change that turns a switch on; the client already runs these through `useStepUpAction`.
 **Resolution:**
 
-### F-250 [P3] open - The server never applies the impersonation narrowing the app shows
+### F-250 [P3] fixed - The server never applies the impersonation narrowing the app shows
 
 **File:** `apps/web/src/app/api/shared/permissions.ts:563-567`; `packages/authz/src/index.ts:109-121`
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
@@ -1084,6 +1090,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Pass the impersonation state into the resolver in `requireOrgPermissions` and the mobile auth context, with F-201.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** owner decision (2026-11-13): impersonating never narrows a Gridmaster's powers. Remove the narrowing from `buildPermissionContext` rather than applying it on the server, and remove the dead `skip: isImpersonating` branch in the requests route.
+**Resolution:** Fixed on fix/impersonation-keeps-powers (2026-11-13), as decided: `buildPermissionContext` no longer turns off staff, settings, approvals, notes, user management or admin-permission editing while impersonating, so the app shows what the role can do and `isImpersonating` only marks the session. The dead `skip` option is gone from `settleShiftRequestAfterTransition` and the requests route; `auto_approve_shift_request` still never auto-approves for a Gridmaster (135), so "It's sent for approval" stays true.
 
 ### F-251 [P3] open - `departments.permissions` is written from client input and read by nothing
 
