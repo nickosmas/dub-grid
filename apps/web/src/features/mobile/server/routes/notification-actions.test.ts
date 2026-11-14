@@ -113,7 +113,7 @@ describe("mobile notification actions", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      error: "We could not update that notification.",
+      error: "We couldn't update that alert. Try again.",
     });
   });
 });

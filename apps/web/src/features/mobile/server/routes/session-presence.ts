@@ -44,12 +44,15 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return json({ error: "We couldn't read that request. Try again." }, { status: 400 });
+    return json({ error: "That didn't go through. Try again." }, { status: 400 });
   }
 
   const parsed = mobileSessionPresenceBodySchema.safeParse(body);
   if (!parsed.success) {
-    return json({ error: "Check the request details and try again." }, { status: 400 });
+    return json(
+      { error: "Some of those details look off. Review them and try again." },
+      { status: 400 },
+    );
   }
 
   const ip =
@@ -76,7 +79,10 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     // The client retries, so a failed detection delays the alert instead of losing it.
     logger.error({ error }, "mobile new sign-in detection failed");
-    return json({ error: "We couldn't record this device. Try again." }, { status: 503 });
+    return json(
+      { error: "We couldn't add this device to your signed-in devices. Try again." },
+      { status: 503 },
+    );
   }
 
   const alertNewSignIn = () =>
@@ -108,7 +114,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "mobile session-presence upsert failed");
-    return json({ error: "We couldn't record this device. Try again." }, { status: 500 });
+    return json(
+      { error: "We couldn't add this device to your signed-in devices. Try again." },
+      { status: 500 },
+    );
   }
 
   // After the upsert, so a failed one's retry still finds the device new.

@@ -401,7 +401,10 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
     await req.json().catch(() => null),
   );
   if (!parsed.success) {
-    return NextResponse.json({ error: "Check the request and try again." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Some of those details look off. Review them and try again." },
+      { status: 400 },
+    );
   }
 
   if (loaded.userId) {

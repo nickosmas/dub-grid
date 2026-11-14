@@ -71,6 +71,6 @@ export async function PATCH(req: NextRequest) {
 
     const rawMessage = extractRawErrorMessage(error) ?? "";
     const status = rawMessage.includes("changed elsewhere") ? 409 : 400;
-    return apiErrorResponse(error, "We couldn't update phone. Try again.", status);
+    return apiErrorResponse(error, "We couldn't update your phone number. Try again.", status);
   }
 }

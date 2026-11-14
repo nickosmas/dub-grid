@@ -157,7 +157,10 @@ async function requireMobileOrganization(
       throw error;
     }
 
-    throw new MobileApiRequestError(503, "We could not verify that organization right now.");
+    throw new MobileApiRequestError(
+      503,
+      "We couldn't find that organization right now. Try again in a moment.",
+    );
   }
 }
 
@@ -238,7 +241,7 @@ async function assertMobileProfileSupported(
     .maybeSingle();
 
   if (profileError) {
-    throw new MobileApiRequestError(503, "We could not finish signing you in right now.");
+    throw new MobileApiRequestError(503, "We couldn't sign you in. Try again in a moment.");
   }
 
   if ((profile?.platform_role as string | null) === "gridmaster") {
@@ -253,7 +256,10 @@ async function loadMobileMemberships(sessionClient: SupabaseClient): Promise<Org
   const membershipsResult = await sessionClient.rpc("get_my_organizations");
 
   if (membershipsResult.error) {
-    throw new MobileApiRequestError(403, "We could not verify your organization access.");
+    throw new MobileApiRequestError(
+      403,
+      "We couldn't check your access to this organization. Sign in again.",
+    );
   }
 
   return (membershipsResult.data ?? []) as OrgMembership[];
@@ -325,15 +331,12 @@ async function switchMobileOrgIfNeeded(
   }
 
   if (switchResult.error) {
-    throw new MobileApiRequestError(400, "We could not switch your organization right now.");
+    throw new MobileApiRequestError(400, "We couldn't switch organizations. Try again.");
   }
 
   const refreshResult = await sessionClient.auth.refreshSession();
   if (refreshResult.error || !refreshResult.data.session) {
-    throw new MobileApiRequestError(
-      503,
-      "We could not refresh your session after switching organizations.",
-    );
+    throw new MobileApiRequestError(503, "Sign in again to finish switching organizations.");
   }
 
   return refreshResult.data.session as SignedInSession;
@@ -524,10 +527,7 @@ export async function resolveMobileAuthContext<
   }
 
   if (!currentOrgId || !orgReads) {
-    throw new MobileApiRequestError(
-      403,
-      "Your session is not tied to an organization. Sign in again to pick one.",
-    );
+    throw new MobileApiRequestError(403, "Sign in again and choose an organization.");
   }
 
   const currentMembership = membershipRows.find(

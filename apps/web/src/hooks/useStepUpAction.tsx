@@ -91,14 +91,14 @@ export function useStepUpAction() {
     let accessToken: string;
     try {
       if ((await settleWithRequestTimeout(readStepUpContext())).key !== request.context) {
-        request.reject(new Error("Your account or organization changed. Try the action again."));
+        request.reject(new Error("Your account or organization changed. Try again."));
         return;
       }
       if (pending.current !== request) return;
       accessToken = await settleWithRequestTimeout(confirmBrowserStepUp(method, credential));
       if (pending.current !== request) return;
       if ((await settleWithRequestTimeout(readStepUpContext())).key !== request.context) {
-        request.reject(new Error("Your account or organization changed. Try the action again."));
+        request.reject(new Error("Your account or organization changed. Try again."));
         return;
       }
     } catch (failure) {

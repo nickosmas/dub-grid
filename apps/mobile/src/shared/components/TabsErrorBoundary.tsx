@@ -10,7 +10,7 @@ export function TabsErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
     <RouteErrorScreen
       actionLabel="Try again"
-      body="Something went wrong loading this tab. Trying again usually clears it."
+      body="This tab didn't load. Try again."
       detail={error.message}
       onAction={() => {
         void retry();

@@ -297,7 +297,7 @@ export function updateSelfProfilePhone(input: {
     }
     if (!response.ok) {
       throw new Error(
-        formatClientErrorMessage(body?.error, "We couldn't update phone. Try again."),
+        formatClientErrorMessage(body?.error, "We couldn't update your phone number. Try again."),
       );
     }
     if (!body?.employee) {

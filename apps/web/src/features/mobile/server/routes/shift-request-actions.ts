@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * the same catch also sees Postgres and Zod errors. `formatClientErrorMessage`
  * keeps the intentional copy and swaps anything technical for the fallback.
  */
-const SHIFT_REQUEST_FALLBACK = "We couldn't complete that request. Try again.";
+const SHIFT_REQUEST_FALLBACK = "We couldn't update that request. Try again.";
 
 function clientSafeError(err: unknown): string {
   return formatClientErrorMessage(err, SHIFT_REQUEST_FALLBACK);
@@ -34,16 +34,13 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: "We couldn't read that request. Try again." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "That didn't go through. Try again." }, { status: 400 });
   }
 
   const parsed = mobileUpdateShiftRequestBodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Check the request details and try again." },
+      { error: "Some of those details look off. Review them and try again." },
       { status: 400 },
     );
   }

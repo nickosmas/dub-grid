@@ -25,8 +25,8 @@ export function ScheduleSessionWarning({
       <BannerIcon tone="danger" icon={Monitor} />
       <strong>Schedule open elsewhere</strong>
       <span>
-        Your account has this schedule open in {sessionLabel}. End those schedule sessions before
-        editing here to avoid conflicting unsaved changes. Those devices will stay signed in.
+        Your account has this schedule open in {sessionLabel}. Close it there before you edit here,
+        so your changes don't clash. Those devices stay signed in.
       </span>
       <div className="dg-draft-banner-actions">
         <Button
@@ -44,7 +44,7 @@ export function ScheduleSessionWarning({
           disabled={endOtherSessions.isRunning}
         >
           <ButtonLoading loading={endOtherSessions.isRunning} spinnerSize={14}>
-            End other schedule sessions
+            Close it there
           </ButtonLoading>
         </Button>
       </div>
@@ -64,7 +64,7 @@ export function ScheduleSessionEndedDialog({ onClose }: { onClose: () => void })
   return (
     <Modal
       alert={{ icon: CalendarClock, tone: "warning" }}
-      title="Schedule session ended"
+      title="You're no longer editing in this tab"
       onClose={onClose}
       aria-describedby="schedule-session-ended-description"
       footer={
@@ -79,8 +79,8 @@ export function ScheduleSessionEndedDialog({ onClose }: { onClose: () => void })
         id="schedule-session-ended-description"
         className="p-1 text-sm leading-6 text-[var(--dg-color-text-secondary)]"
       >
-        This schedule editor was ended from another tab or device. Any unsaved changes in this tab
-        were not saved. Reload the page when you want to start a new schedule session.
+        The schedule was closed here from another tab or device, and changes you hadn't saved are
+        lost. Reload the page to keep editing.
       </p>
     </Modal>
   );

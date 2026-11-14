@@ -156,7 +156,7 @@ export default function ProfileSecurityScreen() {
           actionLabel="Try again"
           body={contentState.message}
           fillScreen
-          title="Couldn't load security"
+          title="Couldn't load your security settings"
           variant="centered"
           onAction={() => {
             void profileQuery.refetch();

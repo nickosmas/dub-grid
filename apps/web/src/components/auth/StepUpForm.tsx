@@ -102,7 +102,7 @@ export function StepUpForm({
       >
         {description ??
           (isPassword
-            ? "Enter your password to continue with this action."
+            ? "Enter your password to continue."
             : "Enter the six-digit code from your authenticator app to continue.")}
       </p>
       <div>

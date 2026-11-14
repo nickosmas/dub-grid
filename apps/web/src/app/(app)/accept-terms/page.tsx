@@ -74,7 +74,7 @@ export default function AcceptTermsPage() {
             ? String((err as { message: unknown }).message)
             : JSON.stringify(err);
       if (isRetryableAuthRecoveryError(err)) {
-        toast.error(getWebAuthRecoveryMessage(err, "We couldn't record that. Try again."));
+        toast.error(getWebAuthRecoveryMessage(err, "We couldn't save your agreement. Try again."));
         return;
       }
       const isStaleSession =
@@ -88,7 +88,7 @@ export default function AcceptTermsPage() {
         window.location.href = "/login";
         return;
       }
-      toast.error("We couldn't record that. Try again.");
+      toast.error("We couldn't save your agreement. Try again.");
     },
     onSettled: () => {
       acceptingRef.current = false;

@@ -16,7 +16,7 @@ import * as Sentry from "@/lib/sentry";
 export type SignOutScope = "local" | "others" | "global";
 
 export const BULK_SIGN_OUT_FAILURE_MESSAGE =
-  "We couldn't finish signing out those devices. Check your sessions before trying again.";
+  "We couldn't sign out every device. Check which devices are still signed in, then try again.";
 
 const RECOVERY_PROOF_MAX_AGE_SECONDS = 15 * 60;
 

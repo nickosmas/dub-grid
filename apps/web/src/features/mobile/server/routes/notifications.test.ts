@@ -180,7 +180,7 @@ describe("mobile notifications route", () => {
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
-      error: "We couldn't load your mobile notifications right now.",
+      error: "We couldn't load your alerts. Try again.",
     });
   });
 });

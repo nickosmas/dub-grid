@@ -46,7 +46,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw Object.assign(
-            new Error(data?.error || "We couldn't prepare your organization's data. Try again."),
+            new Error(data?.error || "We couldn't export your organization's data. Try again."),
             { status: res.status, code: data?.code, method: data?.method },
           );
         }
@@ -62,7 +62,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
       });
     } catch (err) {
       toast.error(
-        formatClientErrorMessage(err, "We couldn't prepare your organization's data. Try again."),
+        formatClientErrorMessage(err, "We couldn't export your organization's data. Try again."),
       );
     } finally {
       setIsDownloading(false);
