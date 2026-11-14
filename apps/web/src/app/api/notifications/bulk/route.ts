@@ -8,7 +8,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bulkSchema = z.object({
   action: z.enum(["read", "unread", "archive", "unarchive"]),
-  ids: z.array(z.string().uuid()).min(1).max(500),
+  ids: z.array(z.guid()).min(1).max(500),
 });
 
 export async function POST(req: NextRequest) {

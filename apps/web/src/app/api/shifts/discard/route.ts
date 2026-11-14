@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   scope: z.enum(["mine", "all"]),
   // Bounds the discard to one window, mirroring /api/shifts/publish. The two
   // sit side by side in the same banner under the same count, so they have to

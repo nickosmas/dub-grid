@@ -20,7 +20,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   startDate: z.string(),
   endDate: z.string(),
 });

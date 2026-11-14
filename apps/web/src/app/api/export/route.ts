@@ -34,7 +34,7 @@ import { isFeatureEnabled } from "@/lib/feature-flags";
 
 const querySchema = z.object({
   type: z.enum(["staff", "schedule"]),
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   startDate: z.string().date().optional(),
   endDate: z.string().date().optional(),
 });

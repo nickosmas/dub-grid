@@ -9,7 +9,7 @@ import logger from "@/lib/logger";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const querySchema = z
-  .object({ orgId: z.string().uuid(), start: isoDate, end: isoDate })
+  .object({ orgId: z.guid(), start: isoDate, end: isoDate })
   .refine(({ start, end }) => isValidCustomRange({ startDate: start, endDate: end }));
 
 /** Your own published shifts for the period My profile shows. */
