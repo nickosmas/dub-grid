@@ -6,6 +6,7 @@ import {
   getRequiredStaffEmailError,
   getStaffNameError,
   getStaffNotesError,
+  comparablePhone,
   normalizeOptionalUsPhone,
   normalizeRequiredStaffEmail,
   normalizeStaffName,
@@ -13,7 +14,7 @@ import {
 } from "@dubgrid/contracts";
 import { toast } from "sonner";
 import { Clock } from "lucide-react";
-import { EMAIL_TAKEN_MESSAGE } from "@dubgrid/client-errors";
+import { EMAIL_UNAVAILABLE_MESSAGE } from "@dubgrid/client-errors";
 
 import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
@@ -115,9 +116,9 @@ const ROLE_LABELS: Record<string, string> = {
 type PendingConfirm = "account-details" | "name-change-request" | null;
 
 function savedBeforeEmailFailure(err: unknown): string {
-  return extractErrorMessage(err, "") === EMAIL_TAKEN_MESSAGE
-    ? "That email belongs to someone else, so your email stayed the same. Your other changes were saved."
-    : "Your profile was saved, but we couldn't start the email change. Try the email again.";
+  return extractErrorMessage(err, "") === EMAIL_UNAVAILABLE_MESSAGE
+    ? "Your other changes were saved, but we can't use that email. Try a different one."
+    : "Your other changes were saved, but we couldn't change your email. Try again.";
 }
 
 function AccountCard({
@@ -251,7 +252,9 @@ export function ProfilePanel({
   const phoneError = employee ? getOptionalUsPhoneError(editPhone) : null;
   const normalizedPhone =
     phoneError || !employee ? editPhone.trim() : normalizeOptionalUsPhone(editPhone);
-  const hasPhoneChanges = normalizedPhone !== savedPhone;
+  // The saved phone is compared in the format a save writes, so one stored as
+  // 555-123-4567 isn't an edit nobody made.
+  const hasPhoneChanges = normalizedPhone !== comparablePhone(savedPhone);
   // Personal details and Work are saved on their own, each from its own card.
   const hasPersonalChanges = hasNameChanges || hasEmailChanges || hasPhoneChanges;
   const contactCheck = useOwnContactCheck({
@@ -418,12 +421,16 @@ export function ProfilePanel({
   async function savePersonalDetails(currentEmployee: Employee): Promise<Employee> {
     return saveStaffRecord({
       ...currentEmployee,
-      firstName: canEditProfileDirectly
-        ? normalizeStaffName(editFirstName)
-        : currentEmployee.firstName,
-      lastName: canEditProfileDirectly
-        ? normalizeStaffName(editLastName)
-        : currentEmployee.lastName,
+      // Only a name that was edited is written: the fields start from the
+      // account's name, which can differ from the staff record's.
+      firstName:
+        canEditProfileDirectly && hasNameChanges
+          ? normalizeStaffName(editFirstName)
+          : currentEmployee.firstName,
+      lastName:
+        canEditProfileDirectly && hasNameChanges
+          ? normalizeStaffName(editLastName)
+          : currentEmployee.lastName,
       phone: normalizeOptionalUsPhone(editPhone),
     });
   }
@@ -527,7 +534,7 @@ export function ProfilePanel({
             toast.error(
               profileSaved
                 ? savedBeforeEmailFailure(err)
-                : extractErrorMessage(err, "We couldn't update your email. Try again."),
+                : extractErrorMessage(err, "We couldn't change your email. Try again."),
             );
             return false;
           }
