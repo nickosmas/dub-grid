@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { ShiftChange } from "@dubgrid/schedule-core";
-import { ShiftChangeBesideCurrent } from "@/components/shift-change/ShiftChangeCard";
+import { ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 
 export interface PanelViewDetail {
   label: string;
@@ -97,12 +97,15 @@ function StatusCard({ status }: { status: NonNullable<PanelViewStatus> }) {
         }
         dotColor="var(--dg-color-warning-text)"
       />
-      {status.kind === "changed" ? <ShiftChangeBesideCurrent change={status.change} /> : null}
+      {status.kind === "changed" ? <ShiftChangeWas change={status.change} /> : null}
     </div>
   );
 }
 
-/** A corrected past day, above the shift as it stands: what it was, and who corrected it. */
+/**
+ * A corrected past day, above the shift as it stands: when and by whom, the
+ * reason, and what the day was. An addition shows no before; the shift is below.
+ */
 export function CorrectedDayCard({
   change,
   notes,
@@ -114,66 +117,71 @@ export function CorrectedDayCard({
   /** When, by whom, and the reason on its own line. */
   detail: string;
 }) {
-  const shownChange = change && change.kind !== "none" ? change : null;
+  const [summary, ...rest] = detail.split("\n");
   return (
-    <div data-corrected-day style={{ ...statusCard, marginBottom: 16 }}>
-      <StatusHeading
-        title="Corrected day"
-        detail={
+    <ChangeCard
+      data={{ "data-corrected-day": true }}
+      title={summary ?? detail}
+      detail={
+        rest.length > 0 ? (
           <span data-correction-notice style={{ whiteSpace: "pre-line" }}>
-            {detail}
+            {rest.join("\n")}
           </span>
-        }
-        dotColor="var(--dg-color-text-muted)"
-      />
-      {shownChange || notes.length > 0 ? (
-        <div data-correction-change style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {shownChange ? <ShiftChangeBesideCurrent change={shownChange} /> : null}
-          {notes.map((note) => (
-            <p
-              key={note}
-              style={{
-                margin: 0,
-                fontSize: "var(--dg-fs-caption)",
-                color: "var(--dg-color-text-secondary)",
-              }}
-            >
-              {note}
-            </p>
-          ))}
-        </div>
-      ) : null}
-    </div>
+        ) : undefined
+      }
+      change={change}
+      notes={notes}
+    />
   );
 }
 
 /**
- * The change the highlighted publish made to this day, above the shift as it
- * stands: when and by whom it was published, then what the day was.
+ * The change the highlighted publish made to this day: when and by whom it was
+ * published, then what the day was. The shift's own chip already says New or
+ * Changed, so an addition is the publication line alone.
  */
 export function PublishedChangeCard({
   change,
   notes,
-  detail,
+  publication,
 }: {
   /** Null when the organization hides change details from this viewer (item 46f). */
   change: ShiftChange | null;
   /** What the publish changed that the change model leaves out, such as mentoring. */
   notes: string[];
   /** When it was published, and by whom when the viewer may see that. */
-  detail: string;
+  publication: string;
+}) {
+  return (
+    <ChangeCard
+      data={{ "data-published-change": true }}
+      title={publication}
+      change={change}
+      notes={notes}
+    />
+  );
+}
+
+function ChangeCard({
+  data,
+  title,
+  detail,
+  change,
+  notes,
+}: {
+  data: Record<string, boolean>;
+  title: string;
+  detail?: ReactNode;
+  change: ShiftChange | null;
+  notes: string[];
 }) {
   const shownChange = change && change.kind !== "none" ? change : null;
   return (
-    <div data-published-change style={{ ...statusCard, marginBottom: 16 }}>
-      <StatusHeading
-        title="Published change"
-        detail={detail}
-        dotColor="var(--dg-color-text-muted)"
-      />
+    <div {...data} style={{ ...statusCard, marginBottom: 16 }}>
+      <StatusHeading title={title} detail={detail} dotColor="var(--dg-color-text-muted)" />
       {shownChange || notes.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {shownChange ? <ShiftChangeBesideCurrent change={shownChange} /> : null}
+        <div data-change-was style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {shownChange ? <ShiftChangeWas change={shownChange} /> : null}
           {notes.map((note) => (
             <p
               key={note}

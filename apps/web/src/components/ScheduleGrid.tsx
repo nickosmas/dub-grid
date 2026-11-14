@@ -38,7 +38,7 @@ import {
   shiftChangeItemMinutes,
   type ShiftChange,
 } from "@dubgrid/schedule-core";
-import { ShiftChangeBesideCurrent } from "@/components/shift-change/ShiftChangeCard";
+import { ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 import {
   buildShiftChangeResolvers,
   cellStateFromParts,
@@ -933,7 +933,7 @@ function ShiftDetailHoverCard({
                             : "Not published yet. Staff still see the published shift."}
                         </div>
                       ) : null}
-                      <ShiftChangeBesideCurrent change={view} />
+                      <ShiftChangeWas change={view} />
                     </div>
                   ))}
                   {publicationLabel ? (
@@ -962,9 +962,7 @@ function ShiftDetailHoverCard({
                       >
                         Corrected day
                       </div>
-                      {shownCorrection ? (
-                        <ShiftChangeBesideCurrent change={shownCorrection} />
-                      ) : null}
+                      {shownCorrection ? <ShiftChangeWas change={shownCorrection} /> : null}
                       {shownCorrectionNotes.map((note) => (
                         <div
                           key={note}

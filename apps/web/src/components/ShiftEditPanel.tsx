@@ -4632,7 +4632,7 @@ export default function ShiftEditPanel({
             <PublishedChangeCard
               change={publishedChangeView}
               notes={publishedChangeNotes}
-              detail={publishedChangeLabel}
+              publication={publishedChangeLabel}
             />
           )}
           {pastDayNotice && (
