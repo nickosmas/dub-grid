@@ -4797,7 +4797,7 @@ describe("ScheduleGrid", () => {
     expect(screen.getByText("Was N.")).toBeInTheDocument();
   });
 
-  it("says what a new draft cell adds, without a published shift staff still see", async () => {
+  it("says a new draft cell isn't published, without restating the shift it adds", async () => {
     renderGrid({
       showShiftDetailHoverCards: true,
       segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: false }],
@@ -4812,7 +4812,7 @@ describe("ScheduleGrid", () => {
     await waitFor(() => {
       expect(screen.getByText("Not published yet, so staff can't see it.")).toBeInTheDocument();
     });
-    expect(screen.getByText(/^Added: /)).toBeInTheDocument();
+    expect(screen.queryByText(/^Added: /)).not.toBeInTheDocument();
     expect(screen.queryByText(/Staff still see the published shift/)).not.toBeInTheDocument();
     expect(screen.queryByText("Before")).not.toBeInTheDocument();
   });

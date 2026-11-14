@@ -192,6 +192,7 @@ describe("formatEditorBreakdownSummary", () => {
     editorId: "user-1",
     isCurrentUser: true,
     newShifts: 0,
+    newAbsences: 0,
     modifiedShifts: 0,
     deletedShifts: 0,
     newNotes: 0,
@@ -207,6 +208,9 @@ describe("formatEditorBreakdownSummary", () => {
 
   it("keeps the singular for one shift", () => {
     expect(formatEditorBreakdownSummary({ ...base, newShifts: 1 })).toBe("1 new shift");
+    expect(formatEditorBreakdownSummary({ ...base, newShifts: 3, newAbsences: 2 })).toBe(
+      "3 new shifts, 2 new absences",
+    );
   });
 
   it("appends notes after shifts", () => {

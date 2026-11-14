@@ -38,7 +38,7 @@ import {
   shiftChangeItemMinutes,
   type ShiftChange,
 } from "@dubgrid/schedule-core";
-import { ShiftChangeBesideCurrent } from "@/components/shift-change/ShiftChangeCard";
+import { ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 import {
   buildShiftChangeResolvers,
   cellStateFromParts,
@@ -933,7 +933,7 @@ function ShiftDetailHoverCard({
                             : "Not published yet. Staff still see the published shift."}
                         </div>
                       ) : null}
-                      <ShiftChangeBesideCurrent change={view} />
+                      <ShiftChangeWas change={view} />
                     </div>
                   ))}
                   {publicationLabel ? (
@@ -962,9 +962,7 @@ function ShiftDetailHoverCard({
                       >
                         Corrected day
                       </div>
-                      {shownCorrection ? (
-                        <ShiftChangeBesideCurrent change={shownCorrection} />
-                      ) : null}
+                      {shownCorrection ? <ShiftChangeWas change={shownCorrection} /> : null}
                       {shownCorrectionNotes.map((note) => (
                         <div
                           key={note}
@@ -2560,14 +2558,17 @@ const SectionBlock = memo(function SectionBlock({
                         const cellSegments = segmentsForKey?.(emp.id, date) ?? [];
                         const draftKind = draftKindForKey?.(emp.id, date) ?? null;
                         const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
-                        const publishedMetadata =
-                          publishedMetadataForKey?.(emp.id, date) ??
-                          (publishDiff
-                            ? {
-                                publishedAt: publishDiff.publishedAt,
-                                publishedBy: publishDiff.publishedBy,
-                              }
-                            : null);
+                        const dateMetadata = publishedMetadataForKey?.(emp.id, date) ?? null;
+                        // A highlighted change is dated by the publish that made it. The
+                        // date's latest publish can be a later one that left this cell
+                        // alone, and "Added: ..." over that time reads as when it was added.
+                        const publishedMetadata = publishDiff
+                          ? {
+                              publishedAt: publishDiff.publishedAt,
+                              publishedBy: publishDiff.publishedBy,
+                              timeZone: dateMetadata?.timeZone ?? null,
+                            }
+                          : dateMetadata;
                         const publicationLabel = publishedMetadata
                           ? formatPublishedMetadata({
                               ...publishedMetadata,

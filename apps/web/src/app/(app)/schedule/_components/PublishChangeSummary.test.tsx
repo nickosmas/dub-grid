@@ -15,6 +15,7 @@ const row = (overrides: Partial<PublishEditorRow> = {}): PublishEditorRow => ({
   name: null,
   isOnline: false,
   newShifts: 0,
+  newAbsences: 0,
   modifiedShifts: 0,
   deletedShifts: 0,
   newNotes: 0,
