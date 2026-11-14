@@ -9,7 +9,6 @@ import {
   type ShiftChangeSide,
   type ShiftChangeTextPart,
 } from "@dubgrid/schedule-core";
-import { formatShiftChangeWasText } from "@/lib/shift-change-web";
 import { cn } from "@/lib/utils";
 
 type SideTone = "before" | "after";
@@ -305,9 +304,14 @@ function withoutLoneShiftLabel(side: ShiftChangeSide): ShiftChangeSide {
   };
 }
 
-/** Only the old side, for places that already show the new shift. */
+/**
+ * Only the old side, for places that already show the new shift. Nothing when
+ * the day only gained shifts: what it had is still there, and each addition
+ * carries its own New mark.
+ */
 export function ShiftChangeWas({ change, className }: { change: ShiftChange; className?: string }) {
   if (change.kind === "none" || isNewShiftChange(change)) return null;
+  if (change.before.items.every((item) => item.status === "same")) return null;
   return (
     <div className={cn("rounded-[8px] border border-border-light bg-bg px-3 py-2.5", className)}>
       <SideBlock
@@ -319,16 +323,4 @@ export function ShiftChangeWas({ change, className }: { change: ShiftChange; cla
       />
     </div>
   );
-}
-
-/** A change beside the shift it led to: what the day was, or that it had nothing. */
-export function ShiftChangeBesideCurrent({ change }: { change: ShiftChange }) {
-  if (isNewShiftChange(change)) {
-    return (
-      <div className="text-[length:var(--dg-fs-caption)] text-text-muted">
-        {formatShiftChangeWasText(change)}
-      </div>
-    );
-  }
-  return <ShiftChangeWas change={change} />;
 }

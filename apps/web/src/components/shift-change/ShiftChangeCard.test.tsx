@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { describeShiftChange, type ShiftChangeShiftInput } from "@dubgrid/schedule-core";
-import { ShiftChangeBesideCurrent, ShiftChangeCard, ShiftChangeWas } from "./ShiftChangeCard";
+import { ShiftChangeCard, ShiftChangeWas } from "./ShiftChangeCard";
 
 const day: ShiftChangeShiftInput = {
   kind: "shift",
@@ -56,7 +56,7 @@ describe("ShiftChangeCard", () => {
       { date: "2026-10-24" },
     );
     expect(change.kind).toBe("multi");
-    render(<ShiftChangeBesideCurrent change={change} />);
+    render(<ShiftChangeWas change={change} />);
     expect(screen.getByText("Was")).toBeInTheDocument();
     expect(screen.queryByText("After")).not.toBeInTheDocument();
     expect(screen.queryByText("Shift 1")).not.toBeInTheDocument();
@@ -76,14 +76,31 @@ describe("ShiftChangeCard", () => {
       { items: [day] },
       { date: "2026-10-24" },
     );
-    render(<ShiftChangeBesideCurrent change={change} />);
+    render(<ShiftChangeWas change={change} />);
     expect(screen.getByText("Shift 1")).toBeInTheDocument();
     expect(screen.getByText("Shift 2")).toBeInTheDocument();
   });
 
-  it("says a day that had nothing was added", () => {
+  it("says nothing when a shift was added beside one that stayed", () => {
+    const evening = {
+      ...day,
+      key: "shift:2",
+      shiftName: "Evening Shift",
+      start: "15:30",
+      end: "23:00",
+    };
+    const change = describeShiftChange(
+      { items: [day] },
+      { items: [day, evening] },
+      { date: "2026-10-24" },
+    );
+    const { container } = render(<ShiftChangeWas change={change} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("says nothing for a day that had nothing, since the added shift is beside it", () => {
     const change = describeShiftChange({ items: [] }, { items: [day] }, { date: "2026-10-24" });
-    render(<ShiftChangeBesideCurrent change={change} />);
-    expect(screen.getByText(/^Added: Day Shift/)).toBeInTheDocument();
+    const { container } = render(<ShiftChangeWas change={change} />);
+    expect(container).toBeEmptyDOMElement();
   });
 });

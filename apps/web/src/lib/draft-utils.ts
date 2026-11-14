@@ -101,6 +101,8 @@ export function countShiftsAddedToPublishedEntry(entry: ShiftMap[string]): numbe
 
 export interface DraftBreakdown {
   newShifts: number;
+  /** New whole-day absences, such as a day off; counted apart so "New shifts" is only shifts. */
+  newAbsences: number;
   modifiedShifts: number;
   deletedShifts: number;
   newNotes: number;
@@ -142,6 +144,7 @@ export function computeDraftBreakdown(
   range?: DateRangeFilter,
 ): DraftBreakdown {
   let newShifts = 0;
+  let newAbsences = 0;
   let modifiedShifts = 0;
   let deletedShifts = 0;
   let newNotes = 0;
@@ -155,7 +158,8 @@ export function computeDraftBreakdown(
     }
     switch (entry.draftKind) {
       case "new":
-        newShifts++;
+        if (isWholeDayAbsenceEntry(entry)) newAbsences++;
+        else newShifts++;
         break;
       case "modified": {
         const added = countShiftsAddedToPublishedEntry(entry);
@@ -182,12 +186,19 @@ export function computeDraftBreakdown(
 
   return {
     newShifts,
+    newAbsences,
     modifiedShifts,
     deletedShifts,
     newNotes,
     deletedNotes,
-    totalChanges: newShifts + modifiedShifts + deletedShifts + newNotes + deletedNotes,
+    totalChanges:
+      newShifts + newAbsences + modifiedShifts + deletedShifts + newNotes + deletedNotes,
   };
+}
+
+/** A cell that is a whole-day absence (a day off, vacation), not worked time. */
+export function isWholeDayAbsenceEntry(entry: { absenceTypeId?: number | null }): boolean {
+  return entry.absenceTypeId != null;
 }
 
 export interface OutOfWindowDraftGroup {
@@ -253,6 +264,7 @@ export function computeOutOfWindowDraftGroups(
 export function draftBreakdownsEqual(left: DraftBreakdown, right: DraftBreakdown): boolean {
   return (
     left.newShifts === right.newShifts &&
+    left.newAbsences === right.newAbsences &&
     left.modifiedShifts === right.modifiedShifts &&
     left.deletedShifts === right.deletedShifts &&
     left.newNotes === right.newNotes &&
@@ -266,6 +278,9 @@ export function formatDraftBreakdownSummary(breakdown: DraftBreakdown): string {
 
   if (breakdown.newShifts > 0) {
     parts.push(`${breakdown.newShifts} new shift${breakdown.newShifts === 1 ? "" : "s"}`);
+  }
+  if (breakdown.newAbsences > 0) {
+    parts.push(`${breakdown.newAbsences} new absence${breakdown.newAbsences === 1 ? "" : "s"}`);
   }
   if (breakdown.modifiedShifts > 0) {
     parts.push(

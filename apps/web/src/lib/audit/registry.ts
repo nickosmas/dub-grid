@@ -317,6 +317,7 @@ function draftSummaryRows(d: AuditDetails, key = "summary"): DetailItem[] {
     }
   };
   add("newShifts", "New shifts");
+  add("newAbsences", "New absences");
   add("modifiedShifts", "Changed shifts");
   add("deletedShifts", "Removed shifts");
   add("newNotes", "New notes");

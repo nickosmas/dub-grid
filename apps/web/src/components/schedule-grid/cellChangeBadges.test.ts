@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PublishChange, ScheduleCellState, ScheduleCellStateEntry } from "@/types";
-import { resolveCellChangeBadges } from "./cellChangeBadges";
+import { buildShiftDiffDescriptors } from "@/lib/shift-diff-badges";
+import { resolveCellChangeBadges, resolvePillChangeBadges } from "./cellChangeBadges";
 
 const DAY = 101;
 const NIGHT = 202;
@@ -508,5 +509,75 @@ describe("resolveCellChangeBadges: details the organization hides (46f)", () => 
     });
 
     expect(pillBadges.map((badge) => badge?.text)).toEqual(["New", "New"]);
+  });
+});
+
+describe("resolvePillChangeBadges: the shift panel's chips", () => {
+  const diff = (before: number[], after: number[], mentored?: [boolean[], boolean[]]) =>
+    buildShiftDiffDescriptors({
+      before: {
+        assignmentIds: before,
+        absenceTypeId: null,
+        isMentoredFlags: mentored?.[0],
+      },
+      after: {
+        assignmentIds: after,
+        absenceTypeId: null,
+        isMentoredFlags: mentored?.[1],
+      },
+      beforeShiftLabels: before.map((id) => labels.get(id) ?? "?"),
+      afterShiftLabels: after.map((id) => labels.get(id) ?? "?"),
+      resolveAssignmentDefinitionLabel: (id) => labels.get(id) ?? "?",
+    });
+
+  it("shows a published addition, which the grid chips as New", () => {
+    const badges = resolvePillChangeBadges({
+      draftDiff: diff([DAY], [DAY]),
+      publishDiff: diff([], [DAY]),
+      pillCount: 1,
+      restOfDayIndex: null,
+    });
+    expect(badges[0]).toMatchObject({ source: "publish", text: "New" });
+  });
+
+  it("leaves a draft addition to its dashed border", () => {
+    const badges = resolvePillChangeBadges({
+      draftDiff: diff([], [DAY]),
+      publishDiff: null,
+      pillCount: 1,
+      restOfDayIndex: null,
+    });
+    expect(badges[0]).toBeNull();
+  });
+
+  it("names a mentoring-only draft change", () => {
+    const badges = resolvePillChangeBadges({
+      draftDiff: diff([DAY], [DAY], [[false], [true]]),
+      publishDiff: null,
+      pillCount: 1,
+      restOfDayIndex: null,
+    });
+    expect(badges[0]).toMatchObject({ source: "draft", kind: "modified" });
+  });
+
+  it("lets the draft outrank a published change on the same shift", () => {
+    const badges = resolvePillChangeBadges({
+      draftDiff: diff([DAY], [NIGHT]),
+      publishDiff: diff([], [DAY]),
+      pillCount: 1,
+      restOfDayIndex: null,
+    });
+    expect(badges[0]?.source).toBe("draft");
+  });
+
+  it("marks only the shift a publish added beside a kept one", () => {
+    const badges = resolvePillChangeBadges({
+      draftDiff: null,
+      publishDiff: diff([DAY], [DAY, NIGHT]),
+      pillCount: 2,
+      restOfDayIndex: null,
+    });
+    expect(badges[0]).toBeNull();
+    expect(badges[1]).toMatchObject({ source: "publish", text: "New" });
   });
 });
