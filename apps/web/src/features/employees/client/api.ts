@@ -159,8 +159,9 @@ export interface EmployeeEmailConflictResult {
   conflictingEmployeeId: string | null;
   /** Why the check flagged it (undefined when conflict is false):
    *  - "employee_duplicate": another active employee's contact email matches.
-   *  - "other_account": someone in this organization signs in with it, or it
-   *    can't be used for another reason this organization isn't told. */
+   *  - "other_account": someone in this organization signs in with it.
+   *  An account outside the organization reads as no conflict; the save
+   *  refuses it without saying why. */
   reason?: "employee_duplicate" | "other_account";
 }
 

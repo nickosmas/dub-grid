@@ -1,3 +1,5 @@
+import { EMAIL_UNAVAILABLE_MESSAGE } from "@dubgrid/client-errors";
+
 export type EmployeeContactConflictField = "email" | "phone" | "name";
 
 export const EMPLOYEE_CONTACT_CONFLICT_CODE = "EMPLOYEE_CONTACT_CONFLICT";
@@ -12,15 +14,22 @@ export interface EmployeeContactConflict {
 export const EMAIL_BELONGS_TO_SOMEONE_ELSE = "That email belongs to someone else.";
 export const PHONE_BELONGS_TO_SOMEONE_ELSE = "That phone number belongs to someone else.";
 
-/** Why an email cannot be a person's contact or sign-in email. */
-export type EmailConflictReason = "employee_duplicate" | "other_account";
+/**
+ * Why an email cannot be a person's contact or sign-in email:
+ * `employee_duplicate` and `other_account` name someone in this organization;
+ * `unavailable` covers an account anywhere else, a Gridmaster's included, and
+ * never says the address belongs to anyone (owner, 2026-11-13).
+ */
+export type EmailConflictReason = "employee_duplicate" | "other_account" | "unavailable";
 
 /** The one conflict answer for an email, whether a pre-check or the database found it. */
 export function emailContactConflict(reason: EmailConflictReason): EmployeeContactConflict {
   const message =
     reason === "employee_duplicate"
       ? "That email is already used by another person."
-      : "Someone else already signs in with that email. Use a different one.";
+      : reason === "other_account"
+        ? "Someone else already signs in with that email. Use a different one."
+        : EMAIL_UNAVAILABLE_MESSAGE;
   return { code: EMPLOYEE_CONTACT_CONFLICT_CODE, error: message, field: "email", message };
 }
 
@@ -65,17 +74,18 @@ export function getEmployeeContactConflict(error: unknown): EmployeeContactConfl
     };
   }
 
-  // employee_email_belongs_to_user / employee_email_belongs_to_other_user /
-  // employee_email_belongs_to_gridmaster:
-  // the BEFORE trigger raised because the email matches a different auth
-  // user's account email. Surface as a contact conflict so the existing
-  // EmployeeContactConflictError path on the client picks it up.
+  // check_employee_email_belongs_to_user (006) raised because the email is
+  // another account's sign-in. Only its "member of this organization" case
+  // may say so; a Gridmaster's address, or a linked record's clash with an
+  // account that could be anywhere, gets the neutral answer.
   if (
     text.includes("employee_email_belongs_to_user") ||
     text.includes("employee_email_belongs_to_other_user") ||
     text.includes("employee_email_belongs_to_gridmaster")
   ) {
-    return emailContactConflict("other_account");
+    return emailContactConflict(
+      text.includes("member of this organization") ? "other_account" : "unavailable",
+    );
   }
 
   return null;
