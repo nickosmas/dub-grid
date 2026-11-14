@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { createRealtimeChannelName, subscribeToPostgresChanges } from "@dubgrid/realtime-core";
+import { orgTopic, subscribeToTableChanges } from "@dubgrid/realtime-core";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 
 type Listener = () => void;
@@ -30,16 +30,9 @@ function acquireShiftRequestsChannel(
     const notify = () => {
       for (const current of Array.from(listeners)) current();
     };
-    const unsubscribe = subscribeToPostgresChanges(
+    const unsubscribe = subscribeToTableChanges(
       supabase,
-      createRealtimeChannelName(`shift_requests_${orgId}`),
-      [
-        {
-          table: "shift_requests",
-          filter: `org_id=eq.${orgId}`,
-          onEvent: notify,
-        },
-      ],
+      [{ table: "shift_requests", topic: orgTopic(orgId), onEvent: notify }],
       {
         onReconnectAfterError: notify,
         onError: (error) => {

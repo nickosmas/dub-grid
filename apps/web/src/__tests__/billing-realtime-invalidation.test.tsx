@@ -7,17 +7,19 @@ import {
 } from "@/features/billing/useBillingRealtimeInvalidation";
 import { queryKeys } from "@/lib/query-keys";
 
-const mockRemoveBrowserRealtimeChannel = vi.fn((_channel: unknown) => Promise.resolve());
-const mockChannel = {
-  on: vi.fn(),
-  subscribe: vi.fn(),
-};
-const mockCreateBrowserRealtimeChannel = vi.fn((_name: string) => mockChannel);
+type TableListener = { table: string; topic: string; onEvent: () => void };
+const mockSubscribe = vi.fn();
+const mockRelease = vi.fn();
 
-vi.mock("@/features/account/client", () => ({
-  createBrowserRealtimeChannel: (name: string) => mockCreateBrowserRealtimeChannel(name),
-  removeBrowserRealtimeChannel: (channel: unknown) => mockRemoveBrowserRealtimeChannel(channel),
+vi.mock("@dubgrid/realtime-core", () => ({
+  orgTopic: (orgId: string) => `org:${orgId}`,
+  subscribeToTableChanges: (_client: unknown, listeners: TableListener[]) => {
+    mockSubscribe(listeners);
+    return mockRelease;
+  },
 }));
+
+vi.mock("@/features/account/client", () => ({ getBrowserSupabaseClient: () => ({}) }));
 
 vi.mock("@/lib/cache-broadcast", () => ({
   broadcastInvalidation: vi.fn(),
@@ -36,8 +38,6 @@ function createWrapper(queryClient: QueryClient) {
 describe("billing realtime invalidation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockChannel.on.mockReturnValue(mockChannel);
-    mockChannel.subscribe.mockReturnValue(mockChannel);
   });
 
   it("targets billing and shell queries for billing changes", () => {
@@ -55,28 +55,14 @@ describe("billing realtime invalidation", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(mockCreateBrowserRealtimeChannel).toHaveBeenCalledWith(
-      expect.stringMatching(/^billing-freshness:org-1:/),
-    );
-    expect(mockChannel.on).toHaveBeenCalledWith(
-      "postgres_changes",
-      expect.objectContaining({
-        table: "organizations",
-        filter: "id=eq.org-1",
-      }),
-      expect.any(Function),
-    );
-    expect(mockChannel.on).toHaveBeenCalledWith(
-      "postgres_changes",
-      expect.objectContaining({
-        table: "subscriptions",
-        filter: "org_id=eq.org-1",
-      }),
-      expect.any(Function),
-    );
+    const [listeners] = mockSubscribe.mock.calls[0] as [TableListener[]];
+    expect(listeners.map(({ table, topic }) => [table, topic])).toEqual([
+      ["organizations", "org:org-1"],
+      ["subscriptions", "org:org-1"],
+    ]);
 
     unmount();
 
-    expect(mockRemoveBrowserRealtimeChannel).toHaveBeenCalledWith(mockChannel);
+    expect(mockRelease).toHaveBeenCalledOnce();
   });
 });

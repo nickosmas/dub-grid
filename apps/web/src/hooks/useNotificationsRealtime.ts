@@ -2,13 +2,10 @@
 
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { createRealtimeChannelName } from "@dubgrid/realtime-core";
+import { subscribeToTableChanges, userTopic } from "@dubgrid/realtime-core";
 import * as Sentry from "@/lib/sentry";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  createBrowserRealtimeChannel,
-  removeBrowserRealtimeChannel,
-} from "@/features/account/client";
+import { getBrowserSupabaseClient } from "@/features/account/client";
 
 type Listener = () => void;
 
@@ -30,46 +27,28 @@ function acquireNotificationsSubscription(userId: string, listener: Listener): (
     existing.count += 1;
     existing.listeners.add(listener);
   } else {
-    let hadError = false;
     const listeners = new Set<Listener>([listener]);
     const notifyAll = () => {
       for (const fn of listeners) fn();
     };
 
-    // Randomized per real subscribe (not just per mount): the ref count can
-    // drop to 0 and a new one begin in the same tick (e.g. React StrictMode's
-    // mount/cleanup/remount), and the old channel's removal isn't awaited
-    // below, so a deterministic name here could collide with one still being
-    // torn down. Mirrors subscribeOrgScopedRealtime's same choice for its own
-    // ref-counted singleton channel.
-    const channel = createBrowserRealtimeChannel(
-      createRealtimeChannelName(`notifications:user:${userId}`),
-    );
-    channel.on(
-      "postgres_changes" as "system",
+    // One message per statement (140), so marking every alert read or
+    // archiving many at once arrives once, not once per alert.
+    const unsubscribe = subscribeToTableChanges(
+      getBrowserSupabaseClient(),
+      [{ table: "notifications", topic: userTopic(userId), onEvent: notifyAll }],
       {
-        event: "*",
-        schema: "public",
-        table: "notifications",
-        filter: `user_id=eq.${userId}`,
-      } as Record<string, unknown>,
-      () => notifyAll(),
+        onReconnectAfterError: notifyAll,
+        onError: (error) => {
+          Sentry.captureException(error);
+        },
+      },
     );
-
-    channel.subscribe((status: string, err?: Error) => {
-      if (status === "SUBSCRIBED" && hadError) {
-        hadError = false;
-        notifyAll();
-      } else if (status === "CHANNEL_ERROR") {
-        hadError = true;
-        Sentry.captureException(err ?? new Error("notifications realtime channel error"));
-      }
-    });
 
     notificationSubscriptions.set(userId, {
       count: 1,
       listeners,
-      unsubscribe: () => void removeBrowserRealtimeChannel(channel),
+      unsubscribe,
     });
   }
 
