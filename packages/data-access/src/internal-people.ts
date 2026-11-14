@@ -82,9 +82,18 @@ const idList = (ids: readonly string[]) => `(${ids.join(",")})`;
 export function withoutHiddenStaff<
   Query extends { or(filters: string, options?: { referencedTable?: string }): Query },
 >(query: Query, hiddenUserIds: readonly string[], referencedTable?: string): Query {
-  if (hiddenUserIds.length === 0) return query;
-  const filter = `user_id.is.null,user_id.not.in.${idList(hiddenUserIds)}`;
+  const filter = hiddenStaffFilter(hiddenUserIds);
+  if (!filter) return query;
   return referencedTable ? query.or(filter, { referencedTable }) : query.or(filter);
+}
+
+/**
+ * The `or` filter `withoutHiddenStaff` applies, or null when nobody is hidden,
+ * for a query whose builder type is too deep to pass through that generic.
+ */
+export function hiddenStaffFilter(hiddenUserIds: readonly string[]): string | null {
+  if (hiddenUserIds.length === 0) return null;
+  return `user_id.is.null,user_id.not.in.${idList(hiddenUserIds)}`;
 }
 
 /** Leaves hidden people out of a query on a table whose `user_id` is never null. */
