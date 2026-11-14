@@ -49,9 +49,10 @@ jobs:
       # `npm audit` is blind to, because no advisory exists yet.
       # npm sometimes fails to match a package's attestation to a registry key
       # (EMISSINGSIGNATUREKEY, a different package each time) on a lookup that
-      # passes on the next run. Only that error is retried: a tarball whose
-      # signature doesn't verify fails at once, and so does a missing key on
-      # every attempt.
+      # passes on the next run. Only that error is retried, after printing and
+      # clearing the restored Sigstore cache npm reads the keys from: a tarball
+      # whose signature doesn't verify fails at once, and so does a missing key
+      # on every attempt.
       - name: Verify registry signatures
         run: |
           set -o pipefail
