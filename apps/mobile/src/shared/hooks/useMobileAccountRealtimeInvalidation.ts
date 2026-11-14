@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { createRealtimeChannelName, subscribeToPostgresChanges } from "@dubgrid/realtime-core";
-import type { RealtimeChangePayload } from "@dubgrid/realtime-core";
+import { subscribeToTableChanges, userTopic } from "@dubgrid/realtime-core";
 import {
-  applyMobileNotificationInsert,
   invalidateMobileAccountRealtimeQueries,
   type MobileAccountRealtimeTable,
 } from "../lib/mobile-account-realtime-invalidation";
@@ -44,35 +42,16 @@ export function useMobileAccountRealtimeInvalidation({
       if (!token) return;
       invalidateMobileAccountRealtimeQueries(queryClient, token, table);
     };
-    const handleNotificationChange = (
-      table: MobileAccountRealtimeTable,
-      payload: RealtimeChangePayload,
-    ) => {
-      const token = accessTokenRef.current;
-      if (!token) return;
-      if (payload.eventType === "INSERT") {
-        applyMobileNotificationInsert(queryClient, token, payload.new);
-        return;
-      }
-      invalidateMobileAccountRealtimeQueries(queryClient, token, table);
-    };
-
-    return subscribeToPostgresChanges<MobileAccountRealtimeTable>(
+    // A change carries no row (140), so a new alert refetches the inbox
+    // rather than being added to the cache from the event.
+    const topic = userTopic(userId);
+    return subscribeToTableChanges<MobileAccountRealtimeTable>(
       supabase,
-      createRealtimeChannelName(`mobile-account-freshness:${userId}`),
       [
-        { table: "profiles", filter: `id=eq.${userId}`, onEvent: handleChange },
-        { table: "user_sessions", filter: `user_id=eq.${userId}`, onEvent: handleChange },
-        {
-          table: "notification_preferences",
-          filter: `user_id=eq.${userId}`,
-          onEvent: handleChange,
-        },
-        {
-          table: "notifications",
-          filter: `user_id=eq.${userId}`,
-          onEvent: handleNotificationChange,
-        },
+        { table: "profiles", topic, onEvent: handleChange },
+        { table: "user_sessions", topic, onEvent: handleChange },
+        { table: "notification_preferences", topic, onEvent: handleChange },
+        { table: "notifications", topic, onEvent: handleChange },
       ],
       {
         onError: (error) => {

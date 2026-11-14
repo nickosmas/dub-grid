@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { createRealtimeChannelName, subscribeToPostgresChanges } from "@dubgrid/realtime-core";
+import { subscribeToTableChanges, userTopic } from "@dubgrid/realtime-core";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 
 // Dedicated per-user notifications channel that reacts directly to realtime
@@ -30,16 +30,9 @@ export function useMobileNotificationsRealtimeTick({
       return;
     }
 
-    return subscribeToPostgresChanges(
+    return subscribeToTableChanges(
       supabase,
-      createRealtimeChannelName(`notifications:user:${userId}`),
-      [
-        {
-          table: "notifications",
-          filter: `user_id=eq.${userId}`,
-          onEvent: onChange,
-        },
-      ],
+      [{ table: "notifications", topic: userTopic(userId), onEvent: onChange }],
       {
         onReconnectAfterError: onChange,
         onError: (error) => {

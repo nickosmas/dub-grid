@@ -1,32 +1,39 @@
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useMobilePermissionsRealtime } from "./useMobilePermissionsRealtime";
 
-function createMockChannel() {
-  const onCalls: Array<{ filter: Record<string, unknown>; handler: () => void }> = [];
-  const channel = {
-    on: vi.fn((_type: string, filter: Record<string, unknown>, handler: () => void) => {
-      onCalls.push({ filter, handler });
-      return channel;
-    }),
-    subscribe: vi.fn(() => channel),
-  };
-  return { channel, onCalls };
-}
+type Listener = { table: string; topic: string; event?: string; onEvent: () => void };
+type Subscription = { listeners: Listener[]; released: boolean };
+const subscriptions: Subscription[] = [];
 
-const channels: ReturnType<typeof createMockChannel>[] = [];
-const removeChannel = vi.fn();
+vi.mock("@dubgrid/realtime-core", () => ({
+  userTopic: (userId: string) => `user:${userId}`,
+  subscribeToTableChanges: (_client: unknown, listeners: Listener[]) => {
+    const subscription = { listeners, released: false };
+    subscriptions.push(subscription);
+    return () => {
+      subscription.released = true;
+    };
+  },
+}));
 
 vi.mock("../../../shared/lib/supabase", () => ({
-  getSupabaseClient: () => ({
-    channel: () => {
-      const mock = createMockChannel();
-      channels.push(mock);
-      return mock.channel;
-    },
-    removeChannel,
-  }),
+  getSupabaseClient: () => ({ channel: vi.fn(), removeChannel: vi.fn() }),
 }));
+
+beforeEach(() => {
+  subscriptions.length = 0;
+});
+
+function mount(refetchQueries = vi.fn()) {
+  return renderHook(() =>
+    useMobilePermissionsRealtime({
+      accessToken: "token-1",
+      userId: "user-1",
+      queryClient: { refetchQueries } as never,
+    }),
+  );
+}
 
 describe("useMobilePermissionsRealtime", () => {
   it("does nothing when accessToken or userId is missing", () => {
@@ -38,47 +45,25 @@ describe("useMobilePermissionsRealtime", () => {
       }),
     );
 
-    expect(channels).toHaveLength(0);
+    expect(subscriptions).toHaveLength(0);
   });
 
-  it("subscribes to organization_memberships and employees UPDATE events for the user", () => {
-    channels.length = 0;
-    renderHook(() =>
-      useMobilePermissionsRealtime({
-        accessToken: "token-1",
-        userId: "user-1",
-        queryClient: { refetchQueries: vi.fn() } as never,
-      }),
-    );
+  it("listens for membership and staff record updates on the person's own topic", () => {
+    mount();
 
-    expect(channels).toHaveLength(2);
-    expect(channels[0]?.onCalls[0]?.filter).toEqual({
-      event: "UPDATE",
-      schema: "public",
-      table: "organization_memberships",
-      filter: "user_id=eq.user-1",
-    });
-    expect(channels[1]?.onCalls[0]?.filter).toEqual({
-      event: "UPDATE",
-      schema: "public",
-      table: "employees",
-      filter: "user_id=eq.user-1",
-    });
+    expect(
+      subscriptions[0].listeners.map(({ table, topic, event }) => [table, topic, event]),
+    ).toEqual([
+      ["organization_memberships", "user:user-1", "UPDATE"],
+      ["employees", "user:user-1", "UPDATE"],
+    ]);
   });
 
-  it("refetches the active bootstrap query when a membership row changes", () => {
-    channels.length = 0;
+  it("refetches the active bootstrap query when a membership changes", () => {
     const refetchQueries = vi.fn();
+    mount(refetchQueries);
 
-    renderHook(() =>
-      useMobilePermissionsRealtime({
-        accessToken: "token-1",
-        userId: "user-1",
-        queryClient: { refetchQueries } as never,
-      }),
-    );
-
-    channels[0]?.onCalls[0]?.handler();
+    subscriptions[0].listeners[0].onEvent();
 
     expect(refetchQueries).toHaveBeenCalledWith({
       queryKey: ["mobile", "bootstrap"],
@@ -86,20 +71,11 @@ describe("useMobilePermissionsRealtime", () => {
     });
   });
 
-  it("unsubscribes both channels on cleanup", () => {
-    channels.length = 0;
-    removeChannel.mockClear();
-
-    const { unmount } = renderHook(() =>
-      useMobilePermissionsRealtime({
-        accessToken: "token-1",
-        userId: "user-1",
-        queryClient: { refetchQueries: vi.fn() } as never,
-      }),
-    );
+  it("leaves the topic on cleanup", () => {
+    const { unmount } = mount();
 
     unmount();
 
-    expect(removeChannel).toHaveBeenCalledTimes(2);
+    expect(subscriptions[0].released).toBe(true);
   });
 });
