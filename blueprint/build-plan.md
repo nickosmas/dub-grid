@@ -1291,7 +1291,7 @@
       approved. Owner decisions, 2026-11-14; design reference: the
       "Request marks on the schedule" canvas. Web only: the mobile app is
       out of scope (owner, 2026-11-14).
-  - [ ] 57a. **Waiting requests on every day involved** - the fold marks
+  - [x] 57a. **Waiting requests on every day involved** - the fold marks
         each day in a waiting request, not only the asker's: the swap
         partner, the teammate asked to pick up, and a claimer's day, which
         shows the shift they would get as a dashed outline. Slate means

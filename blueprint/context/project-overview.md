@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 68aa0a011fd6aea8821273340df83162e50c37fb4c96b785269d04aa28141d89 -->
+<!-- blueprint:source-hash c62e54522c9911fd850aeeaa55978c7f47b57ab0af634027b607b8a3ef409932 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Every item has shipped except 40, which is
-in progress, and 57, which is planned.
+in progress, and 57, which is in progress (57a shipped).
 
 - **1** - Multi-tenant organizations with subdomain isolation and organization-specific settings.
 - **2** - Four-tier RBAC with per-person Admin permissions.
@@ -89,7 +89,7 @@ in progress, and 57, which is planned.
 - **54** - People away or absent all period sit last in their section, under a group row that folds.
 - **55** - One staff page holds everything stored about a person, in tabs that follow one chosen period.
 - **56** - The app feels built for each phone: native navigation, sheets and alerts, one DubGrid design, and a My schedule | Team switch.
-- **57** (planned) - Every day a shift request touches is marked on the web grid while it waits and after approval; approvals count as changes in Highlight changes.
+- **57** (in progress) - Every day a shift request touches is marked on the web grid while it waits and after approval; approvals count as changes in Highlight changes.
 
 Each item's parts, what each part shipped and its migration live in
 `blueprint/build-plan.md` (the checklist) and `blueprint/history/` (the
