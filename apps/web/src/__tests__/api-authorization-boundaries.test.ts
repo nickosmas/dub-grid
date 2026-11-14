@@ -26,6 +26,8 @@ const PUBLIC_OR_SYSTEM_ROUTE_ALLOWLIST: Record<string, string> = {
     "Public legal-consent capture with CSRF protection and optional verified account attribution.",
   "apps/web/src/app/api/cron/expire-requests/route.ts": "System job authenticated by CRON_SECRET.",
   "apps/web/src/app/api/cron/return-from-away/route.ts": "System job authenticated by CRON_SECRET.",
+  "apps/web/src/app/api/cron/purge-archived-organizations/route.ts":
+    "System job authenticated by CRON_SECRET.",
   "apps/web/src/app/api/cron/sandbox-cleanup/route.ts": "System job authenticated by CRON_SECRET.",
   "apps/web/src/app/api/cron/trial-expiry/route.ts": "System job authenticated by CRON_SECRET.",
   "apps/web/src/app/api/health/route.ts": "Public liveness probe that returns no tenant data.",

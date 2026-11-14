@@ -322,6 +322,29 @@ const SENSITIVE_ENTRY_POINTS: Record<string, Boundary> = {
       /const assurance = await requireSensitiveActionAuth\(req\);\s*if \("response" in assurance\) return assurance\.response;[\s\S]*?\.rpc\("change_user_role"/,
     ],
   },
+  // The organization's data as a ZIP, for its Super Admin, after fresh proof (F-203).
+  "apps/web/src/app/api/organizations/export/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireOrgPermissions\s*\([\s\S]*?permissions\.isSuperAdmin[\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bbuildOrganizationArchive\s*\(/,
+    ],
+  },
+  // The same ZIP for DubGrid support, after fresh proof, audited (F-203).
+  "apps/web/src/app/api/gridmaster/organizations/export/route.ts": {
+    policy: "sensitive",
+    assertions: [
+      /\brequireGridmasterSession\s*\([\s\S]*?\brequireSensitiveActionAuth\s*\([\s\S]*?\bbuildOrganizationArchive\s*\([\s\S]*?\bwriteGridmasterAuditLog\s*\(/,
+    ],
+  },
+  // Deletes organizations archived 90 days ago and the accounts they leave
+  // with no organization; only the cron secret reaches it (F-203).
+  "apps/web/src/app/api/cron/purge-archived-organizations/route.ts": {
+    policy: "authorized-target-revocation",
+    assertions: [
+      /if \(!bearerMatchesSecret\(req\.headers\.get\("authorization"\), secret\)\)/,
+      /if \(!\(await isOrphanAccount\(db, userId\)\)\) continue;\s*await deleteUserAccountWithCleanup\(/,
+    ],
+  },
   "apps/web/src/app/api/organizations/delete/route.ts": {
     policy: "sensitive",
     assertions: [/\brequireOrgPermissions\s*\(/, /\brequireSensitiveActionAuth\s*\(/],
