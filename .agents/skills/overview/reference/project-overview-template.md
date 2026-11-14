@@ -23,6 +23,11 @@ the map of what exists and what's coming, not the detailed spec (that's
 1. **<feature>** - what it delivers.
 2. **<feature>** - what it delivers.
 
+## Product rules
+
+Decisions that bind later work, grouped by area, one bullet each with its date.
+Rules only; each item's history stays in build-plan.md and blueprint/history/.
+
 ## Data model
 
 The concrete shape of stored data, derived from project-plan.md section 4 and the
