@@ -27,126 +27,65 @@ everywhere.
 
 ## Workflow
 
-The loop we use for every feature. The spec for the feature being built lives in
-@blueprint/context/current-feature.md.
+The loop we use for every feature, fix and rollback. The skills hold the full
+steps; this is the shape and the rules that apply however a step is invoked.
+The spec being built lives in @blueprint/context/current-feature.md.
 
-Run `/feature` (or `/fix` for a bug or change that isn't a planned feature) to
-write the spec, `/implement` to build it on its own branch from `dev`, and
-`/complete` to log it and squash-merge it into `dev`.
-The numbered loop below is what those skills follow.
+You can also just describe a change in chat. The rules below still apply:
+small steps, you approve each diff, the conventions in `coding-standards.md`.
 
-The skills are the structured path, not a requirement. You can also just describe
-a feature, fix, or change in chat at any time and we'll build it the same way; the
-rules below still apply (small steps, you approve each diff, the conventions in
-`coding-standards.md`), because they're always in context. Use the skills when you
-want the repeatable loop and the logging; prompt directly when you just want
-something done.
-
-1. **Spec** - Optionally run `/brief` first for a read-only preview of the next
-   feature (scope, dependencies, size); it writes nothing. Then run `/feature`
-   (no number = the next unchecked item in `build-plan.md`) to generate
-   @blueprint/context/current-feature.md, then review it together before any code.
-2. **Work branch** - Cut a branch from `dev` with the configured prefix
-   (`feature/`, `fix/`, or `rollback/`) and a short name from the spec. All
-   implementation and checkpoint commits go on that branch.
-3. **Implement** - Build one small step from the spec at a time, not the whole
-   feature at once.
-4. **Review** - Show the diff (not full files), with a short summary: what the
-   step delivered, one line per file on the why, and the done-when shown true. I
-   read and approve each step before moving to the next.
-5. **Test** - Verify the done-when with evidence. If `AGENTS.md` declares a
-   `Verify` command, run that exact command as the final automated gate. It wraps
-   only the checks the project actually has. If no Verify command exists, run the
-   documented build command and the test command when configured. A step that
-   adds logic must ship a passing test when the test gate is on; UI and
-   integration steps ride on browser, screenshot, API, and build evidence. Run
-   `/tests` first if the project needs a stack-native unit test runner added or
-   normalized. See the Testing section of `coding-standards.md` for the gate.
-   Run `/ci` separately when you want one Verify command and matching automatic
-   GitHub checks; CI setup is not part of this feature loop.
-6. **Try manually (optional)** - Run `/try` when you want a human walkthrough:
-   what to start, where to go, what to click or run, what to expect, and what
-   would count as wrong. `/check` proves behavior from the agent side; `/try`
-   gives you the manual review path.
-7. **Audit (optional)** - Run `/audit` when you want a read-only code quality pass
-   before closing a feature or after a larger automated run. It checks for
-   duplication, dead code, missing tests for logic, standards drift, and
-   maintainability risks. Fixes still happen through `/implement` or `/fix`.
-8. **Iterate** - If it doesn't work or needs changes, re-prompt or hand-edit and
-   re-test; repeat until it works, before moving on.
-9. **Checkpoint (optional)** - after an approved step `/implement` offers a quick
-   choice (continue / commit a checkpoint / walk me through it / stop here) as a
-   selectable popup, or in plain text when there's a lot to read first so it doesn't
-   cover what you're reading. Checkpoints are optional cheap rollback points; "walk
-   me through it" gives a deeper code explanation and loops back; `/complete` makes
-   the real feature-level commit. Verify, or the fallback checks, must pass first.
-   When implementation is done, end with a compact review packet: changed files,
-   checks run, manual try path, risks, and next action.
-10. **Safety + log** - `/complete` first checks the active spec, that the work
-    branch uses the configured prefix, and changed
-    files, Verify or fallback check evidence, manual try path, and adapter sync when
-    workflow files changed. Then it archives the spec to `blueprint/history/features/NN-name.md` (or
-    `blueprint/history/fixes/`), checks the feature off in `blueprint/build-plan.md`, and
-    resets `blueprint/context/current-feature.md` to its stub.
-11. **Feature commit** - `/complete` pushes the work branch (step work plus
-    the logging changes) and opens a pull request into `dev`, which
-    squash-merges as one conventional feature commit once every check is
-    green, then deletes the branch.
-12. **Release PR** - Keep `main` untouched during development. After work
-    merges into `dev`, create or update a PR from `dev` to `main` after
-    auditing the diff and included commits, and merge it once every GitHub
-    check on it is green: the owner has standing-authorized releasing every
-    change to production and fixing failing checks without asking (see
-    "DubGrid Git policy" in `AGENTS.md`, including its migration stop). Never
-    rewrite or push `main` directly, and never merge past a red or running
-    check (`gh pr checks <n> --watch`); a failure is fixed and the checks rerun.
-13. **Release prep (optional)** - run `/release render` or `/release vercel`
-    after a completed feature or milestone when you want local provider config,
-    env var review, build/start checks, and a smoke-test path. `/release` must
-    stop before deploy, remote service creation, remote env changes, push, or
-    publish unless the user gives a separate yes in the current chat.
+1. **Spec** - `/brief` (optional, read-only), then `/feature` (no number = the
+   next unchecked build-plan item) or `/fix` writes `current-feature.md`. We
+   review it together before any code.
+2. **Work branch** - cut from `dev` with the configured prefix (`feature/`,
+   `fix/`, `rollback/`) and a short name from the spec.
+3. **Implement** - `/implement` builds one small step at a time.
+4. **Review** - show the diff, not full files, with what the step delivered,
+   one line per file on the why, and the done-when shown true. I approve each
+   step before the next.
+5. **Test** - verify the done-when with evidence. Run the `Verify` command from
+   `AGENTS.md` if one exists, otherwise the documented build and tests. Logic
+   ships with a passing test (the gate in `coding-standards.md`); UI and
+   integration steps ride on browser, screenshot, API and build evidence.
+6. **Optional passes** - `/check` proves behavior against the running app,
+   `/try` writes a manual walkthrough, `/audit` reviews quality. Fixes go
+   through `/implement` or `/fix`. `blueprint/config.json` `qualityGates` can
+   run them automatically.
+7. **Checkpoint** - after an approved step, `/implement` offers continue,
+   commit a checkpoint, walk me through it, or stop. Verify (or the fallback
+   checks) must pass first. When implementation is done, end with a compact
+   review packet: changed files, checks run, manual try path, risks, next
+   action.
+8. **Complete** - `/complete` runs the safety pass, archives the spec under
+   `blueprint/history/`, checks off the build plan, resets `current-feature.md`,
+   then pushes the branch and opens a pull request into `dev`, which
+   squash-merges as one conventional commit once every check is green.
+9. **Release** - after a merge into `dev`, open or update the release PR from
+   `dev` to `main`, audit it, and merge it once every check is green, under
+   "DubGrid Git policy" in `AGENTS.md` (including its migration stop).
+   `/release` (optional) prepares provider config and a smoke test and stops
+   before any deploy, remote change, push or publish without a separate yes.
 
 **Resuming after a context clear.** Progress lives in files, not the chat:
-`current-feature.md` holds the spec with each step checked off as it's done, and git
-holds the code (the work branch, commits, working tree). A fresh session auto-loads
-`current-feature.md` through the project instructions (`AGENTS.md`, and
-`CLAUDE.md` for Claude Code), so `/implement` or `$implement` just continues from
-the first unchecked step - no separate save/load needed.
+`current-feature.md` holds the spec with each step checked off, and git holds
+the code. A fresh session loads `current-feature.md`, so `/implement` continues
+from the first unchecked step.
 
-Do NOT commit without permission or until Verify, or the fallback build and tests,
-passes. If a required check fails, fix the issue first.
+Do NOT commit without permission or until Verify, or the fallback build and
+tests, passes. If a required check fails, fix the issue first.
 
-Autopilot exists only as an explicit opt-in command: `/autopilot` or
-`$autopilot`. Do not suggest it as the default next action. When invoked, it runs
-one bounded pass without pausing after each passing implementation step. It may
-create checkpoint commits on the work branch after passing steps. It
-stops before `/complete`, merge, push, deploy, publish, destructive actions, or
-hiding failing checks.
-
-Continuous Mode also exists only as an explicit opt-in command: `/continuous`
-or `$continuous`. Do not suggest it as the default next action. Its explicit
-invocation authorizes the local per-feature lifecycle defined by that skill:
-configured checkpoint commits, one local `dev` commit per completed
-feature, local squash merges into `dev`, branch deletion, and repetition through the
-configured limit or end of the build plan. It never authorizes push, deploy,
-publish, send, remote changes, destructive actions, finding waivers, or product
-decisions.
+`/autopilot` and `/continuous` are explicit opt-in commands only; never suggest
+them as the default next action. Their limits are in `AGENTS.md` and their
+skills.
 
 ## Branching
 
-Build every feature, fix, and rollback on its own branch cut from `dev`, named
-with the prefix in `blueprint/config.json`, and squash-merge it back into `dev`
-through a pull request opened by `/complete`. Where a Blueprint skill names `main` or the default branch
-as the merge target, read `dev`. Never work on `main`; it is reserved for an
-explicitly requested release PR from `dev`.
-
-Every session that edits files creates its work branch in its own worktree
-and lands it through a pull request into `dev`; nothing pushes to `dev`
-directly. Update a branch by merging `origin/dev` into it, not by rebasing.
-Never switch the shared checkout off `dev`. An editor-embedded agent keeps its
-worktree inside the workspace (for example `.claude/worktrees/`) so the user
-can still see it. See "Several agents share this
-checkout" in `AGENTS.md`.
+Follow "DubGrid Git policy" and "Several agents share this checkout" in
+`AGENTS.md`: one branch per work item cut from `origin/dev`, its own worktree,
+landed through a pull request into `dev`, updated by merging `origin/dev`
+(never rebasing a pushed branch), and the shared checkout never switched off
+`dev`. Where a Blueprint skill names `main` or the default branch as the merge
+target, read `dev`.
 
 ## Commits
 
