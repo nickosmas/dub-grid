@@ -72,6 +72,9 @@
   },
   "overrides": {
     "@hono/node-server": "2.1.0",
+    "@modelcontextprotocol/sdk": {
+      "zod": "$zod"
+    },
     "@opentelemetry/otlp-transformer": {
       "protobufjs": "7.5.9"
     },
@@ -95,6 +98,9 @@
     },
     "axios": "1.20.0",
     "dompurify": "3.4.17",
+    "eslint-plugin-react-hooks": {
+      "zod": "$zod"
+    },
     "fast-uri": "^3.1.6",
     "follow-redirects": "1.16.2",
     "hono": "4.13.8",
@@ -157,6 +163,6 @@
     "typescript": "^5",
     "vite": "^7.3.7",
     "vitest": "^4.1.12",
-    "zod": "3.24.4"
+    "zod": "4.6.7"
   }
 }

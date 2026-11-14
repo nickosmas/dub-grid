@@ -8,7 +8,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { deadInvitationResponse } from "@/lib/auth/invitation-capability";
 
 const querySchema = z.object({
-  token: z.string().uuid(),
+  token: z.guid(),
 });
 
 export async function GET(req: NextRequest) {

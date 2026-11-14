@@ -22,7 +22,7 @@ const ALREADY_SUBSCRIBED =
 const BILLING_PAUSED = "Billing is paused. You can start a subscription once it resumes.";
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   returnUrl: z.string().url(),
 });
 

@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   email: z.string().trim().email(),
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
 });
 
 /**
