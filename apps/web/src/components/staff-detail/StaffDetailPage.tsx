@@ -641,7 +641,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             return;
           }
           toast.error(
-            formatClientErrorMessage(err, "We couldn't schedule the restore. Try again."),
+            formatClientErrorMessage(err, "We couldn't set their return date. Try again."),
           );
         }
         return;

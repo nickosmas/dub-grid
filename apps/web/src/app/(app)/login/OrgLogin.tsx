@@ -624,7 +624,7 @@ export default function OrgLogin({
 
                 {handoffFailed ? (
                   <p className="dg-form-error" role="alert">
-                    We couldn't finish switching organizations. Sign in again.
+                    We couldn't switch you to that organization. Sign in again.
                   </p>
                 ) : null}
 

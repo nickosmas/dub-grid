@@ -27,7 +27,7 @@ export async function readStepUpContext() {
   if (!session?.access_token || !session.user?.id) throw new Error("Sign in again to continue.");
   const claims = decodeJwt(session.access_token);
   if (claims.org_id != null && typeof claims.org_id !== "string") {
-    throw new Error("Refresh your session before trying again.");
+    throw new Error("Sign in again, then try again.");
   }
   // This snapshot only cancels stale UI work. Server guards still authorize every action.
   return {
@@ -44,8 +44,7 @@ export async function confirmBrowserStepUp(method: StepUpMethod, credential: str
   const factors = await listBrowserMfaFactors();
   if (factors.error) throw new Error("We couldn't check your authenticator. Try again.");
   const factor = factors.data.totp.find((entry: Factor) => entry.status === "verified");
-  if (!factor)
-    throw new Error("Your two-factor settings changed. Cancel and try the action again.");
+  if (!factor) throw new Error("Your two-factor settings changed. Cancel and try again.");
   const verified = await verifyBrowserTotpEnrollment({ factorId: factor.id, code: credential });
   if (verified.error || !verified.data?.access_token) {
     throw new Error("We couldn't confirm that code. Enter a new code and try again.");

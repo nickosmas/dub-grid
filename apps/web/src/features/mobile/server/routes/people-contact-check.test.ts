@@ -140,7 +140,7 @@ describe("mobile people contact-check route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(500);
-    expect(payload.error).toBe("We couldn't check those details. Try again.");
+    expect(payload.error).toBe("We couldn't check whether those details are free. Try again.");
     expect(loggerError).toHaveBeenCalled();
   });
 });

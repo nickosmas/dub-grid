@@ -579,7 +579,7 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
         broadcastInvalidation(queryKeys.org.assignments(effectiveOrgId));
       } catch (error) {
         Sentry.captureException(error);
-        toast.error("We couldn't refresh the schedule options. Refresh and try again.");
+        toast.error("We couldn't load the latest schedule settings. Refresh the page.");
       }
     },
     [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache],

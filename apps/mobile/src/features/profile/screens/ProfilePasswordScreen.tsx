@@ -350,7 +350,7 @@ export default function ProfilePasswordScreen() {
         // Always inline, even for a network failure: the person must know the
         // password already changed before they decide what to do next.
         failed = true;
-        inlineError = "Your password changed, but we couldn't sign out every session. Try again.";
+        inlineError = "Your password changed, but we couldn't sign out every device. Try again.";
         setConfirmError(inlineError);
         return;
       }

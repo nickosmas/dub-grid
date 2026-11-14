@@ -841,7 +841,7 @@ export async function verifyMobileTotpFactor(input: {
   }
 
   if (!refreshData.session) {
-    throw new Error("We couldn't refresh your verified mobile session.");
+    throw new Error("We couldn't confirm it's you. Try again.");
   }
 
   return mapSupabaseSessionToMobileAuthSession(refreshData.session);
@@ -881,7 +881,7 @@ export function parseSessionPresenceResponse(value: unknown): {
     return { success: true, deviceId: typeof deviceId === "string" ? deviceId : null };
   }
 
-  throw new Error("We couldn't update your session status.");
+  throw new Error("We couldn't keep you signed in. Try again.");
 }
 
 export async function registerMobileSessionPresence(

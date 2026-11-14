@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     logger.error({ error }, "repeat overwrites POST failed");
     return NextResponse.json(
-      { error: "We couldn't check what this would overwrite. Try again." },
+      { error: "We couldn't check which shifts this would replace. Try again." },
       { status: 500 },
     );
   }

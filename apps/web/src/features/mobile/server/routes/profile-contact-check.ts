@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Check the request and try again." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Some of those details look off. Review them and try again." },
+      { status: 400 },
+    );
   }
 
   const emailInput = checkableEmail.safeParse(parsed.data.email);
@@ -48,7 +51,10 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof EmployeeContactLookupError) {
       logger.error({ error: error.cause }, error.message);
-      return NextResponse.json({ error: "We couldn't check that. Try again." }, { status: 500 });
+      return NextResponse.json(
+        { error: "We couldn't check whether that's free. Try again." },
+        { status: 500 },
+      );
     }
     throw error;
   }

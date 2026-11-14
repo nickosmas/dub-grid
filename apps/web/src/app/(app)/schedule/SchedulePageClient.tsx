@@ -2205,7 +2205,7 @@ function SchedulerContent({
 
     if (sameAccountSessions.length > 20) {
       toast.error(
-        "Too many schedule sessions were detected to end safely at once. Close unused tabs, then try again.",
+        "The schedule is open in too many tabs to close at once. Close tabs you aren't using, then try again.",
       );
       return;
     }
@@ -2219,7 +2219,7 @@ function SchedulerContent({
       });
     } catch (error) {
       Sentry.captureException(error);
-      toast.error("We couldn't end the other schedule sessions. Try again.");
+      toast.error("We couldn't close the schedule in your other tabs. Try again.");
       return;
     }
 
@@ -2256,10 +2256,10 @@ function SchedulerContent({
       deliveryStatuses.length === targetEditorSessionIds.length &&
       deliveryStatuses.every((status) => status === "ok")
     ) {
-      toast.success("The other schedule sessions were ended. You can use this tab now.");
+      toast.success("We closed the schedule in your other tabs. You can edit here now.");
     } else {
       toast.warning(
-        "The other schedule sessions were ended. Their warnings may be delayed until they reconnect.",
+        "We closed the schedule in your other tabs. They'll see a notice once they reconnect.",
       );
     }
   }, [org, removeRemoteSession, sameAccountSessions]);
@@ -4774,7 +4774,10 @@ function SchedulerContent({
         updatedAt: ex?.updatedAt ?? null,
       });
       if (!provisional) {
-        return { status: "invalid", message: "We couldn't match that assignment." };
+        return {
+          status: "invalid",
+          message: "We couldn't place that shift. Refresh and try again.",
+        };
       }
       const dk = computeScheduleEntryDraftKind(provisional);
       const upsertValue = buildScheduleCellEntryFromInput({
@@ -5212,7 +5215,7 @@ function SchedulerContent({
         updatedAt: currentShift?.updatedAt ?? null,
       });
       if (!provisional) {
-        toast.error("We couldn't match that assignment.");
+        toast.error("We couldn't place that shift. Refresh and try again.");
         return currentShift;
       }
 
@@ -6179,8 +6182,8 @@ function SchedulerContent({
           } else {
             toast.error(
               mode === "copy"
-                ? "We couldn't copy entry. Try again."
-                : "We couldn't move entry. Try again.",
+                ? "We couldn't copy that. Try again."
+                : "We couldn't move that. Try again.",
             );
             Sentry.captureException(err);
           }
@@ -7471,7 +7474,7 @@ function SchedulerContent({
             );
       setBusySuggestionId(null);
       if (!applied) {
-        toast.error("That change couldn't be saved. Nothing was changed.");
+        toast.error("We couldn't save that change, so nothing changed. Try again.");
         return;
       }
       const text = appliedSuggestionText(view.text.title);
@@ -7516,7 +7519,7 @@ function SchedulerContent({
       const written: SuggestionWrite[] = [];
       const fail = () => {
         setBusySuggestionId(null);
-        toast.error("Those changes couldn't be saved. Nothing was changed.");
+        toast.error("We couldn't save those changes, so nothing changed. Try again.");
         return null;
       };
       for (const write of fixedWrites) {
@@ -7957,7 +7960,7 @@ function SchedulerContent({
     if (!built) {
       setBuildApplying(null);
       setBusySuggestionId(null);
-      toast.error("The schedule couldn't be generated. Nothing was changed.");
+      toast.error("We couldn't build the schedule, so nothing changed. Try again.");
       return;
     }
     // Planned again at Build; if anything moved on, show what Build would do now.
@@ -8015,7 +8018,7 @@ function SchedulerContent({
       const { restore, kept } = planUndo(entry, shiftsRef.current);
       if (restore.length > 1) {
         if (!applyShiftWriteBatch(restore)) {
-          toast.error("That couldn't be undone. Nothing was changed.");
+          toast.error("We couldn't undo that, so nothing changed. Try again.");
           return;
         }
       } else {
@@ -8184,7 +8187,7 @@ function SchedulerContent({
             const { restore, kept } = planUndo(applied, shiftsRef.current);
             if (restore.length > 1) {
               if (!applyShiftWriteBatch(restore)) {
-                toast.error("That couldn't be undone. Nothing was changed.");
+                toast.error("We couldn't undo that, so nothing changed. Try again.");
                 return;
               }
             } else {
@@ -8766,7 +8769,7 @@ function SchedulerContent({
             {isSessionEnded && (
               <div className="dg-draft-banner no-print" role="status">
                 <BannerIcon tone="warning" icon={Lock} />
-                <strong>Schedule session ended</strong>
+                <strong>You're no longer editing in this tab</strong>
                 <span>
                   This tab is read-only. Any unsaved schedule changes here were not saved.
                 </span>

@@ -67,7 +67,7 @@ export function TermsGate({ children }: PropsWithChildren) {
       setError(
         getInlineErrorMessageOrToast(pushToast, {
           error: acceptError,
-          fallbackMessage: "We couldn't record your acceptance. Try again in a moment.",
+          fallbackMessage: "We couldn't save your agreement to the terms. Try again in a moment.",
           // Without this a network failure returned null and pushed a toast
           // instead — into the root window, behind this full-screen modal, and
           // then dropped outright because `pushToast` discards everything while

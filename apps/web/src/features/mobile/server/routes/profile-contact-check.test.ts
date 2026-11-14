@@ -108,7 +108,9 @@ describe("mobile own contact-check route", () => {
     const response = await POST(makeRequest({ email: "new@example.com" }));
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "We couldn't check that. Try again." });
+    expect(await response.json()).toEqual({
+      error: "We couldn't check whether that's free. Try again.",
+    });
     expect(loggerError).toHaveBeenCalled();
   });
 });

@@ -70,7 +70,7 @@ describe("POST /api/mobile/v1/push-tokens", () => {
 
     expect(response.status).toBe(400);
     expect(payload).toEqual({
-      error: "Check the request details and try again.",
+      error: "Some of those details look off. Review them and try again.",
     });
     expect(upsertMobilePushToken).not.toHaveBeenCalled();
   });

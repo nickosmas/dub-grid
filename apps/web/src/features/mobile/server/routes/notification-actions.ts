@@ -20,12 +20,15 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       return NextResponse.json(mobileNotificationReadResponseSchema.parse(payload));
     } catch {
       return NextResponse.json(
-        { error: "We could not update that notification." },
+        { error: "We couldn't update that alert. Try again." },
         { status: 400 },
       );
     }
   } catch {
-    return NextResponse.json({ error: "We could not update that notification." }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't update that alert. Try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -40,11 +43,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(mobileNotificationReadResponseSchema.parse(payload));
     } catch {
       return NextResponse.json(
-        { error: "We could not update your notifications." },
+        { error: "We couldn't update your alerts. Try again." },
         { status: 400 },
       );
     }
   } catch {
-    return NextResponse.json({ error: "We could not update your notifications." }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't update your alerts. Try again." },
+      { status: 500 },
+    );
   }
 }

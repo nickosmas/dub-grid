@@ -73,9 +73,9 @@ function buildReportParams(input: {
 async function parseReportError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: unknown };
-    return formatClientErrorMessage(body.error, "We couldn't complete the report request.");
+    return formatClientErrorMessage(body.error, "We couldn't build that report. Try again.");
   } catch {
-    return "We couldn't complete the report request.";
+    return "We couldn't build that report. Try again.";
   }
 }
 
