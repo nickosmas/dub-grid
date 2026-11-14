@@ -12,6 +12,8 @@ export interface AbsenceRunReads {
   draftKindForKey?: (empId: string, date: Date) => unknown;
   publishDiffForKey?: (empId: string, date: Date) => unknown;
   showPublishDiffOverlay?: boolean;
+  /** A day a waiting request touches keeps its own pill for the fold. */
+  activeRequestForKey?: (empId: string, date: Date) => unknown;
   hasAbsenceType: (absenceTypeId: number) => boolean;
 }
 
@@ -19,8 +21,9 @@ const STANDS_ALONE: AbsenceRunInputDay = { absenceTypeId: null, hasShift: false,
 
 /**
  * One row's runs. A day joins only as the grid would draw it as one plain
- * absence pill: a known whole-day absence, no shift, and no draft change or
- * published-change mark (those keep their own pill and chip).
+ * absence pill: a known whole-day absence, no shift, and no draft change,
+ * published-change mark or waiting request (those keep their own pill, chip
+ * or fold).
  */
 export function buildRowAbsenceRuns(
   empId: string,
@@ -42,6 +45,7 @@ export function buildRowAbsenceRuns(
         hasShift: (reads.segmentsForKey?.(empId, date) ?? []).length > 0,
         changed:
           reads.draftKindForKey?.(empId, date) != null ||
+          reads.activeRequestForKey?.(empId, date) != null ||
           (!!reads.showPublishDiffOverlay && reads.publishDiffForKey?.(empId, date) != null),
       };
     }),

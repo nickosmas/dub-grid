@@ -220,8 +220,8 @@ import {
   getAssignmentDefinitionDisqualificationReasons as getAssignmentDisqualificationReasons,
   isEmployeeQualifiedForAssignmentDefinition as isEmployeeQualifiedForAssignment,
 } from "@/lib/assignable-shifts";
-import { createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
-import { mergeCellPublishChanges } from "@/lib/shift-change-web";
+import { buildShiftJobPairKey, createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
+import { buildShiftChangeResolvers, mergeCellPublishChanges } from "@/lib/shift-change-web";
 import { seriesScopeRange } from "@/lib/series-dates";
 import {
   buildScheduleCellEntryFromInput,
@@ -402,6 +402,13 @@ import {
   type PublicationRangeLoadState,
 } from "./_lib/publication-range-state";
 import { markOwnPublicationAsAdditions } from "./_lib/own-publication";
+import {
+  NO_REQUEST_MARKS,
+  buildRequestMarks,
+  foldWaitingOn,
+  type RequestCellMark,
+} from "./_lib/request-marks";
+import { describeRequestMark } from "./_lib/request-mark-text";
 import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
@@ -4015,37 +4022,87 @@ function SchedulerContent({
     [shifts, assignmentLabelMap, absenceTypeMap],
   );
 
-  /**
-   * The live request sitting on a cell, if any — what the grid's corner fold
-   * tints itself from and what `hasActiveRequestForShift` answers over.
-   *
-   * Matches the *requester's* cell only. A swap therefore marks the person who
-   * asked, not the person being asked: covering the other side needs a second
-   * index keyed on targetEmpId/targetShiftDate, which nothing needs yet.
-   */
-  const activeRequestForKey = useCallback(
-    (empId: string, date: Date): ActiveShiftRequestSummary | null => {
-      const dateKey = formatDateKey(date);
-      const match = shiftRequests.requests.find(
-        (r) =>
-          r.requesterEmpId === empId &&
-          r.requesterShiftDate === dateKey &&
-          (r.status === "open" || r.status === "pending_approval"),
+  // Every day a waiting request touches, and who acts next. Nothing is marked
+  // while the requests are loading or failed to load, so a mark never outlives
+  // its request.
+  const requestMarks = useMemo(
+    () =>
+      shiftRequests.loading || shiftRequests.error
+        ? NO_REQUEST_MARKS
+        : buildRequestMarks(shiftRequests.requests),
+    [shiftRequests.error, shiftRequests.loading, shiftRequests.requests],
+  );
+  const requestMarkResolvers = useMemo(
+    () =>
+      buildShiftChangeResolvers({
+        assignments: allAssignmentDefinitions,
+        shiftCategories,
+        jobs,
+        absenceTypes: allAbsenceTypes,
+        focusAreas,
+      }),
+    [allAssignmentDefinitions, shiftCategories, jobs, allAbsenceTypes, focusAreas],
+  );
+  const summarizeRequestMarks = useCallback(
+    (marks: readonly RequestCellMark[] | undefined): ActiveShiftRequestSummary | null => {
+      const waitingOn = foldWaitingOn(marks);
+      if (!waitingOn || !marks) return null;
+      const requestsById = new Map(shiftRequests.requests.map((request) => [request.id, request]));
+      const requests = marks.flatMap((mark) => {
+        const request = requestsById.get(mark.requestId);
+        return request
+          ? [
+              describeRequestMark({
+                mark,
+                request,
+                resolvers: requestMarkResolvers,
+                timeZone: org?.timezone ?? null,
+              }),
+            ]
+          : [];
+      });
+      if (requests.length === 0) return null;
+      const gaining = marks.find(
+        (mark) => (mark.role === "claimer" || mark.role === "volunteer") && mark.wouldGet,
       );
-      if (!match) return null;
-      // The find above already admitted only these two, so this narrows rather
-      // than decides.
-      return {
-        type: match.type,
-        status: match.status === "pending_approval" ? "pending_approval" : "open",
-      };
+      const wouldGetLabel =
+        gaining?.wouldGet?.segments
+          .map((segment) => {
+            const assignment = segmentCompatibility.assignmentByPair.get(
+              buildShiftJobPairKey(segment.shiftId, segment.jobId),
+            );
+            if (!assignment) return null;
+            return org?.shiftDisplayMode === "name"
+              ? assignment.name || assignment.label
+              : assignment.label;
+          })
+          .filter((label): label is string => !!label)
+          .join("/") || null;
+      return { waitingOn, requests, wouldGetLabel };
     },
-    [shiftRequests.requests],
+    [
+      org?.shiftDisplayMode,
+      org?.timezone,
+      requestMarkResolvers,
+      segmentCompatibility,
+      shiftRequests.requests,
+    ],
   );
 
+  /** The waiting requests on a day: its corner fold and hover lines. */
+  const activeRequestForKey = useCallback(
+    (empId: string, date: Date): ActiveShiftRequestSummary | null =>
+      summarizeRequestMarks(requestMarks.byCell.get(`${empId}_${formatDateKey(date)}`)),
+    [requestMarks, summarizeRequestMarks],
+  );
+
+  /** Whether the person's own shift that day already has a request they made. */
   const hasActiveRequestForShift = useCallback(
-    (empId: string, date: Date): boolean => activeRequestForKey(empId, date) !== null,
-    [activeRequestForKey],
+    (empId: string, date: Date): boolean =>
+      (requestMarks.byCell.get(`${empId}_${formatDateKey(date)}`) ?? []).some(
+        (mark) => mark.role === "asker",
+      ),
+    [requestMarks],
   );
 
   const publishDiffKindForKey = useCallback(
@@ -8144,6 +8201,7 @@ function SchedulerContent({
       draftKindForKey,
       publishDiffForKey: publishDiffKindForKey,
       showPublishDiffOverlay: showPublishDiff,
+      activeRequestForKey,
       hasAbsenceType: (absenceTypeId) => absenceTypeObjectMap.has(absenceTypeId),
     });
     const day = runs.days[week.findIndex((date) => formatDateKey(date) === dateKey)];
@@ -8154,6 +8212,7 @@ function SchedulerContent({
   }, [
     absenceTypeIdForKey,
     absenceTypeObjectMap,
+    activeRequestForKey,
     canEditShifts,
     draftKindForKey,
     editPanel,

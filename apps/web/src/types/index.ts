@@ -1389,21 +1389,24 @@ export interface ShiftRequest {
   updatedAt: string;
 }
 
-/**
- * The two statuses that mean a request is still live. The resolved ones can
- * never reach the grid, so naming them here keeps the fold's color table total
- * instead of carrying four unreachable entries and a fallback.
- */
-export type ActiveShiftRequestStatus = Extract<ShiftRequestStatus, "open" | "pending_approval">;
+/** Who acts next on a waiting request: a teammate, or a manager. */
+export type RequestWaitingOn = "teammate" | "manager";
 
 /**
- * The little the schedule grid needs to know about a request sitting on a cell:
- * enough to tint its corner fold and name it in a tooltip, without handing the
- * grid the whole request.
+ * The waiting requests on one day of the grid: enough to color its corner
+ * fold and to list each request in the hover card, without handing the grid
+ * the requests themselves.
  */
 export interface ActiveShiftRequestSummary {
-  type: ShiftRequestType;
-  status: ActiveShiftRequestStatus;
+  /** A manager's turn colors the fold when any request on the day waits for one. */
+  waitingOn: RequestWaitingOn;
+  /** Each request on the day, a manager's turn first. */
+  requests: Array<{ status: string; body: string | null; asked: string }>;
+  /**
+   * The shift a claimer or volunteer would get, as the grid labels it, for the
+   * dashed outline on an empty day; null when nobody here would gain a shift.
+   */
+  wouldGetLabel?: string | null;
 }
 
 // ── Grid Open Shifts ────────────────────────────────────────────────────────

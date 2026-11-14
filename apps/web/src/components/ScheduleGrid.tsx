@@ -147,6 +147,7 @@ import {
   LOCK_CORNER_CLEARANCE,
   MENTORED_CORNER_CLEARANCE,
   RequestCornerFold,
+  RequestWouldGetOutline,
   noteMarksWidth,
   NOTE_LANE_INSET,
   AuthorBadge,
@@ -2342,6 +2343,7 @@ const SectionBlock = memo(function SectionBlock({
                       draftKindForKey,
                       publishDiffForKey,
                       showPublishDiffOverlay,
+                      activeRequestForKey,
                       hasAbsenceType: (absenceTypeId) => !!absenceTypeMap?.has(absenceTypeId),
                     },
                     splitAtIndex,
@@ -3671,7 +3673,7 @@ const SectionBlock = memo(function SectionBlock({
                                             >
                                               {activeRequest && activeRequestLabel && (
                                                 <RequestCornerFold
-                                                  status={activeRequest.status}
+                                                  waitingOn={activeRequest.waitingOn}
                                                   label={activeRequestLabel}
                                                 />
                                               )}
@@ -4096,7 +4098,7 @@ const SectionBlock = memo(function SectionBlock({
                                           >
                                             {activeRequest && activeRequestLabel && (
                                               <RequestCornerFold
-                                                status={activeRequest.status}
+                                                waitingOn={activeRequest.waitingOn}
                                                 label={activeRequestLabel}
                                               />
                                             )}
@@ -4947,6 +4949,12 @@ const SectionBlock = memo(function SectionBlock({
                                     </>
                                   );
                                 })()
+                              ) : activeRequest?.wouldGetLabel && activeRequestLabel ? (
+                                <RequestWouldGetOutline
+                                  label={activeRequest.wouldGetLabel}
+                                  waitingOn={activeRequest.waitingOn}
+                                  hint={activeRequestLabel}
+                                />
                               ) : (
                                 <div
                                   style={{

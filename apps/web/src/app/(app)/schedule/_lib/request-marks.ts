@@ -1,7 +1,7 @@
-import type { ScheduleCellState, ShiftRequest, ShiftRequestType } from "@/types";
+import type { RequestWaitingOn, ScheduleCellState, ShiftRequest, ShiftRequestType } from "@/types";
 
 /** Who has to act next on a waiting request. */
-export type RequestMarkWaitingOn = "teammate" | "manager";
+export type RequestMarkWaitingOn = RequestWaitingOn;
 
 export type RequestMarkRole =
   /** The requester's own shift. */

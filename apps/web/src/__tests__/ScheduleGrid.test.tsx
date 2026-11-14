@@ -3386,34 +3386,93 @@ describe("ScheduleGrid", () => {
     expect(screen.getAllByLabelText("Readings").length).toBeGreaterThan(0);
   });
 
-  it("folds the corner of a shift with an open request", () => {
+  it("folds the corner gray while a teammate must answer", () => {
     observedWidth = 1600;
 
     renderGrid({
-      activeRequestForKey: () => ({ type: "pickup", status: "open" }),
+      activeRequestForKey: () => ({
+        waitingOn: "teammate",
+        requests: [
+          {
+            status: "Offered for pickup · waiting for a teammate",
+            body: null,
+            asked: "Offered Nov 14.",
+          },
+        ],
+      }),
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const fold = firstCell.querySelector("[data-request-fold]") as HTMLElement | null;
 
-    expect(fold?.getAttribute("data-request-fold")).toBe("open");
-    expect(fold?.getAttribute("aria-label")).toBe("Pickup request open");
-    expect(fold?.style.borderTop).toBe(`${REQUEST_FOLD_SIZE}px solid var(--dg-color-danger)`);
+    expect(fold?.getAttribute("data-request-fold")).toBe("teammate");
+    expect(fold?.getAttribute("aria-label")).toBe("Offered for pickup · waiting for a teammate");
+    expect(fold?.style.borderTop).toBe(`${REQUEST_FOLD_SIZE}px solid var(--dg-color-text-muted)`);
   });
 
-  it("tints the fold as a warning while a swap waits on an approver", () => {
+  it("tints the fold amber while a manager must act, naming every request on the day", () => {
     observedWidth = 1600;
 
     renderGrid({
-      activeRequestForKey: () => ({ type: "swap", status: "pending_approval" }),
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        requests: [
+          { status: "Swap with Carol Henderson · awaiting approval", body: null, asked: "Asked." },
+          { status: "Offered for pickup · waiting for a teammate", body: null, asked: "Offered." },
+        ],
+      }),
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const fold = firstCell.querySelector("[data-request-fold]") as HTMLElement | null;
 
-    expect(fold?.getAttribute("data-request-fold")).toBe("pending_approval");
-    expect(fold?.getAttribute("aria-label")).toBe("Swap request awaiting approval");
+    expect(fold?.getAttribute("data-request-fold")).toBe("manager");
+    expect(fold?.getAttribute("aria-label")).toBe(
+      "Swap with Carol Henderson · awaiting approval · 1 more",
+    );
     expect(fold?.style.borderTop).toBe(`${REQUEST_FOLD_SIZE}px solid var(--dg-color-warning)`);
+  });
+
+  it("outlines the shift a claimer would get on an empty day", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      shiftForKey: () => null,
+      assignmentIdsForKey: () => [],
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        requests: [
+          { status: "Claiming Laura Marshall's shift · awaiting approval", body: null, asked: "" },
+        ],
+        wouldGetLabel: "D",
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const outline = firstCell.querySelector("[data-request-would-get]") as HTMLElement | null;
+
+    expect(outline?.getAttribute("data-request-would-get")).toBe("manager");
+    expect(outline?.textContent).toBe("D");
+    expect(outline?.style.pointerEvents).toBe("none");
+    expect(outline?.querySelector("[data-request-fold]")?.getAttribute("aria-label")).toBe(
+      "Claiming Laura Marshall's shift · awaiting approval",
+    );
+  });
+
+  it("puts only the fold on a day that already holds a shift", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        requests: [{ status: "Claiming a shift · awaiting approval", body: null, asked: "" }],
+        wouldGetLabel: "E",
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    expect(firstCell.querySelector("[data-request-would-get]")).toBeNull();
+    expect(firstCell.querySelector("[data-request-fold]")).not.toBeNull();
   });
 
   it("leaves a shift with no request unfolded", () => {
@@ -3431,7 +3490,12 @@ describe("ScheduleGrid", () => {
 
     renderGrid({
       assignments: twoPillAssignmentDefinitions,
-      activeRequestForKey: () => ({ type: "pickup", status: "open" }),
+      activeRequestForKey: () => ({
+        waitingOn: "teammate",
+        requests: [
+          { status: "Offered for pickup · waiting for a teammate", body: null, asked: "" },
+        ],
+      }),
       draftKindForKey: () => "modified",
       publishedAssignmentIdsForKey: () => [2],
       publishedLabelForKey: () => "N",

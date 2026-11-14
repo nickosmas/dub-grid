@@ -111,13 +111,13 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       tests pin the exact strings for each request type and both waiting
       states, including a shift crossing midnight and offering one shift of a
       day with two (only the offered shift is named).
-- [ ] **Step 3 - Folds from the model** - the grid draws the fold from the
+- [x] **Step 3 - Folds from the model** - the grid draws the fold from the
       marks instead of the requester-only `activeRequestForKey`, in slate or
       amber, on every pill kind that shows a fold today (single shift, double
       shift, whole-day absence). _Done when:_ in the browser, each waiting
       stage on the canvas shows the same folds on the same days, and no
       request fold is red.
-- [ ] **Step 4 - Dashed outline on an empty day** - the claimer's or
+- [x] **Step 4 - Dashed outline on an empty day** - the claimer's or
       volunteer's empty day shows the shift they would get as a dashed
       outline with the fold; a day that already holds a pill shows only the
       fold. _Done when:_ both cases render as on the canvas in the browser,

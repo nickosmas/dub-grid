@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { UserPen } from "lucide-react";
 import { MaybeHint } from "@/components/ui/hint";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import type { ActiveShiftRequestStatus } from "@/types";
+import type { RequestWaitingOn } from "@/types";
 import { PublishDiffPill } from "./publishDiffPill";
 
 export type GridDiffBadgeConfig = {
@@ -259,31 +259,32 @@ export function MentoredShiftBadge({
  * which is what a scheduler has to chase. Orange is the in-motion state, and
  * keeps pending approval on the same warning axis the board already puts it on.
  */
-const REQUEST_FOLD_COLORS: Record<ActiveShiftRequestStatus, string> = {
-  open: "var(--dg-color-danger)",
-  pending_approval: "var(--dg-color-warning)",
+/** Gray while a teammate must answer, amber while a manager must. Red means destructive. */
+const REQUEST_FOLD_COLORS: Record<RequestWaitingOn, string> = {
+  teammate: "var(--dg-color-text-muted)",
+  manager: "var(--dg-color-warning)",
 };
 
 /**
- * Marks a shift that has a request against it — an open pickup, or a swap
- * waiting on an approver. Drawn as a triangular fold in the pill's top-left so
+ * Marks a day a waiting request touches: gray while a teammate must answer,
+ * amber while a manager must. Drawn as a triangular fold in the pill's top-left so
  * it claims no horizontal room: every corner of a cell already has a
  * conditional occupant, and a chip here would push one of them out of place.
  * Sits above the cross-focus strip and below the diff badge.
  */
 export function RequestCornerFold({
-  status,
+  waitingOn,
   label,
 }: {
-  status: ActiveShiftRequestStatus;
+  waitingOn: RequestWaitingOn;
   label: string;
 }) {
-  const fill = REQUEST_FOLD_COLORS[status];
+  const fill = REQUEST_FOLD_COLORS[waitingOn];
 
   return (
     <MaybeHint content={label} side="top">
       <span
-        data-request-fold={status}
+        data-request-fold={waitingOn}
         aria-label={label}
         style={{
           position: "absolute",
@@ -299,6 +300,54 @@ export function RequestCornerFold({
         }}
       />
     </MaybeHint>
+  );
+}
+
+/**
+ * The shift a claimer or volunteer would get, on a day that has nothing yet:
+ * a dashed outline with the shift's label and the request's fold. It takes no
+ * pointer events, so the cell under it opens as an empty day does.
+ */
+export function RequestWouldGetOutline({
+  label,
+  waitingOn,
+  hint,
+}: {
+  label: string;
+  waitingOn: RequestWaitingOn;
+  hint: string;
+}) {
+  return (
+    <div
+      data-request-would-get={waitingOn}
+      style={{
+        position: "absolute",
+        inset: "5px 4px 4px 5px",
+        boxSizing: "border-box",
+        border: "1.5px dashed var(--dg-color-border-strong)",
+        borderRadius: 8,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0 6px",
+        overflow: "hidden",
+        pointerEvents: "none",
+      }}
+    >
+      <RequestCornerFold waitingOn={waitingOn} label={hint} />
+      <span
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          fontWeight: 600,
+          color: "var(--dg-color-text-muted)",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {label}
+      </span>
+    </div>
   );
 }
 
