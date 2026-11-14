@@ -1192,6 +1192,31 @@ export function checkMobilePersonContact(
   );
 }
 
+export type MobileOwnContactCheckResult = { emailTaken: boolean; phoneTaken: boolean };
+
+/**
+ * Pre-flight check for your own profile's email and phone. Like the person
+ * check, a failure reads as "not taken": the save is still the real gate.
+ */
+export function checkMobileOwnContact(
+  accessToken: string,
+  body: { email?: string; phone?: string },
+  signal?: AbortSignal,
+) {
+  return mobileApiRequest(
+    "/api/mobile/v1/profile/contact-check",
+    accessToken,
+    { method: "POST", body: JSON.stringify(body), signal },
+    (value) => {
+      const result = value as Partial<MobileOwnContactCheckResult> | null;
+      return {
+        emailTaken: result?.emailTaken === true,
+        phoneTaken: result?.phoneTaken === true,
+      };
+    },
+  );
+}
+
 export function getMobilePerson(accessToken: string, personId: string, signal?: AbortSignal) {
   return mobileApiRequest(
     `/api/mobile/v1/people/${personId}`,
