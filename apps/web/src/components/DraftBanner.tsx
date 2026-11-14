@@ -48,7 +48,8 @@ export default function DraftBanner({
       {breakdown && (
         <ChangeCountChips
           counts={{
-            newShifts: breakdown.newShifts,
+            // The chip reads "N new", which covers new absences as well.
+            newShifts: breakdown.newShifts + breakdown.newAbsences,
             modifiedShifts: breakdown.modifiedShifts,
             deletedShifts: breakdown.deletedShifts,
             notes: breakdown.newNotes + breakdown.deletedNotes,

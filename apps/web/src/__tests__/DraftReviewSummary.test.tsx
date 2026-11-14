@@ -10,6 +10,7 @@ describe("DraftReviewSummary", () => {
         description="Latest unpublished changes."
         breakdown={{
           newShifts: 3,
+          newAbsences: 0,
           modifiedShifts: 4,
           deletedShifts: 0,
           newNotes: 2,
@@ -40,6 +41,7 @@ describe("DraftReviewSummary", () => {
         emptyMessage="Nothing to discard."
         breakdown={{
           newShifts: 0,
+          newAbsences: 0,
           modifiedShifts: 0,
           deletedShifts: 0,
           newNotes: 0,

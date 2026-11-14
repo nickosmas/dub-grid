@@ -19,6 +19,7 @@ type BreakdownItem = {
 function getBreakdownItems(breakdown: DraftBreakdown): BreakdownItem[] {
   const items: BreakdownItem[] = [
     { key: "newShifts", label: "New shifts", count: breakdown.newShifts },
+    { key: "newAbsences", label: "New absences", count: breakdown.newAbsences },
     {
       key: "modifiedShifts",
       label: "Changed shifts",

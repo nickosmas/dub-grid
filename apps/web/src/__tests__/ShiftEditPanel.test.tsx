@@ -34,6 +34,7 @@ import {
   ShiftDisplayMode,
   ShiftJobSegment,
   ScheduleCellState,
+  PublishChange,
 } from "@/types";
 import type { MockFn } from "./helpers/mock-fn";
 
@@ -292,6 +293,8 @@ function renderPanel(
     seriesId?: string | null;
     absenceRun?: { dateKeys: string[] } | null;
     onRemoveAbsenceRun?: MockFn;
+    publishChange?: (PublishChange & { publishedAt: string; publishedBy: string | null }) | null;
+    resolvePublisherName?: (userId: string) => string | null;
     correctedLabel?: string | null;
     correctedChange?: {
       before: ScheduleCellState | null;
@@ -320,6 +323,8 @@ function panelElement(
     <ShiftEditPanel
       correctedLabel={overrides.correctedLabel}
       correctedChange={overrides.correctedChange}
+      publishChange={overrides.publishChange}
+      resolvePublisherName={overrides.resolvePublisherName}
       modal={overrides.modalOverride ?? modal}
       currentShift={overrides.currentShift ?? null}
       currentAssignmentIds={overrides.currentAssignmentIds ?? []}
@@ -2032,13 +2037,58 @@ describe("ShiftEditPanel", () => {
       });
 
       const card = document.querySelector("[data-corrected-day]");
-      expect(card).toHaveTextContent("Corrected day");
+      expect(card).not.toHaveTextContent("Corrected day");
       expect(card).toHaveTextContent("Corrected Nov 2 by Mina.");
       expect(card).toHaveTextContent("Reason: Left at 1");
       expect(card).toHaveTextContent("Was");
       expect(card).toHaveTextContent("3:00 PM");
       expect(card).not.toHaveTextContent("After");
       expect(card).not.toHaveTextContent("1:00 PM");
+    });
+
+    it("marks the shift a highlighted publish added, as the grid does, without restating it", () => {
+      const worked = (segments: ShiftJobSegment[]) => ({
+        kind: "worked" as const,
+        segments: segments.map((segment) => ({
+          shiftId: segment.shiftId,
+          jobId: segment.jobId,
+          position: segment.position ?? 0,
+          isMentored: segment.isMentored ?? false,
+        })),
+        absenceTypeId: null,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      });
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [timedDay.id, timedEvening.id],
+        currentSegments: [daySegment, eveningSegment],
+        publishedAssignmentIds: [timedDay.id, timedEvening.id],
+        resolvePublisherName: () => "Mina",
+        publishChange: {
+          empId: "emp-1",
+          date: "2026-11-12",
+          kind: "modified",
+          from: [timedDay.id],
+          to: [timedDay.id, timedEvening.id],
+          fromState: worked([daySegment]),
+          toState: worked([daySegment, eveningSegment]),
+          publishedAt: "2026-11-12T20:00:00.000Z",
+          publishedBy: "user-1",
+        },
+      });
+
+      const badges = document.querySelectorAll("[data-shift-diff-badge]");
+      expect(badges).toHaveLength(1);
+      expect(badges[0]).toHaveAttribute("data-shift-diff-source", "publish");
+      expect(badges[0]).toHaveAttribute("data-shift-diff-index", "1");
+      expect(badges[0]).toHaveTextContent("New");
+
+      const card = document.querySelector("[data-published-change]");
+      expect(card).toHaveTextContent(/^Published .* by Mina\.$/);
+      expect(card).not.toHaveTextContent("Added");
     });
 
     it("repeats nothing the two shift cards already show when a repeating day opens", () => {
