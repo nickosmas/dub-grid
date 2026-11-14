@@ -22,6 +22,7 @@ const updateUser = vi.fn();
 const stepUpRun = vi.fn();
 const createProfileChangeRequest = vi.fn();
 const updateProfilePhone = vi.fn();
+const useOwnContactCheck = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -124,6 +125,8 @@ vi.mock("../../../shared/lib/supabase", () => ({
   })),
 }));
 
+vi.mock("../hooks/useOwnContactCheck", () => ({ useOwnContactCheck }));
+
 vi.mock("../hooks/useMobileStepUpAction", () => ({
   useMobileStepUpAction: () => ({ run: stepUpRun, active: false, sheet: null }),
 }));
@@ -211,6 +214,9 @@ describe("ProfileWorkScreen", () => {
     updateProfileAccount.mockReset();
     createProfileChangeRequest.mockReset().mockResolvedValue({ success: true });
     updateProfilePhone.mockReset().mockResolvedValue({ success: true });
+    useOwnContactCheck
+      .mockReset()
+      .mockReturnValue({ checking: false, emailTaken: false, phoneTaken: false });
     pushToast.mockReset();
     routerBack.mockReset();
     requireMobileCredentialAssurance.mockReset().mockResolvedValue(undefined);
@@ -825,5 +831,44 @@ describe("ProfileWorkScreen", () => {
         }),
       ),
     );
+  });
+
+  it("checks a changed email and phone while you type, and nothing else", () => {
+    render(<ProfileWorkScreen />);
+    expect(useOwnContactCheck).toHaveBeenLastCalledWith(
+      expect.objectContaining({ accessToken: "token-123", email: null, phone: null }),
+    );
+
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: " new@example.com " } });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "415-555-0100" } });
+    expect(useOwnContactCheck).toHaveBeenLastCalledWith(
+      expect.objectContaining({ email: "new@example.com", phone: "415-555-0100" }),
+    );
+
+    // A half-typed address and the saved number written another way aren't asked about.
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@" } });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "4155550199" } });
+    expect(useOwnContactCheck).toHaveBeenLastCalledWith(
+      expect.objectContaining({ email: null, phone: null }),
+    );
+  });
+
+  it("names a taken email and phone under their fields and keeps Save off", () => {
+    useOwnContactCheck.mockReturnValue({ checking: false, emailTaken: true, phoneTaken: true });
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "lee@example.com" } });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "415-555-0100" } });
+
+    expect(screen.getByText("That email belongs to someone else.")).toBeInTheDocument();
+    expect(screen.getByText("That phone number belongs to someone else.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("waits for the check before Save is offered", () => {
+    useOwnContactCheck.mockReturnValue({ checking: true, emailTaken: false, phoneTaken: false });
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "415-555-0100" } });
+
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 });
