@@ -764,7 +764,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5822e99a0bf99bf029659eba3e1db942161e398dc55a9f13c1e6a6ce2f1fa08f"
+      "evidenceFingerprint": "sha256:8875e03edd65befb157023fe87555df503a379c4f78a399f877e883d53069edd"
     },
     {
       "id": "person-detail",
@@ -846,7 +846,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a29d73b01d8b387ea5be252a9538218ec7ae394b6fe78197295f34f84e63298b"
+      "evidenceFingerprint": "sha256:9d4b6e2305eae9c147a98799d206c64c79f3979a986ee8bf1a11c01e34bf3835"
     },
     {
       "id": "invitations",
@@ -909,7 +909,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:d6a56284104ab81098d33bc36cce29bc004264eb29caf2cded84672758706f55"
+      "evidenceFingerprint": "sha256:40199be5566b21f6bb932203bca71ede40d6b73d85d51b5f0309832f68e5d512"
     },
     {
       "id": "organization",
@@ -1322,7 +1322,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:542d7774a8fa5041da783708858d5dee7dbd68b66bbec7f534c14f0245aa8982"
+      "evidenceFingerprint": "sha256:18946b035931d7fe559b4e47d1b9310854b8bdcf7b1a0351321a9970805fe4f8"
     },
     {
       "id": "alerts",
@@ -1518,7 +1518,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b4971298a54a7f6485ad1ca881b675db247c400742d5f1ce03b530b0c97fdd04"
+      "evidenceFingerprint": "sha256:027bcdc3910cd7d74733d515a40e812658712905c51a3b8a04e2948bd37081d2"
     },
     {
       "id": "security-sessions",
@@ -1597,7 +1597,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cf1490f11ca28e49c8d28a096bc1f05087457b0a337e98ab54005d1ea4ad74cc"
+      "evidenceFingerprint": "sha256:bd8f3ac86cc602a8d8b5be1f3eb7037fb2446168f4bf8c04b3bebb2ec3345653"
     },
     {
       "id": "privacy-controls",
@@ -2152,7 +2152,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:ab6b270b1f3b1d4b168bcb8bd256ce773144ff522180149995f71419b073aa3b"
+      "evidenceFingerprint": "sha256:96e1696535120208f2f381c7a1f2c40310574289207ab2215372328bda277a0d"
     }
   ],
   "surfaceExclusions": [
