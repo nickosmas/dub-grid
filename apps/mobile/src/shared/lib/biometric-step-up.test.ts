@@ -9,6 +9,9 @@ const store = vi.hoisted(() => ({
   canUseBiometricAuthentication: vi.fn(),
 }));
 const lock = vi.hoisted(() => ({ enabled: true, unsupported: false }));
+const platform = vi.hoisted(() => ({ OS: "ios" }));
+
+vi.mock("react-native", () => ({ Platform: platform }));
 
 vi.mock("expo-secure-store", () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 6,
@@ -30,6 +33,7 @@ import {
   clearSavedStepUpPassword,
   isRefusedSavedPassword,
   readSavedStepUpPassword,
+  rememberSignInPassword,
   saveStepUpPassword,
   shouldUseBiometricStepUp,
 } from "./biometric-step-up";
@@ -39,6 +43,7 @@ beforeEach(() => {
   store.values.clear();
   lock.enabled = true;
   lock.unsupported = false;
+  platform.OS = "ios";
   store.getItemAsync.mockImplementation(async (key: string) => store.values.get(key) ?? null);
   store.setItemAsync.mockImplementation(async (key: string, value: string) => {
     store.values.set(key, value);
@@ -171,5 +176,30 @@ describe("saved password", () => {
     await clearSavedStepUpPassword();
 
     expect(store.values.size).toBe(0);
+  });
+});
+
+describe("rememberSignInPassword", () => {
+  it("keeps the sign-in password for Face ID on an iPhone with app lock on", async () => {
+    await rememberSignInPassword("user-1", "correct horse");
+
+    expect(store.values.get("dg_step_up_password")).toBe("correct horse");
+    expect(store.values.get("dg_step_up_password_owner")).toBe("user-1");
+  });
+
+  it("keeps nothing on Android, which would ask for a fingerprint at sign-in", async () => {
+    platform.OS = "android";
+
+    await rememberSignInPassword("user-1", "correct horse");
+
+    expect(store.setItemAsync).not.toHaveBeenCalled();
+  });
+
+  it("keeps nothing while app lock is off", async () => {
+    lock.enabled = false;
+
+    await rememberSignInPassword("user-1", "correct horse");
+
+    expect(store.setItemAsync).not.toHaveBeenCalled();
   });
 });

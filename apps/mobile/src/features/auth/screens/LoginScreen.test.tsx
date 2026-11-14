@@ -65,6 +65,12 @@ vi.mock("../../../shared/lib/api", () => ({
   verifyMobileTotpFactor,
 }));
 
+const rememberSignInPassword = vi.fn();
+vi.mock("../../../shared/lib/biometric-step-up", () => ({
+  rememberSignInPassword: (...args: unknown[]) => rememberSignInPassword(...args),
+  clearSavedStepUpPassword: vi.fn(async () => undefined),
+}));
+
 vi.mock("../../../shared/lib/session", () => ({
   loadLastOrg,
   saveLastOrg,
@@ -104,6 +110,7 @@ describe("LoginScreen", () => {
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "https://dubgrid.com");
 
     routerReplace.mockReset();
+    rememberSignInPassword.mockReset();
     useSessionState.mockReset();
     getSupabaseClient.mockReset();
     loginToOrganization.mockReset();
@@ -581,6 +588,8 @@ describe("LoginScreen", () => {
     expect(getBootstrap.mock.invocationCallOrder[0]).toBeLessThan(
       routerReplace.mock.invocationCallOrder[0],
     );
+    // The accepted password is kept for Face ID at the first identity check.
+    expect(rememberSignInPassword).toHaveBeenCalledWith(null, "super-secret");
   });
 
   it("still hands off when warming bootstrap fails", async () => {
@@ -857,6 +866,8 @@ describe("LoginScreen", () => {
     await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home"));
     // The password step was only challenged; the verified session records success.
     expect(recordMobileSignInCompleted).toHaveBeenCalledWith("verified-token");
+    // A two-factor account confirms its identity with a code, never Face ID.
+    expect(rememberSignInPassword).not.toHaveBeenCalled();
   });
 
   it("keeps the pending session out of storage when MFA verification fails", async () => {
