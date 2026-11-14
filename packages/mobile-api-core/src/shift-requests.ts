@@ -68,6 +68,7 @@ type FetchMobileOpenShifts<TEmployee extends MobileShiftRequestEmployee> = (
     endDate?: string;
     showAll?: boolean;
     timeZone?: string | null;
+    includeDrafts?: boolean;
   },
 ) => Promise<MobileOpenShift[]>;
 
@@ -359,6 +360,9 @@ export async function loadMobileShiftRequestsPayload<TEmployee extends MobileShi
           orgId: auth.currentOrg.id,
           ...(linkedEmployee ? { employee: linkedEmployee } : {}),
           showAll: canViewAllRequests,
+          // Unpublished edits are the scheduler's, so only someone who can
+          // edit shifts sees the gaps they leave.
+          includeDrafts: auth.permissions.canEditShifts,
           timeZone: auth.currentOrg.timezone ?? null,
           ...(input.startDate ? { startDate: input.startDate } : {}),
           ...(input.endDate ? { endDate: input.endDate } : {}),
