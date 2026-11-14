@@ -1409,10 +1409,10 @@ export interface ActiveShiftRequestSummary {
     asked: string;
   }>;
   /**
-   * The shift a claimer or volunteer would get, as the grid labels it, for the
-   * dashed outline on an empty day; null when nobody here would gain a shift.
+   * The assignments a claimer or volunteer would get, for the dashed outline
+   * on an empty day; empty when nobody here would gain a shift.
    */
-  wouldGetLabel?: string | null;
+  wouldGetAssignmentIds?: number[];
 }
 
 // ── Grid Open Shifts ────────────────────────────────────────────────────────

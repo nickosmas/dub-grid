@@ -142,7 +142,7 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
       approving and declining from the panel in the browser behaves exactly as
       from the Requests board (same dialogs, same result, marks update), and
       a viewer who can't approve sees no buttons.
-- [ ] **Step 9 - Docs** - `docs/features/shift-requests.mdx` and
+- [x] **Step 9 - Docs** - `docs/features/shift-requests.mdx` and
       `docs/features/schedule-grid.mdx` describe the marks, colors, outline,
       hover and panel; fingerprints re-recorded. _Done when:_ `docs:check`
       passes and the pages match the browser.

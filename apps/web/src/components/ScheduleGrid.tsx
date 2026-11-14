@@ -2719,6 +2719,22 @@ const SectionBlock = memo(function SectionBlock({
                         const activeRequestLabel = activeRequest
                           ? formatActiveRequestLabel(activeRequest)
                           : null;
+                        // The shift a claimer would get, labeled as its pill would be.
+                        const wouldGetLabel =
+                          (activeRequest?.wouldGetAssignmentIds ?? [])
+                            .map((assignmentId) => {
+                              const assignment = assignmentById.get(assignmentId);
+                              if (!assignment) return null;
+                              const parts = getDisplayPartsByIdOrLabel(
+                                assignment.label,
+                                assignmentId,
+                              );
+                              return parts.secondaryLabel
+                                ? `${parts.primaryLabel} · ${parts.secondaryLabel}`
+                                : parts.primaryLabel;
+                            })
+                            .filter((label): label is string => !!label)
+                            .join(" / ") || null;
                         const restOfDayHoverEntries: ShiftDetailEntry[] = restOfDayAbsenceName
                           ? [
                               {
@@ -2946,7 +2962,12 @@ const SectionBlock = memo(function SectionBlock({
                             data-section-id={sectionId}
                             data-interactive={isDayInteractive ? "true" : "false"}
                             data-peer-editing={hasPeerEditor ? "true" : "false"}
-                            data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
+                            // A claimer's outline fills the day, so no "+" is drawn over it.
+                            data-empty={
+                              (!shiftLabel || shiftLabel === "OFF") && !wouldGetLabel
+                                ? "true"
+                                : "false"
+                            }
                             data-slot="cell"
                             data-leading-divider={
                               index === 0 || absenceRunInside
@@ -5013,7 +5034,7 @@ const SectionBlock = memo(function SectionBlock({
                                     </>
                                   );
                                 })()
-                              ) : activeRequest?.wouldGetLabel && activeRequestLabel ? (
+                              ) : wouldGetLabel && activeRequest && activeRequestLabel ? (
                                 <ShiftDetailHoverCard
                                   enabled={showShiftDetailHoverCards}
                                   employeeName={getEmployeeDisplayName(emp)}
@@ -5036,7 +5057,7 @@ const SectionBlock = memo(function SectionBlock({
                                 >
                                   <div style={{ position: "absolute", inset: 0 }}>
                                     <RequestWouldGetOutline
-                                      label={activeRequest.wouldGetLabel}
+                                      label={wouldGetLabel}
                                       waitingOn={activeRequest.waitingOn}
                                       hint={activeRequestLabel}
                                     />

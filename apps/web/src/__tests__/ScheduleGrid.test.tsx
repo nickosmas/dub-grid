@@ -3464,7 +3464,7 @@ describe("ScheduleGrid", () => {
             asked: "",
           },
         ],
-        wouldGetLabel: "D",
+        wouldGetAssignmentIds: [1],
       }),
     });
 
@@ -3493,7 +3493,7 @@ describe("ScheduleGrid", () => {
             asked: "",
           },
         ],
-        wouldGetLabel: "E",
+        wouldGetAssignmentIds: [1],
       }),
     });
 

@@ -4080,28 +4080,15 @@ function SchedulerContent({
       const gaining = marks.find(
         (mark) => (mark.role === "claimer" || mark.role === "volunteer") && mark.wouldGet,
       );
-      const wouldGetLabel =
-        gaining?.wouldGet?.segments
-          .map((segment) => {
-            const assignment = segmentCompatibility.assignmentByPair.get(
-              buildShiftJobPairKey(segment.shiftId, segment.jobId),
-            );
-            if (!assignment) return null;
-            return org?.shiftDisplayMode === "name"
-              ? assignment.name || assignment.label
-              : assignment.label;
-          })
-          .filter((label): label is string => !!label)
-          .join("/") || null;
-      return { waitingOn, requests, wouldGetLabel };
+      const wouldGetAssignmentIds = (gaining?.wouldGet?.segments ?? []).flatMap((segment) => {
+        const assignment = segmentCompatibility.assignmentByPair.get(
+          buildShiftJobPairKey(segment.shiftId, segment.jobId),
+        );
+        return assignment ? [assignment.id] : [];
+      });
+      return { waitingOn, requests, wouldGetAssignmentIds };
     },
-    [
-      org?.shiftDisplayMode,
-      org?.timezone,
-      requestMarkResolvers,
-      segmentCompatibility,
-      shiftRequests.requests,
-    ],
+    [org?.timezone, requestMarkResolvers, segmentCompatibility, shiftRequests.requests],
   );
 
   /** The waiting requests on a day: its corner fold and hover lines. */

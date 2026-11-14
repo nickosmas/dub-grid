@@ -83,7 +83,8 @@ export function describeRequestMark(args: {
   if (request.type === "calloff") {
     return {
       status: `Call-off (${absence}) · awaiting approval`,
-      body: `If approved, ${askerFirst} is marked ${absence} and the shift opens for pickup.`,
+      // Named, since a day can hold two shifts and only one may be called off.
+      body: `If approved, ${askerFirst} is marked ${absence} and the ${shiftTitle(request.requesterState, request.requesterShiftDate, resolvers)} opens for pickup.`,
       asked: `Called off ${at}.`,
     };
   }

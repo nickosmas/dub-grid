@@ -209,7 +209,7 @@ describe("describeRequestMark", () => {
       texts(request({ type: "calloff", status: "pending_approval", absenceTypeId: 9 }))[L],
     ).toEqual({
       status: "Call-off (Sick) · awaiting approval",
-      body: "If approved, Laura is marked Sick and the shift opens for pickup.",
+      body: "If approved, Laura is marked Sick and the Day Shift · Supervisor opens for pickup.",
       asked: `Called off ${AT}.`,
     });
   });
