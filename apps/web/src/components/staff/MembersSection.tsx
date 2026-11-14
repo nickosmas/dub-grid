@@ -2391,7 +2391,11 @@ export function MembersSection({
                   toast.error("Could not load the latest employee record. Refresh and try again.");
                   return false;
                 }
-                const emailChanged = (currentEmployee.email || "") !== (data.email || "");
+                // Compared as the save writes it: a stored "Jane@X.com" left
+                // alone is not a new address.
+                const emailChanged =
+                  (currentEmployee.email || "").trim().toLowerCase() !==
+                  (data.email || "").trim().toLowerCase();
                 const pendingInvitation = pendingInviteByEmployeeId.get(selectedPerson.employeeId);
                 // Grants first: they may prompt a Gridmaster, and a cancelled
                 // prompt should save nothing rather than the details alone.

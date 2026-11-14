@@ -1,6 +1,11 @@
 import type { MobilePerson } from "@dubgrid/contracts";
 import { describe, expect, it } from "vitest";
-import { makePersonDraft, personDraftHasChanges, scheduleAssignmentsChanged } from "./personDraft";
+import {
+  makePersonDraft,
+  personDraftHasChanges,
+  personEmailChanged,
+  scheduleAssignmentsChanged,
+} from "./personDraft";
 
 function person(overrides: Partial<MobilePerson> = {}): MobilePerson {
   return {
@@ -19,6 +24,20 @@ function person(overrides: Partial<MobilePerson> = {}): MobilePerson {
 }
 
 describe("personDraftHasChanges", () => {
+  it("leaves a stored email in capitals, or a phone in another format, unchanged", () => {
+    const saved = person({ email: "Mina@DubGrid.com", phone: "555-010-0100" });
+    const draft = makePersonDraft(saved);
+
+    expect(personEmailChanged(draft, saved)).toBe(false);
+    expect(personDraftHasChanges(draft, saved)).toBe(false);
+    expect(personEmailChanged({ ...draft, email: "mina@dubgrid.com" }, saved)).toBe(false);
+    expect(personEmailChanged({ ...draft, email: "mina.diaz@dubgrid.com" }, saved)).toBe(true);
+  });
+
+  it("keeps the version the edit was opened from", () => {
+    expect(makePersonDraft(person({ version: 7 })).baseVersion).toBe(7);
+  });
+
   it("leaves an untouched draft clean when the saved value carries stray spaces", () => {
     const saved = person({ firstName: "Mina ", contactNotes: " Prefers texts " });
 

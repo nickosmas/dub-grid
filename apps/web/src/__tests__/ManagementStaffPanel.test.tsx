@@ -85,6 +85,33 @@ function renderPanel(
 }
 
 describe("ManagementStaffPanel", () => {
+  it("keeps what was typed when the directory refetches, even if the person changed", async () => {
+    const user = userEvent.setup();
+    const props = {
+      contactEmail: null,
+      departments: [{ id: 10, orgId: "org-1", name: "Leadership", abbr: "LEAD", sortOrder: 0 }],
+      departmentLabel: "Departments",
+      canManageScheduleEmployees: true,
+      canManageManagementAccess: true,
+      onClose: vi.fn(),
+      onSave: vi.fn().mockResolvedValue(true),
+    };
+    const person = () => makePerson({ managementDepartmentIds: [10], isManagementUser: true });
+    const view = render(<ManagementStaffPanel person={person()} {...props} />);
+
+    const firstNameInput = screen.getByDisplayValue("Jordan");
+    await user.clear(firstNameInput);
+    await user.type(firstNameInput, "Jordyn");
+
+    // A refetch hands over a new object, then a teammate's change to the phone.
+    view.rerender(<ManagementStaffPanel person={person()} {...props} />);
+    view.rerender(
+      <ManagementStaffPanel person={{ ...person(), phone: "(415) 425-0000" }} {...props} />,
+    );
+
+    expect(screen.getByDisplayValue("Jordyn")).toBeInTheDocument();
+  });
+
   it("closes after a successful save", async () => {
     const user = userEvent.setup();
     const { onSave, onClose } = renderPanel();
