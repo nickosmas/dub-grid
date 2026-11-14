@@ -1015,13 +1015,14 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Update 2026-11-13 (re-check against dev):** still open. The hook can't know which organization the person asked for, so the login route should look up that organization's `suspended_until` itself.
 **Update 2026-11-13 (fix/p3-quick-wins):** the switch half is fixed: `POST /api/auth/organizations` answers `suspendedUntil` for the organization being switched into, read from `switch_org`'s refusal, which since 127 names that organization's end date (the way the login route reads it); no extra query. `route.test.ts` covers it and fails on the old code. The web switcher doesn't show the date yet. Still open: the sign-in half, where the hook names the default organization's date; the login route, which should look up the requested organization's `suspended_until` itself, was out of this batch's reach.
 
-### F-237 [P2] open - The People filter sheet doesn't open on Android
+### F-237 [P2] fixed - The People filter sheet doesn't open on Android
 
 **File:** `apps/mobile/src/shared/navigation/HeaderFilterAction.tsx:30`; `apps/mobile/src/shared/components/BottomSheetModal.native.tsx` (Android path); `apps/mobile/src/features/people/screens/PeopleScreen.tsx:711`
 **Found:** 2026-11-10 while restoring the native segmented switch
 **Why it matters:** On the Android emulator, tapping People's Filter calls `onPress` (logged) and sets the sheet visible, but no sheet appears and nothing is logged. It happens with the drawn switch and the native one, and with People's search action removed from the bar, so neither causes it. iOS opens the same sheet. Only the emulator's development build was tried, not a release build or a phone, and other native sheets on Android weren't checked.
 **Suggested fix:** Check whether any `BottomSheetModal.native` sheet opens on Android, then whether 56d's `sheetOpenSize` refactor changed the Android first render (it now reads `androidResizableRef` before setting it).
 **Update 2026-11-13 (re-check against dev):** still unknown. Nothing since 2026-11-10 changed `HeaderFilterAction` or `sheet-open-size.ts`, and #506's People filter change wasn't run on Android.
+**Resolution:** Fixed on fix/android-people-filter-sheet (2026-11-14). The sheet was never the problem: People is the only screen that renders sheets inside a list (`Screen` with `list`), where they sit in the `FlatList` header. Android's `FlatList` defaults `removeClippedSubviews` to true, and `@expo/ui`'s Android sheet mounts a zero-height Compose host at the header's top edge (padding 0), which the clipping pass treats as off screen and detaches, so the Material sheet never composes. `Screen` now passes `removeClippedSubviews={false}` in list mode, which covers People's other sheets too; `Screen.test.tsx` asserts it. Reproduced on the Pixel 10 Pro XL emulator with the 2026-11-10 release build (Filter does nothing), then the same native build with today's JS and the fix opens Filter staff. Not run on a phone.
 
 ### F-241 [P2] fixed - The mobile admin dashboard ignores Dashboard: View
 
