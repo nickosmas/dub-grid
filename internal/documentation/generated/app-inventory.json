@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:2de68a3930c46db4c56af8986ccbc83481415a9e93e176367ec7da7083e73b89",
+  "sourceDigest": "sha256:23366e7ccd47aa9111d8d7b7870a5caa280ee7c48acd7c837c00044ce4e12f06",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5251,6 +5251,26 @@
       "sha256": "498174e1b623532135b91702befd3e48382a6e44fcecab9765a251413de8c4b7",
       "source": {
         "path": "supabase/migrations/139_impersonation_start_audit_row.sql"
+      }
+    },
+    {
+      "id": "migration:140_realtime_private_broadcast.sql",
+      "version": "140",
+      "name": "realtime_private_broadcast",
+      "file": "140_realtime_private_broadcast.sql",
+      "sha256": "3920fe713263e86a336ac1b830f69736d7e985b3ba42e11960d2561e7ccc6146",
+      "source": {
+        "path": "supabase/migrations/140_realtime_private_broadcast.sql"
+      }
+    },
+    {
+      "id": "migration:141_postgres_changes_publication_empty.sql",
+      "version": "141",
+      "name": "postgres_changes_publication_empty",
+      "file": "141_postgres_changes_publication_empty.sql",
+      "sha256": "8f326b52776d20263333a301a9766049959b10be86126d6b95c9f9c6cc51e522",
+      "source": {
+        "path": "supabase/migrations/141_postgres_changes_publication_empty.sql"
       }
     }
   ],

@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { createRealtimeChannelName, subscribeToPostgresChanges } from "@dubgrid/realtime-core";
+import { subscribeToTableChanges, userTopic } from "@dubgrid/realtime-core";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { BOOTSTRAP_QUERY_KEY_PREFIX } from "./useBootstrap";
 
 // Realtime: re-resolve the bootstrap-derived permission cache on membership
 // changes. When another session (e.g. super_admin) updates the current
-// user's admin_permissions or org_role, a Postgres change event refetches
+// user's admin_permissions or org_role, a change on their own topic refetches
 // bootstrap and re-renders permission-gated UI immediately.
 //
 // Also subscribes to `employees` for this user: bench/activate flips the
@@ -51,35 +51,16 @@ export function useMobilePermissionsRealtime({
       });
     };
 
-    const unsubscribeMembership = subscribeToPostgresChanges(
-      supabase,
-      createRealtimeChannelName("perms:m"),
-      [
-        {
-          table: "organization_memberships",
-          event: "UPDATE",
-          filter: `user_id=eq.${userId}`,
-          onEvent: reResolve,
-        },
-      ],
-    );
-
-    const unsubscribeEmployee = subscribeToPostgresChanges(
-      supabase,
-      createRealtimeChannelName("perms:e"),
-      [
-        {
-          table: "employees",
-          event: "UPDATE",
-          filter: `user_id=eq.${userId}`,
-          onEvent: reResolve,
-        },
-      ],
-    );
-
-    return () => {
-      unsubscribeMembership();
-      unsubscribeEmployee();
-    };
+    // The person's own topic. A membership update that only stamped when
+    // they opened Schedule never reaches it (140).
+    return subscribeToTableChanges(supabase, [
+      {
+        table: "organization_memberships",
+        topic: userTopic(userId),
+        event: "UPDATE",
+        onEvent: reResolve,
+      },
+      { table: "employees", topic: userTopic(userId), event: "UPDATE", onEvent: reResolve },
+    ]);
   }, [hasToken, queryClient, userId]);
 }

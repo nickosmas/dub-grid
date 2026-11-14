@@ -9,6 +9,7 @@ import { getUserIdFromAccessToken } from "../lib/access-token";
 import { getSupabaseClient } from "../lib/supabase";
 
 const ORG_FILTER_TABLES: MobileRealtimeTable[] = [
+  "organizations",
   "focus_areas",
   "shift_categories",
   "jobs",
@@ -30,17 +31,23 @@ const ORG_FILTER_TABLES: MobileRealtimeTable[] = [
   "profile_change_requests",
   "recurring_shifts",
   "publish_history",
-  "audit_log",
   "impersonation_sessions",
 ];
 
 export function useMobileRealtimeInvalidation({
   accessToken,
   orgId,
+  includeDrafts = false,
   queryClient,
 }: {
   accessToken: string | null;
   orgId: string | null;
+  /**
+   * Also follow draft cells, snapshots and notes, which arrive on their own
+   * topic that only someone who edits the schedule may join (140). Staff
+   * phones no longer refetch on every draft edit (F-150).
+   */
+  includeDrafts?: boolean;
   queryClient: QueryClient;
 }) {
   // Read when an event lands, not a dependency: supabase-js hands each
@@ -70,11 +77,10 @@ export function useMobileRealtimeInvalidation({
       client: supabase,
       orgId,
       tables: ORG_FILTER_TABLES,
-      rowScopedTable: "organizations",
-      // Coalesce bursts of postgres_changes events (e.g. a bulk save) into
-      // one invalidation flush per window, matching web's org-freshness hook.
+      includeDrafts,
+      // Coalesce bursts (a save touches several tables) into one invalidation
+      // flush per window, matching web's org-freshness hook.
       debounceMs: 150,
-      channelNamePrefix: `mobile-freshness:${orgId}`,
       onFlush: (tables) => {
         const token = accessTokenRef.current;
         if (!token) return;
@@ -88,14 +94,11 @@ export function useMobileRealtimeInvalidation({
       onReconnectAfterError: () => {
         const token = accessTokenRef.current;
         if (!token) return;
-        invalidateMobileRealtimeQueriesForTables(queryClient, token, [
-          "organizations",
-          ...ORG_FILTER_TABLES,
-        ]);
+        invalidateMobileRealtimeQueriesForTables(queryClient, token, ORG_FILTER_TABLES);
       },
       onError: (error) => {
         console.error("Mobile realtime freshness channel error", error);
       },
     });
-  }, [hasToken, orgId, queryClient, userId]);
+  }, [hasToken, includeDrafts, orgId, queryClient, userId]);
 }
