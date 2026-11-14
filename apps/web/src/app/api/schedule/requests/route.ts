@@ -242,7 +242,6 @@ async function settleOrNotify(
     userClient: auth.userClient,
     serviceClient: auth.serviceClient,
     requestId,
-    skip: auth.permissions.isImpersonating,
   });
 
   if (settlement.autoApproved) {
