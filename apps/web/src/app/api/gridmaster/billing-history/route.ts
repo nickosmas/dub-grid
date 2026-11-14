@@ -9,7 +9,7 @@ import {
 } from "@/features/gridmaster/billing-history";
 import logger from "@/lib/logger";
 
-const orgIdSchema = z.string().uuid();
+const orgIdSchema = z.guid();
 const REPORT_MONTHS = 12;
 const ORG_SEAT_ROWS = 20;
 // Seat history gains a row per change, so every row fits; the cap only

@@ -18,7 +18,7 @@ import { z } from "zod";
 const accountProfileUpdateSchema = z.object({
   firstName: staffNameSchema,
   lastName: staffNameSchema,
-  orgId: z.string().uuid().nullable(),
+  orgId: z.guid().nullable(),
 });
 
 export async function PATCH(req: NextRequest) {
