@@ -1274,6 +1274,17 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     severity: "create",
     headline: () => "Restored the organization",
   },
+  "org.exported": {
+    category: "organization",
+    severity: "warning",
+    headline: () => "DubGrid support downloaded the organization's data",
+  },
+  "org.purged": {
+    category: "organization",
+    severity: "delete",
+    headline: () => "Deleted the organization for good, 90 days after it was deleted",
+    suppressKeys: ["trigger", "name", "slug", "archivedAt", "memberCount"],
+  },
   "org.suspended": {
     category: "organization",
     severity: "delete",
@@ -1555,6 +1566,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionSpec> = {
     category: "data",
     severity: "warning",
     headline: (d) => {
+      if (d.text("type") === "organization_archive") return "Downloaded the organization's data";
       const type = d.label("type");
       return type ? `Exported ${type.toLowerCase()} data` : "Exported data";
     },
