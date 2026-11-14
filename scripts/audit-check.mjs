@@ -90,25 +90,6 @@ const ALLOWLIST = [
       "upgrade across every schema in the repository (Dependabot #190, F-189). Do that upgrade " +
       "rather than re-dating this entry.",
   },
-  {
-    ids: [
-      "GHSA-82fw-gwwq-j7x9",
-      "GHSA-qxg6-89mg-rqv8",
-      "GHSA-5gmw-xhrv-c9v3",
-      "GHSA-85c8-ppgw-ccpr",
-    ],
-    package: "vitest",
-    reviewBy: "2026-11-15",
-    reason:
-      "Path traversal and code injection through @vitest/mocker's mocks, and prototype-pollution " +
-      "gadgets that reach code execution through tinypool's worker options. Vitest and its " +
-      "tinypool run only on developer machines and in CI over this repository's own test files, " +
-      "so each needs a crafted test, mock path or polluted prototype in a change we review. The " +
-      "fixes are Vitest 4.1.12 (the mocker) and tinypool 2.1.2, which Vitest 3 cannot take, so " +
-      "all four wait on the Vitest major upgrade across web, mobile and the packages (F-125). The " +
-      "short review date reflects the critical rating: schedule that upgrade rather than " +
-      "re-dating this entry.",
-  },
 ];
 
 /** Every GHSA id in `via`, following the chains npm nests inside each other. */

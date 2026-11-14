@@ -1,4 +1,4 @@
-import { configDefaults, type UserConfig } from "vitest/config";
+import { configDefaults, type ViteUserConfig } from "vitest/config";
 
 export const sharedVitestConfig = {
   test: {
@@ -26,4 +26,4 @@ export const sharedVitestConfig = {
       // real thresholds as a follow-up.
     },
   },
-} satisfies UserConfig;
+} satisfies ViteUserConfig;

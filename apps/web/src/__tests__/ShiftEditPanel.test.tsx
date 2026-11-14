@@ -35,6 +35,7 @@ import {
   ShiftJobSegment,
   ScheduleCellState,
 } from "@/types";
+import type { MockFn } from "./helpers/mock-fn";
 
 vi.mock("@/features/schedule/client", () => ({
   fetchRepeatOverwriteCount: vi.fn(),
@@ -263,7 +264,7 @@ function renderPanel(
     currentRestOfDayAbsenceStartTime?: string | null;
     currentRestOfDayAbsenceEndTime?: string | null;
     publishedRestOfDayAbsenceTypeId?: number | null;
-    onRepeatConfirm?: ReturnType<typeof vi.fn>;
+    onRepeatConfirm?: MockFn;
     customStartTime?: string | null;
     customEndTime?: string | null;
     draftKind?: DraftKind;
@@ -271,9 +272,9 @@ function renderPanel(
     publishedAbsenceTypeId?: number | null;
     publishedCustomStartTime?: string | null;
     publishedCustomEndTime?: string | null;
-    onCustomTimeChange?: ReturnType<typeof vi.fn>;
-    onSelect?: ReturnType<typeof vi.fn>;
-    onClose?: ReturnType<typeof vi.fn>;
+    onCustomTimeChange?: MockFn;
+    onSelect?: MockFn;
+    onClose?: MockFn;
     modalOverride?: EditModalState;
     assignmentsOverride?: AssignmentDefinition[];
     jobsOverride?: JobDefinition[];
@@ -287,10 +288,10 @@ function renderPanel(
       focusAreaId: number,
       shift: { shiftId: number | null; jobId: number } | null,
     ) => number[];
-    onNoteToggle?: ReturnType<typeof vi.fn>;
+    onNoteToggle?: MockFn;
     seriesId?: string | null;
     absenceRun?: { dateKeys: string[] } | null;
-    onRemoveAbsenceRun?: ReturnType<typeof vi.fn>;
+    onRemoveAbsenceRun?: MockFn;
     correctedLabel?: string | null;
     correctedChange?: {
       before: ScheduleCellState | null;
@@ -312,8 +313,8 @@ function renderPanel(
 
 function panelElement(
   overrides: Parameters<typeof renderPanel>[0] & object,
-  onSelect: ReturnType<typeof vi.fn>,
-  onClose: ReturnType<typeof vi.fn>,
+  onSelect: MockFn,
+  onClose: MockFn,
 ) {
   return (
     <ShiftEditPanel
@@ -362,9 +363,9 @@ function panelElement(
 function renderRequestPanel(
   overrides: {
     modalOverride?: EditModalState;
-    onMakeAvailable?: ReturnType<typeof vi.fn>;
-    onCallOff?: ReturnType<typeof vi.fn>;
-    onSubmitSwap?: ReturnType<typeof vi.fn>;
+    onMakeAvailable?: MockFn;
+    onCallOff?: MockFn;
+    onSubmitSwap?: MockFn;
     shiftNameForKey?: (empId: string, date: Date) => string | null;
     getShiftTimeRanges?: (empId: string, date: Date) => { start: string; end: string }[];
     getShiftFocusAreaIds?: (empId: string, date: Date) => number[];
@@ -598,7 +599,7 @@ function ConfirmDraftHarness({
   onConfirmDraft,
   isStale = false,
 }: {
-  onConfirmDraft: ReturnType<typeof vi.fn>;
+  onConfirmDraft: MockFn;
   isStale?: boolean;
 }) {
   const [currentShift, setCurrentShift] = useState<string | null>(null);
@@ -1727,7 +1728,7 @@ describe("ShiftEditPanel", () => {
   });
 
   describe("Repeat overwrites", () => {
-    async function submitRepeat(onRepeatConfirm: ReturnType<typeof vi.fn>) {
+    async function submitRepeat(onRepeatConfirm: MockFn) {
       const user = userEvent.setup();
       render(<RepeatFlowPanel onRepeatConfirm={onRepeatConfirm} />);
       await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
@@ -2318,7 +2319,7 @@ describe("ShiftEditPanel", () => {
         onSelect,
       }: {
         initial: Parameters<typeof renderPanel>[0] & object;
-        onSelect: ReturnType<typeof vi.fn>;
+        onSelect: MockFn;
       }) {
         const [props, setProps] = useState(initial);
         const [select] = useState(() =>
