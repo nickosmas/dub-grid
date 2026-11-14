@@ -1,7 +1,7 @@
 # Feature: Waiting requests on every day involved
 
 **From build-plan:** feature 57a (item 57, Request marks on the schedule)
-**Status:** not started
+**Status:** in progress
 
 ## Goal
 
@@ -97,14 +97,14 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
 
 ## Build steps
 
-- [ ] **Step 1 - Request mark model** - a pure function that turns the
+- [x] **Step 1 - Request mark model** - a pure function that turns the
       viewer's requests into marks per cell and per open shift, following the
       table in In scope, with the `RequestCellMark` contract below. _Done
       when:_ unit tests cover every row of the table, a cell in two requests
       (amber wins, both listed), declined, cancelled, expired and approved
       requests (no mark), a swap across two dates, a named pickup's target
       day, and an empty or failed request list (no marks).
-- [ ] **Step 2 - Request wording** - a pure formatter for the hover and panel
+- [x] **Step 2 - Request wording** - a pure formatter for the hover and panel
       text of each mark: status line, what would happen (both sides, full
       shift names, 12-hour times with hours, midnight-crossing days named), and
       "Asked <date, time>" in the organization's time zone. _Done when:_ unit
@@ -178,7 +178,8 @@ type RequestMarkRole =
   | "asker" // the requester's own shift
   | "partner" // a swap's other side, or the teammate a named pickup asks
   | "claimer" // took an offered pickup or a call-off's open shift
-  | "volunteer"; // volunteered for a coverage-gap open shift
+  | "volunteer" // volunteered for a coverage-gap open shift
+  | "open-shift"; // a call-off's open shift in the Open shifts row, once claimed
 
 interface RequestCellMark {
   requestId: string;
