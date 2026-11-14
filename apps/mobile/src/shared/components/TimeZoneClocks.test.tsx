@@ -13,7 +13,9 @@ beforeAll(async () => {
 const RealDateTimeFormat = Intl.DateTimeFormat;
 
 function mockDeviceTimeZone(timeZone: string) {
-  vi.spyOn(Intl, "DateTimeFormat").mockImplementation((...args: unknown[]) => {
+  // A function, not an arrow: the component calls it with `new`, which
+  // Vitest 4 refuses for an arrow implementation.
+  vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function (...args: unknown[]) {
     if (args.length === 0) {
       return { resolvedOptions: () => ({ timeZone }) } as unknown as Intl.DateTimeFormat;
     }

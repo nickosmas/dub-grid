@@ -74,7 +74,7 @@
 **Update 2026-10-31 (56a):** Expo SDK 57 still brings query-string 7.1.3 and decode-uri-component 0.2.2, so the allowlist entry stays.
 **Resolution:**
 
-### F-125 [P3] open - Vitest's mocker advisory needs the Vitest 4 major
+### F-125 [P3] fixed - Vitest's mocker advisory needs the Vitest 4 major
 
 **File:** `package.json` (`vitest` ^3.2.7, `@vitest/coverage-v8` ^3.2.7) and each workspace's Vitest config; Dependabot alerts 185, 186
 **Found:** 2026-09-28 while clearing the open Dependabot alerts
@@ -82,7 +82,7 @@
 **Suggested fix:** Upgrade `vitest` and `@vitest/coverage-v8` to 4.1.11 or later in one change across web, mobile and the packages, following Vitest's 4.0 migration notes, and run every workspace's suite. Medium severity, below the `deps:audit` gate.
 **Update 2026-10-13:** two critical tinypool advisories (GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr, prototype-pollution gadgets reaching code execution through worker options) now put Vitest 3 above the gate. tinypool 2.1.2 fixes them and Vitest 3 cannot take it. All three are allowlisted in `scripts/audit-check.mjs` until 2026-11-15 (fix/dependency-audit); do the upgrade (Vitest 5.0.4 is current) before then rather than re-dating the entry.
 **Update 2026-10-31:** a fourth advisory, GHSA-qxg6-89mg-rqv8 (mock registration code injection, fixed in 4.1.12), joined the Vitest entry; its date stays 2026-11-15.
-**Resolution:**
+**Resolution:** Fixed on fix/vitest-4 (2026-11-13): `vitest` and `@vitest/coverage-v8` go to 4.1.12, which fixes the mocker advisories and drops tinypool, so the allowlist entry is removed and `deps:audit` passes. npm 10.9.2 crashed resolving Vitest 4's own `vite` dependency (an arborist peer-set bug through vite 8's optional devtools peers); an override (`"vitest": { "vite": "$vite" }`) keeps Vitest on the root vite 7, and a second lock-only install is byte-identical. `minWorkers` is gone from the web config, and four tests moved to Vitest 4's mock rules: a constructor mock is a `function`, and `restoreAllMocks` no longer clears `vi.fn()` mocks. Every workspace's suite passes in a worktree with its own `npm ci`.
 
 ### F-126 [P3] open - Faker's code-execution advisory waits on @snaplet/copycat
 
