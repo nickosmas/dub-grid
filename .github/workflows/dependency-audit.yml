@@ -47,8 +47,21 @@ jobs:
       # Registry signatures across the installed tree. Catches a tarball that
       # doesn't match what the registry attests it published — the case
       # `npm audit` is blind to, because no advisory exists yet.
+      # npm sometimes fails to match a package's attestation to a registry key
+      # (EMISSINGSIGNATUREKEY, a different package each time) on a lookup that
+      # passes on the next run. Only that error is retried: a tarball whose
+      # signature doesn't verify fails at once, and so does a missing key on
+      # every attempt.
       - name: Verify registry signatures
-        run: npm audit signatures
+        run: |
+          set -o pipefail
+          for attempt in 1 2 3; do
+            if npm audit signatures 2>&1 | tee audit-signatures.log; then exit 0; fi
+            grep -q EMISSINGSIGNATUREKEY audit-signatures.log || exit 1
+            echo "::warning::npm audit signatures could not find a registry key (attempt $attempt); retrying"
+            sleep 20
+          done
+          exit 1
 
       # Known-bad versions, worm markers, planted persistence files.
       - run: npm run deps:scan
