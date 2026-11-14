@@ -4,11 +4,13 @@ import { expect, test, type Page } from "@playwright/test";
 // space-taking scrollbar a mouse user sees on an external monitor.
 test.use({ launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] } });
 
+// The width and position of the page's content box, read from a full-width
+// block at the top of <body>.
 async function layout(page: Page) {
-  return page.evaluate(() => ({
-    width: document.documentElement.clientWidth,
-    left: Math.round(document.querySelector("form")!.getBoundingClientRect().left),
-  }));
+  return page.evaluate(() => {
+    const box = document.getElementById("layout-probe")!.getBoundingClientRect();
+    return { left: Math.round(box.left), width: Math.round(box.width) };
+  });
 }
 
 test("a scrollbar appearing or a scroll lock never moves the page sideways", async ({ page }) => {
@@ -25,6 +27,11 @@ test("a scrollbar appearing or a scroll lock never moves the page sideways", asy
   });
   test.skip(scrollbarWidth === 0, "this browser draws overlay scrollbars, which take no width");
 
+  await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.id = "layout-probe";
+    document.body.prepend(probe);
+  });
   const short = await layout(page);
 
   await page.evaluate(() => {
@@ -36,16 +43,24 @@ test("a scrollbar appearing or a scroll lock never moves the page sideways", asy
   expect(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight)).toBe(true);
   expect(await layout(page)).toEqual(short);
 
-  // How our slideovers and the mobile nav sheet lock the page.
+  // What lockPageScroll() does while a panel or sheet is open.
   await page.evaluate(() => {
-    document.body.style.overflow = "hidden";
+    const body = document.body;
+    const before = body.getBoundingClientRect().width;
+    document.documentElement.style.overflow = "hidden";
+    const widened = Math.round(body.getBoundingClientRect().width - before);
+    body.style.paddingRight = `${Math.max(0, widened)}px`;
   });
   expect(await layout(page)).toEqual(short);
+  await page.mouse.move(200, 200);
+  await page.mouse.wheel(0, 500);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
 
   // Without the reserved gutter a short page here is wider than a long one,
   // so the checks above measured something real.
   await page.evaluate(() => {
-    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+    document.body.style.paddingRight = "";
     document.getElementById("filler")!.remove();
     document.documentElement.style.scrollbarGutter = "auto";
   });
