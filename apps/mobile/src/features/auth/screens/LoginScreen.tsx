@@ -38,6 +38,8 @@ import { prefetchHomeQueries } from "../lib/prefetch-home";
 import { settleMobileAuthAction } from "../lib/request-deadline";
 import { beginSignInHandoff, useSignInHandoffPending } from "../lib/sign-in-handoff";
 import { queryClient } from "../../../shared/lib/query-client";
+import { getUserIdFromAccessToken } from "../../../shared/lib/access-token";
+import { rememberSignInPassword } from "../../../shared/lib/biometric-step-up";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
 import { loadLastOrg, saveLastOrg } from "../../../shared/lib/session";
@@ -375,6 +377,14 @@ export default function LoginScreen() {
       }
 
       handedOff = await finishLogin(response);
+      // The server just accepted this password, so Face ID can stand in for it
+      // at the first identity check. Best effort: not saving only means typing it.
+      if (handedOff) {
+        void rememberSignInPassword(
+          getUserIdFromAccessToken(response.session.accessToken),
+          password,
+        );
+      }
     } catch (loginError) {
       authEntryRecorder.cancel("cold_sign_in");
       // The JWT hook refuses terminated employees with a sentinel message

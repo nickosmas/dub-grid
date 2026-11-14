@@ -5,8 +5,8 @@ import type { RealtimeChangePayload } from "@dubgrid/realtime-core";
 import {
   createGridmasterInvalidationBatcher,
   getGridmasterRealtimeInvalidationKeys,
-  resolveGridmasterRealtimeOrgId,
-  resolveGridmasterRealtimeUserId,
+  resolveGridmasterRealtimeOrgIds,
+  resolveGridmasterRealtimeUserIds,
   useGridmasterRealtimeInvalidation,
   type GridmasterRealtimeTable,
 } from "@/hooks/useGridmasterRealtimeInvalidation";
@@ -14,6 +14,7 @@ import { queryKeys } from "@/lib/query-keys";
 
 type Listener = {
   table: GridmasterRealtimeTable;
+  topic: string;
   onEvent: (table: GridmasterRealtimeTable, payload: RealtimeChangePayload) => void;
 };
 type Hooks = { onReconnectAfterError?: () => void; onError?: (error: unknown) => void };
@@ -34,12 +35,7 @@ vi.mock("@/features/account/client", () => ({
 
 vi.mock("@dubgrid/realtime-core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@dubgrid/realtime-core")>()),
-  subscribeToPostgresChanges: (
-    _client: unknown,
-    _name: string,
-    listeners: Listener[],
-    hooks: Hooks,
-  ) => {
+  subscribeToTableChanges: (_client: unknown, listeners: Listener[], hooks: Hooks) => {
     subscription.listeners = listeners;
     subscription.hooks = hooks;
     return mockUnsubscribe;
@@ -174,49 +170,29 @@ describe("getGridmasterRealtimeInvalidationKeys", () => {
   });
 });
 
-describe("resolveGridmasterRealtimeOrgId", () => {
-  it("uses id for organization rows", () => {
-    expect(
-      resolveGridmasterRealtimeOrgId("organizations", {
-        new: { id: orgId },
-      }),
-    ).toBe(orgId);
+describe("resolveGridmasterRealtimeOrgIds", () => {
+  it("takes every organization a platform change names", () => {
+    const other = "22222222-2222-4222-8222-222222222222";
+    expect(resolveGridmasterRealtimeOrgIds({ orgIds: [orgId, other] })).toEqual([orgId, other]);
   });
 
-  it("uses target_org_id for impersonation rows", () => {
-    expect(
-      resolveGridmasterRealtimeOrgId("impersonation_sessions", {
-        new: { target_org_id: orgId },
-      }),
-    ).toBe(orgId);
-  });
-
-  it("falls back to old row data for deletes", () => {
-    expect(
-      resolveGridmasterRealtimeOrgId("employees", {
-        old: { org_id: orgId },
-      }),
-    ).toBe(orgId);
+  it("answers one null when the change names none", () => {
+    expect(resolveGridmasterRealtimeOrgIds({ orgIds: [] })).toEqual([null]);
+    expect(resolveGridmasterRealtimeOrgIds({})).toEqual([null]);
   });
 });
 
-describe("resolveGridmasterRealtimeUserId", () => {
+describe("resolveGridmasterRealtimeUserIds", () => {
   const userId = "22222222-2222-4222-8222-222222222222";
 
-  it("resolves user_id for organization_memberships rows", () => {
+  it("names the people a membership change touched", () => {
     expect(
-      resolveGridmasterRealtimeUserId("organization_memberships", {
-        new: { user_id: userId },
-      }),
-    ).toBe(userId);
+      resolveGridmasterRealtimeUserIds("organization_memberships", { userIds: [userId] }),
+    ).toEqual([userId]);
   });
 
-  it("returns null for tables with no per-user invalidation target", () => {
-    expect(
-      resolveGridmasterRealtimeUserId("invitations", {
-        new: { user_id: userId },
-      }),
-    ).toBeNull();
+  it("answers one null for tables with no person page", () => {
+    expect(resolveGridmasterRealtimeUserIds("invitations", { userIds: [userId] })).toEqual([null]);
   });
 
   it("refreshes every open person page when a change names no one", () => {
@@ -234,14 +210,12 @@ describe("resolveGridmasterRealtimeUserId", () => {
     }
   });
 
-  it("finds the person in session, profile and staff changes", () => {
+  it("finds the people in session, profile and staff changes", () => {
     const userId = "33333333-3333-4333-8333-333333333333";
-    expect(resolveGridmasterRealtimeUserId("user_sessions", { new: { user_id: userId } })).toBe(
-      userId,
-    );
-    expect(resolveGridmasterRealtimeUserId("profiles", { old: { id: userId } })).toBe(userId);
-    expect(resolveGridmasterRealtimeUserId("employees", { new: { user_id: null } })).toBeNull();
-    expect(resolveGridmasterRealtimeUserId("invitations", { new: { user_id: userId } })).toBeNull();
+    for (const table of ["user_sessions", "profiles", "employees"] as const) {
+      expect(resolveGridmasterRealtimeUserIds(table, { userIds: [userId] })).toEqual([userId]);
+    }
+    expect(resolveGridmasterRealtimeUserIds("employees", { userIds: [] })).toEqual([null]);
   });
 });
 
@@ -266,11 +240,12 @@ describe("Gridmaster realtime batching", () => {
     vi.useRealTimers();
   });
 
-  function fire(table: GridmasterRealtimeTable, row: Record<string, unknown>) {
+  function fire(table: GridmasterRealtimeTable, payload: RealtimeChangePayload) {
     const listener = subscription.listeners.find((entry) => entry.table === table);
     // A table dropped from the subscription must fail here, not pass vacuously.
     if (!listener) throw new Error(`No realtime listener for ${table}`);
-    listener.onEvent(table, { new: row });
+    expect(listener.topic).toBe("platform");
+    listener.onEvent(table, payload);
   }
 
   it("refreshes each key once per burst, after the window and not before", () => {
@@ -313,10 +288,10 @@ describe("Gridmaster realtime batching", () => {
     expect(invalidate.mock.calls.length).toBe(first * 2);
   });
 
-  it("batches the live subscription's row events", () => {
+  it("batches the live subscription's changes", () => {
     renderHook(() => useGridmasterRealtimeInvalidation({ enabled: true, queryClient }));
-    for (let row = 0; row < 20; row += 1) {
-      fire("employees", { org_id: orgId, user_id: null });
+    for (let change = 0; change < 20; change += 1) {
+      fire("employees", { orgIds: [orgId], userIds: [] });
     }
     expect(invalidate).not.toHaveBeenCalled();
 
@@ -330,7 +305,7 @@ describe("Gridmaster realtime batching", () => {
     const { unmount } = renderHook(() =>
       useGridmasterRealtimeInvalidation({ enabled: true, queryClient }),
     );
-    fire("organizations", { id: orgId });
+    fire("organizations", { orgIds: [orgId] });
     unmount();
 
     vi.advanceTimersByTime(1_000);

@@ -8,7 +8,7 @@ import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { apiErrorResponse } from "@/lib/error-handling";
 
 const paramsSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.guid(),
 });
 
 /**

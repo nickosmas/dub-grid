@@ -13,9 +13,14 @@ export function MobileRealtimeProvider({ children }: PropsWithChildren) {
   const currentOrg = bootstrapQuery.data?.currentOrg ?? null;
   const userId = session?.user?.id ?? null;
 
+  const permissions = bootstrapQuery.data?.permissions;
   useMobileRealtimeInvalidation({
     accessToken,
     orgId: currentOrg?.id ?? null,
+    includeDrafts:
+      bootstrapQuery.data?.effectiveRole === "super_admin" ||
+      permissions?.canEditShifts === true ||
+      permissions?.canEditNotes === true,
     queryClient,
   });
 

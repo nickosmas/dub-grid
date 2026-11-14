@@ -65,7 +65,7 @@ import {
   PHONE_BELONGS_TO_SOMEONE_ELSE,
 } from "@/lib/employee-contact-conflicts";
 import { toast } from "sonner";
-import { EMAIL_TAKEN_MESSAGE } from "@dubgrid/client-errors";
+import { EMAIL_UNAVAILABLE_MESSAGE } from "@dubgrid/client-errors";
 import { requireCredentialAssurance, updateBrowserUserEmail } from "@/features/account/client";
 import { extractErrorMessage } from "@/lib/error-handling";
 
@@ -563,10 +563,10 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           } catch (err) {
             toast.error(
               otherFieldsSaved
-                ? extractErrorMessage(err, "") === EMAIL_TAKEN_MESSAGE
-                  ? "That email belongs to someone else, so your email stayed the same. Your other changes were saved."
-                  : "Your other changes were saved, but we couldn't start the email change. Try the email again."
-                : extractErrorMessage(err, "We couldn't update your email. Try again."),
+                ? extractErrorMessage(err, "") === EMAIL_UNAVAILABLE_MESSAGE
+                  ? "Your other changes were saved, but we can't use that email. Try a different one."
+                  : "Your other changes were saved, but we couldn't change your email. Try again."
+                : extractErrorMessage(err, "We couldn't change your email. Try again."),
             );
             return;
           }

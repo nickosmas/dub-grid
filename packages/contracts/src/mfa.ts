@@ -2,8 +2,8 @@ import { z } from "zod";
 
 export const mfaLifecycleRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("enroll") }),
-  z.object({ action: z.literal("remove"), factorId: z.string().uuid() }),
-  z.object({ action: z.literal("cleanup"), factorId: z.string().uuid() }),
+  z.object({ action: z.literal("remove"), factorId: z.guid() }),
+  z.object({ action: z.literal("cleanup"), factorId: z.guid() }),
   z.object({
     action: z.literal("reauthenticate"),
     password: z.string().min(1).max(1024),

@@ -53,16 +53,16 @@ const adminPermissionsSchema = z
   });
 
 const patchSchema = z.object({
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
+  orgId: z.guid(),
+  userId: z.guid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }),
   orgRole: z.enum(["super_admin", "admin", "user"]).optional(),
   adminPermissions: adminPermissionsSchema.nullable().optional(),
 });
 
 const deleteSchema = z.object({
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
+  orgId: z.guid(),
+  userId: z.guid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }),
 });
 

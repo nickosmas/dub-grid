@@ -1,4 +1,5 @@
 import { ApiResponseError } from "@dubgrid/api-client";
+import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { appLockUnsupported, getAppLockEnabledSnapshot, withDeviceCheckOpen } from "./app-lock";
 
@@ -117,6 +118,21 @@ export async function saveStepUpPassword(userId: string | null, password: string
   } catch {
     await clearSavedStepUpPassword();
   }
+}
+
+/**
+ * Keeps the password someone just signed in with, so their first identity
+ * check can use Face ID instead of asking them to type it again (owner,
+ * 2026-11-13). iPhone only: iOS saves the copy without a prompt, where Android
+ * would ask for a fingerprint at sign-in, so Android keeps saving it after the
+ * first typed check.
+ */
+export async function rememberSignInPassword(
+  userId: string | null,
+  password: string,
+): Promise<void> {
+  if (Platform.OS !== "ios") return;
+  await saveStepUpPassword(userId, password);
 }
 
 export async function clearSavedStepUpPassword(): Promise<void> {

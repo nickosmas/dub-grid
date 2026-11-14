@@ -9,7 +9,7 @@ import {
 } from "@/app/api/gridmaster/_lib/oversight";
 import logger from "@/lib/logger";
 
-const orgIdSchema = z.string().uuid();
+const orgIdSchema = z.guid();
 
 export async function GET(req: NextRequest) {
   try {

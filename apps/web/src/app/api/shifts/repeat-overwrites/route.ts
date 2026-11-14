@@ -8,7 +8,7 @@ import logger from "@/lib/logger";
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const repeatOverwritesSchema = z.object({
-  empId: z.string().uuid(),
+  empId: z.guid(),
   dates: z.array(dateKeySchema).min(1).max(366),
 });
 

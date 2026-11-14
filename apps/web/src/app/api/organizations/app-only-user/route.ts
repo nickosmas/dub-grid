@@ -15,8 +15,8 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import logger from "@/lib/logger";
 
 const patchSchema = z.object({
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
+  orgId: z.guid(),
+  userId: z.guid(),
   firstName: staffNameSchema.optional(),
   lastName: staffNameSchema.optional(),
   phone: optionalUsPhoneSchema.optional(),

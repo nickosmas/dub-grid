@@ -5,7 +5,7 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiErrorResponse } from "@/lib/error-handling";
 
 const querySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   rangeStart: z.string().date(),
   rangeEnd: z.string().date(),
 });

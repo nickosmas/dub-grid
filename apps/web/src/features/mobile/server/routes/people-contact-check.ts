@@ -17,7 +17,7 @@ const checkableEmail = z.string().trim().email();
 const bodySchema = z.object({
   email: z.string().trim().optional(),
   phone: z.string().trim().optional(),
-  excludeEmployeeId: z.string().uuid().optional(),
+  excludeEmployeeId: z.guid().optional(),
 });
 
 /**

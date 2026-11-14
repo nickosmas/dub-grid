@@ -2,47 +2,40 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useMobileShiftRequestsRealtime } from "./useMobileShiftRequestsRealtime";
 
-function createMockChannel() {
-  const onCalls: Array<{ filter: Record<string, unknown>; handler: () => void }> = [];
-  let subscribeCallback: ((status: string, err?: Error) => void) | undefined;
-  const channel = {
-    on: vi.fn((_type: string, filter: Record<string, unknown>, handler: () => void) => {
-      onCalls.push({ filter, handler });
-      return channel;
-    }),
-    subscribe: vi.fn((cb: (status: string, err?: Error) => void) => {
-      subscribeCallback = cb;
-      return channel;
-    }),
-  };
-  return {
-    channel,
-    onCalls,
-    emitStatus: (status: string, err?: Error) => subscribeCallback?.(status, err),
-  };
-}
+type Listener = { table: string; topic: string; onEvent: () => void };
+type Subscription = {
+  listeners: Listener[];
+  hooks: { onReconnectAfterError?: () => void };
+  released: boolean;
+};
+const subscriptions: Subscription[] = [];
 
-let mockChannel: ReturnType<typeof createMockChannel>;
-const channelNames: string[] = [];
-const removeChannel = vi.fn();
+vi.mock("@dubgrid/realtime-core", () => ({
+  orgTopic: (orgId: string) => `org:${orgId}`,
+  subscribeToTableChanges: (
+    _client: unknown,
+    listeners: Listener[],
+    hooks: Subscription["hooks"],
+  ) => {
+    const subscription = { listeners, hooks, released: false };
+    subscriptions.push(subscription);
+    return () => {
+      subscription.released = true;
+    };
+  },
+}));
 
 vi.mock("../../../shared/lib/supabase", () => ({
-  getSupabaseClient: () => ({
-    channel: (name: string) => {
-      channelNames.push(name);
-      return mockChannel.channel;
-    },
-    removeChannel,
-  }),
+  getSupabaseClient: () => ({ channel: vi.fn(), removeChannel: vi.fn() }),
 }));
+
+const change = (index = 0) => subscriptions[index]?.listeners[0]?.onEvent();
 
 // The channel registry is module-level and keyed on the org, so every case
 // unmounts what it mounts; a leaked mount would make the next case join a
-// channel instead of opening one.
+// subscription instead of opening one.
 beforeEach(() => {
-  channelNames.length = 0;
-  removeChannel.mockClear();
-  mockChannel = createMockChannel();
+  subscriptions.length = 0;
 });
 
 describe("useMobileShiftRequestsRealtime", () => {
@@ -52,22 +45,18 @@ describe("useMobileShiftRequestsRealtime", () => {
     );
     unmount();
 
-    expect(channelNames).toHaveLength(0);
+    expect(subscriptions).toHaveLength(0);
   });
 
-  it("subscribes to one channel filtered on the org's shift_requests", () => {
+  it("listens for the organization's shift requests on its topic", () => {
     const { unmount } = renderHook(() =>
       useMobileShiftRequestsRealtime({ orgId: "org-1", onChange: vi.fn() }),
     );
 
-    expect(channelNames).toHaveLength(1);
-    expect(channelNames[0]).toMatch(/^shift_requests_org-1:/);
-    expect(mockChannel.onCalls[0]?.filter).toEqual({
-      event: "*",
-      schema: "public",
-      table: "shift_requests",
-      filter: "org_id=eq.org-1",
-    });
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0].listeners.map(({ table, topic }) => [table, topic])).toEqual([
+      ["shift_requests", "org:org-1"],
+    ]);
     unmount();
   });
 
@@ -77,11 +66,10 @@ describe("useMobileShiftRequestsRealtime", () => {
       useMobileShiftRequestsRealtime({ orgId: "org-1", onChange }),
     );
 
-    mockChannel.onCalls[0]?.handler();
+    change();
     expect(onChange).toHaveBeenCalledTimes(1);
 
-    mockChannel.emitStatus("CHANNEL_ERROR", new Error("boom"));
-    mockChannel.emitStatus("SUBSCRIBED");
+    subscriptions[0].hooks.onReconnectAfterError?.();
     expect(onChange).toHaveBeenCalledTimes(2);
     unmount();
   });
@@ -92,13 +80,13 @@ describe("useMobileShiftRequestsRealtime", () => {
     );
     unmount();
 
-    expect(removeChannel).toHaveBeenCalledWith(mockChannel.channel);
+    expect(subscriptions[0].released).toBe(true);
   });
 
   // Build plan item 35: the Schedule, Requests and Team screens all mount
   // this under native tabs. They used to open three channels and refetch
   // three times per row change.
-  it("shares one channel across simultaneous mounts and fans events out to each", () => {
+  it("shares one subscription across simultaneous mounts and fans events out to each", () => {
     const first = vi.fn();
     const second = vi.fn();
     const a = renderHook(() => useMobileShiftRequestsRealtime({ orgId: "org-1", onChange: first }));
@@ -106,24 +94,24 @@ describe("useMobileShiftRequestsRealtime", () => {
       useMobileShiftRequestsRealtime({ orgId: "org-1", onChange: second }),
     );
 
-    expect(channelNames).toHaveLength(1);
+    expect(subscriptions).toHaveLength(1);
 
-    mockChannel.onCalls[0]?.handler();
+    change();
     expect(first).toHaveBeenCalledTimes(1);
     expect(second).toHaveBeenCalledTimes(1);
 
     // The first screen leaving must not close the channel the second still holds.
     a.unmount();
-    expect(removeChannel).not.toHaveBeenCalled();
-    mockChannel.onCalls[0]?.handler();
+    expect(subscriptions[0].released).toBe(false);
+    change();
     expect(first).toHaveBeenCalledTimes(1);
     expect(second).toHaveBeenCalledTimes(2);
 
     b.unmount();
-    expect(removeChannel).toHaveBeenCalledTimes(1);
+    expect(subscriptions[0].released).toBe(true);
   });
 
-  it("keeps the channel when onChange changes identity", () => {
+  it("keeps the subscription when onChange changes identity", () => {
     const onChange1 = vi.fn();
     const onChange2 = vi.fn();
     const { rerender, unmount } = renderHook(
@@ -133,16 +121,16 @@ describe("useMobileShiftRequestsRealtime", () => {
     );
 
     rerender({ onChange: onChange2 });
-    expect(channelNames).toHaveLength(1);
-    expect(removeChannel).not.toHaveBeenCalled();
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0].released).toBe(false);
 
-    mockChannel.onCalls[0]?.handler();
+    change();
     expect(onChange1).not.toHaveBeenCalled();
     expect(onChange2).toHaveBeenCalledTimes(1);
     unmount();
   });
 
-  it("opens separate channels for different organizations", () => {
+  it("opens separate subscriptions for different organizations", () => {
     const a = renderHook(() =>
       useMobileShiftRequestsRealtime({ orgId: "org-1", onChange: vi.fn() }),
     );
@@ -150,9 +138,10 @@ describe("useMobileShiftRequestsRealtime", () => {
       useMobileShiftRequestsRealtime({ orgId: "org-2", onChange: vi.fn() }),
     );
 
-    expect(channelNames).toHaveLength(2);
-    expect(channelNames[0]).toMatch(/^shift_requests_org-1:/);
-    expect(channelNames[1]).toMatch(/^shift_requests_org-2:/);
+    expect(subscriptions.map((entry) => entry.listeners[0].topic)).toEqual([
+      "org:org-1",
+      "org:org-2",
+    ]);
     a.unmount();
     b.unmount();
   });

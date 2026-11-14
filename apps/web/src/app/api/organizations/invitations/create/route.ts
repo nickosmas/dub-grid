@@ -49,8 +49,8 @@ import { escapeLikePattern } from "@/features/employees/server/contact-conflicts
 const postSchema = z.object({
   email: z.string().trim().email(),
   role: z.enum(["user", "admin", "super_admin"]),
-  orgId: z.string().uuid(),
-  employeeId: z.string().uuid().optional(),
+  orgId: z.guid(),
+  employeeId: z.guid().optional(),
   firstName: z.string().trim().optional(),
   lastName: z.string().trim().optional(),
   phone: z.string().trim().optional(),

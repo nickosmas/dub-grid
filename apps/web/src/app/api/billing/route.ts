@@ -10,7 +10,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 export const dynamic = "force-dynamic";
 
 const querySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
 });
 
 async function handleGET(req: NextRequest, timer: Timer) {

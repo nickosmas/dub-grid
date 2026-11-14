@@ -9,11 +9,11 @@ import logger from "@/lib/logger";
 import { fetchFilteredAuditRows } from "@/lib/audit/server-query";
 
 const exportSchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.guid().optional(),
   action: z.string().min(1).optional(),
   actionPrefix: z.string().min(1).optional(),
   resourceType: z.string().min(1).optional(),
-  actorId: z.string().uuid().optional(),
+  actorId: z.guid().optional(),
   target: z.string().min(1).max(200).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),

@@ -15,8 +15,8 @@ import logger from "@/lib/logger";
  */
 const MAX_PRESENCE_PROFILES = 50;
 const requestSchema = z.object({
-  orgId: z.string().uuid(),
-  userIds: z.array(z.string().uuid()).min(1).max(MAX_PRESENCE_PROFILES),
+  orgId: z.guid(),
+  userIds: z.array(z.guid()).min(1).max(MAX_PRESENCE_PROFILES),
 });
 
 const canUseScheduleEditor = (permissions: {

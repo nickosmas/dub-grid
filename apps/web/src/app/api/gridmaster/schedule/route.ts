@@ -28,7 +28,7 @@ import type { AssignmentDefinition, DraftKind, ShiftDisplayMode } from "@/types"
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const readOnlyScheduleSchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   startDate: dateKeySchema,
   endDate: dateKeySchema,
 });

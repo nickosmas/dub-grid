@@ -31,7 +31,7 @@ import * as Sentry from "@/lib/sentry";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { countBillableAppUsers } from "@/features/billing/server";
 
-const orgIdSchema = z.string().uuid();
+const orgIdSchema = z.guid();
 const billingStatusSchema = z.enum([
   "trialing",
   "active",

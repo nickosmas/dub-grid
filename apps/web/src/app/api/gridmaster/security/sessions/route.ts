@@ -31,7 +31,7 @@ const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
 const querySchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.guid().optional(),
   platform: z.enum(["web", "ios", "android", "unknown"]).optional(),
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).optional(),
   offset: z.coerce.number().int().min(0).optional(),

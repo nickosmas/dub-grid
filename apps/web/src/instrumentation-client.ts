@@ -5,6 +5,7 @@
 // for everyone. Session Replay records user sessions, so it is gated behind
 // analytics consent and only attached once the user opts in (here at boot if
 // already granted, or live via the consent-changed event).
+import "@/lib/zod-jitless";
 import {
   init,
   addIntegration,

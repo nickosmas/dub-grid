@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { createRealtimeChannelName, subscribeToPostgresChanges } from "@dubgrid/realtime-core";
+import { subscribeToTableChanges, userTopic } from "@dubgrid/realtime-core";
 import * as Sentry from "@/lib/sentry";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { queryKeys } from "@/lib/query-keys";
@@ -54,17 +54,13 @@ export function useAccountRealtimeInvalidation({
       invalidateAccountRealtimeQueries(queryClient, userId, table);
     };
 
-    return subscribeToPostgresChanges<AccountRealtimeTable>(
+    const topic = userTopic(userId);
+    return subscribeToTableChanges<AccountRealtimeTable>(
       getBrowserSupabaseClient(),
-      createRealtimeChannelName(`account-freshness:${userId}`),
       [
-        { table: "profiles", filter: `id=eq.${userId}`, onEvent: handleChange },
-        { table: "user_sessions", filter: `user_id=eq.${userId}`, onEvent: handleChange },
-        {
-          table: "notification_preferences",
-          filter: `user_id=eq.${userId}`,
-          onEvent: handleChange,
-        },
+        { table: "profiles", topic, onEvent: handleChange },
+        { table: "user_sessions", topic, onEvent: handleChange },
+        { table: "notification_preferences", topic, onEvent: handleChange },
       ],
       {
         onReconnectAfterError: () => {

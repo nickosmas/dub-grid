@@ -89,13 +89,13 @@ describe("formatClientErrorMessage", () => {
     );
   });
 
-  it("says plainly when an email is taken", () => {
+  it("refuses an email another account holds without saying so", () => {
     expect(
       formatClientErrorMessage(
         new Error("A user with this email address has already been registered"),
         "fallback",
       ),
-    ).toBe("That email belongs to someone else. Try a different one.");
+    ).toBe("We can't use that email. Try a different one.");
   });
 
   it("rewrites duplicate open-shift volunteering into friendly copy", () => {

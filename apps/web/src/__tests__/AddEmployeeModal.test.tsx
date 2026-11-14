@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import { FocusArea } from "@/types";
+import type { MockFn } from "./helpers/mock-fn";
 
 const focusAreas: FocusArea[] = [
   {
@@ -32,8 +33,8 @@ const defaultCertifications = [
 ];
 function renderModal(
   overrides: {
-    onAdd?: ReturnType<typeof vi.fn>;
-    onClose?: ReturnType<typeof vi.fn>;
+    onAdd?: MockFn;
+    onClose?: MockFn;
     canGrantElevatedRoles?: boolean;
   } = {},
 ) {

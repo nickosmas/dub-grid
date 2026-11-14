@@ -102,6 +102,11 @@ vi.mock("../../../shared/lib/supabase", () => ({
   getSupabaseClient,
 }));
 
+const clearSavedStepUpPassword = vi.fn();
+vi.mock("../../../shared/lib/biometric-step-up", () => ({
+  clearSavedStepUpPassword: (...args: unknown[]) => clearSavedStepUpPassword(...args),
+}));
+
 vi.mock("../../../shared/lib/auth-reset", () => ({
   disablePushForCurrentDevice,
   handleExpiredMobileSession,
@@ -330,6 +335,8 @@ describe("ProfilePasswordScreen", () => {
     await confirmUpdate();
     await waitFor(() => expect(signOutMobileSessions).toHaveBeenCalledTimes(1));
     expect(handleExpiredMobileSession).not.toHaveBeenCalled();
+    // The retry's identity check must not be offered the old password.
+    expect(clearSavedStepUpPassword).toHaveBeenCalled();
 
     const dialog = screen.getByRole("alert");
     expect(

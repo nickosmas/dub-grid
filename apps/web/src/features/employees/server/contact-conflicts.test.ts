@@ -81,14 +81,73 @@ describe("checkOwnContact", () => {
     } as unknown as SupabaseClient;
   }
 
-  it("calls an email taken when another account holds it", async () => {
-    findAuthUserByEmail.mockResolvedValue({ id: "someone-else" });
+  /**
+   * Answers each query from per-table rows, applying the eq, in and ilike
+   * filters the check uses.
+   */
+  function tablesClient(tables: {
+    employees: Array<{ id: string; org_id: string; user_id: string | null; email: string }>;
+    organization_memberships: Array<{ org_id: string; user_id: string }>;
+  }) {
+    return {
+      from: (table: keyof typeof tables) => {
+        const rows = tables[table] as Array<Record<string, unknown>>;
+        const tests: Array<(row: Record<string, unknown>) => boolean> = [];
+        const chain: Record<string, unknown> = {};
+        for (const method of ["select", "is", "limit"]) chain[method] = vi.fn(() => chain);
+        chain.eq = vi.fn((column: string, value: unknown) => {
+          tests.push((row) => row[column] === value);
+          return chain;
+        });
+        chain.in = vi.fn((column: string, values: unknown[]) => {
+          tests.push((row) => values.includes(row[column]));
+          return chain;
+        });
+        chain.ilike = vi.fn((column: string, value: string) => {
+          tests.push((row) => String(row[column]).toLowerCase() === value.toLowerCase());
+          return chain;
+        });
+        chain.then = (resolve: (value: unknown) => void) =>
+          resolve({ data: rows.filter((row) => tests.every((test) => test(row))), error: null });
+        return chain;
+      },
+    } as unknown as SupabaseClient;
+  }
+
+  const me = { id: "e1", org_id: "org-1", user_id: "me", email: "me@example.com" };
+
+  it("calls an email free when only an account outside your organizations holds it", async () => {
+    findAuthUserByEmail.mockResolvedValue({ id: "gridmaster-1" });
+    const client = tablesClient({
+      employees: [me],
+      organization_memberships: [{ org_id: "org-1", user_id: "me" }],
+    });
 
     await expect(
-      checkOwnContact(clientFor({ own: [] }), {
+      checkOwnContact(client, {
         userId: "me",
-        orgId: null,
-        email: "taken@example.com",
+        orgId: "org-1",
+        email: "gm@example.com",
+        phone: null,
+      }),
+    ).resolves.toEqual({ emailTaken: false, phoneTaken: false });
+  });
+
+  it("calls an email taken when a member of your organization signs in with it", async () => {
+    findAuthUserByEmail.mockResolvedValue({ id: "admin-1" });
+    const client = tablesClient({
+      employees: [me],
+      organization_memberships: [
+        { org_id: "org-1", user_id: "me" },
+        { org_id: "org-1", user_id: "admin-1" },
+      ],
+    });
+
+    await expect(
+      checkOwnContact(client, {
+        userId: "me",
+        orgId: "org-1",
+        email: "a@example.com",
         phone: null,
       }),
     ).resolves.toEqual({ emailTaken: true, phoneTaken: false });
@@ -96,9 +155,13 @@ describe("checkOwnContact", () => {
 
   it("calls your own account's email free", async () => {
     findAuthUserByEmail.mockResolvedValue({ id: "me" });
+    const client = tablesClient({
+      employees: [me],
+      organization_memberships: [{ org_id: "org-1", user_id: "me" }],
+    });
 
     await expect(
-      checkOwnContact(clientFor({ own: [{ id: "e1", org_id: "org-1" }] }), {
+      checkOwnContact(client, {
         userId: "me",
         orgId: "org-1",
         email: "me@example.com",
@@ -109,12 +172,13 @@ describe("checkOwnContact", () => {
 
   it("calls an email taken when a staff record in any of your organizations holds it", async () => {
     findAuthUserByEmail.mockResolvedValue(null);
-    const client = clientFor({
-      own: [
-        { id: "e1", org_id: "org-1" },
-        { id: "e2", org_id: "org-2" },
+    const client = tablesClient({
+      employees: [
+        me,
+        { id: "e2", org_id: "org-2", user_id: "me", email: "me@example.com" },
+        { id: "other", org_id: "org-2", user_id: null, email: "New@Example.com" },
       ],
-      emailHolders: { "org-2": "other-record" },
+      organization_memberships: [],
     });
 
     await expect(

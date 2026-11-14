@@ -25,8 +25,8 @@ const USED_ELSEWHERE_MESSAGE =
   "This account is also used outside your organization, so it can't be deleted.";
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
-  empId: z.string().uuid(),
+  orgId: z.guid(),
+  empId: z.guid(),
   confirmation: z.string(),
 });
 

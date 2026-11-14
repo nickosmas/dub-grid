@@ -9,13 +9,13 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 
 const cursorSchema = z.object({
   createdAt: z.string(),
-  id: z.string().uuid(),
+  id: z.guid(),
 });
 
 const searchBodySchema = z.object({
   // One alert by id, still scoped to the caller. Read and archive filters
   // are skipped so a deep link can open an alert that has since been handled.
-  id: z.string().uuid().optional(),
+  id: z.guid().optional(),
   limit: z.number().int().min(1).max(100).optional(),
   cursor: cursorSchema.nullable().optional(),
   read: z.enum(["unread", "read"]).nullable().optional(),

@@ -5,7 +5,7 @@ import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api
 import logger from "@/lib/logger";
 
 const querySchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.guid().optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 });

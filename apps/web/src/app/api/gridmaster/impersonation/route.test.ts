@@ -215,7 +215,7 @@ describe("POST /api/gridmaster/impersonation", () => {
     expect(auditInsert).not.toHaveBeenCalled();
   });
 
-  it("starts impersonation and writes a platform audit event", async () => {
+  it("starts impersonation and leaves the audit row to start_impersonation", async () => {
     requestRpc.mockResolvedValueOnce({
       data: {
         session_id: SESSION_ID,
@@ -247,21 +247,7 @@ describe("POST /api/gridmaster/impersonation", () => {
       p_target_org_id: ORG_ID,
     });
     expect(serviceRpc).not.toHaveBeenCalled();
-    expect(auditInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        org_id: ORG_ID,
-        actor_id: "gridmaster-user",
-        actor_email: "gm@example.com",
-        action: "impersonation.started",
-        resource_type: "impersonation_session",
-        resource_id: SESSION_ID,
-        details: expect.objectContaining({
-          initiated_by: "gridmaster",
-          targetUserId: TARGET_USER_ID,
-          justification: "Need support investigation",
-        }),
-      }),
-    );
+    expect(auditInsert).not.toHaveBeenCalled();
   });
 
   it("answers an already-active session with 409 and the RPC's own message", async () => {
@@ -340,27 +326,6 @@ describe("POST /api/gridmaster/impersonation", () => {
     });
   });
 
-  it("still tells the person when recording the start fails", async () => {
-    requestRpc.mockResolvedValueOnce({
-      data: { session_id: SESSION_ID, expires_at: "2026-05-01T17:00:00.000Z" },
-      error: null,
-    });
-    auditInsert.mockResolvedValue({ error: { message: "audit down" } });
-
-    const response = await POST(
-      makePostRequest({
-        action: "start",
-        targetUserId: TARGET_USER_ID,
-        justification: "Need support investigation",
-      }),
-    );
-
-    expect(response.status).toBe(500);
-    expect(scheduleImpersonationNotice).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "start" }),
-    );
-  });
-
   it.each([
     [
       "start",
@@ -435,15 +400,12 @@ describe("POST /api/gridmaster/impersonation", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(auditInsert).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "impersonation.started", org_id: null }),
-    );
     expect(scheduleImpersonationNotice).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "start", targetOrgId: null }),
     );
   });
 
-  it("records a start against the organization the session landed in", async () => {
+  it("announces a start in the organization the session landed in", async () => {
     requestRpc.mockResolvedValueOnce({
       data: { session_id: SESSION_ID, expires_at: "2026-05-01T17:00:00.000Z" },
       error: null,
@@ -457,9 +419,6 @@ describe("POST /api/gridmaster/impersonation", () => {
       }),
     );
 
-    expect(auditInsert).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "impersonation.started", org_id: ORG_ID }),
-    );
     expect(scheduleImpersonationNotice).toHaveBeenCalledExactlyOnceWith({
       kind: "start",
       targetUserId: TARGET_USER_ID,

@@ -39,8 +39,8 @@ export const dynamic = "force-dynamic";
 const invitationRoleSchema = z.enum(["super_admin", "admin", "user"]);
 
 const patchSchema = z.object({
-  orgId: z.string().uuid(),
-  invitationId: z.string().uuid(),
+  orgId: z.guid(),
+  invitationId: z.guid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }),
   email: z.string().trim().email().optional(),
   roleToAssign: invitationRoleSchema.optional(),
@@ -52,22 +52,22 @@ const patchSchema = z.object({
 });
 
 const deleteSchema = z.object({
-  orgId: z.string().uuid(),
-  invitationId: z.string().uuid(),
+  orgId: z.guid(),
+  invitationId: z.guid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }),
 });
 
 const resendSchema = z.object({
   action: z.literal("resend"),
-  orgId: z.string().uuid(),
-  invitationId: z.string().uuid(),
+  orgId: z.guid(),
+  invitationId: z.guid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }),
 });
 
 const replaceAccessSchema = z.object({
   action: z.literal("replace_access"),
-  orgId: z.string().uuid(),
-  invitationId: z.string().uuid(),
+  orgId: z.guid(),
+  invitationId: z.guid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }),
   roleToAssign: invitationRoleSchema,
 });
@@ -75,7 +75,7 @@ const replaceAccessSchema = z.object({
 const postSchema = z.discriminatedUnion("action", [resendSchema, replaceAccessSchema]);
 
 const getSchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
 });
 
 function timestampsMatch(

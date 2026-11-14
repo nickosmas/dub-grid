@@ -14,7 +14,7 @@ import { scheduleSecurityAlert } from "@/features/account/server/security-alerts
 import { endUserSessions } from "@/lib/auth/revocation";
 
 const paramsSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.guid(),
 });
 
 export async function POST(req: NextRequest, context: { params: Promise<{ userId: string }> }) {

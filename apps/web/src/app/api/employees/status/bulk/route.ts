@@ -46,10 +46,10 @@ const ROUTE_ACTIONS: Readonly<Record<BulkStatusAction, StatusChangeAction>> = {
 
 const bodySchema = z
   .object({
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     action: z.enum(BULK_STATUS_ACTIONS as [BulkStatusAction, ...BulkStatusAction[]]),
     people: z
-      .array(z.object({ empId: z.string().uuid(), expectedVersion: z.number().int().min(0) }))
+      .array(z.object({ empId: z.guid(), expectedVersion: z.number().int().min(0) }))
       .min(1)
       .max(BULK_STATUS_MAX_PEOPLE)
       .refine((people) => new Set(people.map((p) => p.empId)).size === people.length),

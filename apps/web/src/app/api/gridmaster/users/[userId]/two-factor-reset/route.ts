@@ -13,7 +13,7 @@ import {
   resetPersonTwoFactor,
 } from "@/features/gridmaster/server/two-factor-reset";
 
-const paramsSchema = z.object({ userId: z.string().uuid() });
+const paramsSchema = z.object({ userId: z.guid() });
 const bodySchema = z.object({ reason: z.string().trim().min(1).max(500) });
 
 const NOT_FOUND = "We couldn't find that account. Refresh the page and try again.";

@@ -223,7 +223,7 @@ describe("ProfilePanel", () => {
     await waitFor(() => expect(order).toEqual(["assurance", "employee", "email"]));
     expect(requireCredentialAssurance).toHaveBeenCalledWith("fresh-token");
     expect(toast.error).toHaveBeenCalledWith(
-      "Your profile was saved, but we couldn't start the email change. Try the email again.",
+      "Your other changes were saved, but we couldn't change your email. Try again.",
     );
   });
 
@@ -240,7 +240,7 @@ describe("ProfilePanel", () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "That email belongs to someone else, so your email stayed the same. Your other changes were saved.",
+        "Your other changes were saved, but we can't use that email. Try a different one.",
       ),
     );
   });
@@ -339,6 +339,28 @@ describe("ProfilePanel", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(screen.getByLabelText("First name")).toHaveValue("Draft");
     expect(personal).toBeEnabled();
+  });
+
+  it("doesn't count a phone saved in another format as an edit", async () => {
+    renderPanel({ employee: { ...employee, phone: "415-555-0199" } });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    expect(checkOwnContact).not.toHaveBeenCalled();
+    expect(personalSave()).toBeDisabled();
+  });
+
+  it("keeps the staff record's own name when only the phone changes", async () => {
+    renderPanel({ employee: { ...employee, firstName: "Ally", phone: "" } });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "415-555-0199" } });
+    await saveOnceChecked();
+    const confirm = screen.queryByRole("alertdialog");
+    if (confirm) fireEvent.click(within(confirm).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(updateEmployee).toHaveBeenCalledOnce());
+    expect(vi.mocked(updateEmployee).mock.calls[0][0]).toMatchObject({
+      firstName: "Ally",
+      phone: "(415) 555-0199",
+    });
   });
 
   it("saves personal details on their own, leaving the Work draft", async () => {

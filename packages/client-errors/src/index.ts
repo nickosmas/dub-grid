@@ -106,8 +106,12 @@ export function isSessionExpiredError(error: unknown): boolean {
   return SESSION_EXPIRED_PATTERN.test(message);
 }
 
-/** A sign-in email another account holds. */
-export const EMAIL_TAKEN_MESSAGE = "That email belongs to someone else. Try a different one.";
+/**
+ * Supabase refusing a sign-in email another account holds. It never says whose
+ * or that anyone holds it: the account can be in another organization, or a
+ * Gridmaster's (owner, 2026-11-13).
+ */
+export const EMAIL_UNAVAILABLE_MESSAGE = "We can't use that email. Try a different one.";
 
 /**
  * Raw error messages rewritten into friendly, user-facing copy. The union of
@@ -165,7 +169,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   },
   {
     pattern: /already been registered|email_exists/i,
-    message: EMAIL_TAKEN_MESSAGE,
+    message: EMAIL_UNAVAILABLE_MESSAGE,
   },
   {
     pattern: /another active shift request/i,

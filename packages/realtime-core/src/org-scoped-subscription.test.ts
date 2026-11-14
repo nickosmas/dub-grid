@@ -2,127 +2,123 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { subscribeOrgScopedRealtime } from "./org-scoped-subscription";
 
-type Handler = (payload?: Record<string, unknown>) => void;
+type Message = { payload?: Record<string, unknown> };
 
-function createMockChannel() {
-  const onCalls: Array<{ filter: Record<string, unknown>; handler: Handler }> = [];
-  const channel = {
-    on: vi.fn((_type: string, filter: Record<string, unknown>, handler: Handler) => {
-      onCalls.push({ filter, handler });
+function createMockClient() {
+  const handlers = new Map<string, (message: Message) => void>();
+  const client = {
+    channel: vi.fn((topic: string) => {
+      const channel = {
+        on: vi.fn((_type: string, _filter: unknown, handler: (message: Message) => void) => {
+          handlers.set(topic, handler);
+          return channel;
+        }),
+        subscribe: vi.fn(() => channel),
+      };
       return channel;
     }),
-    subscribe: vi.fn(() => channel),
-  };
-  return { channel, onCalls };
-}
-
-function createMockClient(mockChannel: ReturnType<typeof createMockChannel>["channel"]) {
-  return {
-    channel: vi.fn(() => mockChannel),
     removeChannel: vi.fn(),
-  } as unknown as SupabaseClient;
+  };
+  return {
+    client: client as unknown as SupabaseClient,
+    raw: client,
+    send: (topic: string, payload: Record<string, unknown>) => handlers.get(topic)?.({ payload }),
+  };
 }
 
 describe("subscribeOrgScopedRealtime", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("subscribes every table with an org_id filter, plus the row-scoped table with an id filter", () => {
-    const mock = createMockChannel();
-    const client = createMockClient(mock.channel);
-
+  it("listens on the organization's topic, and its drafts topic only when asked", () => {
+    const staff = createMockClient();
     subscribeOrgScopedRealtime({
-      client,
+      client: staff.client,
       orgId: "org-1",
-      tables: ["employees", "jobs"] as const,
-      rowScopedTable: "organizations" as const,
+      tables: ["employees"] as const,
       debounceMs: 150,
       onFlush: vi.fn(),
-      channelNamePrefix: "org-freshness",
     });
+    expect(staff.raw.channel.mock.calls.map(([topic]) => topic)).toEqual(["org:org-1"]);
 
-    const filters = mock.onCalls.map((call) => call.filter);
-    expect(filters).toEqual([
-      expect.objectContaining({ table: "organizations", filter: "id=eq.org-1" }),
-      expect.objectContaining({ table: "employees", filter: "org_id=eq.org-1" }),
-      expect.objectContaining({ table: "jobs", filter: "org_id=eq.org-1" }),
+    const editor = createMockClient();
+    subscribeOrgScopedRealtime({
+      client: editor.client,
+      orgId: "org-1",
+      tables: ["schedule_cells"] as const,
+      includeDrafts: true,
+      debounceMs: 150,
+      onFlush: vi.fn(),
+    });
+    expect(editor.raw.channel.mock.calls.map(([topic]) => topic)).toEqual([
+      "org:org-1",
+      "org:org-1:drafts",
     ]);
   });
 
   it("debounces bursts into a single onFlush call with the deduplicated table list", () => {
-    const mock = createMockChannel();
-    const client = createMockClient(mock.channel);
+    const mock = createMockClient();
     const onFlush = vi.fn();
-
     subscribeOrgScopedRealtime({
-      client,
+      client: mock.client,
       orgId: "org-1",
       tables: ["employees", "jobs"] as const,
       debounceMs: 150,
       onFlush,
-      channelNamePrefix: "org-freshness",
     });
 
-    mock.onCalls.forEach(({ handler }) => handler());
-    mock.onCalls.forEach(({ handler }) => handler());
-
-    expect(onFlush).not.toHaveBeenCalled();
+    mock.send("org:org-1", { table: "employees", op: "UPDATE" });
+    mock.send("org:org-1", { table: "jobs", op: "INSERT" });
+    mock.send("org:org-1", { table: "employees", op: "UPDATE" });
+    mock.send("org:org-1", { table: "invitations", op: "INSERT" });
     vi.advanceTimersByTime(150);
 
-    expect(onFlush).toHaveBeenCalledTimes(1);
-    expect(onFlush).toHaveBeenCalledWith(["employees", "jobs"]);
+    expect(onFlush).toHaveBeenCalledExactlyOnceWith(["employees", "jobs"]);
   });
 
-  it("leaves out the events skipEvent answers true for", () => {
-    const mock = createMockChannel();
-    const client = createMockClient(mock.channel);
+  it("leaves out an event the caller handled", () => {
+    const mock = createMockClient();
     const onFlush = vi.fn();
     const skipEvent = vi.fn(
-      (_table: string, payload: { new?: Record<string, unknown> }) => payload.new?.skip === true,
+      (_table: string, payload: { viewStamps?: readonly unknown[] }) =>
+        payload.viewStamps !== undefined,
     );
-
     subscribeOrgScopedRealtime({
-      client,
+      client: mock.client,
       orgId: "org-1",
-      tables: ["employees", "jobs"] as const,
+      tables: ["organization_memberships"] as const,
       debounceMs: 150,
       onFlush,
       skipEvent,
-      channelNamePrefix: "org-freshness",
     });
 
-    mock.onCalls[0]?.handler({ new: { skip: true } });
-    mock.onCalls[1]?.handler({ new: { skip: false } });
+    mock.send("org:org-1", {
+      table: "organization_memberships",
+      op: "UPDATE",
+      view_stamps: [{ user_id: "u1", updated_at: "2026-11-13T00:00:00Z" }],
+    });
     vi.advanceTimersByTime(150);
 
-    expect(skipEvent).toHaveBeenCalledWith("employees", { new: { skip: true } });
-    expect(onFlush).toHaveBeenCalledWith(["jobs"]);
+    expect(skipEvent).toHaveBeenCalledOnce();
+    expect(onFlush).not.toHaveBeenCalled();
   });
 
-  it("cleanup disposes the debounce timer and removes the channel", () => {
-    const mock = createMockChannel();
-    const client = createMockClient(mock.channel);
+  it("stops flushing once disposed", () => {
+    const mock = createMockClient();
     const onFlush = vi.fn();
-
-    const cleanup = subscribeOrgScopedRealtime({
-      client,
+    const dispose = subscribeOrgScopedRealtime({
+      client: mock.client,
       orgId: "org-1",
       tables: ["employees"] as const,
       debounceMs: 150,
       onFlush,
-      channelNamePrefix: "org-freshness",
     });
 
-    mock.onCalls[0]?.handler();
-    cleanup();
-    vi.advanceTimersByTime(150);
+    mock.send("org:org-1", { table: "employees", op: "UPDATE" });
+    dispose();
+    vi.advanceTimersByTime(1_000);
 
     expect(onFlush).not.toHaveBeenCalled();
-    expect(client.removeChannel).toHaveBeenCalledWith(mock.channel);
+    expect(mock.raw.removeChannel).toHaveBeenCalledOnce();
   });
 });

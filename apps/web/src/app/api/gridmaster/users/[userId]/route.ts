@@ -16,7 +16,7 @@ import {
 } from "@/features/employees/server/login-email";
 import { followUpLinkedLoginEmailChange } from "@/features/employees/server/login-email-follow-up";
 
-const paramsSchema = z.object({ userId: z.string().uuid() });
+const paramsSchema = z.object({ userId: z.guid() });
 
 const patchSchema = z.discriminatedUnion("action", [
   z.object({

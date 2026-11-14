@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useClipPageTrailingWhitespace } from "@/hooks/useClipTrailingWhitespace";
 import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
@@ -19,6 +19,7 @@ import {
 import {
   useCanSeeBilling,
   useIsInSandbox,
+  useOrgRealtimeInvalidation,
   useOrganizationData,
   usePermissions,
   useSandboxSourceOrgId,
@@ -45,6 +46,14 @@ function isAppRoute(pathname: string): boolean {
 
 function AppHeader() {
   const perms = usePermissions();
+  // Draft cells, snapshots and notes arrive on their own topic, which only
+  // someone who edits the schedule may join (migration 140).
+  useOrgRealtimeInvalidation({
+    orgId: perms.orgId,
+    queryClient: useQueryClient(),
+    includeDrafts:
+      perms.isSuperAdmin || perms.isGridmaster || perms.canEditShifts || perms.canEditNotes,
+  });
   // A sandbox's permissions name the sandbox copy, which /api/billing refuses:
   // billing is the source organization's, as Billing settings already shows.
   // Asking for the copy's id held the header (and everything in it) behind a

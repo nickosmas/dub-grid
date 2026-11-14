@@ -16,7 +16,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  orgId: z.string().uuid().nullable().optional(),
+  orgId: z.guid().nullable().optional(),
   email: z.string().trim().email().max(320).nullable().optional(),
   phone: z.string().trim().min(1).max(40).nullable().optional(),
 });

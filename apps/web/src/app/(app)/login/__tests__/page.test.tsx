@@ -144,7 +144,9 @@ function loginResponse(overrides: Record<string, unknown> = {}) {
 
 describe("OrgLogin submit states", () => {
   beforeEach(() => {
+    // Vitest 4's restoreAllMocks no longer clears vi.fn() mocks.
     vi.restoreAllMocks();
+    vi.resetAllMocks();
     Object.defineProperty(window, "location", {
       value: {
         host: "test-org.localhost",

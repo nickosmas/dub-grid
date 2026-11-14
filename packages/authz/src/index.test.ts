@@ -133,16 +133,16 @@ describe("buildPerms", () => {
     });
   });
 
-  it("strips manage permissions while impersonating", () => {
-    const perms = buildPerms("gridmaster", "org-1", false, null, true);
-    expect(perms.canManageEmployees).toBe(false);
-    expect(perms.isImpersonating).toBe(true);
-  });
-
-  it("shows schedule notes read-only while impersonating, shifts still editable", () => {
-    const perms = buildPerms("gridmaster", "org-1", false, null, true);
-    expect(perms.canEditNotes).toBe(false);
-    expect(perms.canEditShifts).toBe(true);
+  // Owner decision 2026-11-13 (F-250): impersonating never narrows what the
+  // role can do; the flag only marks the session.
+  it("keeps every power while impersonating", () => {
+    const impersonating = buildPerms("gridmaster", "org-1", false, null, true);
+    const plain = buildPerms("gridmaster", "org-1", false, null);
+    expect(impersonating.isImpersonating).toBe(true);
+    expect({ ...impersonating, isImpersonating: false, atLeast: null }).toEqual({
+      ...plain,
+      atLeast: null,
+    });
   });
 
   // admin_permissions is an unvalidated JSONB column, so the resolver has to

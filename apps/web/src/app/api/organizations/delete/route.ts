@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 const DELETE_ORG_AUDIT_ACTION = "organization.deleted";
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   confirmation: z.string().min(1),
 });
 

@@ -359,4 +359,17 @@ describe("ProfileSecurityScreen", () => {
       screen.queryByRole("button", { name: "Request account deletion" }),
     ).not.toBeInTheDocument();
   });
+  it("offers no deletion request until the role is known", () => {
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+    render(<ProfileSecurityScreen />);
+
+    expect(
+      screen.queryByRole("button", { name: "Request account deletion" }),
+    ).not.toBeInTheDocument();
+  });
 });

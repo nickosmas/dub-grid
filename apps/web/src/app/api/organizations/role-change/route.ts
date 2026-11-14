@@ -24,10 +24,10 @@ function getRequestIp(req: NextRequest): string | null {
 }
 
 const roleChangeSchema = z.object({
-  targetUserId: z.string().uuid(),
+  targetUserId: z.guid(),
   newRole: z.string().min(1),
-  orgId: z.string().uuid(),
-  idempotencyKey: z.string().uuid(),
+  orgId: z.guid(),
+  idempotencyKey: z.guid(),
 });
 
 export async function POST(req: NextRequest) {

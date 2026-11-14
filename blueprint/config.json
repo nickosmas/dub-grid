@@ -15,12 +15,12 @@
   },
   "qualityGates": {
     "regular": {
-      "audit": "manual",
+      "audit": "when-sensitive",
       "check": "manual",
       "tryGuide": "manual"
     },
     "continuous": {
-      "audit": "manual",
+      "audit": "when-sensitive",
       "check": "manual",
       "tryGuide": "manual"
     }

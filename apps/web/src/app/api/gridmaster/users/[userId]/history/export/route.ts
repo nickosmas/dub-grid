@@ -7,7 +7,7 @@ import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { loadPersonHistory } from "@/features/gridmaster/server/person-history";
 
-const paramsSchema = z.object({ userId: z.string().uuid() });
+const paramsSchema = z.object({ userId: z.guid() });
 
 const NOT_FOUND = "We couldn't find that account. Refresh the page and try again.";
 

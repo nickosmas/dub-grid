@@ -190,7 +190,7 @@ describe("ProfileSessionsScreen", () => {
     });
   });
 
-  it("keeps the selected device and confirmation intact when identity confirmation is cancelled", async () => {
+  it("keeps the device open but drops the confirmation when identity confirmation is cancelled", async () => {
     const mutateAsync = vi.fn().mockResolvedValue(undefined);
     useMutation.mockReturnValue({ isPending: false, mutate: vi.fn(), mutateAsync });
     stepUpRun.mockResolvedValue(false);
@@ -202,8 +202,10 @@ describe("ProfileSessionsScreen", () => {
       fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sign out" }));
     });
 
-    expect(screen.getByText("Sign out Pixel 8?")).toBeInTheDocument();
-    expect(screen.getByText("It will lose access right away.")).toBeInTheDocument();
+    // On a phone the confirmation is the system alert: left set, it would pop
+    // straight back up after the person cancelled.
+    expect(screen.queryByText("Sign out Pixel 8?")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign out this device" })).toBeInTheDocument();
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 

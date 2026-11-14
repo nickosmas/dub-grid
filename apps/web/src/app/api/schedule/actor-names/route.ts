@@ -6,8 +6,8 @@ import logger from "@/lib/logger";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 
 const actorNamesSchema = z.object({
-  orgId: z.string().uuid(),
-  ids: z.array(z.string().uuid()).min(1).max(200),
+  orgId: z.guid(),
+  ids: z.array(z.guid()).min(1).max(200),
 });
 
 function formatDisplayName(firstName: string | null, lastName: string | null): string | null {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Employee } from "@dubgrid/domain";
 import { updateMobilePersonStatus } from "@dubgrid/mobile-api-core";
+import type { MockFn } from "./helpers/mock-fn";
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -29,8 +30,8 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 function makeDeps(
   currentEmployee: Employee,
   overrides: Partial<{
-    fetchActiveMembershipOrgRole: ReturnType<typeof vi.fn>;
-    countActiveSuperAdmins: ReturnType<typeof vi.fn>;
+    fetchActiveMembershipOrgRole: MockFn;
+    countActiveSuperAdmins: MockFn;
   }> = {},
 ) {
   return {

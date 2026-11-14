@@ -21,8 +21,8 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  empId: z.string().uuid(),
-  orgId: z.string().uuid(),
+  empId: z.guid(),
+  orgId: z.guid(),
   action: z.enum(STATUS_CHANGE_ACTIONS),
   expectedVersion: z.number().int().min(0),
   note: z.string().trim().max(500).optional(),

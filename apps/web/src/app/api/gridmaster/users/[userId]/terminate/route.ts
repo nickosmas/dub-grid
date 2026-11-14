@@ -10,7 +10,7 @@ import { endUserSessions } from "@/lib/auth/revocation";
 import { apiErrorResponse } from "@/lib/error-handling";
 
 const paramsSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.guid(),
 });
 
 const bodySchema = z.object({

@@ -72,6 +72,9 @@ export default function ProfileSecurityScreen() {
   // Deletion is a super admin's decision, and a super admin deletes from the
   // web profile; every other member, people managers included, requests it.
   const isSuperAdmin = Boolean(bootstrapQuery.data?.permissions.canManageManagementAccess);
+  // Offered only once the role is known: before the bootstrap answers, a Super
+  // Admin would otherwise be shown the request meant for everyone else.
+  const canRequestDeletion = Boolean(bootstrapQuery.data) && !isSuperAdmin;
   const deletionRequestMutation = useMutation({
     mutationFn: () =>
       createProfileChangeRequest(accessToken!, {
@@ -211,7 +214,7 @@ export default function ProfileSecurityScreen() {
             </ProfileSection>
           ) : null}
 
-          {!isSuperAdmin ? (
+          {canRequestDeletion ? (
             <ProfileSection>
               {IS_NATIVE_LIST ? (
                 <ProfileList>

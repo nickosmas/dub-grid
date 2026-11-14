@@ -171,8 +171,22 @@ export function ManagementStaffPanel({
     ],
   );
 
-  // Reset form when person changes
+  // Reseeds for another person, or when this person's saved details really
+  // change while nothing is being edited. A directory refetch hands over a new
+  // object with the same values, which must not wipe what was typed.
+  const seededRef = useRef<{ personId: string; key: string } | null>(null);
+  const hasChangesRef = useRef(false);
   useEffect(() => {
+    const key = JSON.stringify(personDraft);
+    const seeded = seededRef.current;
+    if (
+      seeded &&
+      seeded.personId === person.personId &&
+      (seeded.key === key || hasChangesRef.current)
+    ) {
+      return;
+    }
+    seededRef.current = { personId: person.personId, key };
     setFirstName(personDraft.firstName);
     setLastName(personDraft.lastName);
     setEmail(personDraft.email);
@@ -200,6 +214,7 @@ export function ManagementStaffPanel({
     currentDraft.phone !== savedDraft.phone ||
     JSON.stringify(currentDraft.managementDepartmentIds) !==
       JSON.stringify(savedDraft.managementDepartmentIds);
+  hasChangesRef.current = hasChanges;
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
     hasUnsavedChanges: hasChanges,
     onDiscard: closePanel,

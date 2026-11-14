@@ -1,6 +1,12 @@
 import type { MobileProfileResponse } from "@dubgrid/contracts";
 import { describe, expect, it } from "vitest";
-import { makeProfileDraft, profileDraftHasChanges, type LinkedEmployee } from "./profile-draft";
+import {
+  makeProfileDraft,
+  profileDraftHasChanges,
+  profileNameChanged,
+  profilePhoneChanged,
+  type LinkedEmployee,
+} from "./profile-draft";
 
 const linkedEmployee = {
   phone: "(555) 010-0100",
@@ -34,6 +40,30 @@ describe("profileDraftHasChanges", () => {
     const draft = { ...opened(), departmentIds: [7] };
 
     expect(profileDraftHasChanges(draft, profile, linkedEmployee)).toBe(true);
+  });
+
+  it("leaves an untouched phone clean when it was saved in another format", () => {
+    const dashed = { ...linkedEmployee, phone: "555-010-0100" } as LinkedEmployee;
+    const draft = makeProfileDraft(profile, dashed);
+
+    expect(profilePhoneChanged(draft, dashed)).toBe(false);
+    expect(profileDraftHasChanges(draft, profile, dashed)).toBe(false);
+  });
+
+  it("leaves an untouched name clean when it was saved with extra spaces", () => {
+    const spaced = {
+      ...profile,
+      user: { ...profile.user, firstName: "Mina  Rose ", lastName: " Diaz" },
+    } as MobileProfileResponse;
+    const draft = makeProfileDraft(spaced, linkedEmployee);
+
+    expect(profileNameChanged(draft, spaced)).toBe(false);
+    expect(profileDraftHasChanges(draft, spaced, linkedEmployee)).toBe(false);
+  });
+
+  it("sees a real name or phone edit", () => {
+    expect(profileNameChanged({ ...opened(), lastName: "Diaz-Ruiz" }, profile)).toBe(true);
+    expect(profilePhoneChanged({ ...opened(), phone: "555-010-0101" }, linkedEmployee)).toBe(true);
   });
 
   it("leaves an untouched phone clean when the saved one carries stray spaces", () => {

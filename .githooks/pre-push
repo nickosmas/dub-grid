@@ -7,12 +7,29 @@
 # Both run through Turborepo, so an unchanged workspace replays from cache and
 # the hook usually costs far less than a cold run.
 #
-# Bypass with `git push --no-verify` when you need to.
+# Bypass the checks with `git push --no-verify` when you need to. Never bypass
+# the protected-branch refusal below.
 
 set -e
 
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
+
+# `dev` and `main` change only through merged pull requests (AGENTS.md, "DubGrid
+# Git policy"). Branch protection isn't available on this plan, so refuse the
+# push here, before the slow checks, rather than relying on each agent reading
+# the policy. Git passes one "<local ref> <local sha> <remote ref> <remote sha>"
+# line per ref being pushed.
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/dev | refs/heads/main)
+      echo "pre-push: refusing to push to ${remote_ref#refs/heads/}."
+      echo "  dev and main change only through a merged pull request."
+      echo "  Push your work branch and open a pull request into dev instead."
+      exit 1
+      ;;
+  esac
+done
 
 echo "pre-push: type-check"
 if ! npm run type-check --silent; then

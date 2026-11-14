@@ -23,27 +23,26 @@ vi.mock("@/lib/auth-context", () => ({
 
 // ── Mock account client adapter (only the pieces usePermissions still uses) ──
 const mockFetchAccountPermissions = vi.fn();
-const mockRemoveBrowserRealtimeChannel = vi.fn();
-
-function createMockChannel() {
-  const channel = {
-    on: vi.fn(),
-    subscribe: vi.fn(),
-  };
-  channel.on.mockReturnValue(channel);
-  channel.subscribe.mockReturnValue(channel);
-  return channel;
-}
-
-const mockCreateBrowserRealtimeChannel = vi.fn((_name: string) => createMockChannel());
+type TableListener = { table: string; topic: string; onEvent: () => void };
+const mockSubscriptions: { listeners: TableListener[]; released: boolean }[] = [];
 const mockRefreshBrowserSession = vi.fn();
 const mockToastInfo = vi.fn();
 
+vi.mock("@dubgrid/realtime-core", () => ({
+  userTopic: (userId: string) => `user:${userId}`,
+  subscribeToTableChanges: (_client: unknown, listeners: TableListener[]) => {
+    const subscription = { listeners, released: false };
+    mockSubscriptions.push(subscription);
+    return () => {
+      subscription.released = true;
+    };
+  },
+}));
+
 vi.mock("@/features/account/client", () => ({
-  createBrowserRealtimeChannel: (name: string) => mockCreateBrowserRealtimeChannel(name),
   fetchAccountPermissions: () => mockFetchAccountPermissions(),
+  getBrowserSupabaseClient: () => ({}),
   refreshBrowserSession: () => mockRefreshBrowserSession(),
-  removeBrowserRealtimeChannel: (channel: unknown) => mockRemoveBrowserRealtimeChannel(channel),
 }));
 
 vi.mock("sonner", () => ({
@@ -430,7 +429,7 @@ describe("usePermissions hook", () => {
     expect(result.current.role).toBe("super_admin");
   });
 
-  it("shares one membership channel across consumers and token refreshes, refetching only on a real change", async () => {
+  it("shares one subscription across consumers and token refreshes, refetching on a membership change", async () => {
     signIn({
       platform_role: "none",
       org_role: "admin",
@@ -442,7 +441,7 @@ describe("usePermissions hook", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = ({ children }: { children: ReactNode }) =>
       createElement(QueryClientProvider, { client: queryClient }, children);
-    const channelsBefore = mockCreateBrowserRealtimeChannel.mock.results.length;
+    const subscriptionsBefore = mockSubscriptions.length;
     const hooks = Array.from({ length: 10 }, () => renderHook(() => usePermissions(), { wrapper }));
     await waitFor(() => expect(hooks[0].result.current.isLoading).toBe(false));
 
@@ -455,32 +454,14 @@ describe("usePermissions hook", () => {
     });
     hooks.forEach((hook) => hook.rerender());
 
-    const membershipHandlers = mockCreateBrowserRealtimeChannel.mock.results
-      .slice(channelsBefore)
-      .map((entry) => entry.value as { on: ReturnType<typeof vi.fn> })
-      .flatMap((channel) => channel.on.mock.calls)
-      .filter(([, config]) => (config as { table?: string }).table === "organization_memberships")
-      .map(([, , handler]) => handler as (payload: unknown) => void);
-    expect(membershipHandlers).toHaveLength(1);
-    expect(mockCreateBrowserRealtimeChannel.mock.results.length - channelsBefore).toBe(2);
-    const [onMembershipUpdate] = membershipHandlers;
+    const added = mockSubscriptions.slice(subscriptionsBefore);
+    expect(added).toHaveLength(1);
+    const onMembershipUpdate = added[0].listeners.find(
+      (listener) => listener.table === "organization_memberships",
+    )!.onEvent;
     const fetchesBefore = mockFetchAccountPermissions.mock.calls.length;
-    const row = {
-      user_id: "u-1",
-      org_id: "org-1",
-      org_role: "admin",
-      admin_permissions: ALL_FALSE_PERMS,
-      archived_at: null,
-    };
 
-    // Opening Schedule stamps schedule_last_viewed_at on the same row.
-    act(() => onMembershipUpdate({ new: { ...row, schedule_last_viewed_at: "now" } }));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(mockFetchAccountPermissions.mock.calls.length).toBe(fetchesBefore);
-
-    act(() => onMembershipUpdate({ new: { ...row, org_role: "super_admin" } }));
+    act(() => onMembershipUpdate());
     await waitFor(() =>
       expect(mockFetchAccountPermissions.mock.calls.length).toBeGreaterThan(fetchesBefore),
     );
@@ -488,7 +469,7 @@ describe("usePermissions hook", () => {
     expect(mockFetchAccountPermissions.mock.calls.length - fetchesBefore).toBe(1);
 
     hooks.forEach((hook) => hook.unmount());
-    expect(mockRemoveBrowserRealtimeChannel).toHaveBeenCalledTimes(2);
+    expect(added[0].released).toBe(true);
   });
 
   it("re-resolves when auth changes to a different user", async () => {

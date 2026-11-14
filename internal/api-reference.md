@@ -36,13 +36,14 @@ The mobile API (`/api/mobile/v1/*`) uses a Bearer token in the `Authorization` h
 
 ### Scheduled jobs (`Authorization: Bearer $CRON_SECRET`)
 
-| Method | Path                        | Purpose                                                                         | Schedule                                         |
-| ------ | --------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------ |
-| GET    | `/api/cron/expire-requests` | Expire stale shift requests and pending invitations, notify the affected people | Hourly, `cron-expire-requests.yml` GitHub Action |
-| GET    | `/api/cron/trial-expiry`    | Send trial-ending-soon and trial-expired billing notifications                  | Daily, `apps/web/vercel.json`                    |
-| GET    | `/api/cron/sandbox-cleanup` | Delete abandoned test sandboxes (older than 14 days)                            | Daily, `apps/web/vercel.json`                    |
+| Method | Path                                     | Purpose                                                                                                                                       | Schedule                                         |
+| ------ | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| GET    | `/api/cron/expire-requests`              | Expire stale shift requests and pending invitations, notify the affected people                                                               | Hourly, `cron-expire-requests.yml` GitHub Action |
+| GET    | `/api/cron/trial-expiry`                 | Send trial-ending-soon and trial-expired billing notifications                                                                                | Daily, `apps/web/vercel.json`                    |
+| GET    | `/api/cron/sandbox-cleanup`              | Delete abandoned test sandboxes (older than 14 days)                                                                                          | Daily, `apps/web/vercel.json`                    |
+| GET    | `/api/cron/purge-archived-organizations` | Delete organizations archived 90 days ago, their activity log and the accounts left with no organization (`purge_archived_organization`, 142) | Daily, `apps/web/vercel.json`                    |
 
-Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_requests`, `cron_trial_expiry`, `cron_sandbox_cleanup`).
+Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_requests`, `cron_trial_expiry`, `cron_sandbox_cleanup`, `cron_purge_archived_orgs`).
 
 ---
 
@@ -95,28 +96,29 @@ Each cron is also behind a `platform_feature_flags` kill switch (`cron_expire_re
 
 ### Organization
 
-| Method | Path                                    | Purpose                                                                                    |
-| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------ |
-| GET    | `/api/organization/bootstrap`           | Load all org-scoped config for the current session                                         |
-| GET    | `/api/organization/access-status`       | Report whether the organization gate would still hold this caller (recovery poll)          |
-| GET    | `/api/organization/directory`           | Paginated staff directory (calls `get_org_directory` RPC)                                  |
-| GET    | `/api/organization/employee-count`      | Return headcount for the org                                                               |
-| GET    | `/api/organizations/users`              | List users in the org                                                                      |
-| PATCH  | `/api/organizations/access`             | Update membership (role, permissions, departments)                                         |
-| DELETE | `/api/organizations/access`             | Remove a user from the org                                                                 |
-| PATCH  | `/api/organizations/app-only-user`      | Update an app-only member's details (target must be an active member of the effective org) |
-| POST   | `/api/organizations/delete`             | Soft-delete the caller's org (super_admin only, fresh sensitive-action auth)               |
-| GET    | `/api/organizations/invitations`        | List pending invitations                                                                   |
-| POST   | `/api/organizations/invitations`        | Create an invitation                                                                       |
-| PATCH  | `/api/organizations/invitations`        | Update an invitation (access and address changes replace the token and send a new link)    |
-| DELETE | `/api/organizations/invitations`        | Revoke an invitation                                                                       |
-| POST   | `/api/organizations/invitations/create` | Create an invitation and email its link; a failed send creates nothing                     |
-| POST   | `/api/organizations/role-change`        | Change a member's org role                                                                 |
-| PUT    | `/api/organizations/settings`           | Update org settings                                                                        |
-| GET    | `/api/onboarding`                       | Get onboarding state                                                                       |
-| POST   | `/api/onboarding`                       | Advance or complete onboarding step                                                        |
-| GET    | `/api/settings/config`                  | Read org-level config overrides                                                            |
-| POST   | `/api/settings/config`                  | Update org-level config overrides                                                          |
+| Method | Path                                    | Purpose                                                                                                 |
+| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/organization/bootstrap`           | Load all org-scoped config for the current session                                                      |
+| GET    | `/api/organization/access-status`       | Report whether the organization gate would still hold this caller (recovery poll)                       |
+| GET    | `/api/organization/directory`           | Paginated staff directory (calls `get_org_directory` RPC)                                               |
+| GET    | `/api/organization/employee-count`      | Return headcount for the org                                                                            |
+| GET    | `/api/organizations/users`              | List users in the org                                                                                   |
+| PATCH  | `/api/organizations/access`             | Update membership (role, permissions, departments)                                                      |
+| DELETE | `/api/organizations/access`             | Remove a user from the org                                                                              |
+| PATCH  | `/api/organizations/app-only-user`      | Update an app-only member's details (target must be an active member of the effective org)              |
+| POST   | `/api/organizations/delete`             | Soft-delete the caller's org (super_admin only, fresh sensitive-action auth)                            |
+| GET    | `/api/organizations/export`             | ZIP of staff, published days, requests and activity log (super_admin only, fresh sensitive-action auth) |
+| GET    | `/api/organizations/invitations`        | List pending invitations                                                                                |
+| POST   | `/api/organizations/invitations`        | Create an invitation                                                                                    |
+| PATCH  | `/api/organizations/invitations`        | Update an invitation (access and address changes replace the token and send a new link)                 |
+| DELETE | `/api/organizations/invitations`        | Revoke an invitation                                                                                    |
+| POST   | `/api/organizations/invitations/create` | Create an invitation and email its link; a failed send creates nothing                                  |
+| POST   | `/api/organizations/role-change`        | Change a member's org role                                                                              |
+| PUT    | `/api/organizations/settings`           | Update org settings                                                                                     |
+| GET    | `/api/onboarding`                       | Get onboarding state                                                                                    |
+| POST   | `/api/onboarding`                       | Advance or complete onboarding step                                                                     |
+| GET    | `/api/settings/config`                  | Read org-level config overrides                                                                         |
+| POST   | `/api/settings/config`                  | Update org-level config overrides                                                                       |
 
 ---
 
@@ -239,6 +241,7 @@ All gridmaster routes require `platform_role = 'gridmaster'` in the JWT. They ar
 | POST           | `/api/gridmaster/users/[userId]/terminate`    | Terminate an account platform-wide: memberships archived, employee rows removed, sessions cut, org-side reinstatement blocked (fresh sensitive-action auth) |
 | POST           | `/api/gridmaster/users/[userId]/reinstate`    | Lift a platform termination; access is granted again explicitly by a gridmaster (fresh sensitive-action auth)                                               |
 | POST           | `/api/gridmaster/organizations/manage`        | Manage org lifecycle (suspend, restore, archive)                                                                                                            |
+| GET            | `/api/gridmaster/organizations/export`        | The same ZIP as `/api/organizations/export`, for any real organization including one archived within 90 days (fresh sensitive-action auth)                  |
 | GET            | `/api/gridmaster/invitations`                 | List invitations across all orgs                                                                                                                            |
 | GET            | `/api/gridmaster/audit-log`                   | Paginated audit log for a period                                                                                                                            |
 | GET            | `/api/gridmaster/audit-log/day-counts`        | Per-day event counts for the period navigator                                                                                                               |

@@ -7,7 +7,7 @@ import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { loadPersonHistory } from "@/features/gridmaster/server/person-history";
 
-const paramsSchema = z.object({ employeeId: z.string().uuid() });
+const paramsSchema = z.object({ employeeId: z.guid() });
 
 const NOT_FOUND = "We couldn't find that staff record. Refresh the page and try again.";
 

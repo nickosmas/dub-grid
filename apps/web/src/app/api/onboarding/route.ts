@@ -8,11 +8,11 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 
 const searchSchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
 });
 
 const postSchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
 });
 
 async function handleGET(req: NextRequest, timer: Timer) {

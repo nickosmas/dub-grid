@@ -181,6 +181,14 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
 - Absence runs in the grid: a whole-day absence on days in a row reads as
   one bar per week, labeled with its name and a count of days ("Vacation
   ×4"), while each day stays its own cell to click, change or remove.
+- Platform and access rules (owner, 2026-11-08 and 2026-11-13): the mobile
+  app stays signed in until the person signs out, while web sessions end
+  after 35 minutes idle; suspending or offboarding someone ends only their
+  sessions in that organization; a Gridmaster's schedule, request, publish
+  and settings writes need an active impersonation of the organization, and
+  impersonating never narrows their powers; an archived organization stays
+  restorable for 90 days, with an export offered, before a scheduled job
+  deletes it and its staff data.
 
 Items 1 through 39 and 41 through 43 are shipped. Item 40, documentation truth
 and drift prevention, is in progress: the source inventory and contract (40a),

@@ -328,38 +328,38 @@ const coverageEntrySchema = z.object({
 const postBodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("saveCertifications"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     items: z.array(namedItemSchema),
     existing: z.array(namedItemSchema),
     hardDeleteIds: z.array(z.number().int()).optional(),
   }),
   z.object({
     action: z.literal("restoreCertification"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
   }),
   z.object({
     action: z.literal("saveOrganizationRoles"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     items: z.array(namedItemSchema),
     existing: z.array(namedItemSchema),
     hardDeleteIds: z.array(z.number().int()).optional(),
   }),
   z.object({
     action: z.literal("restoreOrganizationRole"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
   }),
   z.object({
     action: z.literal("saveDepartments"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     items: z.array(departmentSchema),
     existing: z.array(departmentSchema),
     hardDeleteIds: z.array(z.number().int()).optional(),
   }),
   z.object({
     action: z.literal("restoreDepartment"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
   }),
   z.object({
@@ -368,13 +368,13 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("deleteFocusArea"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
     hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("saveFocusAreas"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     upserts: z
       .array(focusAreaSchema.extend({ id: z.number().int().optional() }))
       .max(MAX_BATCH_ITEMS),
@@ -384,7 +384,7 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("restoreFocusArea"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
   }),
   z.object({
@@ -393,7 +393,7 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("saveShiftCategories"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     items: z
       .array(shiftCategorySchema.extend({ id: z.number().int().optional() }))
       .min(1)
@@ -401,13 +401,13 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("deleteShiftCategory"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
     hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("restoreShiftCategory"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
   }),
   z.object({
@@ -416,7 +416,7 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("saveJobDefinitions"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     items: z
       .array(jobSchema.extend({ id: z.number().int().optional() }))
       .min(1)
@@ -424,18 +424,18 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("deleteJobDefinition"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
     hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("restoreJobDefinition"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
   }),
   z.object({
     action: z.literal("saveCoverageRequirements"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     focusAreaId: z.number().int(),
     jobId: z.number().int(),
     preferredShiftId: z.number().int().nullable(),
@@ -443,7 +443,7 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("saveCoverageRequirementsBatch"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     entries: z.array(coverageEntrySchema).min(1).max(MAX_BATCH_ITEMS),
   }),
   z.object({
@@ -452,13 +452,13 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("deleteAbsenceType"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
     hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("restoreAbsenceType"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
   }),
   z.object({
@@ -467,13 +467,13 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("deleteIndicatorType"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
     hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("restoreIndicatorType"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     itemId: z.number().int(),
   }),
 ]);

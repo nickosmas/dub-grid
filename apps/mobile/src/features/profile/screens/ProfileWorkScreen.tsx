@@ -46,6 +46,8 @@ import {
   updateProfilePhone,
 } from "../../../shared/lib/api";
 import { getDepartmentNames, getScheduledDepartmentNames } from "../../../shared/lib/departments";
+import { EMAIL_UNAVAILABLE_MESSAGE, translateErrorMessage } from "@dubgrid/client-errors";
+import { getMobileAuthIdentityKey } from "../../../shared/lib/access-token";
 import { getClientFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { queryClient } from "../../../shared/lib/query-client";
@@ -72,6 +74,11 @@ import { isRoleCertificationBlocked } from "../lib/role-certification";
 import {
   makeProfileDraft as makeDraft,
   profileDraftHasChanges,
+  profileEmailChanged,
+  profileFirstNameChanged,
+  profileLastNameChanged,
+  profileNameChanged,
+  profilePhoneChanged,
   profileWorkChanged,
   type ProfileDraft,
 } from "../lib/profile-draft";
@@ -81,6 +88,10 @@ import { getMobileStepUpMethod } from "../lib/step-up";
 import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
 const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
+
+type SaveConfirmation =
+  | { kind: "email"; email: string; isNameRequest: boolean; hasOtherChanges: boolean }
+  | { kind: "name"; hasOtherChanges: boolean };
 
 /**
  * Field-level validation for the edit form.
@@ -134,7 +145,10 @@ export default function ProfileWorkScreen() {
   const draftTouchedRef = useRef(false);
   // Only the save confirmation now: the discard half belongs to the guard,
   // which has to answer to back navigation as well as to the Cancel button.
-  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  // Fixed when Save opens it, so a draft that moves underneath can't turn an
+  // email change into a name change request.
+  const [saveConfirmation, setSaveConfirmation] = useState<SaveConfirmation | null>(null);
+  const showSaveConfirmation = saveConfirmation !== null;
   const focusAreaQuestion = useFocusAreaShiftsQuestion();
   const [saveError, setSaveError] = useState<string | null>(null);
   const stepUp = useMobileStepUpAction();
@@ -147,24 +161,22 @@ export default function ProfileWorkScreen() {
   const manualRefresh = useManualRefresh(() => profileQuery.refetch());
   const profile = profileQuery.data ?? null;
   const linkedEmployee = profile?.linkedEmployee ?? null;
+  // Until the bootstrap answers, nobody is treated as someone who must ask:
+  // Save waits instead of offering a Super Admin a name change request.
+  const permissionsKnown = Boolean(bootstrapQuery.data);
   const canEditProfileDirectly = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const isNameRequest = Boolean(
+    permissionsKnown &&
     !canEditProfileDirectly &&
     profile &&
     draft &&
-    (draft.firstName.trim() !== (profile.user.firstName ?? "").trim() ||
-      draft.lastName.trim() !== (profile.user.lastName ?? "").trim()),
+    profileNameChanged(draft, profile),
   );
-  const hasEmailChange = Boolean(
-    profile &&
-    draft &&
-    draft.email.trim().toLowerCase() !== (profile.user.email ?? "").trim().toLowerCase(),
-  );
+  const hasEmailChange = Boolean(profile && draft && profileEmailChanged(draft, profile));
   const hasOtherChanges = Boolean(
     profile &&
     draft &&
-    (draft.email.trim().toLowerCase() !== (profile.user.email ?? "").trim().toLowerCase() ||
-      (linkedEmployee && draft.phone.trim() !== (linkedEmployee.phone ?? ""))),
+    (profileEmailChanged(draft, profile) || profilePhoneChanged(draft, linkedEmployee)),
   );
   const contentState = useMobileContentState({
     hasData: Boolean(profile),
@@ -212,7 +224,9 @@ export default function ProfileWorkScreen() {
       : null;
   useEffect(() => {
     if (!profile) return;
-    const identityKey = `${accessToken ?? "anonymous"}:${profile.user.id}:${linkedEmployee?.id ?? "no-employee"}`;
+    // Who is signed in, not the token: a refresh or an identity check mints a
+    // new token for the same person, and must not wipe what they typed.
+    const identityKey = `${getMobileAuthIdentityKey(accessToken).join(":")}:${profile.user.id}:${linkedEmployee?.id ?? "no-employee"}`;
     if (seededIdentityRef.current === identityKey && draftTouchedRef.current) return;
     seededIdentityRef.current = identityKey;
     setDraft(makeDraft(profile, linkedEmployee));
@@ -231,11 +245,8 @@ export default function ProfileWorkScreen() {
       const normalizedPhone = normalizeOptionalUsPhone(draft.phone);
 
       const emailChanged = normalizedEmail !== savedEmail;
-      const nameChanged =
-        normalizedFirst !== (profile.user.firstName ?? "") ||
-        normalizedLast !== (profile.user.lastName ?? "");
-      const phoneChanged =
-        Boolean(linkedEmployee) && normalizedPhone !== (linkedEmployee?.phone ?? "");
+      const nameChanged = profileNameChanged(draft, profile);
+      const phoneChanged = profilePhoneChanged(draft, linkedEmployee);
       const workChanged = linkedEmployee != null && profileWorkChanged(draft, linkedEmployee);
 
       // The sign-in email is account-wide, so nothing in this save is written
@@ -258,7 +269,7 @@ export default function ProfileWorkScreen() {
 
         if (linkedEmployee && (nameChanged || phoneChanged || workChanged)) {
           const body: MobilePersonUpdateBody = {
-            expectedVersion: linkedEmployee.version,
+            expectedVersion: draft.baseVersion ?? linkedEmployee.version,
             firstName: normalizedFirst,
             lastName: normalizedLast,
             employmentType: draft.employmentType,
@@ -277,7 +288,7 @@ export default function ProfileWorkScreen() {
                 ...body,
                 ...(focusAreaShifts ? { focusAreaShifts } : {}),
               }),
-            { self: true, beforeAsk: () => setShowSaveConfirmation(false) },
+            { self: true, beforeAsk: () => setSaveConfirmation(null) },
           );
           focusAreaShiftsNotCleared = saved.focusAreaShiftsNotCleared ?? null;
         }
@@ -285,16 +296,16 @@ export default function ProfileWorkScreen() {
         if (phoneChanged && linkedEmployee) {
           await updateProfilePhone(accessToken, {
             phone: normalizedPhone,
-            expectedVersion: linkedEmployee.version,
+            expectedVersion: draft.baseVersion ?? linkedEmployee.version,
           });
         }
 
         if (nameChanged) {
           const requestedChanges: Record<string, string> = {};
-          if (normalizedFirst !== (profile.user.firstName ?? "")) {
+          if (profileFirstNameChanged(draft, profile)) {
             requestedChanges.firstName = normalizedFirst;
           }
-          if (normalizedLast !== (profile.user.lastName ?? "")) {
+          if (profileLastNameChanged(draft, profile)) {
             requestedChanges.lastName = normalizedLast;
           }
           await createProfileChangeRequest(accessToken, {
@@ -311,10 +322,19 @@ export default function ProfileWorkScreen() {
           email: normalizedEmail,
         });
         if (result.error) {
-          emailFailure =
-            nameChanged || phoneChanged || workChanged
-              ? "Your profile was saved, but we couldn't start the email change. Try the email again."
-              : "We couldn't start the email change. Try again.";
+          const savedOthers = nameChanged || phoneChanged || workChanged;
+          // An address another account signs in with can't be taken, so "try
+          // again" would only fail the same way. Whose it is stays unsaid.
+          const taken =
+            result.error.code === "email_exists" ||
+            translateErrorMessage(result.error.message ?? "") === EMAIL_UNAVAILABLE_MESSAGE;
+          emailFailure = taken
+            ? savedOthers
+              ? "Your other changes were saved, but we can't use that email. Try a different one."
+              : EMAIL_UNAVAILABLE_MESSAGE
+            : savedOthers
+              ? "Your other changes were saved, but we couldn't change your email. Try again."
+              : "We couldn't change your email. Try again.";
         }
       }
 
@@ -336,7 +356,7 @@ export default function ProfileWorkScreen() {
       );
     },
     onSuccess: async (result) => {
-      setShowSaveConfirmation(false);
+      setSaveConfirmation(null);
       const [profileResult] = await Promise.all([
         profileQuery.refetch(),
         bootstrapQuery.refetch(),
@@ -386,15 +406,18 @@ export default function ProfileWorkScreen() {
   const hasChanges = Boolean(
     profile && draft && profileDraftHasChanges(draft, profile, linkedEmployee),
   );
-  const saveConfirmationPoints = hasEmailChange
-    ? [
-        ...(isNameRequest ? ["An admin reviews your new name."] : []),
-        ...(isNameRequest && hasOtherChanges ? ["Other edits you made are saved."] : []),
-        "Your email changes for every organization you belong to.",
-        "You'll confirm it's you first.",
-        "We'll email a link to your current address and your new one. Your email changes once you confirm both.",
-      ]
-    : [];
+  const saveConfirmationPoints =
+    saveConfirmation?.kind === "email"
+      ? [
+          ...(saveConfirmation.isNameRequest ? ["An admin reviews your new name."] : []),
+          ...(saveConfirmation.isNameRequest && saveConfirmation.hasOtherChanges
+            ? ["Other edits you made are saved."]
+            : []),
+          "Your email changes for every organization you belong to.",
+          "You'll confirm it's you first.",
+          "We'll email a link to your current address and your new one. Your email changes once you confirm both.",
+        ]
+      : [];
   const pushSettled = usePushSettled();
 
   const editFieldErrors =
@@ -412,7 +435,8 @@ export default function ProfileWorkScreen() {
   // Save is offered from the prompt only for a plain save: a name change
   // request and an email change each confirm first, and an invalid form can't
   // save at all.
-  const canSaveFromPrompt = hasChanges && !hasValidationErrors && !isNameRequest && !hasEmailChange;
+  const canSaveFromPrompt =
+    hasChanges && !hasValidationErrors && permissionsKnown && !isNameRequest && !hasEmailChange;
   // No `onClose`: unlike PersonDetailScreen there is no view mode to fall back
   // to, so nothing here calls `requestClose`. Leaving is `router.back()`, and
   // `useNavigationDiscardGuard` below is what puts the confirmation in front of
@@ -453,7 +477,11 @@ export default function ProfileWorkScreen() {
       return;
     }
     if (isNameRequest || hasEmailChange) {
-      setShowSaveConfirmation(true);
+      setSaveConfirmation(
+        hasEmailChange
+          ? { kind: "email", email: draft.email.trim(), isNameRequest, hasOtherChanges }
+          : { kind: "name", hasOtherChanges },
+      );
       return;
     }
     return saveMutation.mutateAsync(null);
@@ -477,7 +505,9 @@ export default function ProfileWorkScreen() {
         <View style={styles.actionButton}>
           <Button
             compact
-            disabled={saveMutation.isPending || !hasChanges || hasValidationErrors}
+            disabled={
+              saveMutation.isPending || !hasChanges || hasValidationErrors || !permissionsKnown
+            }
             label={isNameRequest ? "Send request" : "Save"}
             loading={saveMutation.isPending}
             onPress={handleSave}
@@ -497,7 +527,12 @@ export default function ProfileWorkScreen() {
           label: isNameRequest ? "Send" : "Save",
           accessibilityLabel: isNameRequest ? "Send request" : "Save",
           disabled:
-            !draft || !profile || saveMutation.isPending || !hasChanges || hasValidationErrors,
+            !draft ||
+            !profile ||
+            saveMutation.isPending ||
+            !hasChanges ||
+            hasValidationErrors ||
+            !permissionsKnown,
           loading: saveMutation.isPending,
           onPress: handleSave,
         }}
@@ -642,31 +677,49 @@ export default function ProfileWorkScreen() {
       )}
       <ConfirmationModal
         body={
-          hasEmailChange
+          saveConfirmation?.kind === "email"
             ? undefined
-            : hasOtherChanges
+            : saveConfirmation?.hasOtherChanges
               ? "An admin will review your new name. Your other edits will be saved."
               : "An admin will review your new name."
         }
         summary={saveConfirmationPoints.length > 0 ? { points: saveConfirmationPoints } : undefined}
         error={saveError}
-        confirmLabel={hasEmailChange ? "Request changes" : "Send request"}
+        confirmLabel={saveConfirmation?.kind === "email" ? "Request changes" : "Send request"}
         loading={saveMutation.isPending}
         onCancel={() => {
           setSaveError(null);
-          setShowSaveConfirmation(false);
+          setSaveConfirmation(null);
         }}
-        onConfirm={() =>
-          hasEmailChange
-            ? stepUp.run((actionAccessToken) => saveMutation.mutateAsync(actionAccessToken))
-            : saveMutation.mutateAsync(null)
-        }
+        onConfirm={async () => {
+          if (saveConfirmation?.kind !== "email") {
+            await saveMutation.mutateAsync(null);
+            return;
+          }
+          // Closed before the identity check, never after: on a phone this is
+          // the system alert, which reopens with whatever the screen says the
+          // moment it is visible again. Cancelling the check leaves the form as
+          // it was, and a failure shows on the form.
+          setSaveConfirmation(null);
+          try {
+            await stepUp.run((actionAccessToken) => saveMutation.mutateAsync(actionAccessToken));
+          } catch (error) {
+            if (
+              !getMobileStepUpMethod(error) &&
+              !(error instanceof FocusAreaShiftsCancelledError)
+            ) {
+              setSaveError(
+                getClientFriendlyErrorMessage(error, "We couldn't save your profile right now."),
+              );
+            }
+          }
+        }}
         title={
-          hasEmailChange
-            ? `Change your sign-in email to ${draft?.email.trim()}?`
+          saveConfirmation?.kind === "email"
+            ? `Change your sign-in email to ${saveConfirmation.email}?`
             : "Send name change request?"
         }
-        visible={showSaveConfirmation && !stepUp.active}
+        visible={showSaveConfirmation}
       />
       {stepUp.sheet}
       {focusAreaQuestion.modal}

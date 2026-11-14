@@ -12,7 +12,7 @@ import {
 } from "@/lib/db/publish-history";
 
 const querySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   limit: z.coerce.number().int().positive().max(100).optional(),
   offset: z.coerce.number().int().min(0).optional(),
   // Optional: scopes to publish events whose [start_date, end_date] range

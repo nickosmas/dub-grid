@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 const MAX_ROWS = 5000;
 
 const querySchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.guid().optional(),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   timeZone: z

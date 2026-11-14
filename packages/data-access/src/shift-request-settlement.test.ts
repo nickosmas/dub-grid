@@ -18,17 +18,6 @@ function makeClients(
 }
 
 describe("settleShiftRequestAfterTransition", () => {
-  it("does nothing when told to skip", async () => {
-    const { serviceClient, userClient, rpc } = makeClients("pending_approval", {
-      data: null,
-      error: null,
-    });
-    await expect(
-      settleShiftRequestAfterTransition({ userClient, serviceClient, requestId: "r1", skip: true }),
-    ).resolves.toEqual({ autoApproved: false, reason: "skipped" });
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
   it("does not call the database for a request that is not pending approval", async () => {
     const { serviceClient, userClient, rpc } = makeClients("open", { data: null, error: null });
     await expect(

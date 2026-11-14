@@ -13,7 +13,7 @@ import {
 } from "@dubgrid/domain";
 
 const switchOrganizationSchema = z.object({
-  targetOrgId: z.string().uuid(),
+  targetOrgId: z.guid(),
 });
 
 export async function GET(req: NextRequest) {

@@ -8,7 +8,7 @@ import logger from "@/lib/logger";
 import { writeGridmasterAuditLogAfterCommit } from "@/app/api/gridmaster/_lib/audit";
 import { loadPersonTarget } from "@/features/gridmaster/server/person-target";
 
-const paramsSchema = z.object({ userId: z.string().uuid() });
+const paramsSchema = z.object({ userId: z.guid() });
 const bodySchema = z.object({
   isInternal: z.boolean(),
   reason: z.string().trim().min(1).max(500),

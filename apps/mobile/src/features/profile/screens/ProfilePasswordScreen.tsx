@@ -18,6 +18,7 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { InlineError } from "../../../shared/components/InlineError";
 import { Screen } from "../../../shared/components/Screen";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
+import { clearSavedStepUpPassword } from "../../../shared/lib/biometric-step-up";
 import { EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
@@ -317,6 +318,9 @@ export default function ProfilePasswordScreen() {
           if (!mayHavePasswordUpdateCommitted(updateError)) throw updateError;
           unconfirmed = true;
         }
+        // The copy Face ID releases is the old password now. Left in place, the
+        // "Finish signing out" retry would offer it and be refused.
+        await clearSavedStepUpPassword();
         passwordChangeRef.current = { unconfirmed };
         setPasswordChanged(true);
         assuredAccessToken = session.access_token;

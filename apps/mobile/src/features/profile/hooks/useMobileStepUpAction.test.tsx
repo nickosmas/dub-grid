@@ -49,8 +49,9 @@ vi.mock("../components/MobileStepUpSheet", () => ({
 }));
 
 import { useMobileStepUpAction } from "./useMobileStepUpAction";
+import type { MockFn } from "../../../test/mock-fn";
 
-let action: ReturnType<typeof vi.fn>;
+let action: MockFn;
 
 function Harness() {
   const stepUp = useMobileStepUpAction();

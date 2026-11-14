@@ -28,7 +28,7 @@ The workflow is defined by the local skills and context files below.
 - `blueprint/context/coding-standards.md` - conventions to follow
 - `blueprint/context/ai-interaction.md` - how to work with the user on this project
 - `blueprint/context/current-feature.md` - the one feature, fix, or rollback being built right now
-- `blueprint/context/findings.md` - open review findings; P0 and P1 entries block `complete` until fixed or explicitly accepted
+- `blueprint/context/findings.md` - the review findings ledger; P0 and P1 entries block `complete` until closed or explicitly accepted. Not loaded every session: read it when a task touches a finding or a skill's gate needs it
 
 ## Project configuration
 
@@ -217,13 +217,8 @@ exposed through tool-specific adapters:
 - OpenCode: `AGENTS.md` plus the compatible `.agents/skills/` or
   `.claude/skills/` tree already installed for the selected tools
 
-Unused adapters can be removed. Codex, GitHub Copilot, and OpenCode can share
-`.agents/`. OpenCode can also reuse `.claude/` when Claude Code is selected.
-Codex-only, Copilot-only, or OpenCode-only projects can delete `CLAUDE.md` and
-`.claude/`. Claude Code-only projects can delete `.agents/`, but should keep
-`AGENTS.md` because `CLAUDE.md` imports it. Do not duplicate the same Blueprint
-skills under `.opencode/skills/`; OpenCode already discovers the compatible
-trees.
+`.claude/` is gitignored here, so the Claude Code copies of the skills live only
+in each clone; `.agents/skills/` is the tracked copy.
 
 When changing shared workflow behavior, update the matching skill in both
 adapter folders so Codex, Claude Code, GitHub Copilot, and OpenCode stay aligned.
@@ -326,25 +321,10 @@ a workflow failure.
 
 ## Automatic verification
 
-Automatic GitHub checks are a separate explicit setup. `/onboard` and `/adopt`
-only report existing checks and point to `/ci` or `$ci` when none exist. Running
-`/ci` inspects the real project and defines one `Verify` command from checks that
-already exist. Use this order when available: typecheck, tests, then build. Never
-invent a test runner or another check just to fill the command.
-
-For JavaScript and TypeScript projects, prefer a package script such as `verify`
-and use the detected package manager. For other stacks, use the native task
-runner or exact combined command. Record the exact command under Commands below.
-
-The optional `.github/workflows/verify.yml` must run that same command for pull
-requests and pushes to the default branch. Preserve existing workflows, use the
-project's real runtime and install command, and grant only `contents: read` by
-default. This setup does not add local git hooks, coverage, browser tests,
-security scans, or version matrices. Those remain later project choices.
-
-GitHub branch protection or a ruleset can require the check after the repository
-is pushed, but that is a separate remote setting. Missing automatic GitHub
-checks do not make the Blueprint unusable.
+Automatic GitHub checks are a separate explicit setup through `/ci`, which
+defines one `Verify` command from checks that already exist (typecheck, tests,
+then build) and a matching `.github/workflows/verify.yml`. Never invent a check
+to fill the command. Record the exact command under Commands below.
 
 ## Commands
 

@@ -33,6 +33,12 @@ updates:
       - dependency-name: "@expo/*"
       - dependency-name: "react-native"
       - dependency-name: "react-native-*"
+      - dependency-name: "@react-native/*"
+      - dependency-name: "babel-preset-expo"
+      # 0.98 adds a LangChain tree with high advisories for seed tooling we
+      # don't use; stay on 0.97 until a release drops it.
+      - dependency-name: "@snaplet/seed"
+        versions: [">=0.98.0"]
     groups:
       # Grouped so the lockfile diff stays reviewable. A hundred separate bumps
       # is how a bad version slips through unread.

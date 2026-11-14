@@ -14,7 +14,7 @@ const searchSchema = z.object({
 
 const patchSchema = z
   .object({
-    notificationId: z.string().uuid().optional(),
+    notificationId: z.guid().optional(),
     markAll: z.boolean().optional(),
   })
   .refine((value) => value.markAll === true || typeof value.notificationId === "string", {

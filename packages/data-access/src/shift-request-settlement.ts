@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type ShiftRequestSettlement =
   | {
       autoApproved: false;
-      reason: "skipped" | "not_pending" | "no_approver" | "error";
+      reason: "not_pending" | "no_approver" | "error";
       error?: string;
     }
   | { autoApproved: true; approverUserId: string; adminNote: string };
@@ -12,7 +12,6 @@ export type SettleShiftRequestAfterTransition = (input: {
   userClient: SupabaseClient;
   serviceClient: SupabaseClient;
   requestId: string;
-  skip?: boolean;
 }) => Promise<ShiftRequestSettlement>;
 
 /**
@@ -26,12 +25,7 @@ export const settleShiftRequestAfterTransition: SettleShiftRequestAfterTransitio
   userClient,
   serviceClient,
   requestId,
-  skip = false,
 }) => {
-  if (skip) {
-    return { autoApproved: false, reason: "skipped" };
-  }
-
   const { data: row } = await serviceClient
     .from("shift_requests")
     .select("status")

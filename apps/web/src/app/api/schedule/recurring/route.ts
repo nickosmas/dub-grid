@@ -58,37 +58,37 @@ const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 const requestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("fetchRecurringShifts"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid().optional(),
+    orgId: z.guid(),
+    employeeId: z.guid().optional(),
     assignmentLabels: mapEntrySchema.optional(),
     absenceTypeLabels: mapEntrySchema.optional(),
     includeArchived: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("getRecurringDraft"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
   }),
   z.object({
     action: z.literal("saveRecurringDraft"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     draftData: recurringScheduleDraftSchema,
   }),
   z.object({
     action: z.literal("deleteRecurringDraft"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
   }),
   z.object({
     action: z.literal("upsertRecurringShift"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
+    orgId: z.guid(),
+    employeeId: z.guid(),
     dayOfWeek: z.number().int().min(0).max(6),
     input: scheduleCellStateSchema,
     effectiveFrom: z.string().date(),
   }),
   z.object({
     action: z.literal("deleteRecurringShift"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
+    orgId: z.guid(),
+    employeeId: z.guid(),
     dayOfWeek: z.number().int().min(0).max(6),
   }),
   // Bulk form of the two actions above. The recurring-schedule editor saves a
@@ -97,12 +97,12 @@ const requestSchema = z.discriminatedUnion("action", [
   // (a getUser round trip plus four queries). This authorises once.
   z.object({
     action: z.literal("saveRecurringShifts"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     effectiveFrom: z.string().date(),
     changes: z
       .array(
         z.object({
-          employeeId: z.string().uuid(),
+          employeeId: z.guid(),
           dayOfWeek: z.number().int().min(0).max(6),
           // null = clear this day for this employee
           input: scheduleCellStateSchema.nullable(),
@@ -113,13 +113,13 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("fetchShiftPreferences"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid().optional(),
+    orgId: z.guid(),
+    employeeId: z.guid().optional(),
   }),
   z.object({
     action: z.literal("saveShiftPreference"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
+    orgId: z.guid(),
+    employeeId: z.guid(),
     // null = no preference
     preference: z
       .object({
@@ -130,13 +130,13 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("fetchJobPreferences"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid().optional(),
+    orgId: z.guid(),
+    employeeId: z.guid().optional(),
   }),
   z.object({
     action: z.literal("saveJobPreference"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
+    orgId: z.guid(),
+    employeeId: z.guid(),
     // null = no preference
     preference: z
       .object({

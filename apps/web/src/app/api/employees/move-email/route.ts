@@ -13,8 +13,8 @@ import { getRequestIp } from "@/features/mobile/server/management-roster";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
-  empId: z.string().uuid(),
+  orgId: z.guid(),
+  empId: z.guid(),
   email: z.string().trim().email(),
   expectedVersion: z.number().int().min(0),
 });

@@ -79,6 +79,7 @@ describe("MobileRealtimeProvider", () => {
     expect(useMobileRealtimeInvalidation).toHaveBeenCalledWith({
       accessToken: "token-1",
       orgId: "org-1",
+      includeDrafts: false,
       queryClient: mockQueryClient,
     });
     expect(useMobilePermissionsRealtime).toHaveBeenCalledWith({
@@ -114,6 +115,7 @@ describe("MobileRealtimeProvider", () => {
     expect(useMobileRealtimeInvalidation).toHaveBeenCalledWith({
       accessToken: "token-1",
       orgId: "org-1",
+      includeDrafts: false,
       queryClient: mockQueryClient,
     });
     expect(useMobilePermissionsRealtime).toHaveBeenCalledWith({
@@ -121,5 +123,30 @@ describe("MobileRealtimeProvider", () => {
       userId: "user-1",
       queryClient: mockQueryClient,
     });
+  });
+
+  it("follows draft edits only for someone who edits the schedule", () => {
+    useSessionState.mockReturnValue({
+      accessToken: "token-1",
+      isLoading: false,
+      session: { user: { id: "user-1" } },
+    });
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { id: "org-1", featureFlags: {} },
+        effectiveRole: "admin",
+        permissions: { canEditShifts: true, canEditNotes: false },
+      },
+    });
+
+    render(
+      <MobileRealtimeProvider>
+        <div>App content</div>
+      </MobileRealtimeProvider>,
+    );
+
+    expect(useMobileRealtimeInvalidation).toHaveBeenCalledWith(
+      expect.objectContaining({ orgId: "org-1", includeDrafts: true }),
+    );
   });
 });

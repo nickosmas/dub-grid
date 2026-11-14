@@ -148,6 +148,7 @@ import { PermissionsSheet } from "../components/PermissionsSheet";
 import {
   makePersonDraft as makeDraft,
   personDraftHasChanges,
+  personEmailChanged,
   type PersonEditDraft as EditDraft,
 } from "../lib/personDraft";
 import { buildInitialPermissions, countPermissionLevels } from "@dubgrid/authz";
@@ -451,6 +452,15 @@ export default function PersonDetailScreen() {
     bootstrapQuery.data?.currentOrg.labels.focusArea ?? DEFAULT_ORGANIZATION_LABELS.focusArea;
 
   function updateCachedPerson(nextPerson: MobilePerson) {
+    // An action of this person's own (a status change, a moved email) moves
+    // an open edit onto the new version, as long as the edit was opened on the
+    // version that action replaced: anything older is a teammate's change.
+    const replacedVersion = person?.version;
+    setDraft((current) =>
+      current && current.baseVersion === replacedVersion
+        ? { ...current, baseVersion: nextPerson.version }
+        : current,
+    );
     queryClient.setQueryData(mobileQueryKeys.person(accessToken, nextPerson.id), {
       person: nextPerson,
     });
@@ -769,7 +779,7 @@ export default function PersonDetailScreen() {
         Boolean(person.userId),
       ),
     ).some(Boolean) &&
-    normalizeOptionalStaffEmail(draft.email) === person.email,
+    !personEmailChanged(draft, person),
   );
   const guard = useUnsavedChangesGuard({
     isDirty: editing && hasChanges,
@@ -872,7 +882,7 @@ export default function PersonDetailScreen() {
     // Only the email is worth stopping for. Coming off the schedule is already
     // stated inline, by the notice above the focus areas, so asking again here
     // warned twice for one action.
-    const changesAccessEmail = normalizeOptionalStaffEmail(draft.email) !== person.email;
+    const changesAccessEmail = personEmailChanged(draft, person);
     if (changesAccessEmail) {
       setShowSaveConfirmation(true);
       return;
@@ -896,7 +906,7 @@ export default function PersonDetailScreen() {
 
   function buildUpdateBody(): MobilePersonUpdateBody {
     return {
-      expectedVersion: person!.version,
+      expectedVersion: draft!.baseVersion,
       firstName: normalizeStaffName(draft!.firstName),
       lastName: normalizeStaffName(draft!.lastName),
       employmentType: draft!.employmentType,
