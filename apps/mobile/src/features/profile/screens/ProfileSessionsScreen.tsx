@@ -170,6 +170,9 @@ export default function ProfileSessionsScreen() {
       return;
     }
 
+    // Closed before the identity check: on a phone the confirmation is the
+    // system alert, which would reopen the moment a cancelled check ended.
+    setPendingConfirmation(null);
     try {
       const completed = await stepUp.run((actionAccessToken) =>
         revokeMutation.mutateAsync({
@@ -178,11 +181,10 @@ export default function ProfileSessionsScreen() {
         }),
       );
       if (!completed) return;
-      setPendingConfirmation(null);
       handoff(() => setOpenSession(null));
     } catch {
-      // The mutation owns its user-facing error. Keeping both surfaces open
-      // leaves the same device selected for an explicit retry or cancel.
+      // The mutation owns its user-facing error. The device stays open for an
+      // explicit retry or cancel.
     }
   }
 
@@ -340,7 +342,7 @@ export default function ProfileSessionsScreen() {
         onCancel={() => setPendingConfirmation(null)}
         onConfirm={confirmSessionAction}
         title={confirmationTitle}
-        visible={pendingConfirmation != null && !stepUp.active}
+        visible={pendingConfirmation != null}
       />
       {stepUp.sheet}
     </Screen>

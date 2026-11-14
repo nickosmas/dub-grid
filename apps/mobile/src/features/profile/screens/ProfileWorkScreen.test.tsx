@@ -20,6 +20,8 @@ const routerBack = vi.fn();
 const requireMobileCredentialAssurance = vi.fn();
 const updateUser = vi.fn();
 const stepUpRun = vi.fn();
+const createProfileChangeRequest = vi.fn();
+const updateProfilePhone = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -106,12 +108,12 @@ vi.mock("../../auth/hooks/useBootstrap", () => ({
 vi.mock("../../../shared/lib/api", async (importOriginal) => ({
   parseFocusAreaShiftsRefusal: (await importOriginal<typeof import("../../../shared/lib/api")>())
     .parseFocusAreaShiftsRefusal,
-  createProfileChangeRequest: vi.fn(),
+  createProfileChangeRequest,
   getProfile: vi.fn(),
   requireMobileCredentialAssurance,
   updateMobilePerson,
   updateProfileAccount,
-  updateProfilePhone: vi.fn(),
+  updateProfilePhone,
 }));
 
 vi.mock("../../../shared/lib/supabase", () => ({
@@ -207,6 +209,8 @@ describe("ProfileWorkScreen", () => {
     useBootstrap.mockReset();
     updateMobilePerson.mockReset();
     updateProfileAccount.mockReset();
+    createProfileChangeRequest.mockReset().mockResolvedValue({ success: true });
+    updateProfilePhone.mockReset().mockResolvedValue({ success: true });
     pushToast.mockReset();
     routerBack.mockReset();
     requireMobileCredentialAssurance.mockReset().mockResolvedValue(undefined);
@@ -706,5 +710,77 @@ describe("ProfileWorkScreen", () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(navigatedActions).toHaveLength(0);
+  });
+  it("keeps what you typed when the session token is refreshed", async () => {
+    const view = render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+
+    useAccessToken.mockReturnValue("token-456");
+    useQuery.mockReturnValue({
+      data: { ...profileData },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    view.rerender(<ProfileWorkScreen />);
+
+    await waitFor(() => expect(screen.getByLabelText("Email")).toHaveValue("new@example.com"));
+  });
+
+  it("closes the email confirmation when the identity check is cancelled", async () => {
+    stepUpRun.mockReset().mockResolvedValue(false);
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(
+      within(screen.getByRole("alert")).getByRole("button", { name: "Request changes" }),
+    );
+
+    await waitFor(() => expect(stepUpRun).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("Send name change request?")).toBeNull();
+    expect(screen.getByLabelText("Email")).toHaveValue("new@example.com");
+    expect(updateUser).not.toHaveBeenCalled();
+    expect(createProfileChangeRequest).not.toHaveBeenCalled();
+  });
+
+  it("never offers a Super Admin a name change request while permissions load", () => {
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Mia" } });
+
+    expect(screen.queryByRole("button", { name: "Send request" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("sends no name change request when only the phone changes", async () => {
+    useBootstrap.mockReturnValue({
+      data: { permissions: { canManageEmployees: false }, focusAreas: [], departments: [] },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useQuery.mockReturnValue({
+      data: {
+        ...profileData,
+        user: { ...profileData.user, firstName: "Mina " },
+        linkedEmployee: { ...profileData.linkedEmployee, phone: "415-555-0199" },
+      },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    render(<ProfileWorkScreen />);
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "415-555-0100" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(updateProfilePhone).toHaveBeenCalledTimes(1));
+    expect(createProfileChangeRequest).not.toHaveBeenCalled();
   });
 });

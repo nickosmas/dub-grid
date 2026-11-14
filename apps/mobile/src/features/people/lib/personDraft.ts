@@ -1,4 +1,4 @@
-import type { MobilePerson } from "@dubgrid/contracts";
+import { normalizeOptionalUsPhone, type MobilePerson } from "@dubgrid/contracts";
 import { sameIds } from "../../../shared/lib/same-ids";
 
 /** What the person page's edit panel holds while it is open. */
@@ -13,6 +13,12 @@ export type PersonEditDraft = {
   focusAreaIds: number[];
   roleIds: number[];
   departmentIds: number[];
+  /**
+   * The record version the draft was opened from. A save sends this, not the
+   * latest version, so a teammate's change that lands mid-edit is a conflict
+   * to resolve rather than something the save quietly reverts.
+   */
+  baseVersion: number;
 };
 
 export function makePersonDraft(person: MobilePerson): PersonEditDraft {
@@ -27,7 +33,27 @@ export function makePersonDraft(person: MobilePerson): PersonEditDraft {
     focusAreaIds: person.focusAreaIds,
     roleIds: person.roleIds,
     departmentIds: person.departmentIds,
+    baseVersion: person.version,
   };
+}
+
+// Compared the way the save writes them: names with their spaces collapsed,
+// emails lowercased, phones in one format. A stored "Jane@X.com" or
+// "555-123-4567" is not an edit.
+const nameKey = (value: string) => value.trim().replace(/\s+/g, " ");
+const emailKey = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+function phoneKey(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim();
+  try {
+    return normalizeOptionalUsPhone(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
+/** Whether the draft changes the person's email, which is also their sign-in. */
+export function personEmailChanged(draft: PersonEditDraft, person: MobilePerson): boolean {
+  return emailKey(draft.email) !== emailKey(person.email);
 }
 
 /**
@@ -49,11 +75,11 @@ export function personDraftHasChanges(draft: PersonEditDraft, person: MobilePers
   const differs = (left: string, right: string) => left.trim() !== right.trim();
 
   return (
-    differs(draft.firstName, saved.firstName) ||
-    differs(draft.lastName, saved.lastName) ||
+    nameKey(draft.firstName) !== nameKey(saved.firstName) ||
+    nameKey(draft.lastName) !== nameKey(saved.lastName) ||
     draft.employmentType !== saved.employmentType ||
-    differs(draft.phone, saved.phone) ||
-    differs(draft.email, saved.email) ||
+    phoneKey(draft.phone) !== phoneKey(saved.phone) ||
+    personEmailChanged(draft, person) ||
     differs(draft.contactNotes, saved.contactNotes) ||
     draft.certificationId !== saved.certificationId ||
     !sameIds(draft.focusAreaIds, saved.focusAreaIds) ||

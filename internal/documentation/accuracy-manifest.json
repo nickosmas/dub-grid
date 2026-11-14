@@ -846,7 +846,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a29d73b01d8b387ea5be252a9538218ec7ae394b6fe78197295f34f84e63298b"
+      "evidenceFingerprint": "sha256:f0fef85725d32444fc5d6b061997ac55aa71dd26325641fcebb3a27e082281c3"
     },
     {
       "id": "invitations",
@@ -1322,7 +1322,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:542d7774a8fa5041da783708858d5dee7dbd68b66bbec7f534c14f0245aa8982"
+      "evidenceFingerprint": "sha256:756fc38a022dfa798026469c677b89d50fcb1b5f1a952a5aa91e9c6b5a2175da"
     },
     {
       "id": "alerts",
@@ -1518,7 +1518,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b4971298a54a7f6485ad1ca881b675db247c400742d5f1ce03b530b0c97fdd04"
+      "evidenceFingerprint": "sha256:7395d05fac2dceb484ff872d7605b2dbd249a8bcd3866e19845ad3eedd3c5957"
     },
     {
       "id": "security-sessions",
@@ -1597,7 +1597,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cf1490f11ca28e49c8d28a096bc1f05087457b0a337e98ab54005d1ea4ad74cc"
+      "evidenceFingerprint": "sha256:bd8f3ac86cc602a8d8b5be1f3eb7037fb2446168f4bf8c04b3bebb2ec3345653"
     },
     {
       "id": "privacy-controls",
