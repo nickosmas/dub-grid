@@ -113,7 +113,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
             toast.error(
               formatClientErrorMessage(
                 error,
-                "Checkout finished, but we couldn't sync your billing. Refresh to check.",
+                "Your payment went through, but your plan hasn't updated here yet. Refresh to check.",
               ),
             );
           })
@@ -145,7 +145,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
       });
       window.location.assign(url);
     } catch (error) {
-      toast.error(formatClientErrorMessage(error, "We couldn't start checkout. Try again."));
+      toast.error(formatClientErrorMessage(error, "We couldn't open checkout. Try again."));
     } finally {
       setOpeningCheckout(false);
     }

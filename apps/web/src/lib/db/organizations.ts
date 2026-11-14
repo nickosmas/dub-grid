@@ -67,7 +67,7 @@ export interface UpdateOrganizationSettingsInput extends Partial<OrganizationSet
 
 export class OrganizationSettingsConflictError extends Error {
   constructor(public readonly latestOrganization: Organization) {
-    super("Organization settings were updated by someone else.");
+    super("Someone else changed these settings. Refresh to see their changes, then try again.");
     this.name = "OrganizationSettingsConflictError";
   }
 }

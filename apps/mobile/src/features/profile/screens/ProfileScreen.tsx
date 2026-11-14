@@ -239,7 +239,7 @@ export default function ProfileScreen() {
       pushClientFriendlyErrorToast(pushToast, {
         error,
         fallbackMessage: "Sign in again to finish switching organizations.",
-        title: "Couldn't finish organization switch",
+        title: "Couldn't switch organizations",
       });
       await handleExpiredMobileSession();
     };

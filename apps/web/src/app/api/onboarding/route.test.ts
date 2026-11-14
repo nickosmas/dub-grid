@@ -81,7 +81,7 @@ describe("POST /api/onboarding", () => {
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
-      error: "We couldn't confirm setup was saved. Try again.",
+      error: "We're not sure your setup saved. Refresh to check, then try again.",
     });
   });
 

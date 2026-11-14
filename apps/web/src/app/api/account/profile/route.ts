@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(
       {
-        error: "Profile details are changed by admins. Submit a profile change request instead.",
+        error: "Only an admin can change these details. Ask for a change instead.",
       },
       { status: 403 },
     );

@@ -169,7 +169,7 @@ export default function ProfileTwoFactorScreen() {
       await reconcileStatus(data.session?.access_token ?? tokenRef.current);
     } catch (error) {
       setActionError(
-        formatClientErrorMessage(error, "We couldn't refresh two-factor status. Try again."),
+        formatClientErrorMessage(error, "We couldn't check your two-factor settings. Try again."),
       );
     } finally {
       setMfaLoading(false);
@@ -217,7 +217,7 @@ export default function ProfileTwoFactorScreen() {
       });
     } catch (error) {
       setActionError(
-        formatClientErrorMessage(error, "We couldn't start two-factor setup right now."),
+        formatClientErrorMessage(error, "We couldn't set up two-factor authentication. Try again."),
       );
     } finally {
       setMfaLoading(false);
@@ -241,7 +241,7 @@ export default function ProfileTwoFactorScreen() {
       setNeedsReconciliation(true);
       setPhase("sync");
       if (!verifiedSession?.access_token) {
-        throw new Error("We couldn't finish two-factor setup. Try again.");
+        throw new Error("We couldn't turn on two-factor authentication. Try again.");
       }
 
       // Verifying TOTP promotes the current Supabase session to AAL2. The
@@ -282,7 +282,7 @@ export default function ProfileTwoFactorScreen() {
       resetMfaEnrollment();
     } catch {
       setPhase("sync");
-      setActionError("We couldn't cancel setup. Refresh its status before trying again.");
+      setActionError("We couldn't cancel two-factor setup. Refresh, then try again.");
     } finally {
       setMfaLoading(false);
     }
@@ -354,7 +354,7 @@ export default function ProfileTwoFactorScreen() {
       ) : phase === "sync" ? (
         <ProfileSection
           title="Refresh status"
-          description="We couldn't confirm your last change. Check your two-factor status before trying again."
+          description="We're not sure your last change saved. Check your two-factor settings, then try again."
         >
           {IS_NATIVE_LIST ? (
             <ProfileList>

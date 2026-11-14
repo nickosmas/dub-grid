@@ -431,7 +431,7 @@ describe("OrgLogin submit states", () => {
     expect(mockSetSession).not.toHaveBeenCalled();
     expect(mockClearAuthState).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "We couldn't finish switching organizations. Sign in again.",
+      "We couldn't switch you to that organization. Sign in again.",
     );
     expect(screen.getByRole("button", { name: /sign in/i })).not.toBeDisabled();
   });
@@ -471,7 +471,7 @@ describe("OrgLogin submit states", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "We couldn't finish switching organizations. Sign in again.",
+        "We couldn't switch you to that organization. Sign in again.",
       );
     });
     expect(mockClearAuthState).toHaveBeenCalledTimes(1);
@@ -647,7 +647,7 @@ describe("OrgLogin submit states", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "We couldn't finish switching organizations. Sign in again.",
+        "We couldn't switch you to that organization. Sign in again.",
       );
     });
     expect(mockSwitchOrganization).toHaveBeenCalledTimes(1);
@@ -681,7 +681,7 @@ describe("OrgLogin submit states", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "We couldn't finish switching organizations. Sign in again.",
+        "We couldn't switch you to that organization. Sign in again.",
       );
     });
     expect(mockClearAuthState).toHaveBeenCalledTimes(1);

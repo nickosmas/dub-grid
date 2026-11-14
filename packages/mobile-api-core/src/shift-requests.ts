@@ -468,7 +468,7 @@ export async function createMobileShiftRequest(
   });
 
   if (error || !requestId) {
-    throw error ?? new Error("Unable to create shift request");
+    throw error ?? new Error("We couldn't send your request. Try again.");
   }
 
   const { autoApproved } = await settleOrNotify(
@@ -618,7 +618,7 @@ export async function updateMobileShiftRequest(
         },
       );
       if (error || !createdRequestId) {
-        throw error ?? new Error("Unable to volunteer");
+        throw error ?? new Error("We couldn't sign you up for that shift. Try again.");
       }
 
       return settleOrNotify(

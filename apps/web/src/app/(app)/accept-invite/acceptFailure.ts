@@ -26,7 +26,7 @@ export function classifyAcceptFailure(error: unknown): AcceptFailure {
 
 export function describeAcceptFailure(failure: "step-up" | "unavailable"): string {
   if (failure === "step-up") {
-    return "We couldn't confirm your authentication code. Try again.";
+    return "That code didn't work. Check your authenticator app and try again.";
   }
   return "We couldn't accept your invitation just now. Try again in a moment.";
 }

@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "account terms POST failed");
-    return NextResponse.json({ error: "We couldn't record that. Try again." }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't save your agreement. Try again." },
+      { status: 500 },
+    );
   }
 }

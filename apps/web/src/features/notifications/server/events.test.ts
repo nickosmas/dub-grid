@@ -750,7 +750,7 @@ describe("dispatchNotificationEvent", () => {
       "org-1",
       "shift_request_expired",
       "Pickup request expired",
-      "Your pickup request expired before anyone decided on it. Submit a new one if you still need it.",
+      "Your pickup request expired before anyone decided on it. Send a new one if you still need it.",
       expect.objectContaining({ requestId: "req-1", requestType: "pickup" }),
       expect.anything(),
     );

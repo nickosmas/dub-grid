@@ -147,7 +147,9 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       setFactorId(data.id);
       setStep("verifying");
     } catch (err: unknown) {
-      setVerifyError(extractErrorMessage(err, "We couldn't start MFA enrollment. Try again."));
+      setVerifyError(
+        extractErrorMessage(err, "We couldn't set up two-factor authentication. Try again."),
+      );
     } finally {
       setLoading(false);
     }
@@ -211,7 +213,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       });
       if (challengeError) throw challengeError;
       if (!verifiedSession?.access_token)
-        throw new Error("We couldn't verify your session. Try again.");
+        throw new Error("We couldn't confirm it's you. Try again.");
       syncTokenRef.current = verifiedSession.access_token;
       setNeedsReconciliation(true);
       // Once a mutation starts, retries reconcile first rather than replaying it.
@@ -236,7 +238,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
     syncTokenRef.current = accessToken ?? syncTokenRef.current;
     const { profile } = await updateMfaStatus(syncTokenRef.current);
     if (typeof profile?.mfa_enabled !== "boolean")
-      throw new Error("We couldn't refresh two-factor status. Try again.");
+      throw new Error("We couldn't check your two-factor settings. Try again.");
     onStatusChange(profile.mfa_enabled);
     setNeedsReconciliation(false);
     resetState();
@@ -249,7 +251,9 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       const session = await getBrowserAuthSession();
       await reconcileStatus(session?.access_token);
     } catch (err) {
-      setVerifyError(extractErrorMessage(err, "We couldn't refresh two-factor status. Try again."));
+      setVerifyError(
+        extractErrorMessage(err, "We couldn't check your two-factor settings. Try again."),
+      );
     } finally {
       setLoading(false);
     }
@@ -538,7 +542,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
               if (pendingFactorId) await cleanupBrowserMfaFactor(pendingFactorId);
               resetState();
             } catch {
-              setVerifyError("We couldn't cancel setup. Refresh its status before trying again.");
+              setVerifyError("We couldn't cancel two-factor setup. Refresh, then try again.");
               setStep("syncing");
             } finally {
               setLoading(false);

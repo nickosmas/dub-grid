@@ -45,10 +45,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
     });
   } catch (error) {
     logger.error({ error }, "onboarding GET failed");
-    return NextResponse.json(
-      { error: "We couldn't check your setup progress. Try again." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "We couldn't load your setup. Try again." }, { status: 500 });
   }
 }
 
@@ -91,7 +88,7 @@ export async function POST(req: NextRequest) {
     const completedAt = membership?.onboarding_completed_at;
     if (typeof completedAt !== "string" || completedAt.length === 0) {
       return NextResponse.json(
-        { error: "We couldn't confirm setup was saved. Try again." },
+        { error: "We're not sure your setup saved. Refresh to check, then try again." },
         { status: 409 },
       );
     }

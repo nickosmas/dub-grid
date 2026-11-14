@@ -1705,7 +1705,7 @@ async function dispatchNotificationEventInternal(
         `${capitalize(typeLabel)} request expired`,
         event.requestType === "pickup" && parentRequestId != null
           ? calloffMessage
-          : `Your ${typeLabel} request expired before anyone decided on it. Submit a new one if you still need it.`,
+          : `Your ${typeLabel} request expired before anyone decided on it. Send a new one if you still need it.`,
         {
           requestId: event.requestId,
           requestType: event.requestType,

@@ -68,7 +68,8 @@ export function createMfaLifecycleHandler(options: {
         return auth.response;
       }
       const hasTotp = resolveVerifiedTotpFactorPresence(auth.user.factors);
-      if (hasTotp === null) return reply({ error: "We could not verify two-factor status." }, 503);
+      if (hasTotp === null)
+        return reply({ error: "We couldn't check your two-factor settings. Try again." }, 503);
       const rate = await checkRateLimit(
         input.action === "reauthenticate" ? loginLimiter : apiLimiter,
         `mfa:${input.action}:${auth.user.id}`,
@@ -122,12 +123,16 @@ export function createMfaLifecycleHandler(options: {
             const { error: switchError } = await scoped.rpc("switch_org", {
               target_org_id: auth.claims.org_id,
             });
-            if (switchError) return reply({ error: "We couldn't retain your organization." }, 403);
+            if (switchError)
+              return reply(
+                { error: "We couldn't keep you in this organization. Sign in again." },
+                403,
+              );
             const refreshed = await client.auth.refreshSession({
               refresh_token: session.refresh_token,
             });
             if (refreshed.error || !refreshed.data.session) {
-              return reply({ error: "We couldn't refresh your session. Try again." }, 503);
+              return reply({ error: "We couldn't keep you signed in. Try again." }, 503);
             }
             session = refreshed.data.session;
           }
@@ -137,7 +142,7 @@ export function createMfaLifecycleHandler(options: {
             verified.userId !== auth.user.id ||
             (verified.claims.org_id ?? null) !== (auth.claims.org_id ?? null)
           ) {
-            return reply({ error: "We couldn't retain your session. Try again." }, 503);
+            return reply({ error: "We couldn't keep you signed in. Try again." }, 503);
           }
           delivered = true;
           await writeSecurityAuditEvent({
@@ -178,7 +183,7 @@ export function createMfaLifecycleHandler(options: {
           ...(options.surface === "web" ? { issuer: "DubGrid" } : {}),
         });
         if (result.error || !result.data)
-          return reply({ error: "We couldn't start two-factor setup. Try again." }, 502);
+          return reply({ error: "We couldn't set up two-factor authentication. Try again." }, 502);
         after(() =>
           writeSecurityAuditEvent({
             event: "security.auth.mfa",
@@ -203,7 +208,10 @@ export function createMfaLifecycleHandler(options: {
       const result = await client.auth.mfa.unenroll({ factorId: factor.id });
       if (result.error)
         return reply(
-          { error: "We couldn't remove this authenticator. Check its status before retrying." },
+          {
+            error:
+              "We couldn't remove your authenticator app. Refresh to see if it's still on, then try again.",
+          },
           502,
         );
       const orgId = typeof auth.claims.org_id === "string" ? auth.claims.org_id : null;
@@ -230,7 +238,7 @@ export function createMfaLifecycleHandler(options: {
     } catch {
       // Do not log provider errors: enrollment replies and credentials are sensitive.
       return reply(
-        { error: "We couldn't finish this request. Check its status and try again." },
+        { error: "We couldn't change your two-factor settings. Refresh to check, then try again." },
         503,
       );
     }

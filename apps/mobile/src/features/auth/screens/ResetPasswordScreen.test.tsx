@@ -274,7 +274,7 @@ describe("ResetPasswordScreen", () => {
 
     expect(signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(pushToast).toHaveBeenCalledWith({
-      message: "Password updated. Sign in and review your active sessions.",
+      message: "Your password changed. Sign in and check which devices are signed in.",
       tone: "info",
     });
     expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");

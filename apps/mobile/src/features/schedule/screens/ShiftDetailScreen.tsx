@@ -352,7 +352,7 @@ export default function ShiftDetailScreen() {
     if (teamScheduleQuery.error) {
       pushClientFriendlyErrorToast(pushToast, {
         error: teamScheduleQuery.error,
-        title: "Couldn't load working-with list",
+        title: "Couldn't load who you're working with",
         fallbackMessage: "We couldn't load who is working with you right now.",
       });
     }
@@ -480,15 +480,15 @@ export default function ShiftDetailScreen() {
     shouldCheckExistingRequests && requestsQuery.error
       ? getQueryErrorMessage(
           requestsQuery.error,
-          "We couldn't verify existing requests for this shift.",
+          "We couldn't check whether you already asked about this shift. Try again.",
         )
       : null;
   useEffect(() => {
     if (shouldCheckExistingRequests && requestsQuery.error) {
       pushClientFriendlyErrorToast(pushToast, {
         error: requestsQuery.error,
-        title: "Couldn't verify existing requests",
-        fallbackMessage: "We couldn't verify existing requests for this shift.",
+        title: "Couldn't check your requests",
+        fallbackMessage: "We couldn't check whether you already asked about this shift. Try again.",
       });
     }
   }, [shouldCheckExistingRequests, requestsQuery.error, pushToast]);
@@ -1606,7 +1606,7 @@ export default function ShiftDetailScreen() {
           ) : null}
           {activeShiftRequest ? (
             <Card
-              title="Request already in progress"
+              title="You already asked about this shift"
               body={`Your ${formatShiftRequestType(activeShiftRequest.type).toLowerCase()} request is ${formatShiftRequestStatus(activeShiftRequest.status).toLowerCase()} for this shift.`}
               detail={
                 activeShiftRequest.adminNote ? (
