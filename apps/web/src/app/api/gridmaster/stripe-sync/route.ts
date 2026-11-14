@@ -12,7 +12,7 @@ import * as Sentry from "@/lib/sentry";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
 });
 
 export async function POST(req: NextRequest) {
