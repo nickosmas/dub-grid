@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:985fa1da161db34ac0ac84d432fda956541cf17f09d3807d26328262be7b3273",
+  "sourceDigest": "sha256:1661420bf43abb3879c062626bf06207f74c8fa4c08d9d6cc510abfb350aa2c2",
   "webRoutes": [
     {
       "id": "web:/",
@@ -5285,7 +5285,7 @@
       "version": "140",
       "name": "realtime_private_broadcast",
       "file": "140_realtime_private_broadcast.sql",
-      "sha256": "05f890b4aa9c21234fd6ca88e0164bd0dba285a2cd703789e140d95fc18d0e6d",
+      "sha256": "3920fe713263e86a336ac1b830f69736d7e985b3ba42e11960d2561e7ccc6146",
       "source": {
         "path": "supabase/migrations/140_realtime_private_broadcast.sql"
       }

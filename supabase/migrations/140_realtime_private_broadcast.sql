@@ -26,7 +26,7 @@ CREATE OR REPLACE FUNCTION public.broadcast_table_change()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = public
 AS $$
 DECLARE
   v_table TEXT := TG_TABLE_NAME;
