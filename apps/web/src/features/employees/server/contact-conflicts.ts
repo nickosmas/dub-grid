@@ -39,10 +39,10 @@ export class EmployeeContactLookupError extends Error {
  * 006_block_gridmaster_employee_email.sql) would reject at save time?
  *
  * The second case matters because an account's real login email often isn't
- * mirrored into `employees.email` at all - a Gridmaster has no employees row to
- * match, and a management-dept member's contact email field is commonly blank
- * even though their account is very much taken. Without this, typing one of
- * those emails shows no conflict, then fails only on submit.
+ * mirrored into `employees.email` at all: a member's contact email field is
+ * commonly blank even though their account is very much taken. Without this,
+ * typing one of those emails shows no conflict, then fails only on submit.
+ * Only accounts in this organization count (see below).
  */
 export async function checkEmployeeEmailConflict(
   serviceClient: SupabaseClient,
@@ -100,31 +100,18 @@ export async function checkEmployeeEmailConflict(
     return { conflict: false, conflictingEmployeeId: null };
   }
 
-  const { data: ownerProfile, error: profileError } = await serviceClient
-    .from("profiles")
-    .select("platform_role")
-    .eq("id", emailOwnerId)
-    .maybeSingle();
-  if (profileError) {
-    throw new EmployeeContactLookupError(
-      "employees check-email profile lookup failed",
-      profileError,
-    );
-  }
-  // Reads as any other account's address, so the answer never singles out
-  // platform staff (F-196).
-  if (ownerProfile?.platform_role === "gridmaster") {
-    return { conflict: true, conflictingEmployeeId: null, reason: "other_account" };
-  }
-
-  // This employee is linked to a different account than the email's owner.
+  // This employee is linked to a different account than the email's owner
+  // (only the Gridmaster tool asks this way).
   if (input.currentUserId) {
     return { conflict: true, conflictingEmployeeId: null, reason: "other_account" };
   }
 
   // Unlinked employee: block only if the email's owner already has their own
   // active employee record in this org (found via user_id, not email - the
-  // exact gap this check exists to close).
+  // exact gap this check exists to close). An account outside this
+  // organization, a Gridmaster's included, reads as free, so the answer never
+  // tells a manager that someone holds the address (owner, 2026-11-13); the
+  // save refuses what it can't take without saying why.
   let ownerEmployeeQuery = serviceClient
     .from("employees")
     .select("id")

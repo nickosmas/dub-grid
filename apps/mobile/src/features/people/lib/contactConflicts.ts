@@ -3,11 +3,12 @@ import type { MobileContactConflictReason } from "../../../shared/lib/api";
 /**
  * What a taken email or phone reads as under the field. Word for word what web
  * shows for the same three cases, so the two apps explain a duplicate the same
- * way rather than each inventing its own phrasing.
+ * way rather than each inventing its own phrasing. Both name only someone in
+ * this organization: an account anywhere else never reaches the check.
  */
 export const EMAIL_CONFLICT_MESSAGES: Record<MobileContactConflictReason, string> = {
   employee_duplicate: "That email is already used by another person on your team.",
-  other_account: "That email belongs to a different user account.",
+  other_account: "Someone else already signs in with that email. Use a different one.",
 };
 
 export const PHONE_CONFLICT_MESSAGE =
