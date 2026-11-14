@@ -87,7 +87,7 @@ const ICONS = {
 export default function AppToaster() {
   return (
     <Toaster
-      position="bottom-right"
+      position="top-center"
       visibleToasts={3}
       closeButton
       icons={ICONS}
