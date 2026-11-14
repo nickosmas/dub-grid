@@ -247,6 +247,25 @@ export async function endUserSession(userId: string, sessionId: string): Promise
   await revokeSession(sessionId);
 }
 
+/**
+ * Signs someone out of one organization and leaves their other organizations
+ * signed in: each session whose active organization it is ends for good, as
+ * Move email does (owner, 2026-11-13). A token minted for this organization
+ * belongs to a session whose `active_org_id` is this organization, since the
+ * token hook freezes it at the session's first mint.
+ */
+export async function endUserSessionsInOrganization(userId: string, orgId: string): Promise<void> {
+  const { data, error } = await getServiceClient()
+    .from("user_sessions")
+    .select("supabase_session_id")
+    .eq("user_id", userId)
+    .eq("active_org_id", orgId);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    if (row.supabase_session_id) await endUserSession(userId, row.supabase_session_id as string);
+  }
+}
+
 /** Revoke tracked peers without applying the watermark that would revoke this device too. */
 export async function revokeOtherUserSessions(
   userId: string,

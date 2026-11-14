@@ -26,9 +26,8 @@ const tierMembershipMaybeSingle = vi.fn();
 const superAdminCountIs = vi.fn();
 const auditInsert = vi.fn();
 const requireSensitiveActionAuth = vi.fn();
-const revokeAllUserSessions = vi.fn();
 const orgTimezoneSingle = vi.fn();
-const endUserSessions = vi.fn();
+const endUserSessionsInOrganization = vi.fn();
 const disableMobilePushTokensForOrg = vi.fn();
 
 const scheduleSuspensionNotice = vi.fn();
@@ -36,8 +35,7 @@ vi.mock("@/features/employees/server/suspension-notice", () => ({
   scheduleSuspensionNotice: (...args: unknown[]) => scheduleSuspensionNotice(...args),
 }));
 vi.mock("@/lib/auth/revocation", () => ({
-  revokeAllUserSessions: (...args: unknown[]) => revokeAllUserSessions(...args),
-  endUserSessions: (...args: unknown[]) => endUserSessions(...args),
+  endUserSessionsInOrganization: (...args: unknown[]) => endUserSessionsInOrganization(...args),
 }));
 
 vi.mock("@dubgrid/data-access", () => ({
@@ -353,7 +351,7 @@ describe("POST /api/employees/status", () => {
 
       expect(response.status).toBe(200);
       expect(employeeUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: "inactive" }));
-      expect(revokeAllUserSessions).not.toHaveBeenCalled();
+      expect(endUserSessionsInOrganization).not.toHaveBeenCalled();
     });
 
     it("refuses someone who isn't on the schedule, and changes nothing", async () => {
@@ -369,7 +367,7 @@ describe("POST /api/employees/status", () => {
       expect(employeeUpdate).not.toHaveBeenCalled();
     });
 
-    it("still signs a removed person out everywhere", async () => {
+    it("still signs a removed person out of this organization", async () => {
       arrange([]);
       employeeUpdateMaybeSingle.mockResolvedValue({
         data: {
@@ -387,7 +385,7 @@ describe("POST /api/employees/status", () => {
       const response = await POST(makeRequest("remove"));
 
       expect(response.status).toBe(200);
-      expect(revokeAllUserSessions).toHaveBeenCalledWith(EMPLOYEE_USER_ID);
+      expect(endUserSessionsInOrganization).toHaveBeenCalledWith(EMPLOYEE_USER_ID, ORG_ID);
     });
   });
 
@@ -712,7 +710,7 @@ describe("POST /api/employees/status", () => {
       expect(update).not.toHaveProperty("status");
       expect(update).not.toHaveProperty("archived_at");
       expect(update).not.toHaveProperty("status_changed_at");
-      expect(revokeAllUserSessions).not.toHaveBeenCalled();
+      expect(endUserSessionsInOrganization).not.toHaveBeenCalled();
       expect(membershipArchiveUpdate).not.toHaveBeenCalled();
       expect(auditInsert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1256,7 +1254,7 @@ describe("POST /api/employees/status", () => {
 
       expect(response.status).toBe(200);
       expect(membershipArchiveUpdate).toHaveBeenCalled();
-      expect(revokeAllUserSessions).toHaveBeenCalledWith(EMPLOYEE_USER_ID);
+      expect(endUserSessionsInOrganization).toHaveBeenCalledWith(EMPLOYEE_USER_ID, ORG_ID);
     });
 
     it("reopens a User's membership on Restore", async () => {
@@ -1477,7 +1475,7 @@ describe("POST /api/employees/status", () => {
       }));
       targetMembershipMaybeSingle.mockResolvedValue({ data: { org_role: "user" }, error: null });
       auditInsert.mockResolvedValue({ error: null });
-      endUserSessions.mockResolvedValue(undefined);
+      endUserSessionsInOrganization.mockResolvedValue(undefined);
       disableMobilePushTokensForOrg.mockResolvedValue(undefined);
     }
 
@@ -1496,7 +1494,7 @@ describe("POST /api/employees/status", () => {
       );
     }
 
-    it("suspends someone, signs them out everywhere and stops their push", async () => {
+    it("suspends someone, signs them out of this organization and stops its push", async () => {
       arrange({});
 
       const response = await post("suspend");
@@ -1506,7 +1504,7 @@ describe("POST /api/employees/status", () => {
       expect(update).toMatchObject({ suspended_by: USER_ID, updated_by: USER_ID });
       expect(update.suspended_at).toEqual(expect.any(String));
       expect(update).not.toHaveProperty("status");
-      expect(endUserSessions).toHaveBeenCalledWith(LINKED_USER_ID);
+      expect(endUserSessionsInOrganization).toHaveBeenCalledWith(LINKED_USER_ID, ORG_ID);
       expect(disableMobilePushTokensForOrg).toHaveBeenCalledWith(expect.anything(), {
         userId: LINKED_USER_ID,
         orgId: ORG_ID,
@@ -1544,7 +1542,7 @@ describe("POST /api/employees/status", () => {
 
     it("still suspends when signing out fails, which the hook backs up", async () => {
       arrange({});
-      endUserSessions.mockRejectedValueOnce(new Error("redis down"));
+      endUserSessionsInOrganization.mockRejectedValueOnce(new Error("redis down"));
 
       expect((await post("suspend")).status).toBe(200);
     });
@@ -1564,7 +1562,7 @@ describe("POST /api/employees/status", () => {
         code: "NOT_SUSPENDABLE",
       });
       expect(employeeUpdate).not.toHaveBeenCalled();
-      expect(endUserSessions).not.toHaveBeenCalled();
+      expect(endUserSessionsInOrganization).not.toHaveBeenCalled();
     });
 
     it("refuses to suspend someone with no account", async () => {
@@ -1629,7 +1627,7 @@ describe("POST /api/employees/status", () => {
       expect(employeeUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ suspended_at: null, suspended_by: null, status_note: "" }),
       );
-      expect(endUserSessions).not.toHaveBeenCalled();
+      expect(endUserSessionsInOrganization).not.toHaveBeenCalled();
       expect(auditInsert).toHaveBeenCalledWith(
         expect.objectContaining({ action: "employee.reinstated" }),
       );
@@ -1670,7 +1668,7 @@ describe("POST /api/employees/status", () => {
         expect(employeeUpdate).toHaveBeenCalledWith(
           expect.objectContaining({ suspended_until: "2026-11-20", suspended_by: USER_ID }),
         );
-        expect(endUserSessions).toHaveBeenCalledWith(LINKED_USER_ID);
+        expect(endUserSessionsInOrganization).toHaveBeenCalledWith(LINKED_USER_ID, ORG_ID);
         expect(auditInsert).toHaveBeenCalledWith(
           expect.objectContaining({
             action: "employee.suspended",
@@ -1709,7 +1707,7 @@ describe("POST /api/employees/status", () => {
         });
         expect(update).not.toHaveProperty("suspended_at");
         expect(update).not.toHaveProperty("status_changed_at");
-        expect(endUserSessions).not.toHaveBeenCalled();
+        expect(endUserSessionsInOrganization).not.toHaveBeenCalled();
         expect(scheduleSuspensionNotice).not.toHaveBeenCalled();
         expect(auditInsert).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -1779,7 +1777,7 @@ describe("POST /api/employees/status", () => {
         const update = employeeUpdate.mock.calls[0][0] as Record<string, unknown>;
         expect(update).toMatchObject({ suspended_until: "2026-11-20" });
         expect(update).not.toHaveProperty("status_changed_at");
-        expect(endUserSessions).not.toHaveBeenCalled();
+        expect(endUserSessionsInOrganization).not.toHaveBeenCalled();
         expect(auditInsert).toHaveBeenCalledWith(
           expect.objectContaining({
             action: "employee.suspension_end_changed",

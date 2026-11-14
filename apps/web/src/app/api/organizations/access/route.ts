@@ -20,7 +20,7 @@ import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
-import { revokeAllUserSessions } from "@/lib/auth/revocation";
+import { endUserSessionsInOrganization } from "@/lib/auth/revocation";
 import { offboardRemovedMember, requestInfo } from "@/features/employees/server/status-change";
 import {
   changedElsewhereMessage,
@@ -515,9 +515,10 @@ export async function DELETE(req: NextRequest) {
 
     // RLS derives the tenant from the token's org claim. Archiving the
     // membership prevents future refreshes, but does not invalidate an access
-    // token that has already been issued. Revoke it before responding so the
-    // former member cannot continue reading this organization with that token.
-    await revokeAllUserSessions(userId);
+    // token that has already been issued. End this organization's sessions
+    // before responding so the former member cannot keep reading it with that
+    // token; their other organizations stay signed in (owner, 2026-11-13).
+    await endUserSessionsInOrganization(userId, orgId);
 
     await offboardRemovedMember(
       {

@@ -10,7 +10,7 @@ const requireSensitiveActionAuth = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const checkRateLimit = vi.fn();
 const canManageEmployees = vi.fn();
-const endUserSessions = vi.fn();
+const endUserSessionsInOrganization = vi.fn();
 const endOffboardedAccess = vi.fn();
 const reopenRestoredAccess = vi.fn();
 const scheduleSuspensionNotice = vi.fn();
@@ -132,7 +132,7 @@ vi.mock("@/app/api/employees/shared", () => ({
   canManageEmployees: (...args: unknown[]) => canManageEmployees(...args),
 }));
 vi.mock("@/lib/auth/revocation", () => ({
-  endUserSessions: (...args: unknown[]) => endUserSessions(...args),
+  endUserSessionsInOrganization: (...args: unknown[]) => endUserSessionsInOrganization(...args),
 }));
 vi.mock("@dubgrid/data-access", () => ({ disableMobilePushTokensForOrg: vi.fn() }));
 vi.mock("@/features/employees/server/offboard-access", () => ({
@@ -378,7 +378,7 @@ describe("POST /api/employees/status/bulk", () => {
     );
     expect(suspended.map((r) => r.ok)).toEqual([true, false]);
     expect(suspended[1].error).toBe("Only someone with an account can be suspended.");
-    expect(endUserSessions).toHaveBeenCalledWith(user(1));
+    expect(endUserSessionsInOrganization).toHaveBeenCalledWith(user(1), ORG);
     expect(scheduleSuspensionNotice).toHaveBeenCalledTimes(1);
 
     tables.employees[0].version = 2;
