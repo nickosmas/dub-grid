@@ -37,6 +37,7 @@ import {
   ScheduleCellState,
   ScheduleNoteShift,
   ShiftJobSegment,
+  PublishChange,
 } from "@/types";
 import CustomSelect from "./CustomSelect";
 import { formatShiftWindow, type WorkingShift } from "@/lib/shift-picker-groups";
@@ -94,6 +95,7 @@ import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import {
   CorrectedDayCard,
+  PublishedChangeCard,
   ShiftPanelView,
   type PanelViewDetail,
   type PanelViewStatus,
@@ -110,7 +112,16 @@ import {
   buildShiftChangeResolvers,
   describeCellStateChange,
   describeMentoringChanges,
+  publishChangeHasStates,
 } from "@/lib/shift-change-web";
+import {
+  buildPublishChangeDiff,
+  isMeaningfulPublishChange,
+  resolvePillChangeBadges,
+  type CellChangeBadge,
+} from "@/components/schedule-grid/cellChangeBadges";
+import { formatPublishedMetadata } from "@/components/schedule-grid/gridHelpers";
+import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import {
   cellStateToChangeDay,
   describeShiftChangeItem,
@@ -193,6 +204,17 @@ interface ShiftEditPanelProps {
   publishedCustomEndTime?: string | null;
   /** Draft classification for this cell — used to show NEW badge on single-shift pills */
   draftKind?: DraftKind;
+  /**
+   * The published change the grid highlights on this day (Highlight changes
+   * on), so the panel marks the same shifts and says what changed.
+   */
+  publishChange?: (PublishChange & { publishedAt: string; publishedBy: string | null }) | null;
+  /** Archived assignments too, to name what a published snapshot held. */
+  historicalAssignments?: AssignmentDefinition[];
+  /** Names the publisher; without it the viewer reads the time alone (item 46f). */
+  resolvePublisherName?: (userId: string) => string | null;
+  /** The organization's time zone for the publication time. */
+  publicationTimeZone?: string | null;
   /** Commits the current local draft to the server. */
   onConfirmDraft?: (seriesScope?: SeriesScope) => void | Promise<boolean>;
   /**
@@ -366,7 +388,7 @@ function parseMultiTimes(time: string | null | undefined, count: number): (strin
   return Array.from({ length: count }, (_, i) => parts[i] || null);
 }
 
-function getPanelDiffBadgeBackground(kind: ShiftDiffBadgeDescriptor["kind"]): string {
+function getPanelDiffBadgeBackground(kind: CellChangeBadge["kind"]): string {
   switch (kind) {
     case "new":
       return "var(--dg-color-success-text)";
@@ -386,14 +408,24 @@ const shiftEditCardInnerRadius = "calc(var(--dg-radius-md) - 2px)";
 // The panel's larger pills draw a 1.5px edge; a filled one keeps the width, unseen.
 const FILLED_PANEL_PILL_BORDER = "1.5px solid transparent";
 
-function getPanelDiffBorder(args: { diffKind: ShiftDiffBorderKind; fallback: string }): string {
-  const { diffKind, fallback } = args;
-  if (diffKind === "new") {
-    return `2px dashed var(--dg-color-success-text)`;
-  }
-  if (diffKind === "modified") {
-    return `2px dashed var(--dg-color-warning)`;
-  }
+function sortedByPosition(segments: readonly ShiftJobSegment[]): ShiftJobSegment[] {
+  return [...segments].sort((left, right) => (left.position ?? 0) - (right.position ?? 0));
+}
+
+/**
+ * A draft change is dashed, as on the grid; a change the highlighted publish
+ * made is a solid line in the same color, the panel's form of the grid's ring.
+ */
+function getPanelDiffBorder(args: {
+  diffKind: ShiftDiffBorderKind;
+  publishKind?: ShiftDiffBorderKind;
+  fallback: string;
+}): string {
+  const { diffKind, publishKind = null, fallback } = args;
+  const color = (kind: "new" | "modified") =>
+    kind === "new" ? "var(--dg-color-success-text)" : "var(--dg-color-warning)";
+  if (diffKind === "new" || diffKind === "modified") return `2px dashed ${color(diffKind)}`;
+  if (publishKind === "new" || publishKind === "modified") return `2px solid ${color(publishKind)}`;
   return fallback;
 }
 
@@ -450,6 +482,10 @@ export default function ShiftEditPanel({
   publishedCustomStartTime = null,
   publishedCustomEndTime = null,
   draftKind = null,
+  publishChange = null,
+  historicalAssignments,
+  resolvePublisherName,
+  publicationTimeZone = null,
   onConfirmDraft,
   correction = null,
   pastDayNotice = null,
@@ -696,9 +732,14 @@ export default function ShiftEditPanel({
                 initialCustomEndTime,
                 initialAssignmentIds.length,
               ),
+          isMentoredFlags: (hasPublishedBaseline
+            ? sortedByPosition(publishedSegments ?? [])
+            : initialSegments
+          ).map((segment) => segment.isMentored ?? false),
         },
         after: {
           assignmentIds: currentAssignmentIds,
+          isMentoredFlags: currentSegments.map((segment) => segment.isMentored ?? false),
           absenceTypeId: currentAbsenceTypeId ?? null,
           restOfDayAbsenceTypeId: currentRestOfDayAbsenceTypeId,
           timeRanges: expandDelimitedTimeRanges(
@@ -740,10 +781,64 @@ export default function ShiftEditPanel({
       currentRestOfDayAbsenceTypeId,
       customStartTime,
       customEndTime,
+      publishedSegments,
+      initialSegments,
+      currentSegments,
       assignableShiftDisplayMap,
       absenceTypes,
     ],
   );
+
+  // The day's published change, resolved exactly as the grid resolves it, so
+  // the panel marks the same shifts the grid did.
+  const shownPublishChange = isMeaningfulPublishChange(publishChange) ? publishChange : null;
+  const panelPillCount = currentAbsenceTypeId
+    ? 1
+    : currentAssignmentIds.length + (currentRestOfDayAbsenceTypeId != null ? 1 : 0);
+  const restOfDayPillIndex =
+    !currentAbsenceTypeId && currentRestOfDayAbsenceTypeId != null ? panelPillCount - 1 : null;
+  const publishDiff = useMemo(() => {
+    if (!shownPublishChange) return null;
+    const labelOf = (assignmentId: number) => assignableShiftDisplayMap.get(assignmentId) ?? "?";
+    return buildPublishChangeDiff(shownPublishChange, {
+      pillCount: panelPillCount,
+      publishedAssignmentIdByPair: createAssignmentDefinitionIdByPairMap([
+        ...(historicalAssignments ?? []),
+        ...assignments,
+      ]),
+      resolveAssignmentLabel: labelOf,
+      resolveAbsenceLabel: (absenceTypeId) => {
+        const absenceType = absenceTypes.find((item) => item.id === absenceTypeId);
+        return absenceType ? absenceType.name || absenceType.label : "?";
+      },
+    });
+  }, [
+    shownPublishChange,
+    panelPillCount,
+    historicalAssignments,
+    assignments,
+    assignableShiftDisplayMap,
+    absenceTypes,
+  ]);
+  const pillChangeBadges = resolvePillChangeBadges({
+    draftDiff: panelDiff,
+    publishDiff,
+    pillCount: panelPillCount,
+    restOfDayIndex: restOfDayPillIndex,
+  });
+  /** The solid ring the grid draws around a shift the highlighted publish changed. */
+  function publishRingKindAt(index: number): ShiftDiffBorderKind {
+    if (!publishDiff) return null;
+    const pill =
+      index === restOfDayPillIndex ? publishDiff.restOfDayDiff : publishDiff.pillDiffs[index];
+    if (pill?.borderKind) return pill.borderKind;
+    const cellKind = publishDiff.cellBadge?.kind;
+    return panelPillCount <= 1 &&
+      publishDiff.pillDiffs.length === 0 &&
+      (cellKind === "new" || cellKind === "modified")
+      ? cellKind
+      : null;
+  }
 
   const shiftChangeResolvers = useMemo(
     () =>
@@ -765,6 +860,30 @@ export default function ShiftEditPanel({
           shiftChangeResolvers,
         )
       : null;
+  const publishedChangeView =
+    shownPublishChange && publishChangeHasStates(shownPublishChange)
+      ? describeCellStateChange(
+          shownPublishChange.fromState,
+          shownPublishChange.toState,
+          formatDateKey(modal.date),
+          shiftChangeResolvers,
+        )
+      : null;
+  const publishedChangeNotes = shownPublishChange
+    ? describeMentoringChanges(
+        shownPublishChange.fromState,
+        shownPublishChange.toState,
+        shiftChangeResolvers,
+      )
+    : [];
+  const publishedChangeLabel = shownPublishChange
+    ? formatPublishedMetadata({
+        publishedAt: shownPublishChange.publishedAt,
+        publishedBy: shownPublishChange.publishedBy,
+        resolvePublisherName,
+        timeZone: publicationTimeZone,
+      })
+    : null;
   const correctedNotes =
     correctedLabel && correctedChange
       ? describeMentoringChanges(
@@ -3148,12 +3267,14 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderShiftDiffBadge(badge: ShiftDiffBadgeDescriptor | null, index?: number) {
-    if (!badge || (badge.kind === "new" && badge.text === "New")) return null;
+  function renderShiftDiffBadge(badge: CellChangeBadge | null, index?: number) {
+    if (!badge) return null;
     return (
       <span
         data-shift-diff-badge={badge.kind}
+        data-shift-diff-source={badge.source}
         data-shift-diff-index={index != null ? String(index) : undefined}
+        aria-label={`${badge.text}: ${badge.detail}`}
         style={{
           position: "absolute",
           top: -10,
@@ -3181,9 +3302,12 @@ export default function ShiftEditPanel({
     const noteTypes = getActiveIndicatorIds
       ? getActiveIndicatorIds(activeTab, singleNoteShift)
       : [];
-    const cellDiffBadge = panelDiff.cellBadge;
+    const cellDiffBadge = pillChangeBadges[0] ?? null;
+    const draftCellBadge = panelDiff.cellBadge;
     const cellBorderKind: ShiftDiffBorderKind =
-      cellDiffBadge?.kind === "new" ? "new" : cellDiffBadge ? "modified" : null;
+      panelDiff.pillDiffs[0]?.borderKind ??
+      (draftCellBadge?.kind === "new" ? "new" : draftCellBadge ? "modified" : null);
+    const cellPublishKind = publishRingKindAt(0);
 
     // Absence type pill — use absence type colors directly
     if (isAbsence) {
@@ -3197,6 +3321,7 @@ export default function ShiftEditPanel({
             background: atResolved.background,
             border: getPanelDiffBorder({
               diffKind: cellBorderKind,
+              publishKind: cellPublishKind,
               fallback: FILLED_PANEL_PILL_BORDER,
             }),
             borderRadius: "var(--dg-radius-md)",
@@ -3272,6 +3397,7 @@ export default function ShiftEditPanel({
             background: s.color,
             border: getPanelDiffBorder({
               diffKind: cellBorderKind,
+              publishKind: cellPublishKind,
               fallback: FILLED_PANEL_PILL_BORDER,
             }),
             borderRadius: "var(--dg-radius-md)",
@@ -3382,10 +3508,11 @@ export default function ShiftEditPanel({
             <div
               key={label + i}
               data-shift-edit-card={i}
-              data-shift-edit-card-diff={pillDiff.borderKind ?? undefined}
+              data-shift-edit-card-diff={pillDiff.borderKind ?? publishRingKindAt(i) ?? undefined}
               style={{
                 border: getPanelDiffBorder({
                   diffKind: pillDiff.borderKind,
+                  publishKind: publishRingKindAt(i),
                   fallback: `1.5px solid ${darkenColor(s.color, 0.25)}`,
                 }),
                 borderRadius: shiftEditCardOuterRadius,
@@ -3395,7 +3522,7 @@ export default function ShiftEditPanel({
                 background: "var(--dg-color-surface)",
               }}
             >
-              {renderShiftDiffBadge(pillDiff.badge, i)}
+              {renderShiftDiffBadge(pillChangeBadges[i] ?? null, i)}
               {/* Pill header */}
               <div
                 data-shift-edit-card-header={i}
@@ -3850,10 +3977,13 @@ export default function ShiftEditPanel({
       <div
         data-rest-of-day-absence-card
         data-absence-side={absenceSession?.side}
-        data-shift-edit-card-diff={diff?.borderKind ?? undefined}
+        data-shift-edit-card-diff={
+          diff?.borderKind ?? publishRingKindAt(restOfDayPillIndex ?? -1) ?? undefined
+        }
         style={{
           border: getPanelDiffBorder({
             diffKind: diff?.borderKind ?? null,
+            publishKind: restOfDayPillIndex != null ? publishRingKindAt(restOfDayPillIndex) : null,
             fallback: `1.5px solid ${colors.border}`,
           }),
           borderRadius: shiftEditCardOuterRadius,
@@ -3864,7 +3994,9 @@ export default function ShiftEditPanel({
           background: "var(--dg-color-surface)",
         }}
       >
-        {renderShiftDiffBadge(diff?.badge ?? null)}
+        {renderShiftDiffBadge(
+          restOfDayPillIndex != null ? (pillChangeBadges[restOfDayPillIndex] ?? null) : null,
+        )}
         <div
           style={{
             background: colors.background,
@@ -4496,6 +4628,13 @@ export default function ShiftEditPanel({
               detail={correctedLabel}
             />
           )}
+          {publishedChangeLabel && (
+            <PublishedChangeCard
+              change={publishedChangeView}
+              notes={publishedChangeNotes}
+              detail={publishedChangeLabel}
+            />
+          )}
           {pastDayNotice && (
             <p
               data-past-day-notice
@@ -4843,32 +4982,36 @@ export default function ShiftEditPanel({
               )}
 
               {/* ── Shift Request Actions (employee self-service) ─────────── */}
-              {isOwnShift && hasActiveShift && !hasActiveRequest && !hasEdits && (
-                <div
-                  style={{
-                    marginTop: 16,
-                    paddingTop: 16,
-                    borderTop: "1px solid var(--dg-color-border)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
+              {isOwnShift &&
+                hasActiveShift &&
+                !hasActiveRequest &&
+                !hasEdits &&
+                (canRenderCoverage || canRenderSwap) && (
                   <div
                     style={{
-                      fontSize: "var(--dg-type-field-title-size)",
-                      fontWeight: "var(--dg-type-field-title-weight)",
-                      letterSpacing: "var(--dg-type-field-title-letter-spacing)",
-                      lineHeight: "var(--dg-type-field-title-line-height)",
-                      color: "var(--dg-type-field-title-color)",
-                      marginBottom: 2,
+                      marginTop: 16,
+                      paddingTop: 16,
+                      borderTop: "1px solid var(--dg-color-border)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
                     }}
                   >
-                    Shift requests
+                    <div
+                      style={{
+                        fontSize: "var(--dg-type-field-title-size)",
+                        fontWeight: "var(--dg-type-field-title-weight)",
+                        letterSpacing: "var(--dg-type-field-title-letter-spacing)",
+                        lineHeight: "var(--dg-type-field-title-line-height)",
+                        color: "var(--dg-type-field-title-color)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      Shift requests
+                    </div>
+                    {renderRequestControls({ standalone: false })}
                   </div>
-                  {renderRequestControls({ standalone: false })}
-                </div>
-              )}
+                )}
               {isOwnShift && hasActiveRequest && (
                 <Banner tone="warning" icon={Hourglass} className="mt-4">
                   A request is already active for this shift

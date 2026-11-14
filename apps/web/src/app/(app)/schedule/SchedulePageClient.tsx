@@ -6660,7 +6660,9 @@ function SchedulerContent({
           true,
           { startDate: formatDateKey(startDate), endDate: formatDateKey(endDate) },
         );
-        setPublishHistory(markOwnPublicationAsAdditions(recentPublishes));
+        setPublishHistory(
+          markOwnPublicationAsAdditions(recentPublishes, authUser?.id ?? currentUser?.id ?? null),
+        );
       } catch (err: unknown) {
         Sentry.captureException(err);
         toast.error("Published, but the view couldn't refresh. Reload to see the latest.");
@@ -6683,6 +6685,8 @@ function SchedulerContent({
     sendReliableBroadcast,
     guardActiveSession,
     publishWindowDateRange,
+    authUser?.id,
+    currentUser?.id,
   ]);
 
   const handleCancelChanges = useCallback(
@@ -8851,23 +8855,16 @@ function SchedulerContent({
               canEditShifts &&
               outOfWindowDraftGroups.length > 0 &&
               !outOfWindowDraftsDismissed && (
-                <div
-                  className="dg-draft-banner dg-draft-banner--info no-print"
-                  data-tour="draft-banner-other-weeks"
-                >
-                  <BannerIcon tone="info" icon={FilePen} />
-                  <span style={{ fontWeight: 600 }}>Also unpublished in other weeks:</span>
-                  <span>
-                    {(() => {
-                      const total = outOfWindowDraftGroups.reduce((s, g) => s + g.count, 0);
-                      const unit =
-                        spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
-                      // Counted from the loaded window only, so it can shrink
-                      // after a far jump recenters the fetch. Referencing other
-                      // weeks makes the schedule relationship clear without
-                      // implying a physical location.
-                      return `${total} draft${total === 1 ? "" : "s"} in ${outOfWindowDraftGroups.length} other ${unit}${outOfWindowDraftGroups.length === 1 ? "" : "s"} within the loaded dates (${outOfWindowDraftGroupRanges.join(", ")})`;
-                    })()}
+                <div className="dg-draft-banner no-print" data-tour="draft-banner-other-weeks">
+                  <BannerIcon tone="warning" icon={FilePen} />
+                  {/* Each button names its period and count, so the title
+                      needs no total. Counted from the loaded dates only. */}
+                  <span style={{ fontWeight: 700 }}>
+                    {spanWeeks === "month"
+                      ? "Drafts in other months"
+                      : spanWeeks === 2
+                        ? "Drafts in other pay periods"
+                        : "Drafts in other weeks"}
                   </span>
                   <div className="dg-draft-banner-actions" style={{ flexWrap: "wrap" }}>
                     {outOfWindowDraftGroups.map((group, index) => (
@@ -9836,6 +9833,10 @@ function SchedulerContent({
                 null
               }
               draftKind={panelDraftKind}
+              publishChange={publishDiffKindForKey(editPanel.empId, editPanel.date)}
+              historicalAssignments={allAssignmentDefinitions}
+              resolvePublisherName={(userId) => auditNames.get(userId) ?? null}
+              publicationTimeZone={org?.timezone ?? null}
               isStale={editSessionDraft?.isStale ?? false}
               auditInfo={canEditShifts && canRenderAuthorNames ? auditInfo : undefined}
               overlapWarnings={overnightOverlapWarnings}

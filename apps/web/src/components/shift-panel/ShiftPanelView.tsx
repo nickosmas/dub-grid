@@ -147,6 +147,51 @@ export function CorrectedDayCard({
   );
 }
 
+/**
+ * The change the highlighted publish made to this day, above the shift as it
+ * stands: when and by whom it was published, then what the day was.
+ */
+export function PublishedChangeCard({
+  change,
+  notes,
+  detail,
+}: {
+  /** Null when the organization hides change details from this viewer (item 46f). */
+  change: ShiftChange | null;
+  /** What the publish changed that the change model leaves out, such as mentoring. */
+  notes: string[];
+  /** When it was published, and by whom when the viewer may see that. */
+  detail: string;
+}) {
+  const shownChange = change && change.kind !== "none" ? change : null;
+  return (
+    <div data-published-change style={{ ...statusCard, marginBottom: 16 }}>
+      <StatusHeading
+        title="Published change"
+        detail={detail}
+        dotColor="var(--dg-color-text-muted)"
+      />
+      {shownChange || notes.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {shownChange ? <ShiftChangeBesideCurrent change={shownChange} /> : null}
+          {notes.map((note) => (
+            <p
+              key={note}
+              style={{
+                margin: 0,
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--dg-color-text-secondary)",
+              }}
+            >
+              {note}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** What a repeating item holds and how it repeats, before anything is edited. */
 export function ShiftPanelView({
   header,

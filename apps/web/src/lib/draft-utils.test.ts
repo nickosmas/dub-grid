@@ -144,6 +144,26 @@ describe("computeDraftBreakdown", () => {
     expect(breakdown.totalChanges).toBe(1);
   });
 
+  it("counts a new day off as an absence, not a shift", () => {
+    const dayOff: ShiftMap[string] = {
+      label: "Off",
+      assignmentIds: [],
+      segments: [],
+      absenceTypeId: 5,
+      isDraft: true,
+      draftKind: "new",
+      publishedAssignmentDefinitionIds: [],
+      publishedLabel: "",
+    };
+    const breakdown = computeDraftBreakdown(
+      { "emp_2026-09-18": dayOff, "emp_2026-09-19": { ...baseEntry, draftKind: "new" } },
+      {},
+    );
+    expect(breakdown.newShifts).toBe(1);
+    expect(breakdown.newAbsences).toBe(1);
+    expect(breakdown.totalChanges).toBe(2);
+  });
+
   it("still reports a replaced shift as an edit", () => {
     const replaced: ShiftMap[string] = {
       ...baseEntry,
