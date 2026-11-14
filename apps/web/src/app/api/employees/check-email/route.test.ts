@@ -134,7 +134,7 @@ describe("POST /api/employees/check-email", () => {
 
   // ── The auth.users-based cases: mirrors check_employee_email_belongs_to_user ──
 
-  it("flags a Gridmaster's login email the same way as any other account's", async () => {
+  it("says nothing of a Gridmaster's login email, like any account outside the organization", async () => {
     findAuthUserByEmail.mockResolvedValue({
       id: OTHER_USER_ID,
       email: "gridmaster@test.com",
@@ -146,11 +146,7 @@ describe("POST /api/employees/check-email", () => {
     const res = await POST(makeRequest({ email: "gridmaster@test.com", orgId: ORG_ID }));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      conflict: true,
-      conflictingEmployeeId: null,
-      reason: "other_account",
-    });
+    await expect(res.json()).resolves.toEqual({ conflict: false, conflictingEmployeeId: null });
   });
 
   it("does not flag an employee's own login email", async () => {

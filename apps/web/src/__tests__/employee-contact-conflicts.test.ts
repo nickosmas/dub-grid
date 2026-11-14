@@ -45,12 +45,40 @@ describe("getEmployeeContactConflict", () => {
     });
   });
 
-  it("words a Gridmaster's address like any other account's (F-196)", () => {
+  const UNAVAILABLE = {
+    code: "EMPLOYEE_CONTACT_CONFLICT",
+    error: "We can't use that email. Try a different one.",
+    field: "email",
+    message: "We can't use that email. Try a different one.",
+  };
+
+  it("never says a Gridmaster holds an address", () => {
     expect(
       getEmployeeContactConflict({
         code: "23505",
         constraint: "employee_email_belongs_to_user",
-        message: "employee_email_belongs_to_gridmaster: belongs to a Gridmaster account",
+        message: "employee_email_belongs_to_gridmaster: x@y.com belongs to a Gridmaster account",
+      }),
+    ).toEqual(UNAVAILABLE);
+  });
+
+  it("never says an account that could be anywhere holds an address", () => {
+    expect(
+      getEmployeeContactConflict({
+        code: "23505",
+        constraint: "employee_email_belongs_to_user",
+        message: "employee_email_belongs_to_other_user: x@y.com belongs to a different account",
+      }),
+    ).toEqual(UNAVAILABLE);
+  });
+
+  it("names a clash with someone in this organization", () => {
+    expect(
+      getEmployeeContactConflict({
+        code: "23505",
+        constraint: "employee_email_belongs_to_user",
+        message:
+          "employee_email_belongs_to_other_user: x@y.com belongs to another active member of this organization",
       }),
     ).toEqual({
       code: "EMPLOYEE_CONTACT_CONFLICT",
