@@ -185,6 +185,7 @@ vi.mock("react-native", async () => {
           ...pickDomProps(props),
           "data-content-container-style": JSON.stringify(contentContainerStyle),
           "data-content-inset-adjustment-behavior": props.contentInsetAdjustmentBehavior,
+          "data-remove-clipped-subviews": String(props.removeClippedSubviews),
           "data-testid": "screen-flat-list",
         },
         refreshControl as React.ReactNode,
@@ -412,6 +413,8 @@ describe("Screen", () => {
     const list = screen.getByTestId("screen-flat-list");
     expect(screen.queryByTestId("screen-scroll-view")).toBeNull();
     expect(list.getAttribute("data-content-inset-adjustment-behavior")).toBe("automatic");
+    // A sheet in the header is a zero-height native view Android would detach.
+    expect(list.getAttribute("data-remove-clipped-subviews")).toBe("false");
     expect(JSON.parse(list.getAttribute("data-content-container-style") ?? "{}")).toMatchObject({
       minHeight: 874 - 168 - 83,
     });

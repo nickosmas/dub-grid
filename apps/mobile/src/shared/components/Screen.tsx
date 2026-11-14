@@ -322,6 +322,10 @@ export function Screen<T = never>({
       data={list.data as T[]}
       renderItem={({ item, index }) => <>{list.renderItem(item, index)}</>}
       keyExtractor={list.keyExtractor}
+      // Android lists default to detaching views outside the visible rect,
+      // and a native sheet's host in the header is a zero-height view at the
+      // top edge, so the sheet never opened there (F-237).
+      removeClippedSubviews={false}
       ListHeaderComponent={<View style={contentStyle}>{children}</View>}
       // With rows, the first one sits one section gap below the header, the
       // distance the page content keeps between its own sections. Without
