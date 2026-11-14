@@ -16,7 +16,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 import { changedElsewhereMessage } from "@dubgrid/domain";
 
 const phoneUpdateSchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   phone: optionalUsPhoneSchema,
   expectedVersion: z.number().int().nonnegative().optional(),
 });

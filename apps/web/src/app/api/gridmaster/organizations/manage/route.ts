@@ -71,24 +71,24 @@ const createSetupSchema = z.object({
 const requestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("archiveOrganization"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
   }),
   z.object({
     action: z.literal("restoreOrganization"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
   }),
   z.object({
     action: z.literal("suspendOrganization"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     reason: z.string().trim().min(1),
   }),
   z.object({
     action: z.literal("unsuspendOrganization"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
   }),
   z.object({
     action: z.literal("assignOrgRoleByEmail"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     email: z.string().trim().email(),
     role: z.enum(["super_admin", "admin", "user"]),
   }),

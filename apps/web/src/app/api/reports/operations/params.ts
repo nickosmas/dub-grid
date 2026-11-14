@@ -9,7 +9,7 @@ import {
 const MAX_REPORT_RANGE_DAYS = 90;
 
 export const operationsQuerySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   startDate: z.string().date(),
   endDate: z.string().date(),
   employeeIds: z.string().optional(),
@@ -60,7 +60,7 @@ export function parseOperationsFilters(
 ): OperationsReportFilters {
   const employeeIds = parseCsv(input.employeeIds);
   for (const employeeId of employeeIds) {
-    if (!z.string().uuid().safeParse(employeeId).success) {
+    if (!z.guid().safeParse(employeeId).success) {
       throw new RangeError("Choose valid people before generating the report.");
     }
   }

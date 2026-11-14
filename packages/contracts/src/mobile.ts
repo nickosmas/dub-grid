@@ -47,14 +47,14 @@ export const mobileShiftRequestStatusSchema = z.enum([
 ]);
 
 export const mobileUserSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   email: z.string().email().nullable(),
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),
 });
 
 export const mobileOrganizationSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   name: z.string(),
   slug: mobileOrgSlugSchema,
 });
@@ -97,7 +97,7 @@ export const mobileAuthLoginResponseSchema = z.object({
 });
 
 export const mobileOrganizationSummarySchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   name: z.string(),
   slug: z.string().nullable(),
   orgRole: z.enum(["super_admin", "admin", "user"]).nullable(),
@@ -146,7 +146,7 @@ export const mobilePermissionsSchema = z.object({
 });
 
 export const mobileOrgConfigSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   name: z.string(),
   slug: z.string().nullable(),
   timezone: z.string().nullable(),
@@ -168,12 +168,12 @@ export const mobileOrgConfigSchema = z.object({
       calloff: z.enum(["hidden", "matched", "always"]),
     })
     .default({ coverageGap: "matched", calloff: "matched" }),
-  featureFlags: z.record(z.boolean()),
+  featureFlags: z.record(z.string(), z.boolean()),
 });
 
 export const mobileLinkedEmployeeSchema = z
   .object({
-    id: z.string().uuid(),
+    id: z.guid(),
     firstName: z.string(),
     lastName: z.string(),
     status: z.enum(["active", "inactive", "removed"]),
@@ -357,18 +357,18 @@ export const mobileProfileRequestedChangesSchema = z
   .strict();
 
 export const mobileProfileChangeRequestSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  requesterUserId: z.string().uuid().nullable(),
-  requesterEmployeeId: z.string().uuid().nullable(),
+  id: z.guid(),
+  orgId: z.guid(),
+  requesterUserId: z.guid().nullable(),
+  requesterEmployeeId: z.guid().nullable(),
   requesterName: z.string(),
   requesterEmail: z.string().nullable(),
   type: mobileProfileChangeRequestTypeSchema,
   status: mobileProfileChangeRequestStatusSchema,
   requestedChanges: mobileProfileRequestedChangesSchema,
-  currentValues: z.record(z.unknown()),
+  currentValues: z.record(z.string(), z.unknown()),
   requestNote: z.string(),
-  resolverUserId: z.string().uuid().nullable(),
+  resolverUserId: z.guid().nullable(),
   resolverNote: z.string(),
   resolvedAt: z.string().nullable(),
   cancelledAt: z.string().nullable(),
@@ -452,7 +452,7 @@ export const webNotificationPreferencesUpdateBodySchema = z.object({
 });
 
 export const mobileProfileSessionSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   platform: z.enum(["web", "ios", "android"]).nullable(),
   appVersion: z.string().nullable(),
   deviceLabel: z.string().nullable(),
@@ -639,7 +639,7 @@ export const mobileScheduleIndicatorSchema = z.object({
 });
 
 export const mobileScheduleEntrySchema = z.object({
-  employeeId: z.string().uuid(),
+  employeeId: z.guid(),
   employeeName: z.string(),
   employeeSeniority: z.number().int().nullable().optional(),
   employeeFocusAreaIds: z.array(z.number().int()).default([]),
@@ -675,7 +675,7 @@ export const mobileOrgScheduleResponseSchema = z.object({
 export const mobileShiftSwapOptionsQuerySchema = z.object({
   startDate: z.string().date().optional(),
   endDate: z.string().date().optional(),
-  requesterEmpId: z.string().uuid(),
+  requesterEmpId: z.guid(),
   requesterShiftDate: z.string().date(),
 });
 
@@ -688,23 +688,23 @@ export const mobileShiftSwapOptionsResponseSchema = z.object({
 });
 
 export const mobileShiftRequestSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.guid(),
+  orgId: z.guid(),
   type: mobileShiftRequestTypeSchema,
   status: mobileShiftRequestStatusSchema,
-  requesterEmpId: z.string().uuid(),
+  requesterEmpId: z.guid(),
   requesterName: z.string(),
   requesterShiftDate: z.string().date(),
   requesterState: scheduleCellStateSchema,
   requesterPresentation: resolvedSchedulePresentationSchema,
-  targetEmpId: z.string().uuid().nullable(),
+  targetEmpId: z.guid().nullable(),
   targetName: z.string().nullable(),
   targetShiftDate: z.string().date().nullable(),
   targetState: scheduleCellStateSchema.nullable().optional(),
   targetPresentation: resolvedSchedulePresentationSchema.nullable().optional(),
   absenceTypeId: z.number().int().nullable(),
-  parentRequestId: z.string().uuid().nullable(),
-  adminUserId: z.string().uuid().nullable(),
+  parentRequestId: z.guid().nullable(),
+  adminUserId: z.guid().nullable(),
   adminNote: z.string().nullable(),
   expiresAt: z.string(),
   resolvedAt: z.string().nullable(),
@@ -719,7 +719,7 @@ export const mobileShiftRequestSchema = z.object({
   draftCells: z
     .array(
       z.object({
-        empId: z.string().uuid(),
+        empId: z.guid(),
         date: z.string().date(),
         // Which kind of unpublished change the day holds (119); absent from older servers.
         hasShiftChanges: z.boolean().optional(),
@@ -757,14 +757,14 @@ export const mobileShiftRequestsResponseSchema = z.object({
 
 export const mobileShiftRequestHistoryCursorSchema = z.object({
   createdAt: z.string().datetime({ offset: true }),
-  id: z.string().uuid(),
+  id: z.guid(),
 });
 
 export const mobileShiftRequestHistoryQuerySchema = z
   .object({
     limit: z.coerce.number().int().positive().max(100).optional(),
     cursorCreatedAt: z.string().datetime({ offset: true }).optional(),
-    cursorId: z.string().uuid().optional(),
+    cursorId: z.guid().optional(),
   })
   .refine((query) => Boolean(query.cursorCreatedAt) === Boolean(query.cursorId), {
     message: "Both cursor fields are required",
@@ -819,7 +819,7 @@ export const mobileDashboardActivityItemSchema = z.object({
 });
 
 export const mobileDashboardStaffHoursEntrySchema = z.object({
-  employeeId: z.string().uuid(),
+  employeeId: z.guid(),
   employeeName: z.string(),
   totalHours: z.number(),
   overtimeHours: z.number(),
@@ -891,10 +891,10 @@ export const mobileDashboardResponseSchema = z.object({
 export const mobileCreateShiftRequestBodySchema = z
   .object({
     type: mobileShiftRequestTypeSchema,
-    requesterEmpId: z.string().uuid(),
+    requesterEmpId: z.guid(),
     requesterShiftDate: z.string().date(),
     requesterSegmentIndex: z.number().int().nonnegative().optional(),
-    targetEmpId: z.string().uuid().optional(),
+    targetEmpId: z.guid().optional(),
     targetShiftDate: z.string().date().optional(),
     targetSegmentIndex: z.number().int().nonnegative().optional(),
     absenceTypeId: z.number().int().optional(),
@@ -940,7 +940,7 @@ export const mobileCreateShiftRequestBodySchema = z
   });
 
 export const mobileCreateShiftRequestResponseSchema = z.object({
-  requestId: z.string().uuid(),
+  requestId: z.guid(),
   // Settled on the spot because an approver was party to it. Defaulted so
   // an older server's response still parses as "pending".
   autoApproved: z.boolean().default(false),
@@ -949,11 +949,11 @@ export const mobileCreateShiftRequestResponseSchema = z.object({
 export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("claim"),
-    claimerEmpId: z.string().uuid(),
+    claimerEmpId: z.guid(),
   }),
   z.object({
     action: z.literal("respond"),
-    empId: z.string().uuid(),
+    empId: z.guid(),
     accept: z.boolean(),
   }),
   z.object({
@@ -963,12 +963,12 @@ export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion("action",
   }),
   z.object({
     action: z.literal("cancel"),
-    empId: z.string().uuid(),
+    empId: z.guid(),
     note: z.string().trim().max(1000).optional(),
   }),
   z.object({
     action: z.literal("volunteer_open_shift"),
-    empId: z.string().uuid(),
+    empId: z.guid(),
     shiftDate: z.string().date(),
     focusAreaId: z.number().int(),
     state: scheduleCellStateSchema,
@@ -981,7 +981,7 @@ export const mobileUpdateShiftRequestResponseSchema = z.object({
 });
 
 export const mobilePersonSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   employeeNumber: z.number().int(),
   firstName: z.string(),
   lastName: z.string(),
@@ -1019,7 +1019,7 @@ export const mobilePersonSchema = z.object({
   plannedAbsenceTypeId: z.number().int().nullable().default(null),
   /** Their first day (YYYY-MM-DD, 51g4): no day before it can be scheduled; null when not set. */
   firstDay: z.string().date().nullable().default(null),
-  userId: z.string().uuid().nullable().default(null),
+  userId: z.guid().nullable().default(null),
   version: z.number().int().nonnegative().default(0),
   /**
    * The linked membership row's `updated_at`, for optimistic concurrency on the
@@ -1036,7 +1036,7 @@ export const mobilePersonSchema = z.object({
     .default(null),
   pendingInvitation: z
     .object({
-      id: z.string().uuid(),
+      id: z.guid(),
       email: z.string().email(),
       expiresAt: z.string(),
       updatedAt: z.string().nullable(),
@@ -1172,7 +1172,7 @@ export const mobilePersonInvitationCreateBodySchema = z.object({
 });
 
 export const mobilePersonInvitationActionBodySchema = z.object({
-  invitationId: z.string().uuid(),
+  invitationId: z.guid(),
   expectedUpdatedAt: z.string().nullable(),
 });
 
@@ -1265,9 +1265,9 @@ export const mobilePersonPermissionsResponseSchema = z.object({
 export const mobileManagementUserSchema = z.object({
   id: z.string().min(1),
   source: z.enum(["member", "pending_invite"]),
-  userId: z.string().uuid().nullable().default(null),
+  userId: z.guid().nullable().default(null),
   /** Set when they also have a staff profile, so the app can link across. */
-  employeeId: z.string().uuid().nullable().default(null),
+  employeeId: z.guid().nullable().default(null),
   employeeStatus: z.enum(["active", "inactive", "removed"]).nullable().default(null),
   firstName: z.string().default(""),
   lastName: z.string().default(""),
@@ -1278,7 +1278,7 @@ export const mobileManagementUserSchema = z.object({
   managementDeptAdminIds: z.array(z.number().int()).default([]),
   /** Optimistic-concurrency guard for whichever row backs this person. */
   updatedAt: z.string().nullable().default(null),
-  invitationId: z.string().uuid().nullable().default(null),
+  invitationId: z.guid().nullable().default(null),
   invitationExpiresAt: z.string().nullable().default(null),
 });
 
@@ -1327,7 +1327,7 @@ export const mobileManagementUserResponseSchema = z.object({
 export const mobileNotificationPrioritySchema = z.enum(["low", "normal", "high", "critical"]);
 
 export const mobileNotificationSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   type: z.enum([
     "impersonation_start",
     "impersonation_end",
@@ -1387,7 +1387,7 @@ export const mobileNotificationSchema = z.object({
   priority: mobileNotificationPrioritySchema,
   title: z.string(),
   message: z.string(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   readAt: z.string().nullable(),
   archivedAt: z.string().nullable(),
   createdAt: z.string(),
@@ -1395,15 +1395,15 @@ export const mobileNotificationSchema = z.object({
 
 export const mobileNotificationsCursorSchema = z.object({
   createdAt: z.string(),
-  id: z.string().uuid(),
+  id: z.guid(),
 });
 
 export const mobileNotificationsQuerySchema = z.object({
   /** One alert by id, for a deep link whose target may sit far past the first page. */
-  id: z.string().uuid().optional(),
+  id: z.guid().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
   cursorCreatedAt: z.string().optional(),
-  cursorId: z.string().uuid().optional(),
+  cursorId: z.guid().optional(),
   category: z.string().min(1).max(64).optional(),
   type: z.string().min(1).max(64).optional(),
   priority: mobileNotificationPrioritySchema.optional(),
@@ -1432,7 +1432,7 @@ export const mobileNotificationBulkActionSchema = z.enum([
 ]);
 
 export const mobileNotificationBulkBodySchema = z.object({
-  ids: z.array(z.string().uuid()).min(1).max(200),
+  ids: z.array(z.guid()).min(1).max(200),
   action: mobileNotificationBulkActionSchema,
 });
 

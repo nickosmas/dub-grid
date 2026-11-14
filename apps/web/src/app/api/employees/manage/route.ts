@@ -105,7 +105,7 @@ const employeeStatusSchema = z.enum(["active", "inactive", "removed"]);
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 
 const employeeSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   firstName: staffNameSchema,
   lastName: staffNameSchema,
   employmentType: employeeEmploymentTypeSchema,
@@ -120,7 +120,7 @@ const employeeSchema = z.object({
   email: optionalStaffEmailSchema,
   contactNotes: staffNotesSchema,
   archivedAt: z.string().datetime({ offset: true }).nullable().optional(),
-  userId: z.string().uuid().nullable(),
+  userId: z.guid().nullable(),
   departmentIds: z.array(z.number().int()),
   deptAdminIds: z.array(z.number().int()),
   version: z.number().int().nonnegative(),
@@ -153,17 +153,17 @@ const REORDER_WRITE_CHUNK = 25;
 const requestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("fetchEmployees"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     statuses: z.array(employeeStatusSchema).optional(),
   }),
   z.object({
     action: z.literal("insertEmployee"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     employee: employeeCreateSchema,
   }),
   z.object({
     action: z.literal("updateEmployee"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     employee: employeeSchema,
     expectedVersion: z.number().int().nonnegative().optional(),
     /** What to do with their upcoming shifts in focus areas they come off (51i). */
@@ -171,7 +171,7 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("insertEmployees"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     employees: z
       .array(employeeCreateSchema.omit({ seniority: true }))
       .min(1)
@@ -179,12 +179,12 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("reorderSeniority"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     /** Only the people whose place changed, each at the version the manager saw. */
     order: z
       .array(
         z.object({
-          id: z.string().uuid(),
+          id: z.guid(),
           seniority: z.number().int(),
           version: z.number().int().nonnegative(),
         }),
@@ -194,18 +194,18 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("fetchEmployeeById"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
+    orgId: z.guid(),
+    employeeId: z.guid(),
   }),
   z.object({
     action: z.literal("fetchEmployeeByUserId"),
-    orgId: z.string().uuid(),
-    userId: z.string().uuid(),
+    orgId: z.guid(),
+    userId: z.guid(),
   }),
   z.object({
     action: z.literal("fetchEmployeeShifts"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
+    orgId: z.guid(),
+    employeeId: z.guid(),
     assignmentLabels: mapEntrySchema,
     absenceTypeLabels: mapEntrySchema.optional(),
     startDate: z.string().date().optional(),
@@ -213,18 +213,18 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("fetchEmployeeHasStarted"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
+    orgId: z.guid(),
+    employeeId: z.guid(),
   }),
   z.object({
     action: z.literal("fetchEmployeeInvitations"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
+    orgId: z.guid(),
+    employeeId: z.guid(),
   }),
   z.object({
     action: z.literal("fetchEmployeeActivity"),
-    orgId: z.string().uuid(),
-    employeeId: z.string().uuid(),
+    orgId: z.guid(),
+    employeeId: z.guid(),
   }),
 ]);
 
