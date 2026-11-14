@@ -1083,7 +1083,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Require `requireSensitiveActionAuth` for any role change and any permission change that turns a switch on; the client already runs these through `useStepUpAction`.
 **Resolution:**
 
-### F-250 [P3] open - The server never applies the impersonation narrowing the app shows
+### F-250 [P3] fixed - The server never applies the impersonation narrowing the app shows
 
 **File:** `apps/web/src/app/api/shared/permissions.ts:563-567`; `packages/authz/src/index.ts:109-121`
 **Found:** 2026-11-10 by /audit (scope: admin permissions; lens: security)
@@ -1091,6 +1091,7 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Pass the impersonation state into the resolver in `requireOrgPermissions` and the mobile auth context, with F-201.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** owner decision (2026-11-13): impersonating never narrows a Gridmaster's powers. Remove the narrowing from `buildPermissionContext` rather than applying it on the server, and remove the dead `skip: isImpersonating` branch in the requests route.
+**Resolution:** Fixed on fix/impersonation-keeps-powers (2026-11-13), as decided: `buildPermissionContext` no longer turns off staff, settings, approvals, notes, user management or admin-permission editing while impersonating, so the app shows what the role can do and `isImpersonating` only marks the session. The dead `skip` option is gone from `settleShiftRequestAfterTransition` and the requests route; `auto_approve_shift_request` still never auto-approves for a Gridmaster (135), so "It's sent for approval" stays true.
 
 ### F-251 [P3] open - `departments.permissions` is written from client input and read by nothing
 

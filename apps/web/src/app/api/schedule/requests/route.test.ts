@@ -474,20 +474,6 @@ describe("POST /api/schedule/requests", () => {
       );
     });
 
-    it("never settles while a gridmaster is impersonating", async () => {
-      mockActorContext({ isImpersonating: true });
-      settleShiftRequestAfterTransition.mockResolvedValueOnce({
-        autoApproved: false,
-        reason: "skipped",
-      });
-
-      await POST(claimRequest());
-
-      expect(settleShiftRequestAfterTransition).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: true }),
-      );
-    });
-
     it("does not try to settle a declined swap", async () => {
       mockActorContext({});
 
