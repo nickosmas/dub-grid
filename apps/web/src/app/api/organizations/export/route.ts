@@ -14,7 +14,7 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const querySchema = z.object({ orgId: z.string().uuid() });
+const querySchema = z.object({ orgId: z.guid() });
 
 /**
  * The organization's data as a ZIP of CSVs, for its Super Admin before they
