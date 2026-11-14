@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
-import { endUserSession, revokeAllUserSessions } from "@/lib/auth/revocation";
+import { endUserSessionsInOrganization } from "@/lib/auth/revocation";
 import { cacheDel, CacheKey } from "@/lib/db/shared";
 import logger from "@/lib/logger";
 
@@ -27,9 +27,10 @@ export async function endOffboardedAccess(
 
   // The JWT hook refuses to mint for an offboarded person, but an access
   // token they already hold stays valid until it expires, and API routes
-  // verify tokens locally.
+  // verify tokens locally. Only this organization's sessions end: their
+  // other organizations stay signed in (owner, 2026-11-13).
   try {
-    await revokeAllUserSessions(userId);
+    await endUserSessionsInOrganization(userId, orgId);
   } catch (err) {
     logger.error(
       { error: err, orgId, empId, userId },
@@ -54,9 +55,8 @@ export async function endOffboardedAccess(
 }
 
 /**
- * Ends one sign-in's access to one organization and leaves the rest alone: an
- * Offboard signs them out everywhere, but someone who lost their mailbox can't
- * reset a password to get back into their other organizations. Throws if the
+ * Ends one sign-in's access to one organization and leaves the rest alone, so
+ * someone who lost their mailbox keeps their other organizations. Throws if the
  * membership stays open; ending its sessions is best effort, since every
  * organization route checks the membership on each request.
  */
@@ -65,13 +65,6 @@ export async function endAccessInOrganization(
   input: { orgId: string; userId: string; actorId: string; at: string },
 ): Promise<void> {
   const { orgId, userId, actorId, at } = input;
-  const { data: sessions, error: sessionsError } = await serviceClient
-    .from("user_sessions")
-    .select("supabase_session_id")
-    .eq("user_id", userId)
-    .eq("active_org_id", orgId);
-  if (sessionsError) throw sessionsError;
-
   const { error } = await serviceClient
     .from("organization_memberships")
     .update({ archived_at: at, archived_by: actorId })
@@ -82,11 +75,7 @@ export async function endAccessInOrganization(
   await clearMembershipCaches(orgId);
 
   try {
-    for (const session of sessions ?? []) {
-      if (session.supabase_session_id) {
-        await endUserSession(userId, session.supabase_session_id as string);
-      }
-    }
+    await endUserSessionsInOrganization(userId, orgId);
     await disableMobilePushTokensForOrg(serviceClient, { userId, orgId });
   } catch (err) {
     logger.error({ error: err, orgId, userId }, "Failed to end sessions in one organization");
