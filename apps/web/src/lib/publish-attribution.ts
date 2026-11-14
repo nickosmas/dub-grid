@@ -2,6 +2,7 @@ import type { ShiftMap } from "@/types";
 import {
   countShiftsAddedToPublishedEntry,
   extractDateKeyFromCellKey,
+  isWholeDayAbsenceEntry,
   type DateRangeFilter,
   type DraftBreakdown,
 } from "@/lib/draft-utils";
@@ -29,6 +30,7 @@ function emptyBreakdown(editorId: string, isCurrentUser: boolean): EditorDraftBr
     editorId,
     isCurrentUser,
     newShifts: 0,
+    newAbsences: 0,
     modifiedShifts: 0,
     deletedShifts: 0,
     newNotes: 0,
@@ -81,7 +83,8 @@ export function computeEditorDraftBreakdowns(
     const bucket = bucketFor(entry.updatedBy);
     switch (entry.draftKind) {
       case "new":
-        bucket.newShifts += 1;
+        if (isWholeDayAbsenceEntry(entry)) bucket.newAbsences += 1;
+        else bucket.newShifts += 1;
         break;
       case "modified": {
         const added = countShiftsAddedToPublishedEntry(entry);
@@ -136,6 +139,9 @@ export function formatEditorBreakdownSummary(breakdown: EditorDraftBreakdown): s
   const summary = parts.length > 0 ? `${parts.join(", ")} shift${shiftCount === 1 ? "" : "s"}` : "";
 
   const noteParts: string[] = [];
+  if (breakdown.newAbsences > 0) {
+    noteParts.push(`${breakdown.newAbsences} new absence${breakdown.newAbsences === 1 ? "" : "s"}`);
+  }
   if (breakdown.newNotes > 0) {
     noteParts.push(`${breakdown.newNotes} new note${breakdown.newNotes === 1 ? "" : "s"}`);
   }

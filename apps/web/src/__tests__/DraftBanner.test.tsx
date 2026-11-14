@@ -5,6 +5,7 @@ import DraftBanner from "@/components/DraftBanner";
 
 const breakdown = {
   newShifts: 1,
+  newAbsences: 0,
   modifiedShifts: 2,
   deletedShifts: 1,
   newNotes: 0,
@@ -32,6 +33,7 @@ describe("DraftBanner", () => {
         onCancel={vi.fn()}
         breakdown={{
           newShifts: 3,
+          newAbsences: 0,
           modifiedShifts: 0,
           deletedShifts: 0,
           newNotes: 0,

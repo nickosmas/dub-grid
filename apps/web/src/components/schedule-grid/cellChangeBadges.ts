@@ -79,7 +79,7 @@ function pillBadgeFor(
   return toBadge(source, descriptor);
 }
 
-function isMeaningfulPublishChange(
+export function isMeaningfulPublishChange(
   change: PublishChange | null | undefined,
 ): change is PublishChange {
   // A period's first publication is the baseline, not a set of additions.
@@ -124,9 +124,13 @@ function buildDraftDiff(
   });
 }
 
-function buildPublishDiff(
+/** The published change as per-pill descriptors, before against after. */
+export function buildPublishChangeDiff(
   change: PublishChange,
-  input: ResolveCellChangeBadgesInput,
+  input: Pick<
+    ResolveCellChangeBadgesInput,
+    "pillCount" | "publishedAssignmentIdByPair" | "resolveAssignmentLabel" | "resolveAbsenceLabel"
+  >,
 ): ShiftDiffDescriptorResult {
   if (change.detailsHidden && change.kind !== "deleted") {
     return hiddenPublishDiffDescriptors(change.kind, input.pillCount);
@@ -180,6 +184,44 @@ function hasCellContent(entry: ScheduleCellStateEntry | null): boolean {
 }
 
 /**
+ * One chip per pill from a cell's draft and published diffs. A cell-level chip
+ * silences its own source's pill chips unless it is the "Changed" summary,
+ * which still lets each pill say what happened to it; the draft is the newer
+ * state, so it outranks a published chip on the same pill. A worked cell's
+ * absence for the rest of the day is its last pill (`restOfDayIndex`).
+ */
+export function resolvePillChangeBadges(input: {
+  /** Null when the cell has no draft to compare with what is published. */
+  draftDiff: ShiftDiffDescriptorResult | null;
+  /** Null when no published change is being highlighted. */
+  publishDiff: ShiftDiffDescriptorResult | null;
+  pillCount: number;
+  restOfDayIndex: number | null;
+}): Array<CellChangeBadge | null> {
+  const { draftDiff, publishDiff, pillCount, restOfDayIndex } = input;
+  const draftCellDescriptor = cellLevelDiffBadge(draftDiff);
+  const publishCellDescriptor = publishDiff ? publishCellLevelBadge(publishDiff, pillCount) : null;
+  const draftCellBadge = draftCellDescriptor ? toBadge("draft", draftCellDescriptor) : null;
+  const publishCellBadge = publishCellDescriptor ? toBadge("publish", publishCellDescriptor) : null;
+  const pillDiffAt = (diff: ShiftDiffDescriptorResult | null, index: number) =>
+    index === restOfDayIndex ? (diff?.restOfDayDiff ?? undefined) : diff?.pillDiffs[index];
+
+  return Array.from({ length: pillCount }, (_, index) => {
+    const draftPill =
+      draftCellBadge == null || draftCellBadge.text === "Changed"
+        ? pillBadgeFor("draft", pillDiffAt(draftDiff, index)?.badge)
+        : null;
+    const publishPill =
+      publishCellBadge == null || publishCellBadge.text === "Changed"
+        ? pillBadgeFor("publish", pillDiffAt(publishDiff, index)?.badge)
+        : null;
+    return index === 0
+      ? (draftCellBadge ?? draftPill ?? publishCellBadge ?? publishPill)
+      : (draftPill ?? publishPill);
+  });
+}
+
+/**
  * The change chips a cell shows, resolved the same way the schedule grid does
  * so every surface that repeats a cell (the dashboard's schedule strip, the
  * user dashboard's hero and week list) marks the same pills. A draft outranks
@@ -212,38 +254,17 @@ export function resolveCellChangeBadges(input: ResolveCellChangeBadgesInput): Ce
 
   const showsDraftBadge = cellShowsDraftDiffBadge({ draftKind });
   const draftDiff = showsDraftBadge && entry ? buildDraftDiff(entry, input) : null;
-  const publishDiff = publishChange ? buildPublishDiff(publishChange, input) : null;
+  const publishDiff = publishChange ? buildPublishChangeDiff(publishChange, input) : null;
 
-  const draftCellDescriptor = showsDraftBadge ? cellLevelDiffBadge(draftDiff) : null;
-  const publishCellDescriptor = publishDiff
-    ? publishCellLevelBadge(publishDiff, input.pillCount)
-    : null;
-  const draftCellBadge = draftCellDescriptor ? toBadge("draft", draftCellDescriptor) : null;
-  const publishCellBadge = publishCellDescriptor ? toBadge("publish", publishCellDescriptor) : null;
-
-  // A worked cell's absence for the rest of the day is its last pill, and its
-  // change comes from the diff's own slot rather than a worked pill's.
   const restOfDayIndex = entry?.restOfDayAbsenceTypeId != null ? input.pillCount - 1 : null;
+  const pillBadges = resolvePillChangeBadges({
+    draftDiff,
+    publishDiff,
+    pillCount: input.pillCount,
+    restOfDayIndex,
+  });
   const pillDiffAt = (diff: ShiftDiffDescriptorResult | null, index: number) =>
     index === restOfDayIndex ? (diff?.restOfDayDiff ?? undefined) : diff?.pillDiffs[index];
-
-  // A cell-level chip silences its own source's pill chips unless it is the
-  // "Changed" summary, which still lets each pill say what happened to it.
-  const pillBadges = perPill((index) => {
-    const draftPill =
-      showsDraftBadge && (draftCellBadge == null || draftCellBadge.text === "Changed")
-        ? pillBadgeFor("draft", pillDiffAt(draftDiff, index)?.badge)
-        : null;
-    const publishPill =
-      publishCellBadge == null || publishCellBadge.text === "Changed"
-        ? pillBadgeFor("publish", pillDiffAt(publishDiff, index)?.badge)
-        : null;
-    // The draft is the newer state, so it outranks a published chip on the
-    // same pill, cell-level or not.
-    return index === 0
-      ? (draftCellBadge ?? draftPill ?? publishCellBadge ?? publishPill)
-      : (draftPill ?? publishPill);
-  });
 
   // A single pill inherits the cell's draft kind when the diff has nothing
   // finer to say; with several pills only a pill the draft touched is dashed.
