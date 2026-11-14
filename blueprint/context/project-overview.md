@@ -236,9 +236,16 @@ one it names.
   extended to staff, organization settings or discard, and impersonating never
   narrows a Gridmaster's powers (2026-11-13).
 - An archived organization stays restorable by a Gridmaster for 90 days, then
-  a scheduled job deletes it and its staff data; the Super Admin is offered an
-  export in that window, and the Privacy Policy states the 90 days and the
-  backup window (2026-11-13; not built yet, needs its own spec).
+  a daily job deletes it, its staff data and its own activity log, and each
+  account left with no organization; DubGrid support's records of it stay.
+  Delete organization offers Download your data (staff, published days,
+  requests, activity log) and a Gridmaster can produce the same ZIP in the
+  window. The Privacy Policy states the 90 days and the backup window
+  (2026-11-13; shipped 2026-11-14, migration 142).
+- Realtime reaches the apps only on private Broadcast topics (the
+  organization, its schedule editors' drafts, the person, Gridmasters), one
+  message per statement with no row data; nothing is published to Postgres
+  Changes (2026-11-14, migrations 140 and 141).
 - Public documentation covers customer behavior only. Gridmaster tooling, Test
   Sandbox, feature flags, migrations, environment variables, and internal HTTP
   endpoints remain internal.
@@ -409,17 +416,18 @@ Main mobile surfaces:
 ## Deployment
 
 - **Web host:** Vercel. `apps/web/vercel.json` pins the region and the daily
-  trial-expiry and sandbox-cleanup jobs.
+  trial-expiry, sandbox-cleanup, return-from-away and
+  purge-archived-organizations jobs.
 - **Build and start:** `npm run build` and `npm run start`; the root production
   build targets the Next.js web app.
 - **Database:** Supabase-hosted Postgres with an immutable ordered migration
   stream. Migrations `001` through `004` are frozen. The repository is
-  checksum-locked through `136`.
-- **Production boundary:** migration `136` was recorded as applied to production
-  on 2026-11-13. Read the live ledger with `npm run db:migrations:inspect`
+  checksum-locked through `142`.
+- **Production boundary:** migration `142` was recorded as applied to production
+  on 2026-11-14. Read the live ledger with `npm run db:migrations:inspect`
   (read-only) before any release rather than relying on this line.
 - **Background jobs:** a GitHub Action expires stale requests and invitations
-  hourly; Vercel runs trial-expiry and sandbox-cleanup jobs daily. They require
+  hourly; Vercel runs the four daily jobs above. They require
   `CRON_SECRET`.
 - **Health:** `GET /api/health`.
 - **Feature controls:** Gridmasters create and manage feature flags through the

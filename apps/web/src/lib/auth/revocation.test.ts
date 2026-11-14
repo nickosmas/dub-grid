@@ -33,6 +33,7 @@ vi.mock("@/lib/supabase-service", () => ({
 import {
   endUserSession,
   endUserSessions,
+  endUserSessionsInOrganization,
   isSessionRevoked,
   resetRevocationMemo,
   revokeAllUserSessions,
@@ -107,6 +108,36 @@ describe("session revocation persistence", () => {
     await expect(endUserSession("user-1", "session-1")).rejects.toThrow("auth schema down");
     expect(cacheMocks.cacheSetOrThrow).not.toHaveBeenCalled();
     expect(serviceMocks.delete).not.toHaveBeenCalled();
+  });
+
+  // A suspension or Offboard signs them out of that organization only
+  // (owner, 2026-11-13), so no watermark: it would end every organization.
+  it("ends only the sessions whose active organization is the one named", async () => {
+    const activeOrgEq = vi.fn().mockResolvedValue({
+      data: [{ supabase_session_id: "session-a" }, { supabase_session_id: null }],
+      error: null,
+    });
+    serviceMocks.selectEq.mockReturnValueOnce({ eq: activeOrgEq });
+
+    await endUserSessionsInOrganization("user-1", "org-a");
+
+    expect(serviceMocks.selectEq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(activeOrgEq).toHaveBeenCalledWith("active_org_id", "org-a");
+    expect(serviceMocks.rpc).toHaveBeenCalledExactlyOnceWith("end_user_auth_session", {
+      p_user_id: "user-1",
+      p_session_id: "session-a",
+    });
+    expect(cacheMocks.cacheSetOrThrow).toHaveBeenCalledOnce();
+    expect(serviceMocks.rpc).not.toHaveBeenCalledWith("end_user_auth_sessions", expect.anything());
+  });
+
+  it("throws when the organization's sessions can't be read", async () => {
+    serviceMocks.selectEq.mockReturnValueOnce({
+      eq: vi.fn().mockResolvedValue({ data: null, error: new Error("db down") }),
+    });
+
+    await expect(endUserSessionsInOrganization("user-1", "org-a")).rejects.toThrow("db down");
+    expect(serviceMocks.rpc).not.toHaveBeenCalled();
   });
 
   it("removes the tracked database session used by direct PostgREST RLS", async () => {

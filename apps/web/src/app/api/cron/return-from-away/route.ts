@@ -14,7 +14,7 @@ import {
 } from "@/features/employees/server/offboard-access";
 import { repairLinkedEmails } from "@/features/employees/server/linked-email-repair";
 import { scheduleSuspensionNotice } from "@/features/employees/server/suspension-notice";
-import { endUserSessions } from "@/lib/auth/revocation";
+import { endUserSessionsInOrganization } from "@/lib/auth/revocation";
 import { disableMobilePushTokensForOrg } from "@dubgrid/data-access";
 
 export const dynamic = "force-dynamic";
@@ -610,7 +610,7 @@ async function startPlannedSuspensions(
     }
     if (!updated || drop || !row.user_id) continue;
     try {
-      await endUserSessions(row.user_id);
+      await endUserSessionsInOrganization(row.user_id, row.org_id);
       await disableMobilePushTokensForOrg(db, { userId: row.user_id, orgId: row.org_id });
     } catch (sessionError) {
       logger.error(

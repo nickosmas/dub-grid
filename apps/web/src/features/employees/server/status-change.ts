@@ -1,5 +1,5 @@
 import type { getServiceClient } from "@/lib/supabase-service";
-import { endUserSessions } from "@/lib/auth/revocation";
+import { endUserSessionsInOrganization } from "@/lib/auth/revocation";
 import {
   endOffboardedAccess,
   reopenRestoredAccess,
@@ -736,11 +736,12 @@ export async function applyStatusChange(
   // locally now. Org-scoped routes would still reject them on the
   // per-request membership check; this covers the routes that only
   // authenticate. Non-fatal: never fail the status change over it.
-  // A suspension signs them out of every device and stops their push here;
-  // the hook refuses their next sign-in and refresh (101).
+  // A suspension signs them out of this organization and stops its push;
+  // the hook refuses their next sign-in and refresh here (101), and their
+  // other organizations stay signed in (owner, 2026-11-13).
   if (action === "suspend" && !planning && currentEmployee.userId) {
     try {
-      await endUserSessions(currentEmployee.userId);
+      await endUserSessionsInOrganization(currentEmployee.userId, orgId);
       await disableMobilePushTokensForOrg(serviceClient, {
         userId: currentEmployee.userId,
         orgId,
