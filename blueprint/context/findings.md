@@ -700,13 +700,13 @@
 **Suggested fix:** Defer presence until the splash lifts and persist its mark; overlap the org lookup and run the trial start in `after()`; allow submit while the org confirms; prefetch `/org/schedule` when the person can view it; embed the fonts through the `expo-font` plugin.
 **Resolution:**
 
-### F-189 [P2] open - zod 3 can exhaust memory validating an oversized constrained collection, and the fix is zod 4
+### F-189 [P2] fixed - zod 3 can exhaust memory validating an oversized constrained collection, and the fix is zod 4
 
 **File:** `package.json`, `apps/web/package.json`, `packages/contracts/package.json` (`zod` 3.24.4); 104 files import it in `apps/web/src` and `packages/contracts/src`; `scripts/audit-check.mjs` allowlist
 **Found:** 2026-10-31 while clearing the Dependency Audit gate (fix/dependency-audit-gate)
 **Why it matters:** GHSA-mrhx-c7xc-m3w5 (high): a huge array posted against a schema with a length or size constraint walks every element before the constraint fails, so request validation in the web routes and the mobile API can be pushed into memory exhaustion. Vercel caps a request body at 4.5 MB, which bounds what one request supplies. Fixed only in zod 4.6.6.
 **Suggested fix:** Upgrade to zod 4 across web, mobile and the packages in one change (Dependabot #190 has the version bump; the schema API changes need the code), keeping one zod copy so `instanceof` checks hold (see the identical-specifier note). The allowlist entry holds until 2026-12-01.
-**Resolution:**
+**Resolution:** Fixed on fix/zod-4 (2026-11-13): web, the contracts package and the root go to zod 4.6.7, one copy, and overrides pin the zod 4 copies under eslint-plugin-react-hooks and the shadcn MCP server to it. zod 4 changed `.uuid()` to accept only RFC 9562 UUIDs, which would refuse ids Postgres accepts (fixed seed and test ids such as `00000000-0000-0000-0000-000000000001`), so every `z.string().uuid()` became `z.guid()`, which keeps zod 3's rule. The three `z.record` calls with one argument name their string keys. No schema uses `.default()` inside `.optional()` or an enum-keyed record, the two other changes that pass type-check silently. The allowlist entry stays, narrowed to zod 3.25.76 inside `@expo/cli`, `@snaplet/seed` and the shadcn CLI, which require zod 3 and validate only our own config and seed templates.
 
 ### F-199 [P2] open - Realtime sends every signed-in user the ids of rows deleted in other organizations
 

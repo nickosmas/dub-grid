@@ -12,7 +12,7 @@ import { collectGroupedPage } from "@/lib/audit/grouped-page";
 import { groupActivityEntries } from "@/lib/audit/grouping";
 
 const querySchema = z.object({
-  orgId: z.string().uuid().optional(),
+  orgId: z.guid().optional(),
   action: z.string().min(1).optional(),
   actionPrefix: z.string().min(1).optional(),
   // Comma-separated prefixes, OR'd. A single category can span several
@@ -32,7 +32,7 @@ const querySchema = z.object({
         : undefined,
     ),
   resourceType: z.string().min(1).optional(),
-  actorId: z.string().uuid().optional(),
+  actorId: z.guid().optional(),
   target: z.string().min(1).max(200).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),

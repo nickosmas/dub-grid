@@ -28,8 +28,8 @@ import { changedElsewhereMessage } from "@dubgrid/domain";
 export const dynamic = "force-dynamic";
 
 const patchSchema = z.object({
-  employeeId: z.string().uuid(),
-  orgId: z.string().uuid(),
+  employeeId: z.guid(),
+  orgId: z.guid(),
   firstName: staffNameSchema,
   lastName: staffNameSchema,
   phone: optionalUsPhoneSchema,

@@ -16,7 +16,7 @@ import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   returnUrl: z.string().url(),
 });
 

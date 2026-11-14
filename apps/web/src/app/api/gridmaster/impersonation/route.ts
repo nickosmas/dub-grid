@@ -20,22 +20,22 @@ const historyQuerySchema = z.object({
 
 const startSchema = z.object({
   action: z.literal("start"),
-  targetUserId: z.string().uuid(),
+  targetUserId: z.guid(),
   justification: z.string().trim().min(10),
-  targetOrgId: z.string().uuid().optional(),
+  targetOrgId: z.guid().optional(),
   userAgent: z.string().optional(),
 });
 
 const endSchema = z.object({
   action: z.literal("end"),
-  sessionId: z.string().uuid(),
+  sessionId: z.guid(),
   // A subset of impersonation_sessions.end_reason's check constraint, so an
   // unknown value is a 400 here rather than a constraint violation in the RPC.
   // 'navigation' is the middleware's /gridmaster escape alone, which the RPC
   // records itself (060); accepting it here would record that end twice.
   reason: z.enum(["manual", "expired"]).optional(),
   // Older clients still send it; the organization comes from the session row.
-  targetOrgId: z.string().uuid().nullable().optional(),
+  targetOrgId: z.guid().nullable().optional(),
 });
 
 /**
