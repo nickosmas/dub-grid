@@ -9,9 +9,10 @@ import { scheduleAccountDeletedNotice } from "./account-deleted-notice";
 export interface DeleteUserAccountInput {
   serviceClient: SupabaseClient;
   userId: string;
-  actorId: string;
+  /** Null when no person made the change, as with the 90-day purge. */
+  actorId: string | null;
   actorEmail: string | null;
-  reason: "self_service" | "admin_approved_request" | "super_admin_deleted";
+  reason: "self_service" | "admin_approved_request" | "super_admin_deleted" | "organization_purged";
   requestId?: string | null;
 }
 
