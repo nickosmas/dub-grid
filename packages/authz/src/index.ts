@@ -105,21 +105,6 @@ export function buildPermissionContext(
     permissions = READ_ONLY_PERMS;
   }
 
-  if (isImpersonating) {
-    permissions = {
-      ...permissions,
-      canManageEmployees: false,
-      canManageOrgSettings: false,
-      canManageOrgLabels: false,
-      canManageFocusAreas: false,
-      canManageScheduleDefinitions: false,
-      canManageIndicatorTypes: false,
-      canManageCoverageRequirements: false,
-      canApproveShiftRequests: false,
-      canEditNotes: false,
-    };
-  }
-
   permissions = applyViewImplications(permissions);
 
   const canManageOrg =
@@ -154,8 +139,8 @@ export function buildPermissionContext(
     actualLevel: level,
     canManageOrg,
     canAccessSettings,
-    canManageUsers: isImpersonating ? false : isSuperAdmin || isGridmaster,
-    canConfigureAdminPermissions: isImpersonating ? false : isSuperAdmin || isGridmaster,
+    canManageUsers: isSuperAdmin || isGridmaster,
+    canConfigureAdminPermissions: isSuperAdmin || isGridmaster,
   };
 }
 
