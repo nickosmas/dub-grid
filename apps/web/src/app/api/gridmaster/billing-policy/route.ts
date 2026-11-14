@@ -60,7 +60,7 @@ const bodySchema = z.discriminatedUnion("scope", [
   }),
   z.object({
     scope: z.literal("organization"),
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     overrides: overridesSchema,
   }),
 ]);

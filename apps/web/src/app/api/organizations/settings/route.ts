@@ -29,7 +29,7 @@ import { changedElsewhereMessage, storedOrganizationLabel } from "@dubgrid/domai
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   expectedUpdatedAt: z.string().datetime({ offset: true }),
   name: z.string().trim().min(1).max(200).optional(),
   phone: z.string().trim().max(50).optional(),

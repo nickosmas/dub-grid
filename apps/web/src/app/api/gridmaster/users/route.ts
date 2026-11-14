@@ -16,8 +16,8 @@ import type { PlatformRole, OrganizationRole } from "@dubgrid/domain";
 import type { PlatformUser } from "@/types";
 
 const activationSchema = z.object({
-  userId: z.string().uuid(),
-  orgId: z.string().uuid(),
+  userId: z.guid(),
+  orgId: z.guid(),
   deactivate: z.boolean(),
 });
 

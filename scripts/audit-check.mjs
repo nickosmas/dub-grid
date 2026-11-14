@@ -81,14 +81,14 @@ const ALLOWLIST = [
     package: "zod",
     reviewBy: "2026-12-01",
     reason:
-      "Validating an oversized collection against a constrained schema can exhaust memory. zod " +
-      "3.24.4 validates request input in the web routes and @dubgrid/contracts, so this one does " +
-      "reach production: a huge array posted to a route walks every element before the length " +
-      "check fails. Vercel caps a function's request body at 4.5 MB, which bounds the input any " +
-      "one request can supply, and the other copies (4.5.4 under eslint-plugin-react-hooks, the " +
-      "shadcn MCP server and @snaplet/seed) are developer tooling. The fix is zod 4.6.6, a major " +
-      "upgrade across every schema in the repository (Dependabot #190, F-189). Do that upgrade " +
-      "rather than re-dating this entry.",
+      "Validating an oversized collection against a constrained schema can exhaust memory. The web " +
+      "routes and @dubgrid/contracts are on zod 4.6.7 (F-189), and the zod 4 copies under " +
+      "eslint-plugin-react-hooks and the shadcn MCP server are pinned to it by overrides, so nothing " +
+      "that validates production input is affected. What is left is zod 3.25.76 inside build and " +
+      "seed tooling that requires zod 3, which has no fixed release: @expo/cli (Expo SDK 57), " +
+      "@snaplet/seed (0.98 still requires ^3.23.5) and the shadcn CLI. Each validates its own config " +
+      "and our seed templates on a developer machine or in CI, never request input. Revisit with the " +
+      "Expo SDK upgrade, a zod 4 @snaplet/seed, and shadcn 4.23 or later (which moves to zod 4).",
   },
 ];
 

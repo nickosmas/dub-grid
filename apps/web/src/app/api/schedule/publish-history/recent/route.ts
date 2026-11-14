@@ -18,7 +18,7 @@ import logger from "@/lib/logger";
 
 const querySchema = z
   .object({
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     since: z.string().datetime({ offset: true }).optional(),
     includeCurrent: z.enum(["true", "false"]).optional(),
     startDate: z.string().date().optional(),

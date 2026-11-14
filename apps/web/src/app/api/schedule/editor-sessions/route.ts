@@ -5,15 +5,15 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 
-const sessionIdSchema = z.string().uuid();
+const sessionIdSchema = z.guid();
 const querySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   editorSessionId: sessionIdSchema,
 });
 const MAX_SESSION_TERMINATIONS = 20;
 const endSessionSchema = z
   .object({
-    orgId: z.string().uuid(),
+    orgId: z.guid(),
     targetEditorSessionIds: z.array(sessionIdSchema).min(1).max(MAX_SESSION_TERMINATIONS),
     endingEditorSessionId: sessionIdSchema,
   })
