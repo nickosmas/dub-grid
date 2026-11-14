@@ -84,6 +84,11 @@ import {
 } from "../lib/profile-draft";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 import { useMobileStepUpAction } from "../hooks/useMobileStepUpAction";
+import { useOwnContactCheck } from "../hooks/useOwnContactCheck";
+import {
+  OWN_EMAIL_TAKEN_MESSAGE,
+  OWN_PHONE_TAKEN_MESSAGE,
+} from "../../people/lib/contactConflicts";
 import { getMobileStepUpMethod } from "../lib/step-up";
 import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
 
@@ -108,9 +113,14 @@ function getProfileEditFieldErrors(
     hasLinkedEmployee,
     isManagementUser,
     focusAreaLabel,
+    emailTaken = false,
+    phoneTaken = false,
   }: {
     canEditProfileDirectly: boolean;
     hasLinkedEmployee: boolean;
+    /** Someone in your organizations already uses the changed email or phone. */
+    emailTaken?: boolean;
+    phoneTaken?: boolean;
     /**
      * Someone with management departments can come off the schedule without
      * being orphaned, the same allowance the person page and web's editor
@@ -123,8 +133,10 @@ function getProfileEditFieldErrors(
   return {
     firstName: getStaffNameError(draft.firstName, "First name"),
     lastName: getStaffNameError(draft.lastName, "Last name"),
-    email: getRequiredStaffEmailError(draft.email),
-    phone: hasLinkedEmployee ? getOptionalUsPhoneError(draft.phone) : null,
+    email: getRequiredStaffEmailError(draft.email) ?? (emailTaken ? OWN_EMAIL_TAKEN_MESSAGE : null),
+    phone: hasLinkedEmployee
+      ? (getOptionalUsPhoneError(draft.phone) ?? (phoneTaken ? OWN_PHONE_TAKEN_MESSAGE : null))
+      : null,
     contactNotes: getStaffNotesError(draft.contactNotes),
     requestNote: getStaffNotesError(draft.requestNote),
     focusAreaIds:
@@ -178,6 +190,20 @@ export default function ProfileWorkScreen() {
     draft &&
     (profileEmailChanged(draft, profile) || profilePhoneChanged(draft, linkedEmployee)),
   );
+  const contactCheck = useOwnContactCheck({
+    accessToken,
+    email:
+      hasEmailChange && draft && !getRequiredStaffEmailError(draft.email)
+        ? draft.email.trim()
+        : null,
+    phone:
+      draft &&
+      draft.phone.trim() &&
+      profilePhoneChanged(draft, linkedEmployee) &&
+      !getOptionalUsPhoneError(draft.phone)
+        ? draft.phone.trim()
+        : null,
+  });
   const contentState = useMobileContentState({
     hasData: Boolean(profile),
     isLoading: profileQuery.isLoading,
@@ -427,6 +453,8 @@ export default function ProfileWorkScreen() {
           hasLinkedEmployee: Boolean(linkedEmployee),
           isManagementUser,
           focusAreaLabel: profile.currentOrg.labels.focusArea,
+          emailTaken: contactCheck.emailTaken,
+          phoneTaken: contactCheck.phoneTaken,
         })
       : null;
   const hasValidationErrors = editFieldErrors
@@ -436,7 +464,12 @@ export default function ProfileWorkScreen() {
   // request and an email change each confirm first, and an invalid form can't
   // save at all.
   const canSaveFromPrompt =
-    hasChanges && !hasValidationErrors && permissionsKnown && !isNameRequest && !hasEmailChange;
+    hasChanges &&
+    !hasValidationErrors &&
+    !contactCheck.checking &&
+    permissionsKnown &&
+    !isNameRequest &&
+    !hasEmailChange;
   // No `onClose`: unlike PersonDetailScreen there is no view mode to fall back
   // to, so nothing here calls `requestClose`. Leaving is `router.back()`, and
   // `useNavigationDiscardGuard` below is what puts the confirmation in front of
@@ -460,7 +493,7 @@ export default function ProfileWorkScreen() {
   useNavigationDiscardGuard(guard);
 
   function handleSave() {
-    if (!profile || !draft || !editFieldErrors) return;
+    if (!profile || !draft || !editFieldErrors || contactCheck.checking) return;
     const firstError =
       editFieldErrors.firstName ??
       editFieldErrors.lastName ??
@@ -506,7 +539,11 @@ export default function ProfileWorkScreen() {
           <Button
             compact
             disabled={
-              saveMutation.isPending || !hasChanges || hasValidationErrors || !permissionsKnown
+              saveMutation.isPending ||
+              !hasChanges ||
+              hasValidationErrors ||
+              contactCheck.checking ||
+              !permissionsKnown
             }
             label={isNameRequest ? "Send request" : "Save"}
             loading={saveMutation.isPending}
@@ -532,6 +569,7 @@ export default function ProfileWorkScreen() {
             saveMutation.isPending ||
             !hasChanges ||
             hasValidationErrors ||
+            contactCheck.checking ||
             !permissionsKnown,
           loading: saveMutation.isPending,
           onPress: handleSave,
@@ -657,11 +695,13 @@ export default function ProfileWorkScreen() {
                 certificationLabel={profile.currentOrg.labels.certification}
                 certifications={certifications}
                 draft={draft}
+                emailTaken={contactCheck.emailTaken}
                 focusAreaLabel={profile.currentOrg.labels.focusArea}
                 focusAreas={focusAreas}
                 hasLinkedEmployee={Boolean(linkedEmployee)}
                 isManagementUser={isManagementUser}
                 isNameRequest={isNameRequest}
+                phoneTaken={contactCheck.phoneTaken}
                 onChange={(nextDraft) => {
                   draftTouchedRef.current = true;
                   setDraft(nextDraft);
@@ -742,11 +782,13 @@ function EditPanel({
   certificationLabel,
   certifications,
   draft,
+  emailTaken,
   focusAreaLabel,
   focusAreas,
   hasLinkedEmployee,
   isManagementUser,
   isNameRequest,
+  phoneTaken,
   onChange,
   roleLabel,
   roles,
@@ -757,11 +799,13 @@ function EditPanel({
   certificationLabel: string;
   certifications: MobileNamedItem[];
   draft: ProfileDraft;
+  emailTaken: boolean;
   focusAreaLabel: string;
   focusAreas: MobileFocusArea[];
   hasLinkedEmployee: boolean;
   isManagementUser: boolean;
   isNameRequest: boolean;
+  phoneTaken: boolean;
   onChange: (draft: ProfileDraft) => void;
   roleLabel: string;
   roles: MobileBootstrapRole[];
@@ -777,6 +821,8 @@ function EditPanel({
     hasLinkedEmployee,
     isManagementUser,
     focusAreaLabel,
+    emailTaken,
+    phoneTaken,
   });
   // Raised once for the whole section, the way the person page does: only a
   // management user can come off the schedule at all, and for them an empty

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:c9ecc322b06c8f4b91c0fa6dd177020aff1e403eb18b696b999a8f3939167d37",
+  "sourceDigest": "sha256:5fcb7f04706081f84860b133addc7534d301c67b153537aeca105635d60cb773",
   "webRoutes": [
     {
       "id": "web:/",
@@ -2881,6 +2881,18 @@
       },
       "implementationSource": {
         "path": "apps/web/src/features/mobile/server/routes/profile-change-requests.ts"
+      }
+    },
+    {
+      "id": "http:POST:/api/mobile/v1/profile/contact-check",
+      "method": "POST",
+      "path": "/api/mobile/v1/profile/contact-check",
+      "scope": "api",
+      "source": {
+        "path": "apps/web/src/app/api/mobile/v1/profile/contact-check/route.ts"
+      },
+      "implementationSource": {
+        "path": "apps/web/src/features/mobile/server/routes/profile-contact-check.ts"
       }
     },
     {
