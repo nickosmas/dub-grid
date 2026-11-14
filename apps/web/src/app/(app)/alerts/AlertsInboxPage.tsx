@@ -393,7 +393,7 @@ export function InboxView({
       .catch(() => {});
   }, []);
 
-  // Realtime postgres_changes events are subject to delivery latency and the
+  // Realtime change events are subject to delivery latency and the
   // occasional dropped connection. Sidebar bell mark-read also doesn't fire a
   // realtime event for THIS tab if the same session triggered the write.
   // Subscribe to the React Query cache so any notifications-key invalidation
