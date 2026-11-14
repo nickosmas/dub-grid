@@ -1,4 +1,4 @@
-import type { MobileProfileResponse } from "@dubgrid/contracts";
+import { comparablePhone, type MobileProfileResponse } from "@dubgrid/contracts";
 import { sameIds } from "../../../shared/lib/same-ids";
 
 export type LinkedEmployee = NonNullable<MobileProfileResponse["linkedEmployee"]>;
@@ -15,6 +15,11 @@ export type ProfileDraft = {
   departmentIds: number[];
   contactNotes: string;
   requestNote: string;
+  /**
+   * The staff record version the draft was opened from, sent with the save so
+   * a change made meanwhile is a conflict rather than quietly reverted.
+   */
+  baseVersion: number | null;
 };
 
 export function makeProfileDraft(
@@ -33,7 +38,40 @@ export function makeProfileDraft(
     departmentIds: linkedEmployee?.departmentIds ?? [],
     contactNotes: linkedEmployee?.contactNotes ?? "",
     requestNote: "",
+    baseVersion: linkedEmployee?.version ?? null,
   };
+}
+
+// The save sends names and phones in their normalized form, so a stored value
+// is compared in that form too: a double space or a phone saved as
+// 555-123-4567 is not an edit.
+function nameKey(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/\s+/g, " ");
+}
+
+export function profileFirstNameChanged(draft: ProfileDraft, profile: MobileProfileResponse) {
+  return nameKey(draft.firstName) !== nameKey(profile.user.firstName);
+}
+
+export function profileLastNameChanged(draft: ProfileDraft, profile: MobileProfileResponse) {
+  return nameKey(draft.lastName) !== nameKey(profile.user.lastName);
+}
+
+export function profileNameChanged(draft: ProfileDraft, profile: MobileProfileResponse): boolean {
+  return profileFirstNameChanged(draft, profile) || profileLastNameChanged(draft, profile);
+}
+
+export function profileEmailChanged(draft: ProfileDraft, profile: MobileProfileResponse): boolean {
+  return draft.email.trim().toLowerCase() !== (profile.user.email ?? "").trim().toLowerCase();
+}
+
+export function profilePhoneChanged(
+  draft: ProfileDraft,
+  linkedEmployee: LinkedEmployee | null,
+): boolean {
+  return (
+    linkedEmployee != null && comparablePhone(draft.phone) !== comparablePhone(linkedEmployee.phone)
+  );
 }
 
 /**
@@ -69,13 +107,10 @@ export function profileDraftHasChanges(
   profile: MobileProfileResponse,
   linkedEmployee: LinkedEmployee | null,
 ): boolean {
-  const saved = makeProfileDraft(profile, linkedEmployee);
-
   return (
-    draft.firstName.trim() !== saved.firstName.trim() ||
-    draft.lastName.trim() !== saved.lastName.trim() ||
-    draft.email.trim().toLowerCase() !== saved.email.trim().toLowerCase() ||
-    (linkedEmployee != null &&
-      (draft.phone.trim() !== saved.phone.trim() || profileWorkChanged(draft, linkedEmployee)))
+    profileNameChanged(draft, profile) ||
+    profileEmailChanged(draft, profile) ||
+    profilePhoneChanged(draft, linkedEmployee) ||
+    (linkedEmployee != null && profileWorkChanged(draft, linkedEmployee))
   );
 }

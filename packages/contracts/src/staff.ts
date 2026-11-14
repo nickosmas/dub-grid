@@ -194,6 +194,19 @@ export function normalizeOptionalUsPhone(value: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+/**
+ * A stored phone in the format a save writes, for telling an edit from a value
+ * saved in another format. One that can't be normalized compares as typed.
+ */
+export function comparablePhone(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim();
+  try {
+    return normalizeOptionalUsPhone(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
 export const optionalUsPhoneSchema = z
   .string()
   .superRefine((value, ctx) => {
