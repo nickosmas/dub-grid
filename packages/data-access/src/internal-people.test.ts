@@ -5,6 +5,7 @@ import {
   withoutHiddenRequests,
   withoutHiddenStaffRows,
   fetchHiddenInternalUserIds,
+  hiddenStaffFilter,
   resetInternalUserIdsMemo,
   withoutHiddenMembers,
   withoutHiddenStaff,
@@ -83,6 +84,11 @@ describe("query filters", () => {
     const { query, calls } = recordingQuery();
     withoutHiddenStaff(query, ["qa-1", "qa-2"]);
     expect(calls).toEqual([["or", "user_id.is.null,user_id.not.in.(qa-1,qa-2)"]]);
+  });
+
+  it("gives the same staff filter as a string, or none when nobody is hidden", () => {
+    expect(hiddenStaffFilter(["qa-1", "qa-2"])).toBe("user_id.is.null,user_id.not.in.(qa-1,qa-2)");
+    expect(hiddenStaffFilter([])).toBeNull();
   });
 
   it("drops hidden members", () => {
