@@ -310,7 +310,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:37ed54f8422b3cf239101ed1155cdd20548ed4234965d7bb0902473c229f7a2f"
+      "evidenceFingerprint": "sha256:955619094422adced32003dd239a915469e2c4a96e39ce6dc9a6ef59fb05872f"
     },
     {
       "id": "schedule-grid",
@@ -1322,7 +1322,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:18946b035931d7fe559b4e47d1b9310854b8bdcf7b1a0351321a9970805fe4f8"
+      "evidenceFingerprint": "sha256:380f819e377a38f873d8e1d2a4194ee6981cb89a1c32d6d6b7460df44e93ef56"
     },
     {
       "id": "alerts",
@@ -1597,7 +1597,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bd8f3ac86cc602a8d8b5be1f3eb7037fb2446168f4bf8c04b3bebb2ec3345653"
+      "evidenceFingerprint": "sha256:fd7cc62de8bf2df0125968a403c954d003e685d9dbd8d17475c6263007fbfa64"
     },
     {
       "id": "privacy-controls",
@@ -1660,7 +1660,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:854a32a2615835226755694ed1f2107bb4b0667df3b3cc84e1eb5cbdd27d5456"
+      "evidenceFingerprint": "sha256:e24516fc45a3f56300ee78ea2109e46dd0233f50822d83a69f1f81cd8320ca00"
     },
     {
       "id": "schedule-rules-display",
@@ -1796,8 +1796,9 @@
             "both Super Admin only",
             "Activity Log scope, periods, search, type filter, details, 200 per page",
             "delete closes the organization, cancels the subscription, removes access",
+            "Download your data: a ZIP of staff, published days, requests and activity log, after an identity check",
             "typed DELETE confirmation and identity check",
-            "signs you out; not reversible in the product; support restores"
+            "signs you out; support restores or sends the export for 90 days, then it is purged with orphan accounts"
           ],
           "sourceFiles": [
             "apps/web/src/components/settings/nav-config.tsx",
@@ -1810,7 +1811,11 @@
             "apps/web/src/lib/audit/registry.ts",
             "apps/web/src/lib/activity-period.ts",
             "apps/web/src/components/settings/DangerZone.tsx",
-            "apps/web/src/app/api/organizations/delete/route.ts"
+            "apps/web/src/app/api/organizations/delete/route.ts",
+            "apps/web/src/app/api/organizations/export/route.ts",
+            "apps/web/src/features/organization/server/archive-export.ts",
+            "apps/web/src/app/api/cron/purge-archived-organizations/route.ts",
+            "supabase/migrations/142_purge_archived_organizations.sql"
           ],
           "testFiles": [
             "apps/web/src/components/settings/__tests__/nav-config.test.tsx",
@@ -1819,13 +1824,16 @@
             "apps/web/src/components/settings/__tests__/ActivityLog.test.tsx",
             "apps/web/src/lib/activity-period.test.ts",
             "apps/web/src/components/settings/__tests__/DangerZone.test.tsx",
-            "apps/web/src/app/api/organizations/delete/route.test.ts"
+            "apps/web/src/app/api/organizations/delete/route.test.ts",
+            "apps/web/src/app/api/organizations/export/route.test.ts",
+            "apps/web/src/app/api/cron/purge-archived-organizations/route.test.ts",
+            "apps/web/src/__tests__/migration-142-purge-archived-organizations.integration.test.ts"
           ],
           "runtimeScenarios": [],
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:2cd339c00fc44d912a10c9741cf3302a85da5271ea83135553252479ca3f6f8a"
+      "evidenceFingerprint": "sha256:409db2b36bb9fb89184ca775716561416f65c0fc6fb009252d48bfe3575124f5"
     },
     {
       "id": "departments-focus-areas",
@@ -2152,7 +2160,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:96e1696535120208f2f381c7a1f2c40310574289207ab2215372328bda277a0d"
+      "evidenceFingerprint": "sha256:35b990b6fe6802708e5e337e92bd14fbdf0255361e3bb7b36610beeb2279cbf2"
     }
   ],
   "surfaceExclusions": [
