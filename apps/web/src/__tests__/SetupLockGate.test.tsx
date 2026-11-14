@@ -80,6 +80,7 @@ vi.mock("@/hooks", () => ({
   useSandboxSourceOrgId: () => null,
   useCanSeeBilling: (isSuperAdmin: boolean) => isSuperAdmin,
   useIsInSandbox: () => false,
+  useOrgRealtimeInvalidation: () => {},
 }));
 
 vi.mock("@/features/onboarding/client", () => ({
