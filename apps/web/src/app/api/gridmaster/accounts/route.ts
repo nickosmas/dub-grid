@@ -21,13 +21,13 @@ const accountActionSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("demote"),
-    userId: z.string().uuid(),
-    orgId: z.string().uuid(),
+    userId: z.guid(),
+    orgId: z.guid(),
     orgRole: z.enum(["super_admin", "admin", "user"]),
   }),
   z.object({
     action: z.literal("setActivation"),
-    userId: z.string().uuid(),
+    userId: z.guid(),
     deactivate: z.boolean(),
   }),
 ]);

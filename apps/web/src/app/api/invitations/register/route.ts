@@ -27,7 +27,7 @@ import { deadInvitationResponse } from "@/lib/auth/invitation-capability";
  */
 
 const bodySchema = z.object({
-  token: z.string().trim().uuid(),
+  token: z.string().trim().pipe(z.guid()),
   email: z.string().trim().email(),
   password: z.string().min(1).max(200),
 });

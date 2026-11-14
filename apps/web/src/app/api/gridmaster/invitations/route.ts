@@ -6,7 +6,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 
 const querySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
 });
 
 export async function GET(req: NextRequest) {

@@ -9,7 +9,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 export const dynamic = "force-dynamic";
 
 const querySchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.guid(),
   weeks: z.coerce.number().int().min(1).max(104).default(13),
 });
 

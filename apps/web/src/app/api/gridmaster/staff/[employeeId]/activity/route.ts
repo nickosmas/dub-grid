@@ -5,7 +5,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { loadPersonSchedule } from "@/features/gridmaster/server/person-activity";
 
-const paramsSchema = z.object({ employeeId: z.string().uuid() });
+const paramsSchema = z.object({ employeeId: z.guid() });
 
 const NOT_FOUND = "We couldn't find that staff record. Refresh the page and try again.";
 

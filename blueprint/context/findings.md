@@ -74,7 +74,7 @@
 **Update 2026-10-31 (56a):** Expo SDK 57 still brings query-string 7.1.3 and decode-uri-component 0.2.2, so the allowlist entry stays.
 **Resolution:**
 
-### F-125 [P3] open - Vitest's mocker advisory needs the Vitest 4 major
+### F-125 [P3] fixed - Vitest's mocker advisory needs the Vitest 4 major
 
 **File:** `package.json` (`vitest` ^3.2.7, `@vitest/coverage-v8` ^3.2.7) and each workspace's Vitest config; Dependabot alerts 185, 186
 **Found:** 2026-09-28 while clearing the open Dependabot alerts
@@ -82,7 +82,7 @@
 **Suggested fix:** Upgrade `vitest` and `@vitest/coverage-v8` to 4.1.11 or later in one change across web, mobile and the packages, following Vitest's 4.0 migration notes, and run every workspace's suite. Medium severity, below the `deps:audit` gate.
 **Update 2026-10-13:** two critical tinypool advisories (GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr, prototype-pollution gadgets reaching code execution through worker options) now put Vitest 3 above the gate. tinypool 2.1.2 fixes them and Vitest 3 cannot take it. All three are allowlisted in `scripts/audit-check.mjs` until 2026-11-15 (fix/dependency-audit); do the upgrade (Vitest 5.0.4 is current) before then rather than re-dating the entry.
 **Update 2026-10-31:** a fourth advisory, GHSA-qxg6-89mg-rqv8 (mock registration code injection, fixed in 4.1.12), joined the Vitest entry; its date stays 2026-11-15.
-**Resolution:**
+**Resolution:** Fixed on fix/vitest-4 (2026-11-13): `vitest` and `@vitest/coverage-v8` go to 4.1.12, which fixes the mocker advisories and drops tinypool, so the allowlist entry is removed and `deps:audit` passes. npm 10.9.2 crashed resolving Vitest 4's own `vite` dependency (an arborist peer-set bug through vite 8's optional devtools peers); an override (`"vitest": { "vite": "$vite" }`) keeps Vitest on the root vite 7, and a second lock-only install is byte-identical. `minWorkers` is gone from the web config, and four tests moved to Vitest 4's mock rules: a constructor mock is a `function`, and `restoreAllMocks` no longer clears `vi.fn()` mocks. Every workspace's suite passes in a worktree with its own `npm ci`.
 
 ### F-126 [P3] open - Faker's code-execution advisory waits on @snaplet/copycat
 
@@ -700,13 +700,13 @@
 **Suggested fix:** Defer presence until the splash lifts and persist its mark; overlap the org lookup and run the trial start in `after()`; allow submit while the org confirms; prefetch `/org/schedule` when the person can view it; embed the fonts through the `expo-font` plugin.
 **Resolution:**
 
-### F-189 [P2] open - zod 3 can exhaust memory validating an oversized constrained collection, and the fix is zod 4
+### F-189 [P2] fixed - zod 3 can exhaust memory validating an oversized constrained collection, and the fix is zod 4
 
 **File:** `package.json`, `apps/web/package.json`, `packages/contracts/package.json` (`zod` 3.24.4); 104 files import it in `apps/web/src` and `packages/contracts/src`; `scripts/audit-check.mjs` allowlist
 **Found:** 2026-10-31 while clearing the Dependency Audit gate (fix/dependency-audit-gate)
 **Why it matters:** GHSA-mrhx-c7xc-m3w5 (high): a huge array posted against a schema with a length or size constraint walks every element before the constraint fails, so request validation in the web routes and the mobile API can be pushed into memory exhaustion. Vercel caps a request body at 4.5 MB, which bounds what one request supplies. Fixed only in zod 4.6.6.
 **Suggested fix:** Upgrade to zod 4 across web, mobile and the packages in one change (Dependabot #190 has the version bump; the schema API changes need the code), keeping one zod copy so `instanceof` checks hold (see the identical-specifier note). The allowlist entry holds until 2026-12-01.
-**Resolution:**
+**Resolution:** Fixed on fix/zod-4 (2026-11-13): web, the contracts package and the root go to zod 4.6.7, one copy, and overrides pin the zod 4 copies under eslint-plugin-react-hooks and the shadcn MCP server to it. zod 4 changed `.uuid()` to accept only RFC 9562 UUIDs, which would refuse ids Postgres accepts (fixed seed and test ids such as `00000000-0000-0000-0000-000000000001`), so every `z.string().uuid()` became `z.guid()`, which keeps zod 3's rule. The three `z.record` calls with one argument name their string keys. No schema uses `.default()` inside `.optional()` or an enum-keyed record, the two other changes that pass type-check silently. In the browser zod runs jitless (`lib/zod-jitless.ts`, the first import of `instrumentation-client.ts`): its `new Function` probe breaks the CSP, which forbids eval, and Firefox logged that as an error on every page that parses a schema. The allowlist entry stays, narrowed to zod 3.25.76 inside `@expo/cli`, `@snaplet/seed` and the shadcn CLI, which require zod 3 and validate only our own config and seed templates.
 
 ### F-199 [P2] open - Realtime sends every signed-in user the ids of rows deleted in other organizations
 
@@ -726,7 +726,7 @@
 **Resolution:** Fixed on fix/leftover-direct-writes (2026-11-13): migration 137 revokes INSERT, UPDATE, DELETE and TRUNCATE on `organizations` from `authenticated`, which also removes 004's column grants, so no write-once field (the subdomain among them) can be changed through the data API. Every organization write already went through the service client; the unused browser `updateOrganization` is deleted. The live test `migration-137-leftover-direct-writes.integration.test.ts` checks no table or column privilege is left.
 **Update 2026-11-13 (re-check against dev):** still open. Revoking every column is safe (settings write through the service client); delete the unused `updateOrganization` in `lib/db/organizations.ts` with it.
 
-### F-201 [P2] open - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
+### F-201 [P2] fixed - Gridmaster writes don't always need an impersonation, and starting one doesn't always leave an audit row
 
 **File:** `apps/web/src/app/api/employees/manage`, `organizations/settings`, `import/employees`, `shifts/discard`, `employees/status`, `employees/identity` (none set `gridmasterNeedsImpersonation`); `start_impersonation` (migration 057)
 **Found:** 2026-11-06 by /audit (scope: full; lens: security)
@@ -734,6 +734,7 @@
 **Suggested fix:** Make the impersonation requirement the default for any Gridmaster write in `requireOrgPermissions`, with named exceptions, and apply it in `canManageEmployees`. Write the audit row inside `start_impersonation`, as migration 071 does elsewhere.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** employee import now requires impersonation. Owner decision (2026-11-13): keep 075's rule as it is (schedule, requests, publish and settings need an impersonation) and don't extend it to staff, organization settings or discard. Impersonating never narrows a Gridmaster's powers (see F-250). Still worth doing: `start_impersonation` should write its own audit row.
+**Update 2026-11-13 (fix/impersonation-start-audit-row):** migration 139 has `start_impersonation` write the `impersonation.started` row itself, in the same transaction as the session, with the caller's address and user agent, so a direct call through the data API is recorded; the route no longer writes its own. Live test: `migration-139-impersonation-start-audit.integration.test.ts`. With the owner's decision above, nothing else in this finding remains, so it is fixed.
 
 ### F-202 [P2] open - The server code has no enforced tenant boundary: 196 files can reach the service client
 
