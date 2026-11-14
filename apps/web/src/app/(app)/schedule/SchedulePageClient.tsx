@@ -6661,7 +6661,11 @@ function SchedulerContent({
           { startDate: formatDateKey(startDate), endDate: formatDateKey(endDate) },
         );
         setPublishHistory(
-          markOwnPublicationAsAdditions(recentPublishes, authUser?.id ?? currentUser?.id ?? null),
+          markOwnPublicationAsAdditions(
+            recentPublishes,
+            authUser?.id ?? currentUser?.id ?? null,
+            lastViewedRef.current,
+          ),
         );
       } catch (err: unknown) {
         Sentry.captureException(err);
