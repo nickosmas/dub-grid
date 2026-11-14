@@ -59,6 +59,10 @@ jobs:
             if npm audit signatures 2>&1 | tee audit-signatures.log; then exit 0; fi
             grep -q EMISSINGSIGNATUREKEY audit-signatures.log || exit 1
             echo "::warning::npm audit signatures could not find a registry key (attempt $attempt); retrying"
+            tuf="$(npm config get cache)/_tuf"
+            find "$tuf" -name '*keys.json' -exec sh -c 'echo "$1"; node -e "for (const k of JSON.parse(require(\"fs\").readFileSync(process.argv[1])).keys) console.log(k.keyId, k.keyUsage, JSON.stringify(k.publicKey.validFor))" "$1"' _ {} \; || true
+            find "$tuf" -name '*.json' -maxdepth 2 -exec sh -c 'echo "$1 $(node -p "const d=JSON.parse(require(\"fs\").readFileSync(process.argv[1])).signed; d._type+\" v\"+d.version+\" expires \"+d.expires" "$1")"' _ {} \; || true
+            rm -rf "$tuf"
             sleep 20
           done
           exit 1
