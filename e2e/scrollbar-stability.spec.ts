@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { waitForClientHydration } from "./helpers/auth";
 
 // Headless Chromium hides scrollbars by default; showing them gives the
 // space-taking scrollbar a mouse user sees on an external monitor.
@@ -15,7 +16,7 @@ async function layout(page: Page) {
 
 test("a scrollbar appearing or a scroll lock never moves the page sideways", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.locator("form")).toBeVisible();
+  await waitForClientHydration(page);
 
   const scrollbarWidth = await page.evaluate(() => {
     const probe = document.createElement("div");

@@ -159,6 +159,7 @@ import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
 import { AbsenceRunBar, AwayRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
 import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
+import type { AwayRunChanges, AwayRunDayChange } from "./schedule-grid/awayRunChanges";
 import {
   awayLockedHint,
   awayRangeOf,
@@ -293,6 +294,8 @@ interface LegacyScheduleGridProps {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** The day's whole published cell, null when it has none; a removal's Before. */
+  publishedCellStateForKey?: (empId: string, date: Date) => ScheduleCellState | null;
   /** A worked cell's absence for the rest of the day (item 45), drawn as its last pill. */
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
@@ -420,6 +423,8 @@ interface SectionBlockProps {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** The day's whole published cell, null when it has none; a removal's Before. */
+  publishedCellStateForKey?: (empId: string, date: Date) => ScheduleCellState | null;
   /** A worked cell's absence for the rest of the day (item 45), drawn as its last pill. */
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
@@ -1117,6 +1122,7 @@ const CELL_READ_KEYS = new Set<keyof SectionBlockProps>([
   "publishedLabelForKey",
   "publishedAssignmentIdsForKey",
   "publishedAbsenceTypeIdForKey",
+  "publishedCellStateForKey",
   "restOfDayAbsenceTypeIdForKey",
   "restOfDayAbsenceLayoutForKey",
   "publishedRestOfDayAbsenceTypeIdForKey",
@@ -1264,6 +1270,7 @@ const SectionBlock = memo(function SectionBlock({
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
+  publishedCellStateForKey,
   restOfDayAbsenceTypeIdForKey,
   restOfDayAbsenceLayoutForKey,
   publishedRestOfDayAbsenceTypeIdForKey,
@@ -1783,7 +1790,82 @@ const SectionBlock = memo(function SectionBlock({
   const releaseRowIndex = Math.max(0, employees.length - STICKY_RELEASE_ROWS);
   const renderedEmployees =
     renderedRows === undefined ? employees : employees.slice(0, renderedRows);
+  // A day's draft and published change, for the Away bar that covers its cell.
+  const describeDayChanges = (
+    empId: string,
+    date: Date,
+  ): { draft: AwayRunDayChange | null; published: AwayRunDayChange | null } => {
+    const dateKey = formatDateKey(date);
+    const spans = restOfDayAbsenceLayoutForKey?.(empId, date) ?? null;
+    const draftKind = draftKindForKey?.(empId, date) ?? null;
+    let draft: AwayRunDayChange | null = null;
+    if (draftKind) {
+      const absenceTypeId = absenceTypeIdForKey?.(empId, date) ?? null;
+      const current =
+        draftKind === "deleted"
+          ? null
+          : cellStateFromParts({
+              segments: segmentsForKey?.(empId, date) ?? [],
+              absenceTypeId,
+              restOfDayAbsenceTypeId:
+                absenceTypeId == null
+                  ? (restOfDayAbsenceTypeIdForKey?.(empId, date) ?? null)
+                  : null,
+              restOfDayAbsenceTimes: spans?.range ?? null,
+              customTimes: getCustomShiftTimes?.(empId, date) ?? null,
+            });
+      // The whole published cell, when the page gives it: a pending removal
+      // reports no published parts, so this is its only Before.
+      const published = publishedCellStateForKey?.(empId, date) ?? null;
+      const publishedSegments = publishedSegmentsForKey?.(empId, date) ?? [];
+      const publishedAbsenceTypeId = publishedAbsenceTypeIdForKey?.(empId, date) ?? null;
+      const before =
+        published ??
+        (publishedSegments.length > 0 || publishedAbsenceTypeId != null
+          ? cellStateFromParts({
+              segments: publishedSegments,
+              absenceTypeId: publishedAbsenceTypeId,
+              restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeIdForKey?.(empId, date) ?? null,
+              restOfDayAbsenceTimes: spans?.publishedRange ?? null,
+              customTimes: getPublishedCustomShiftTimes?.(empId, date) ?? null,
+            })
+          : null);
+      draft = {
+        dateKey,
+        kind: draftKind,
+        view:
+          draftKind === "new" || before
+            ? describeCellStateChange(before, current, dateKey, shiftChangeResolvers)
+            : null,
+      };
+    }
+    const publishDiff = showPublishDiffOverlay ? (publishDiffForKey?.(empId, date) ?? null) : null;
+    const published: AwayRunDayChange | null = publishDiff
+      ? {
+          dateKey,
+          kind: publishDiff.kind,
+          view: publishChangeHasStates(publishDiff)
+            ? describeCellStateChange(
+                publishDiff.fromState,
+                publishDiff.toState,
+                dateKey,
+                shiftChangeResolvers,
+              )
+            : null,
+        }
+      : null;
+    return { draft, published };
+  };
+
   const awayAllPeriodPeople = employees.filter((employee) => awayAllPeriod?.has(employee.id));
+  // Folded, the group hides its people's Away bars, so it says what they hold.
+  const awayAllPeriodDraftDays = awayAllPeriodFolded
+    ? awayAllPeriodPeople.reduce(
+        (total, employee) =>
+          total + weekDates.filter((date) => draftKindForKey?.(employee.id, date) != null).length,
+        0,
+      )
+    : 0;
   const firstAwayAllPeriodIndex = renderedEmployees.findIndex((employee) =>
     awayAllPeriod?.has(employee.id),
   );
@@ -1840,6 +1922,15 @@ const SectionBlock = memo(function SectionBlock({
               Away all period
             </span>
             <span>· {awayAllPeriodPeople.length}</span>
+            {awayAllPeriodDraftDays > 0 && (
+              <span
+                data-away-all-period-drafts={awayAllPeriodDraftDays}
+                style={{ color: "var(--dg-color-warning-text, var(--dg-color-text-secondary))" }}
+              >
+                · {awayAllPeriodDraftDays} unpublished{" "}
+                {awayAllPeriodDraftDays === 1 ? "change" : "changes"}
+              </span>
+            )}
             {awayAllPeriodFolded && (
               <span
                 style={{
@@ -2389,6 +2480,19 @@ const SectionBlock = memo(function SectionBlock({
                 todayKey,
                 splitAtIndex,
               );
+              // Each Away bar carries its days' changes, since it covers their cells.
+              const rowAwayRunChanges = new Map<number, AwayRunChanges>();
+              rowAwayDays?.runs.forEach((runDay, index) => {
+                if (!runDay) return;
+                const entry = rowAwayRunChanges.get(runDay.runIndex) ?? {
+                  draft: [],
+                  published: [],
+                };
+                const { draft, published } = describeDayChanges(emp.id, weekDates[index]);
+                if (draft) entry.draft.push(draft);
+                if (published) entry.published.push(published);
+                rowAwayRunChanges.set(runDay.runIndex, entry);
+              });
               const rowAwayAbsenceTypeId =
                 rowAwayRange?.from != null ? emp.plannedAbsenceTypeId : emp.awayAbsenceTypeId;
               const rowAwayAbsence =
@@ -3134,6 +3238,8 @@ const SectionBlock = memo(function SectionBlock({
                               {awayRunDay?.position === "start" && (
                                 <AwayRunBar
                                   runIndex={awayRunDay.runIndex}
+                                  changes={rowAwayRunChanges.get(awayRunDay.runIndex) ?? null}
+                                  personName={getEmployeeDisplayName(emp)}
                                   label={
                                     awayRunBeforeFirstDay && rowAwayRange?.firstDay
                                       ? startsRunLabel(rowAwayRange.firstDay)
@@ -5343,6 +5449,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
+  publishedCellStateForKey,
   restOfDayAbsenceTypeIdForKey,
   restOfDayAbsenceLayoutForKey,
   publishedRestOfDayAbsenceTypeIdForKey,
@@ -5805,6 +5912,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     publishedLabelForKey={publishedLabelForKey}
                     publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
                     publishedAbsenceTypeIdForKey={publishedAbsenceTypeIdForKey}
+                    publishedCellStateForKey={publishedCellStateForKey}
                     restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
                     restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
                     publishedRestOfDayAbsenceTypeIdForKey={publishedRestOfDayAbsenceTypeIdForKey}
@@ -6050,6 +6158,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           publishedLabelForKey={model.accessors.publishedLabelForKey}
           publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
           publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
+          publishedCellStateForKey={model.accessors.publishedCellStateForKey}
           restOfDayAbsenceTypeIdForKey={model.accessors.restOfDayAbsenceTypeIdForKey}
           restOfDayAbsenceLayoutForKey={model.accessors.restOfDayAbsenceLayoutForKey}
           publishedRestOfDayAbsenceTypeIdForKey={

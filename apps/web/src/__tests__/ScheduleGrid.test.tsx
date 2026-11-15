@@ -2580,6 +2580,23 @@ describe("ScheduleGrid", () => {
 
     afterEach(() => window.localStorage.clear());
 
+    it("says, folded, how many unpublished changes its people hold", () => {
+      observedWidth = 1600;
+      const people = [gone, employees[0]];
+      renderGrid({
+        filteredEmployees: people,
+        allEmployees: people,
+        draftKindForKey: (empId, date) =>
+          empId === gone.id && [8, 9, 10].includes(date.getDate()) ? "deleted" : null,
+      });
+      const fold = screen.getByRole("button", { name: /Away all period/ });
+      expect(fold).not.toHaveTextContent("unpublished");
+      fireEvent.click(fold);
+      expect(screen.getByRole("button", { name: /Away all period/ })).toHaveTextContent(
+        "· 3 unpublished changes",
+      );
+    });
+
     it("lists someone away every day last, under a row that folds and stays folded", () => {
       observedWidth = 1600;
       const people = [gone, employees[0]];
@@ -2790,6 +2807,60 @@ describe("ScheduleGrid", () => {
         "split",
       ]);
       expect(cells[3].getAttribute("aria-label")).toBe("Jamie Fox, Away on Wed, Jan 10");
+    });
+
+    it("marks an Away bar whose days hold drafts, and says what publishing changes", async () => {
+      observedWidth = 1600;
+      const removed = (empId: string, date: Date) =>
+        empId === "emp-away" && [10, 11].includes(date.getDate());
+      renderAway({
+        draftKindForKey: (empId, date) => (removed(empId, date) ? "deleted" : null),
+        publishedSegmentsForKey: (empId, date) =>
+          removed(empId, date) ? [{ shiftId: 1, jobId: 101, position: 0, isMentored: false }] : [],
+      });
+
+      const cells = cellsOf("emp-away");
+      const bar = cells[2].querySelector("[data-away-run-bar]") as HTMLElement;
+      expect(bar.hasAttribute("data-away-run-draft")).toBe(true);
+      expect(bar.querySelector('[data-away-run-chip="draft"]')?.textContent).toBe("Removed ×2");
+      expect(bar.getAttribute("aria-label")).toBe(
+        "Jamie Fox, Away: 2 days removed, not published yet",
+      );
+      // The second week's bar holds no drafts and stays plain.
+      const nextBar = cells[7].querySelector("[data-away-run-bar]") as HTMLElement;
+      expect(nextBar.hasAttribute("data-away-run-draft")).toBe(false);
+      expect(nextBar.getAttribute("aria-hidden")).toBe("true");
+
+      fireEvent.mouseEnter(bar);
+      const card = await waitFor(() => {
+        const found = document.querySelector("[data-away-run-card]");
+        expect(found).not.toBeNull();
+        return found as HTMLElement;
+      });
+      expect(card).toHaveTextContent("Jamie Fox · Away");
+      expect(card).toHaveTextContent("Not published yet. When you publish:");
+      expect(card).toHaveTextContent("Wed, Jan 10");
+      expect(card).toHaveTextContent("Staff still see the published schedule until then.");
+    });
+
+    it("carries a published change on an Away day while Highlight changes is on", () => {
+      observedWidth = 1600;
+      renderAway({
+        showPublishDiffOverlay: true,
+        publishDiffForKey: (empId: string, date: Date) =>
+          empId === "emp-away" && date.getDate() === 12
+            ? {
+                empId,
+                date: "2024-01-12",
+                kind: "deleted",
+                publishedAt: "2024-01-09T10:00:00Z",
+                publishedBy: "user-1",
+              }
+            : null,
+      });
+      const bar = cellsOf("emp-away")[2].querySelector("[data-away-run-bar]") as HTMLElement;
+      expect(bar.hasAttribute("data-away-run-draft")).toBe(false);
+      expect(bar.querySelector('[data-away-run-chip="published"]')?.textContent).toBe("Removed");
     });
 
     it("names the absence their away days hold, and explains a locked day (51f)", () => {
