@@ -51,6 +51,46 @@ describe("Toolbar — Schedule Builder button", () => {
   });
 });
 
+describe("Toolbar — Shift requests button", () => {
+  it("sits after Schedule Builder and opens the board", async () => {
+    const user = userEvent.setup();
+    const onRequestsToggle = vi.fn();
+    render(
+      <Toolbar
+        {...defaultProps}
+        onCoverageToggle={vi.fn()}
+        onRequestsToggle={onRequestsToggle}
+        requestsBadgeCount={3}
+      />,
+    );
+    const buttons = screen.getAllByRole("button").map((button) => button.textContent);
+    const builder = buttons.indexOf("Schedule Builder");
+    expect(buttons[builder + 1]).toBe("Shift requests3");
+    await user.click(screen.getByRole("button", { name: /Shift requests/ }));
+    expect(onRequestsToggle).toHaveBeenCalledOnce();
+    const badge = screen
+      .getByRole("button", { name: /Shift requests/ })
+      .querySelector("[data-numeric-badge]");
+    expect(badge).toHaveAttribute("data-tone", "danger");
+  });
+
+  it("always shows its count, a quiet 0 when nothing is waiting", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} requestsBadgeCount={0} />);
+    const badge = screen
+      .getByRole("button", { name: /Shift requests/ })
+      .querySelector("[data-numeric-badge]");
+    expect(badge).toHaveTextContent("0");
+    expect(badge).toHaveAttribute("data-tone", "neutral");
+  });
+
+  it("leaves Tools without a count", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} requestsBadgeCount={4} />);
+    expect(
+      screen.getByRole("button", { name: /Tools/ }).querySelector("[data-numeric-badge]"),
+    ).toBeNull();
+  });
+});
+
 describe("Toolbar — schedule mode rendering", () => {
   it("renders previous period button", () => {
     render(<Toolbar {...defaultProps} />);
@@ -191,7 +231,7 @@ describe("Toolbar — Tools dropdown", () => {
 
     await user.click(screen.getByRole("button", { name: /Tools/i }));
 
-    expect(screen.getByRole("menuitem", { name: /Requests/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Requests/i })).toBeNull();
     expect(screen.getByRole("menuitem", { name: /Print/i })).toHaveAttribute(
       "aria-disabled",
       "true",
@@ -240,7 +280,7 @@ describe("Toolbar — Tools dropdown", () => {
 
     await user.click(screen.getByRole("button", { name: /Tools/i }));
 
-    expect(screen.getByRole("menuitem", { name: /Requests/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Requests/i })).toBeNull();
     expect(screen.getByRole("menuitem", { name: /Authors/i })).toHaveAttribute(
       "aria-disabled",
       "true",

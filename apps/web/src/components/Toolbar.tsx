@@ -32,10 +32,6 @@ import ScrollableTabs from "@/components/ScrollableTabs";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { NumericBadge } from "@/components/ui/numeric-badge";
 
-// Sits on the corner of the icon button it counts for; the badge itself owns
-// the pill, the call site owns where it floats.
-const FLOATING_BADGE_STYLE = { position: "absolute", top: -6, right: -6 } as const;
-
 const SORT_OPTIONS = [
   { value: "seniority" as const, label: "Seniority" },
   { value: "name" as const, label: "Alphabetical" },
@@ -197,6 +193,43 @@ function SortMenuButton({
 }
 
 /* ── Tools Dropdown Menu ── */
+/**
+ * Opens the shift request board. Its count is always shown, 0 included, so
+ * "nothing waiting on you" reads as plainly as a number that is.
+ */
+function ShiftRequestsButton({
+  count,
+  onClick,
+  fill = false,
+}: {
+  count: number;
+  onClick: () => void;
+  /** Share a phone row equally with Tools. */
+  fill?: boolean;
+}) {
+  return (
+    <Hint content={hint("Review pickup, swap and call-off requests")} side="bottom">
+      <Button
+        onClick={onClick}
+        className="dg-btn dg-btn-ghost"
+        data-shift-requests-button=""
+        style={{
+          border: "1px solid var(--dg-color-border)",
+          borderRadius: "var(--dg-btn-radius)",
+          height: "var(--dg-toolbar-h)",
+          padding: "0 12px",
+          flex: fill ? "1 1 0" : "0 0 auto",
+          minWidth: 0,
+          gap: 8,
+        }}
+      >
+        Shift requests
+        <NumericBadge count={count} size="sm" tone={count > 0 ? "danger" : "neutral"} showZero />
+      </Button>
+    </Hint>
+  );
+}
+
 function ToolsMenu({
   triggerRef,
   onClose,
@@ -210,8 +243,6 @@ function ToolsMenu({
   canImportPrevious,
   onImportPrevious,
   isImportingPrevious,
-  requestsBadgeCount,
-  onRequestsToggle,
   onPublishHistory,
   onBulkDeleteToggle,
   isBulkDeleteMode,
@@ -233,8 +264,6 @@ function ToolsMenu({
   canImportPrevious?: boolean;
   onImportPrevious?: () => unknown;
   isImportingPrevious?: boolean;
-  requestsBadgeCount?: number;
-  onRequestsToggle?: () => void;
   onPublishHistory?: () => void;
   onBulkDeleteToggle?: () => void;
   isBulkDeleteMode?: boolean;
@@ -284,35 +313,6 @@ function ToolsMenu({
               <User size={14} strokeWidth={2.5} />
               <span style={{ flex: 1 }}>Authors</span>
               <Switch checked={!!showAudit} presentationOnly />
-            </MenuItem>
-          </Hint>
-        )}
-
-        {/* Requests */}
-        {onRequestsToggle && (
-          <Hint content={hint("Review pickup, swap and call-off requests")} side="left">
-            <MenuItem
-              onClick={() => {
-                onRequestsToggle();
-              }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="17 1 21 5 17 9" />
-                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                <polyline points="7 23 3 19 7 15" />
-                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-              </svg>
-              <span style={{ flex: 1 }}>Requests</span>
-              <NumericBadge count={requestsBadgeCount ?? 0} tone="danger" />
             </MenuItem>
           </Hint>
         )}
@@ -524,7 +524,10 @@ export default function Toolbar({
   /* ── Mobile Toolbar ─────────────────────────────────────── */
   if (isMobile) {
     return (
+      // Its own key: reusing the desktop toolbar's nodes leaves their old gap
+      // longhands cleared, and the wrapped rows lose their spacing.
       <div
+        key="mobile"
         className="dg-toolbar-type dg-field-raised"
         style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }}
       >
@@ -616,7 +619,8 @@ export default function Toolbar({
           </Button>
           {hasData && <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />}
           {hasData && (
-            <div style={{ position: "relative", flex: "1 1 160px", minWidth: 0 }}>
+            // Its own row, so the two buttons below share theirs evenly.
+            <div style={{ position: "relative", flex: "1 1 100%", minWidth: 0 }}>
               <Search
                 size={13}
                 strokeWidth={2.5}
@@ -647,6 +651,9 @@ export default function Toolbar({
               {staffSearch && <ClearSearchButton onClick={() => onStaffSearchChange("")} />}
             </div>
           )}
+          {hasData && onRequestsToggle && (
+            <ShiftRequestsButton count={requestsBadgeCount} onClick={onRequestsToggle} fill />
+          )}
           {hasData && (
             <Button
               ref={toolsBtnRef}
@@ -659,7 +666,8 @@ export default function Toolbar({
                 borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
-                flexShrink: 0,
+                flex: onRequestsToggle ? "1 1 0" : "0 0 auto",
+                minWidth: 0,
                 position: "relative",
               }}
             >
@@ -684,13 +692,6 @@ export default function Toolbar({
                 <line x1="17" y1="16" x2="23" y2="16" />
               </svg>
               Tools
-              <NumericBadge
-                count={requestsBadgeCount}
-                label={`${requestsBadgeCount} active requests`}
-                size="sm"
-                tone="danger"
-                style={FLOATING_BADGE_STYLE}
-              />
             </Button>
           )}
           {hasData && toolsOpen && (
@@ -707,8 +708,6 @@ export default function Toolbar({
               canImportPrevious={canImportPrevious}
               onImportPrevious={onImportPrevious}
               isImportingPrevious={isImportingPrevious}
-              requestsBadgeCount={requestsBadgeCount}
-              onRequestsToggle={onRequestsToggle}
               onPublishHistory={onPublishHistory}
               onBulkDeleteToggle={onBulkDeleteToggle}
               isBulkDeleteMode={isBulkDeleteMode}
@@ -725,6 +724,7 @@ export default function Toolbar({
   /* ── Desktop / Tablet Toolbar ───────────────────────────── */
   return (
     <div
+      key="desktop"
       className="dg-toolbar-type dg-field-raised"
       style={{
         display: "flex",
@@ -958,8 +958,12 @@ export default function Toolbar({
             </Hint>
           )}
 
+          {onRequestsToggle && (
+            <ShiftRequestsButton count={requestsBadgeCount} onClick={onRequestsToggle} />
+          )}
+
           {/* Tools dropdown */}
-          <Hint content={hint("Print, export, recurring shifts, requests, and more")} side="bottom">
+          <Hint content={hint("Print, export, recurring shifts, and more")} side="bottom">
             <Button
               ref={toolsBtnRef}
               onClick={toggleTools}
@@ -995,13 +999,6 @@ export default function Toolbar({
                 <line x1="17" y1="16" x2="23" y2="16" />
               </svg>
               Tools
-              <NumericBadge
-                count={requestsBadgeCount}
-                label={`${requestsBadgeCount} active requests`}
-                size="sm"
-                tone="danger"
-                style={FLOATING_BADGE_STYLE}
-              />
             </Button>
           </Hint>
 
@@ -1019,8 +1016,6 @@ export default function Toolbar({
               canImportPrevious={canImportPrevious}
               onImportPrevious={onImportPrevious}
               isImportingPrevious={isImportingPrevious}
-              requestsBadgeCount={requestsBadgeCount}
-              onRequestsToggle={onRequestsToggle}
               onPublishHistory={onPublishHistory}
               onBulkDeleteToggle={onBulkDeleteToggle}
               isBulkDeleteMode={isBulkDeleteMode}

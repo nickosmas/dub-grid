@@ -39,12 +39,15 @@ type NumericBadgeProps = Omit<ComponentProps<"span">, "children" | "aria-label">
      * text already reads the number.
      */
     label?: string;
+    /** Show "0" rather than nothing, for a count that is always on display. */
+    showZero?: boolean;
   };
 
 /**
  * The one count badge: always a pill whose height and minimum width come from
  * the shared size token, so a one-digit value only looks circular because its
- * content is narrower than the minimum. Renders nothing for a count of zero.
+ * content is narrower than the minimum. Renders nothing for a count of zero
+ * unless `showZero` asks for it.
  */
 export function NumericBadge({
   className,
@@ -54,9 +57,10 @@ export function NumericBadge({
   tone,
   label,
   style,
+  showZero = false,
   ...props
 }: NumericBadgeProps) {
-  const text = formatBadgeCount(count, max);
+  const text = formatBadgeCount(count, max) ?? (showZero ? "0" : null);
   if (text === null) return null;
 
   const { size: box, paddingX } = numericBadgeSize[size];
