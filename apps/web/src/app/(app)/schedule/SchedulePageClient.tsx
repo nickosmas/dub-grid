@@ -183,6 +183,7 @@ import { buildSchedulableOn } from "./_lib/schedulable-on";
 import {
   CORRECTION_ADMIN_WINDOW_DAYS,
   describeClaimApproval,
+  describeShiftRequestNoteRecipients,
   singularLabelNoun,
   DEFAULT_ORGANIZATION_LABELS,
   orderFocusAreasByDepartment,
@@ -220,8 +221,8 @@ import {
   getAssignmentDefinitionDisqualificationReasons as getAssignmentDisqualificationReasons,
   isEmployeeQualifiedForAssignmentDefinition as isEmployeeQualifiedForAssignment,
 } from "@/lib/assignable-shifts";
-import { createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
-import { mergeCellPublishChanges } from "@/lib/shift-change-web";
+import { buildShiftJobPairKey, createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
+import { buildShiftChangeResolvers, mergeCellPublishChanges } from "@/lib/shift-change-web";
 import {
   describeOtherPeriodPublishes,
   describeOwnChangedDays,
@@ -411,6 +412,15 @@ import {
   type PublicationRangeLoadState,
 } from "./_lib/publication-range-state";
 import { markOwnPublicationAsAdditions } from "./_lib/own-publication";
+import {
+  NO_REQUEST_MARKS,
+  buildRequestMarks,
+  foldWaitingOn,
+  type RequestCellMark,
+} from "./_lib/request-marks";
+import { describeRequestMark } from "./_lib/request-mark-text";
+import type { PanelRequestCard } from "@/components/shift-panel/ShiftPanelView";
+import { loadApprovalDraftWarning } from "@/components/shift-requests/approval-draft-warning";
 import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
@@ -3981,13 +3991,21 @@ function SchedulerContent({
           visible.push({
             ...openShift,
             viewerEligible,
-            viewerAction: canEditShifts ? "assign" : viewerEligible ? "volunteer" : "details",
+            // A claimed one waits for a manager; nobody else fills it meanwhile.
+            viewerAction: openShift.claimedBy
+              ? "details"
+              : canEditShifts
+                ? "assign"
+                : viewerEligible
+                  ? "volunteer"
+                  : "details",
           });
           return visible;
         }
 
-        // Plain staff only ever see shifts they're personally eligible for.
-        if (!viewerEligible) return visible;
+        // Plain staff only ever see shifts they're personally eligible for,
+        // and never one already claimed.
+        if (!viewerEligible || openShift.claimedBy) return visible;
 
         const mode =
           openShift.source === "calloff"
@@ -4062,14 +4080,7 @@ function SchedulerContent({
     [shifts, assignmentLabelMap, absenceTypeMap],
   );
 
-  /**
-   * The live request sitting on a cell, if any — what the grid's corner fold
-   * tints itself from and what `hasActiveRequestForShift` answers over.
-   *
-   * Matches the *requester's* cell only. A swap therefore marks the person who
-   * asked, not the person being asked: covering the other side needs a second
-   * index keyed on targetEmpId/targetShiftDate, which nothing needs yet.
-   */
+  /** The live request someone made about their own shift that day, which they can open or withdraw. */
   const findActiveRequestForShift = useCallback(
     (empId: string, date: Date): ShiftRequest | null => {
       const dateKey = formatDateKey(date);
@@ -4085,23 +4096,131 @@ function SchedulerContent({
     [shiftRequests.requests],
   );
 
-  const activeRequestForKey = useCallback(
-    (empId: string, date: Date): ActiveShiftRequestSummary | null => {
-      const match = findActiveRequestForShift(empId, date);
-      if (!match) return null;
-      // The find above already admitted only these two, so this narrows rather
-      // than decides.
-      return {
-        type: match.type,
-        status: match.status === "pending_approval" ? "pending_approval" : "open",
+  // Every day a waiting request touches, and who acts next. Nothing is marked
+  // while the requests are loading or failed to load, so a mark never outlives
+  // its request.
+  const requestMarks = useMemo(
+    () =>
+      shiftRequests.loading || shiftRequests.error
+        ? NO_REQUEST_MARKS
+        : buildRequestMarks(shiftRequests.requests),
+    [shiftRequests.error, shiftRequests.loading, shiftRequests.requests],
+  );
+  const requestMarkResolvers = useMemo(
+    () =>
+      buildShiftChangeResolvers({
+        assignments: allAssignmentDefinitions,
+        shiftCategories,
+        jobs,
+        absenceTypes: allAbsenceTypes,
+        focusAreas,
+      }),
+    [allAssignmentDefinitions, shiftCategories, jobs, allAbsenceTypes, focusAreas],
+  );
+  const summarizeRequestMarks = useCallback(
+    (
+      marks: readonly RequestCellMark[] | undefined,
+      daySegments: ReadonlyArray<{ shiftId: number | null; jobId: number }> = [],
+    ): ActiveShiftRequestSummary | null => {
+      const waitingOn = foldWaitingOn(marks);
+      if (!waitingOn || !marks) return null;
+      const requestsById = new Map(shiftRequests.requests.map((request) => [request.id, request]));
+      // The shifts of the day a request is about: what the asker offers, or
+      // what a swap partner gives. A whole-day absence, or nothing to match,
+      // is the first.
+      const affectedIndexes = (mark: RequestCellMark, request: ShiftRequest): number[] => {
+        const state =
+          mark.role === "asker"
+            ? request.requesterState
+            : mark.role === "partner" && request.type === "swap"
+              ? request.targetState
+              : null;
+        const pairs = new Set(
+          (state?.segments ?? []).map((segment) =>
+            buildShiftJobPairKey(segment.shiftId, segment.jobId),
+          ),
+        );
+        const indexes = daySegments.flatMap((segment, index) =>
+          pairs.has(buildShiftJobPairKey(segment.shiftId, segment.jobId)) ? [index] : [],
+        );
+        return indexes.length > 0 ? indexes : [0];
       };
+      const kindLabel = (type: ShiftRequest["type"]) =>
+        type === "calloff" ? "Call-off" : type === "swap" ? "Swap" : "Pickup";
+      const requests = marks.flatMap((mark) => {
+        const request = requestsById.get(mark.requestId);
+        return request
+          ? [
+              {
+                requestId: mark.requestId,
+                waitingOn: mark.waitingOn,
+                kind: kindLabel(request.type),
+                affectedSegmentIndexes: affectedIndexes(mark, request),
+                ...describeRequestMark({
+                  mark,
+                  request,
+                  resolvers: requestMarkResolvers,
+                  timeZone: org?.timezone ?? null,
+                }),
+              },
+            ]
+          : [];
+      });
+      if (requests.length === 0) return null;
+      const gaining = marks.find(
+        (mark) => (mark.role === "claimer" || mark.role === "volunteer") && mark.wouldGet,
+      );
+      const wouldGetAssignmentIds = (gaining?.wouldGet?.segments ?? []).flatMap((segment) => {
+        const assignment = segmentCompatibility.assignmentByPair.get(
+          buildShiftJobPairKey(segment.shiftId, segment.jobId),
+        );
+        return assignment ? [assignment.id] : [];
+      });
+      const affectedSegmentIndexes = [
+        ...new Set(requests.flatMap((line) => line.affectedSegmentIndexes)),
+      ].sort((left, right) => left - right);
+      return { waitingOn, requests, wouldGetAssignmentIds, affectedSegmentIndexes };
     },
-    [findActiveRequestForShift],
+    [org?.timezone, requestMarkResolvers, segmentCompatibility, shiftRequests.requests],
   );
 
+  /** The waiting requests on a day: its corner fold and hover lines. */
+  const activeRequestForKey = useCallback(
+    (empId: string, date: Date): ActiveShiftRequestSummary | null =>
+      summarizeRequestMarks(
+        requestMarks.byCell.get(`${empId}_${formatDateKey(date)}`),
+        segmentsForKey(empId, date),
+      ),
+    [requestMarks, segmentsForKey, summarizeRequestMarks],
+  );
+
+  // The waiting requests on the open panel's day, for its request cards.
+  const panelRequestCards = useMemo<PanelRequestCard[]>(() => {
+    if (!editPanel) return [];
+    const summary = summarizeRequestMarks(
+      requestMarks.byCell.get(`${editPanel.empId}_${formatDateKey(editPanel.date)}`),
+      segmentsForKey(editPanel.empId, editPanel.date),
+    );
+    const requestsById = new Map(shiftRequests.requests.map((request) => [request.id, request]));
+    return (summary?.requests ?? []).map((line) => {
+      const request = requestsById.get(line.requestId);
+      return {
+        ...line,
+        awaitingApproval: line.waitingOn === "manager",
+        notePlaceholder: request
+          ? `Note to ${describeShiftRequestNoteRecipients(request)}? (Optional)`
+          : "Note (Optional)",
+      };
+    });
+  }, [editPanel, requestMarks, segmentsForKey, shiftRequests.requests, summarizeRequestMarks]);
+
+  /** Whether the person's own shift that day already has a request they made. */
   const hasActiveRequestForShift = useCallback(
-    (empId: string, date: Date): boolean => activeRequestForKey(empId, date) !== null,
-    [activeRequestForKey],
+    (empId: string, date: Date): boolean =>
+      (requestMarks.byCell.get(`${empId}_${formatDateKey(date)}`) ?? []).some(
+        (mark) => mark.role === "asker",
+      ),
+    [requestMarks],
   );
 
   // The viewer's own request on the shift in the panel, which they can open or withdraw.
@@ -7161,6 +7280,10 @@ function SchedulerContent({
   // an ineligible shift in the first place, per the openShifts memo above).
   const handleOpenShiftClick = useCallback(
     (openShift: GridOpenShift) => {
+      if (openShift.claimedBy) {
+        setOpenShiftDetails(openShift);
+        return;
+      }
       const action = resolveOpenShiftClickAction({
         canEditShifts,
         canSeeAllOpenShifts,
@@ -8215,6 +8338,7 @@ function SchedulerContent({
       draftKindForKey,
       publishDiffForKey: publishDiffKindForKey,
       showPublishDiffOverlay: showPublishDiff,
+      activeRequestForKey,
       hasAbsenceType: (absenceTypeId) => absenceTypeObjectMap.has(absenceTypeId),
     });
     const day = runs.days[week.findIndex((date) => formatDateKey(date) === dateKey)];
@@ -8225,6 +8349,7 @@ function SchedulerContent({
   }, [
     absenceTypeIdForKey,
     absenceTypeObjectMap,
+    activeRequestForKey,
     canEditShifts,
     draftKindForKey,
     editPanel,
@@ -9744,12 +9869,18 @@ function SchedulerContent({
                   {openShiftDetails.calledOffBy && (
                     <div>Called off by {openShiftDetails.calledOffBy}</div>
                   )}
-                  <div>{openShiftDetails.needed ?? 1} needed</div>
-                  <div style={{ color: "var(--dg-color-text-muted)" }}>
-                    {openShiftDetailsReasons.length > 0
-                      ? `You can't personally claim this shift: it requires ${openShiftDetailsReasons.join(", ")}.`
-                      : "You aren't personally eligible to claim this shift."}
-                  </div>
+                  {openShiftDetails.claimedBy ? (
+                    <div>Claimed by {openShiftDetails.claimedBy}, awaiting approval</div>
+                  ) : (
+                    <>
+                      <div>{openShiftDetails.needed ?? 1} needed</div>
+                      <div style={{ color: "var(--dg-color-text-muted)" }}>
+                        {openShiftDetailsReasons.length > 0
+                          ? `You can't personally claim this shift: it requires ${openShiftDetailsReasons.join(", ")}.`
+                          : "You aren't personally eligible to claim this shift."}
+                      </div>
+                    </>
+                  )}
                 </div>
               </Modal>
             )}
@@ -9913,6 +10044,16 @@ function SchedulerContent({
               historicalAssignments={allAssignmentDefinitions}
               resolvePublisherName={(userId) => auditNames.get(userId) ?? null}
               publicationTimeZone={org?.timezone ?? null}
+              requestCards={panelRequestCards}
+              onResolveRequest={
+                canApproveShiftRequests
+                  ? (requestId, approved, note) => shiftRequests.resolve(requestId, approved, note)
+                  : undefined
+              }
+              loadRequestApprovalWarning={async (requestId) => {
+                const request = shiftRequests.requests.find((item) => item.id === requestId);
+                return request ? loadApprovalDraftWarning(orgId ?? org?.id ?? null, request) : [];
+              }}
               isStale={editSessionDraft?.isStale ?? false}
               auditInfo={canEditShifts && canRenderAuthorNames ? auditInfo : undefined}
               overlapWarnings={overnightOverlapWarnings}

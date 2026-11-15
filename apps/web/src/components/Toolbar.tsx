@@ -5,14 +5,18 @@ import {
   ArrowUpDown,
   CalendarCheck,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Printer,
+  Repeat,
   Import as ImportIcon,
   Search,
   Trash2,
   Upload,
   User,
+  X,
 } from "lucide-react";
 import {
   SEARCH_CLEAR_PADDING,
@@ -26,15 +30,11 @@ import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { Switch } from "@/components/ui/switch";
 import { addDays, formatDate } from "@/lib/utils";
 import { FocusArea } from "@/types";
-import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useMediaQuery, MOBILE, TABLET, COMPACT_TOOLBAR, ROOMY_TOOLBAR } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { NumericBadge } from "@/components/ui/numeric-badge";
-
-// Sits on the corner of the icon button it counts for; the badge itself owns
-// the pill, the call site owns where it floats.
-const FLOATING_BADGE_STYLE = { position: "absolute", top: -6, right: -6 } as const;
 
 const SORT_OPTIONS = [
   { value: "seniority" as const, label: "Seniority" },
@@ -125,9 +125,12 @@ function ClearSearchButton({ onClick }: { onClick: () => void }) {
 function SortMenuButton({
   sortBy,
   onSortByChange,
+  iconOnly = false,
 }: {
   sortBy: "seniority" | "name";
   onSortByChange: (sortBy: "seniority" | "name") => void;
+  /** The desktop toolbar shows the icon alone, so it fits one row. */
+  iconOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -140,19 +143,23 @@ function SortMenuButton({
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-haspopup="menu"
+          aria-label={iconOnly ? "Sort staff" : undefined}
+          data-toolbar-sort=""
           className={`dg-btn dg-btn-secondary${open ? " dg-btn-toggled" : ""}`}
           style={{
             height: "var(--dg-toolbar-h)",
-            padding: "0 12px",
+            padding: iconOnly ? 0 : "0 12px",
+            width: iconOnly ? "var(--dg-toolbar-h)" : undefined,
             display: "flex",
             alignItems: "center",
+            justifyContent: "center",
             gap: 6,
             borderRadius: "var(--dg-btn-radius)",
             flexShrink: 0,
           }}
         >
-          <ArrowUpDown size={13} />
-          Sort staff
+          <ArrowUpDown size={13} aria-hidden />
+          {iconOnly ? null : "Sort staff"}
         </Button>
       </Hint>
       {open && (
@@ -196,60 +203,117 @@ function SortMenuButton({
   );
 }
 
-const TOOLBAR_BUTTON_STYLE = {
-  borderRadius: "var(--dg-btn-radius)",
-  height: "var(--dg-toolbar-h)",
-  padding: "0 12px",
-  flexShrink: 0,
-} as const;
-
 // The options modal is its own chunk; fetching it on the way to a click
 // usually means it opens from cache.
 const warmPrintOptions = () => void import("@/components/PrintOptionsModal");
 
-/* ── Requests and Print, when the Tools menu would hold nothing else ── */
-function DirectToolButtons({
-  requestsBadgeCount,
-  onRequestsToggle,
-  onPrintOpen,
-  printDisabled,
+/** Print on the toolbar, for someone whose More tools menu would hold nothing else. */
+function PrintButton({
+  onClick,
+  disabled,
+  fill = false,
+  compact = false,
 }: {
-  requestsBadgeCount: number;
-  onRequestsToggle?: () => void;
-  onPrintOpen?: () => void;
-  printDisabled: boolean;
+  onClick: () => void;
+  disabled: boolean;
+  /** Share a phone row equally with Shift requests. */
+  fill?: boolean;
+  /** Icon only, on a narrower desktop window. */
+  compact?: boolean;
 }) {
   return (
-    <>
-      {onRequestsToggle && (
-        <Hint content={hint("Pickup, swap and call-off requests")} side="bottom">
-          <Button
-            onClick={onRequestsToggle}
-            className="dg-btn dg-btn-secondary"
-            style={TOOLBAR_BUTTON_STYLE}
-          >
-            Requests
-            <NumericBadge count={requestsBadgeCount} tone="label" className="dg-btn-count" />
-          </Button>
-        </Hint>
-      )}
-      {onPrintOpen && (
-        <Button
-          onClick={onPrintOpen}
-          disabled={printDisabled}
-          onPointerEnter={warmPrintOptions}
-          onFocus={warmPrintOptions}
-          className="dg-btn dg-btn-secondary"
-          style={TOOLBAR_BUTTON_STYLE}
-        >
-          Print
-        </Button>
-      )}
-    </>
+    <Button
+      onClick={onClick}
+      disabled={disabled}
+      onPointerEnter={warmPrintOptions}
+      onFocus={warmPrintOptions}
+      aria-label={compact ? "Print" : undefined}
+      className="dg-btn dg-btn-ghost"
+      style={{
+        border: "1px solid var(--dg-color-border)",
+        borderRadius: "var(--dg-btn-radius)",
+        height: "var(--dg-toolbar-h)",
+        padding: "0 12px",
+        flex: fill ? "1 1 0" : "0 0 auto",
+        minWidth: 0,
+        gap: 8,
+      }}
+    >
+      <Printer aria-hidden size={14} strokeWidth={2.25} />
+      {compact ? null : "Print"}
+    </Button>
   );
 }
 
 /* ── Tools Dropdown Menu ── */
+function ToolsIcon() {
+  return (
+    <svg
+      aria-hidden
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="4" y1="21" x2="4" y2="14" />
+      <line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" />
+      <line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="17" y1="16" x2="23" y2="16" />
+    </svg>
+  );
+}
+
+/**
+ * Opens the shift request board. Its count is always shown, 0 included, so
+ * "nothing waiting on you" reads as plainly as a number that is.
+ */
+function ShiftRequestsButton({
+  count,
+  onClick,
+  fill = false,
+  compact = false,
+}: {
+  count: number;
+  onClick: () => void;
+  /** Share a phone row equally with Tools. */
+  fill?: boolean;
+  /** Icon and count only, on a narrower desktop window. */
+  compact?: boolean;
+}) {
+  return (
+    <Hint content={hint("Review pickup, swap and call-off requests")} side="bottom">
+      <Button
+        onClick={onClick}
+        className="dg-btn dg-btn-ghost"
+        data-shift-requests-button=""
+        aria-label={compact ? `Shift requests, ${count} waiting` : undefined}
+        style={{
+          border: "1px solid var(--dg-color-border)",
+          borderRadius: "var(--dg-btn-radius)",
+          height: "var(--dg-toolbar-h)",
+          padding: "0 12px",
+          flex: fill ? "1 1 0" : "0 0 auto",
+          minWidth: 0,
+          gap: 8,
+        }}
+      >
+        <Repeat aria-hidden size={14} strokeWidth={2.25} />
+        {compact ? null : "Shift requests"}
+        <NumericBadge count={count} size="sm" tone={count > 0 ? "danger" : "neutral"} showZero />
+      </Button>
+    </Hint>
+  );
+}
+
 function ToolsMenu({
   triggerRef,
   onClose,
@@ -263,8 +327,6 @@ function ToolsMenu({
   canImportPrevious,
   onImportPrevious,
   isImportingPrevious,
-  requestsBadgeCount,
-  onRequestsToggle,
   onPublishHistory,
   onBulkDeleteToggle,
   isBulkDeleteMode,
@@ -286,8 +348,6 @@ function ToolsMenu({
   canImportPrevious?: boolean;
   onImportPrevious?: () => unknown;
   isImportingPrevious?: boolean;
-  requestsBadgeCount?: number;
-  onRequestsToggle?: () => void;
   onPublishHistory?: () => void;
   onBulkDeleteToggle?: () => void;
   isBulkDeleteMode?: boolean;
@@ -337,35 +397,6 @@ function ToolsMenu({
               <User size={14} strokeWidth={2.5} />
               <span style={{ flex: 1 }}>Authors</span>
               <Switch checked={!!showAudit} presentationOnly />
-            </MenuItem>
-          </Hint>
-        )}
-
-        {/* Requests */}
-        {onRequestsToggle && (
-          <Hint content={hint("Review pickup, swap and call-off requests")} side="left">
-            <MenuItem
-              onClick={() => {
-                onRequestsToggle();
-              }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="17 1 21 5 17 9" />
-                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                <polyline points="7 23 3 19 7 15" />
-                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-              </svg>
-              <span style={{ flex: 1 }}>Requests</span>
-              <NumericBadge count={requestsBadgeCount ?? 0} tone="danger" />
             </MenuItem>
           </Hint>
         )}
@@ -542,6 +573,31 @@ export default function Toolbar({
 }: ToolbarProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
+  const isCompact = useMediaQuery(COMPACT_TOOLBAR);
+
+  // A wide desktop shows Sort staff and the search field in full; anything
+  // tighter shows both as icon buttons, the field opening in place of its button.
+  const roomyToolbar = useMediaQuery(ROOMY_TOOLBAR) && !isTablet;
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef(false);
+  const closeSearch = useCallback(() => {
+    returnFocusRef.current = true;
+    setSearchOpen(false);
+    onStaffSearchChange("");
+  }, [onStaffSearchChange]);
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+  // An open search field takes the room the buttons' labels would.
+  const searchingInline = searchOpen && !roomyToolbar;
+  const actionsCompact = isCompact || searchingInline;
+  useEffect(() => {
+    if (searchOpen || !returnFocusRef.current) return;
+    returnFocusRef.current = false;
+    searchButtonRef.current?.focus();
+  }, [searchOpen]);
   const hasGridRows = hasVisibleGridRows ?? hasData;
   const hasScheduleEntries = hasGridRows && (hasVisibleScheduleEntries ?? hasGridRows);
   const hasBulkDeleteEntries = hasRemovableVisibleEntries ?? hasScheduleEntries;
@@ -569,8 +625,8 @@ export default function Toolbar({
     ...focusAreas.map((fa) => ({ id: fa.id, name: fa.name })),
   ];
 
-  // Someone who can't edit shifts would find only Requests and Print in the
-  // Tools menu, so those two sit on the toolbar instead.
+  // Someone who can't edit shifts would find only Print in More tools, so
+  // Print sits on the toolbar instead (Shift requests always does).
   const hasEditorTools = Boolean(
     onAuditToggle ||
     onExportCSV ||
@@ -579,14 +635,15 @@ export default function Toolbar({
     (canApplyRecurringSchedule && onApplyRecurring) ||
     (canImportPrevious && onImportPrevious),
   );
-  const directToolButtons = hasEditorTools ? null : (
-    <DirectToolButtons
-      requestsBadgeCount={requestsBadgeCount}
-      onRequestsToggle={onRequestsToggle}
-      onPrintOpen={onPrintOpen}
-      printDisabled={scheduleEntryActionsDisabled}
-    />
-  );
+  const renderPrintButton = (fill: boolean, compact = false) =>
+    hasEditorTools || !onPrintOpen ? null : (
+      <PrintButton
+        onClick={onPrintOpen}
+        disabled={scheduleEntryActionsDisabled}
+        fill={fill}
+        compact={compact}
+      />
+    );
 
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsBtnRef = useRef<HTMLButtonElement>(null);
@@ -596,7 +653,10 @@ export default function Toolbar({
   /* ── Mobile Toolbar ─────────────────────────────────────── */
   if (isMobile) {
     return (
+      // Its own key: reusing the desktop toolbar's nodes leaves their old gap
+      // longhands cleared, and the wrapped rows lose their spacing.
       <div
+        key="mobile"
         className="dg-toolbar-type dg-field-raised"
         style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 8 }}
       >
@@ -688,7 +748,8 @@ export default function Toolbar({
           </Button>
           {hasData && <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />}
           {hasData && (
-            <div style={{ position: "relative", flex: "1 1 160px", minWidth: 0 }}>
+            // Its own row, so the two buttons below share theirs evenly.
+            <div style={{ position: "relative", flex: "1 1 100%", minWidth: 0 }}>
               <Search
                 size={13}
                 strokeWidth={2.5}
@@ -719,7 +780,10 @@ export default function Toolbar({
               {staffSearch && <ClearSearchButton onClick={() => onStaffSearchChange("")} />}
             </div>
           )}
-          {hasData && directToolButtons}
+          {hasData && onRequestsToggle && (
+            <ShiftRequestsButton count={requestsBadgeCount} onClick={onRequestsToggle} fill />
+          )}
+          {hasData && renderPrintButton(true)}
           {hasData && hasEditorTools && (
             <Button
               ref={toolsBtnRef}
@@ -732,37 +796,22 @@ export default function Toolbar({
                 borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
-                flexShrink: 0,
+                flex: onRequestsToggle ? "1 1 0" : "0 0 auto",
+                minWidth: 0,
                 position: "relative",
               }}
             >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="4" y1="21" x2="4" y2="14" />
-                <line x1="4" y1="10" x2="4" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12" y2="3" />
-                <line x1="20" y1="21" x2="20" y2="16" />
-                <line x1="20" y1="12" x2="20" y2="3" />
-                <line x1="1" y1="14" x2="7" y2="14" />
-                <line x1="9" y1="8" x2="15" y2="8" />
-                <line x1="17" y1="16" x2="23" y2="16" />
-              </svg>
-              Tools
-              <NumericBadge
-                count={requestsBadgeCount}
-                label={`${requestsBadgeCount} active requests`}
-                size="sm"
-                tone="danger"
-                style={FLOATING_BADGE_STYLE}
+              <ToolsIcon />
+              More tools
+              <ChevronDown
+                size={12}
+                strokeWidth={2.5}
+                aria-hidden
+                style={{
+                  color: "var(--dg-color-text-faint)",
+                  transition: "transform 150ms ease",
+                  transform: toolsOpen ? "rotate(180deg)" : "rotate(0deg)",
+                }}
               />
             </Button>
           )}
@@ -780,8 +829,6 @@ export default function Toolbar({
               canImportPrevious={canImportPrevious}
               onImportPrevious={onImportPrevious}
               isImportingPrevious={isImportingPrevious}
-              requestsBadgeCount={requestsBadgeCount}
-              onRequestsToggle={onRequestsToggle}
               onPublishHistory={onPublishHistory}
               onBulkDeleteToggle={onBulkDeleteToggle}
               isBulkDeleteMode={isBulkDeleteMode}
@@ -798,6 +845,7 @@ export default function Toolbar({
   /* ── Desktop / Tablet Toolbar ───────────────────────────── */
   return (
     <div
+      key="desktop"
       className="dg-toolbar-type dg-field-raised"
       style={{
         display: "flex",
@@ -907,21 +955,30 @@ export default function Toolbar({
             // this row also renders for a frame at phone widths before the
             // media query resolves, and a rigid row there pushes its own
             // controls off the side of the screen.
-            flexWrap: "wrap",
+            // While the field is open it shares this row with the tabs, which
+            // give up width (they scroll), rather than wrapping below them.
+            flexWrap: searchingInline && !isTablet ? "nowrap" : "wrap",
             rowGap: 8,
-            flex: isTablet ? undefined : "1 1 auto",
+            flex: isTablet ? undefined : searchingInline ? "1 1 0" : "1 1 auto",
             minWidth: 0,
             maxWidth: "100%",
             ...(isTablet ? { order: 3, flexBasis: "100%", width: "100%" } : {}),
           }}
         >
-          {/* Focus area filter */}
           {focusAreaOptions.length > 1 && (
             <div
               data-tour="schedule-focus-filter"
-              style={{ flex: isTablet ? "1 1 240px" : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
+              style={{
+                flex: isTablet ? "1 1 240px" : searchingInline ? "0 1 auto" : "0 0 auto",
+                minWidth: searchingInline && !isTablet ? 96 : 0,
+                maxWidth: "100%",
+              }}
             >
               <ScrollableTabs
+                // All and four areas, and no wider than long names allow; the
+                // rest scroll, so the toolbar stays one row.
+                maxVisibleItems={5}
+                maxVisibleWidth={420}
                 className="dg-span-tabs dg-span-tabs--light"
                 style={{ flex: isTablet ? 1 : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
               >
@@ -941,59 +998,162 @@ export default function Toolbar({
               </ScrollableTabs>
             </div>
           )}
-
-          {/* Sort order */}
-          <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />
-
-          {/* Staff search */}
-          <div
-            style={{
-              position: "relative",
-              // No hard floor: the flex basis already asks for a comfortable
-              // width, and a floor made the field push itself out of the
-              // toolbar instead of compressing when the row ran out of room
-              // (a zoomed-in desktop is narrow in CSS pixels without being
-              // narrow enough to reach the tablet layout).
-              minWidth: 0,
-              maxWidth: isTablet ? undefined : 320,
-              flex: isTablet ? "1 1 160px" : "1 1 220px",
-            }}
-          >
-            <Search
-              size={13}
-              strokeWidth={2.5}
-              style={{
-                position: "absolute",
-                left: 10,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--dg-color-text-faint)",
-                pointerEvents: "none",
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search staff"
-              value={staffSearch}
-              onChange={(e) => onStaffSearchChange(e.target.value)}
-              onKeyDown={clearSearchOnEscape(() => onStaffSearchChange(""))}
-              aria-label="Search staff"
-              className="dg-input"
-              style={{
-                paddingLeft: 30,
-                paddingRight: staffSearch ? SEARCH_CLEAR_PADDING : 12,
-                width: "100%",
-                borderRadius: "var(--dg-btn-radius)",
-              }}
-            />
-            {staffSearch && <ClearSearchButton onClick={() => onStaffSearchChange("")} />}
-          </div>
+          {roomyToolbar ? (
+            <>
+              <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />
+              <div
+                data-toolbar-search=""
+                style={{
+                  position: "relative",
+                  // No hard floor: the flex basis asks for a comfortable width,
+                  // and a floor pushed the field out of the toolbar instead of
+                  // compressing when the row ran short.
+                  minWidth: 0,
+                  maxWidth: 320,
+                  flex: "1 1 220px",
+                }}
+              >
+                <Search
+                  size={13}
+                  strokeWidth={2.5}
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--dg-color-text-faint)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search staff"
+                  value={staffSearch}
+                  onChange={(e) => onStaffSearchChange(e.target.value)}
+                  onKeyDown={clearSearchOnEscape(() => onStaffSearchChange(""))}
+                  aria-label="Search staff"
+                  className="dg-input"
+                  style={{
+                    paddingLeft: 30,
+                    paddingRight: staffSearch ? SEARCH_CLEAR_PADDING : 12,
+                    width: "100%",
+                    borderRadius: "var(--dg-btn-radius)",
+                  }}
+                />
+                {staffSearch && <ClearSearchButton onClick={() => onStaffSearchChange("")} />}
+              </div>
+            </>
+          ) : (
+            <>
+              <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} iconOnly />
+              {searchOpen ? (
+                <div
+                  data-toolbar-search=""
+                  style={{ position: "relative", flex: "1 0 240px", maxWidth: 340, minWidth: 0 }}
+                >
+                  <Search
+                    size={13}
+                    strokeWidth={2.5}
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      left: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "var(--dg-color-text-faint)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search staff"
+                    value={staffSearch}
+                    onChange={(e) => onStaffSearchChange(e.target.value)}
+                    // Escape clears what was typed first, then closes the field.
+                    onKeyDown={(event) => {
+                      if (event.key !== "Escape") return;
+                      if (event.currentTarget.value) {
+                        clearSearchOnEscape(() => onStaffSearchChange(""))(event);
+                        return;
+                      }
+                      event.preventDefault();
+                      returnFocusRef.current = true;
+                      setSearchOpen(false);
+                    }}
+                    onBlur={() => setSearchOpen(false)}
+                    aria-label="Search staff"
+                    className="dg-input"
+                    style={{
+                      paddingLeft: 30,
+                      paddingRight: SEARCH_CLEAR_PADDING,
+                      width: "100%",
+                      borderRadius: "var(--dg-btn-radius)",
+                    }}
+                  />
+                  <Hint content={hint("Close search")} side="bottom">
+                    <Button
+                      type="button"
+                      aria-label="Close search"
+                      // Keeps the field's focus, so its blur doesn't close it first.
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={closeSearch}
+                      className="dg-btn dg-btn-ghost"
+                      style={{
+                        position: "absolute",
+                        right: 4,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: 28,
+                        height: 28,
+                        padding: 0,
+                        justifyContent: "center",
+                        borderRadius: "var(--dg-btn-radius)",
+                      }}
+                    >
+                      <X size={14} strokeWidth={2.25} aria-hidden />
+                    </Button>
+                  </Hint>
+                </div>
+              ) : (
+                <Hint
+                  content={hint(staffSearch ? `Search staff: ${staffSearch}` : "Search staff")}
+                  side="bottom"
+                >
+                  <Button
+                    ref={searchButtonRef}
+                    type="button"
+                    aria-label={
+                      staffSearch ? `Search staff, showing "${staffSearch}"` : "Search staff"
+                    }
+                    data-toolbar-search-toggle=""
+                    data-active={staffSearch ? "" : undefined}
+                    onClick={() => setSearchOpen(true)}
+                    // An active search keeps the button lit, so the filter is never hidden.
+                    className={`dg-btn dg-btn-secondary${staffSearch ? " dg-btn-toggled" : ""}`}
+                    style={{
+                      height: "var(--dg-toolbar-h)",
+                      width: "var(--dg-toolbar-h)",
+                      padding: 0,
+                      justifyContent: "center",
+                      borderRadius: "var(--dg-btn-radius)",
+                    }}
+                  >
+                    <Search size={14} strokeWidth={2.25} aria-hidden />
+                  </Button>
+                </Hint>
+              )}
+            </>
+          )}
         </div>
       )}
 
       {/* ── RIGHT ZONE: Presence + Coverage + Tools ── */}
       {hasData && (
         <div
+          data-toolbar-actions=""
+          data-compact={actionsCompact ? "" : undefined}
           style={{
             marginLeft: "auto",
             display: "flex",
@@ -1016,6 +1176,7 @@ export default function Toolbar({
             >
               <Button
                 onClick={onCoverageToggle}
+                aria-label={actionsCompact ? "Schedule Builder" : undefined}
                 className="dg-btn dg-btn-ghost"
                 style={{
                   border: "1px solid var(--dg-color-border)",
@@ -1026,25 +1187,31 @@ export default function Toolbar({
                 }}
               >
                 <CalendarCheck aria-hidden size={14} strokeWidth={2.25} />
-                Schedule Builder
+                {actionsCompact ? null : "Schedule Builder"}
               </Button>
             </Hint>
           )}
 
-          {directToolButtons}
+          {onRequestsToggle && (
+            <ShiftRequestsButton
+              count={requestsBadgeCount}
+              onClick={onRequestsToggle}
+              compact={actionsCompact}
+            />
+          )}
 
-          {/* Tools dropdown */}
+          {renderPrintButton(false, actionsCompact)}
+
+          {/* More tools dropdown, for editors; everyone else has Print on the toolbar */}
           {hasEditorTools && (
-            <Hint
-              content={hint("Print, export, recurring shifts, requests, and more")}
-              side="bottom"
-            >
+            <Hint content={hint("Print, export, recurring shifts, and more")} side="bottom">
               <Button
                 ref={toolsBtnRef}
                 onClick={toggleTools}
                 aria-expanded={toolsOpen}
                 aria-haspopup="menu"
                 className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
+                aria-label={actionsCompact ? "More tools" : undefined}
                 data-tour="toolbar-tools-btn"
                 style={{
                   borderRadius: "var(--dg-btn-radius)",
@@ -1053,33 +1220,17 @@ export default function Toolbar({
                   position: "relative",
                 }}
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="4" y1="21" x2="4" y2="14" />
-                  <line x1="4" y1="10" x2="4" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12" y2="3" />
-                  <line x1="20" y1="21" x2="20" y2="16" />
-                  <line x1="20" y1="12" x2="20" y2="3" />
-                  <line x1="1" y1="14" x2="7" y2="14" />
-                  <line x1="9" y1="8" x2="15" y2="8" />
-                  <line x1="17" y1="16" x2="23" y2="16" />
-                </svg>
-                Tools
-                <NumericBadge
-                  count={requestsBadgeCount}
-                  label={`${requestsBadgeCount} active requests`}
-                  size="sm"
-                  tone="danger"
-                  style={FLOATING_BADGE_STYLE}
+                <ToolsIcon />
+                {actionsCompact ? null : "More tools"}
+                <ChevronDown
+                  size={12}
+                  strokeWidth={2.5}
+                  aria-hidden
+                  style={{
+                    color: "var(--dg-color-text-faint)",
+                    transition: "transform 150ms ease",
+                    transform: toolsOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  }}
                 />
               </Button>
             </Hint>
@@ -1099,8 +1250,6 @@ export default function Toolbar({
               canImportPrevious={canImportPrevious}
               onImportPrevious={onImportPrevious}
               isImportingPrevious={isImportingPrevious}
-              requestsBadgeCount={requestsBadgeCount}
-              onRequestsToggle={onRequestsToggle}
               onPublishHistory={onPublishHistory}
               onBulkDeleteToggle={onBulkDeleteToggle}
               isBulkDeleteMode={isBulkDeleteMode}

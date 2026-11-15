@@ -3459,34 +3459,272 @@ describe("ScheduleGrid", () => {
     expect(screen.getAllByLabelText("Readings").length).toBeGreaterThan(0);
   });
 
-  it("folds the corner of a shift with an open request", () => {
+  it("folds the corner gray while a teammate must answer", () => {
     observedWidth = 1600;
 
     renderGrid({
-      activeRequestForKey: () => ({ type: "pickup", status: "open" }),
+      activeRequestForKey: () => ({
+        waitingOn: "teammate",
+        affectedSegmentIndexes: [0],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
+            waitingOn: "teammate",
+            status: "Offered for pickup · waiting for a teammate",
+            body: null,
+            asked: "Offered Nov 14.",
+          },
+        ],
+      }),
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const fold = firstCell.querySelector("[data-request-fold]") as HTMLElement | null;
 
-    expect(fold?.getAttribute("data-request-fold")).toBe("open");
-    expect(fold?.getAttribute("aria-label")).toBe("Pickup request open");
-    expect(fold?.style.borderTop).toBe(`${REQUEST_FOLD_SIZE}px solid var(--dg-color-danger)`);
+    expect(fold?.getAttribute("data-request-fold")).toBe("teammate");
+    expect(fold?.getAttribute("aria-label")).toBe("Offered for pickup · waiting for a teammate");
+    expect(fold?.style.borderTop).toBe(`${REQUEST_FOLD_SIZE}px solid var(--dg-color-text-muted)`);
   });
 
-  it("tints the fold as a warning while a swap waits on an approver", () => {
+  it("tints the fold amber while a manager must act, naming every request on the day", () => {
     observedWidth = 1600;
 
     renderGrid({
-      activeRequestForKey: () => ({ type: "swap", status: "pending_approval" }),
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        affectedSegmentIndexes: [0],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
+            waitingOn: "teammate",
+            status: "Swap with Carol Henderson · awaiting approval",
+            body: null,
+            asked: "Asked.",
+          },
+          {
+            requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
+            waitingOn: "teammate",
+            status: "Offered for pickup · waiting for a teammate",
+            body: null,
+            asked: "Offered.",
+          },
+        ],
+      }),
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const fold = firstCell.querySelector("[data-request-fold]") as HTMLElement | null;
 
-    expect(fold?.getAttribute("data-request-fold")).toBe("pending_approval");
-    expect(fold?.getAttribute("aria-label")).toBe("Swap request awaiting approval");
+    expect(fold?.getAttribute("data-request-fold")).toBe("manager");
+    expect(fold?.getAttribute("aria-label")).toBe(
+      "Swap with Carol Henderson · awaiting approval · 1 more",
+    );
     expect(fold?.style.borderTop).toBe(`${REQUEST_FOLD_SIZE}px solid var(--dg-color-warning)`);
+  });
+
+  it("folds only the pill a request is about on a double", () => {
+    const localAssignments: AssignmentDefinition[] = [
+      { ...assignments[0], jobId: 101 },
+      { ...assignments[0], id: 2, label: "N", name: "Night Shift", jobId: 102, sortOrder: 2 },
+    ];
+    renderGrid({
+      assignments: localAssignments,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        affectedSegmentIndexes: [1],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Call-off",
+            affectedSegmentIndexes: [1],
+            waitingOn: "manager",
+            status: "Call-off · awaiting approval",
+            body: null,
+            asked: "Asked.",
+          },
+        ],
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
+    expect(pills).toHaveLength(2);
+    expect(pills[0]?.querySelector("[data-request-fold]")).toBeNull();
+    expect(pills[1]?.querySelector("[data-request-fold]")).not.toBeNull();
+  });
+
+  it("outlines the shift a claimer would get on an empty day", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      shiftForKey: () => null,
+      assignmentIdsForKey: () => [],
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        affectedSegmentIndexes: [0],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
+            waitingOn: "teammate",
+            status: "Claiming Laura Marshall's shift · awaiting approval",
+            body: null,
+            asked: "",
+          },
+        ],
+        wouldGetAssignmentIds: [1],
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const outline = firstCell.querySelector("[data-request-would-get]") as HTMLElement | null;
+
+    expect(outline?.getAttribute("data-request-would-get")).toBe("manager");
+    expect(outline?.textContent).toBe("D");
+    expect(outline?.querySelector("[data-request-fold]")?.getAttribute("aria-label")).toBe(
+      "Claiming Laura Marshall's shift · awaiting approval",
+    );
+  });
+
+  it("puts only the fold on a day that already holds a shift", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        affectedSegmentIndexes: [0],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
+            waitingOn: "teammate",
+            status: "Claiming a shift · awaiting approval",
+            body: null,
+            asked: "",
+          },
+        ],
+        wouldGetAssignmentIds: [1],
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    expect(firstCell.querySelector("[data-request-would-get]")).toBeNull();
+    expect(firstCell.querySelector("[data-request-fold]")).not.toBeNull();
+  });
+
+  it("puts the hover card's dot on the shift a request is about on a double", async () => {
+    observedWidth = 1600;
+    const localAssignments: AssignmentDefinition[] = [
+      { ...assignments[0], jobId: 101 },
+      { ...assignments[0], id: 2, label: "N", name: "Night Shift", jobId: 102, sortOrder: 2 },
+    ];
+    renderGrid({
+      showShiftDetailHoverCards: true,
+      assignments: localAssignments,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        affectedSegmentIndexes: [1],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Call-off",
+            affectedSegmentIndexes: [1],
+            waitingOn: "manager",
+            status: "Call-off (Sick) · awaiting approval",
+            body: null,
+            asked: "Called off.",
+          },
+        ],
+      }),
+    });
+
+    const pill = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector("[data-shift-pill]") as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(screen.getByText("Call-off (Sick) · awaiting approval")).toBeInTheDocument();
+    });
+    // One dot, beside the second shift's name, and none on the request line.
+    const dots = document.querySelectorAll("[data-request-dot]");
+    expect(dots).toHaveLength(1);
+    expect(dots[0]?.getAttribute("data-request-dot")).toBe("manager");
+    const entry = dots[0]?.parentElement?.parentElement as HTMLElement;
+    expect(Array.from(entry.parentElement?.children ?? []).indexOf(entry)).toBe(1);
+  });
+
+  it("lists each waiting request in the hover card, with what would happen and when it was asked", async () => {
+    observedWidth = 1600;
+    renderGrid({
+      showShiftDetailHoverCards: true,
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        affectedSegmentIndexes: [0],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
+            waitingOn: "manager",
+            status: "Swap with Carol Henderson · awaiting approval",
+            body: "Laura would work Carol's Evening Shift. Carol would work Laura's Day Shift.",
+            asked: "Asked Nov 14, 2026, 8:02 AM PST.",
+          },
+          {
+            requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
+            waitingOn: "teammate",
+            status: "Offered for pickup · waiting for a teammate",
+            body: "Laura keeps this shift until a claim is approved.",
+            asked: "Offered Nov 13, 2026, 9:00 AM PST.",
+          },
+        ],
+      }),
+    });
+
+    const pill = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector("[data-shift-pill]") as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(screen.getByText("Swap with Carol Henderson · awaiting approval")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(
+        "Laura would work Carol's Evening Shift. Carol would work Laura's Day Shift.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Asked Nov 14, 2026, 8:02 AM PST.")).toBeInTheDocument();
+    expect(screen.getByText("Offered for pickup · waiting for a teammate")).toBeInTheDocument();
+    expect(screen.queryByText(/^Request: /)).toBeNull();
+    // The card's lines carry a dot; the fold stays on the pill's corner.
+    expect(document.querySelectorAll("[data-request-detail] [data-request-dot]")).toHaveLength(2);
+    expect(document.querySelector("[data-request-detail] [data-request-fold]")).toBeNull();
   });
 
   it("leaves a shift with no request unfolded", () => {
@@ -3504,7 +3742,21 @@ describe("ScheduleGrid", () => {
 
     renderGrid({
       assignments: twoPillAssignmentDefinitions,
-      activeRequestForKey: () => ({ type: "pickup", status: "open" }),
+      activeRequestForKey: () => ({
+        waitingOn: "teammate",
+        affectedSegmentIndexes: [0],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
+            waitingOn: "teammate",
+            status: "Offered for pickup · waiting for a teammate",
+            body: null,
+            asked: "",
+          },
+        ],
+      }),
       draftKindForKey: () => "modified",
       publishedAssignmentIdsForKey: () => [2],
       publishedLabelForKey: () => "N",

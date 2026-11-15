@@ -77,6 +77,7 @@ import {
   CoverageRequirement,
   AbsenceType,
   ActiveShiftRequestSummary,
+  RequestWaitingOn,
   ShiftDisplayMode,
   GridOpenShift,
   ScheduleCellState,
@@ -147,6 +148,8 @@ import {
   LOCK_CORNER_CLEARANCE,
   MENTORED_CORNER_CLEARANCE,
   RequestCornerFold,
+  RequestDot,
+  RequestWouldGetOutline,
   noteMarksWidth,
   NOTE_LANE_INSET,
   AuthorBadge,
@@ -582,6 +585,8 @@ type ShiftDetailEntry = {
   timeLabel: string | null;
   isCustomTime: boolean;
   isMentored: boolean;
+  /** On a day with two shifts, who acts next on a waiting request about this one. */
+  requestWaitingOn?: RequestWaitingOn | null;
 };
 
 const EMPTY_ID_SET = new Set<number>();
@@ -734,7 +739,7 @@ function ShiftDetailHoverCard({
   date,
   entries,
   indicators,
-  requestLabel,
+  request = null,
   status,
   changeDetails,
   changes = [],
@@ -749,7 +754,8 @@ function ShiftDetailHoverCard({
   date: Date;
   entries: ShiftDetailEntry[];
   indicators: string[];
-  requestLabel: string | null;
+  /** The waiting requests on this day, each with what would happen. */
+  request?: ActiveShiftRequestSummary | null;
   status: string | null;
   /** Per-cell change explanations, already scoped to the affected segment(s). */
   changeDetails: string[];
@@ -778,6 +784,7 @@ function ShiftDetailHoverCard({
   const shownCorrectionNotes = correctionLabel ? correctionNotes : [];
   const hasRichChanges =
     shownChanges.length > 0 || !!shownCorrection || shownCorrectionNotes.length > 0;
+  const markedOnShift = entries.some((entry) => entry.requestWaitingOn);
 
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
@@ -851,11 +858,17 @@ function ShiftDetailHoverCard({
                 >
                   <div
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 700,
                     }}
                   >
-                    {entry.label}
+                    {entry.requestWaitingOn ? (
+                      <RequestDot waitingOn={entry.requestWaitingOn} />
+                    ) : null}
+                    <span>{entry.label}</span>
                   </div>
                   {entry.jobName ? (
                     <div
@@ -902,6 +915,56 @@ function ShiftDetailHoverCard({
                   ) : null}
                 </div>
               ))}
+              {request && request.requests.length > 0 ? (
+                <div
+                  data-request-detail
+                  style={{
+                    paddingTop: 10,
+                    borderTop: "1px solid var(--dg-color-border-light)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  {request.requests.map((line, index) => (
+                    <div key={index} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: "var(--dg-color-text-primary)",
+                        }}
+                      >
+                        {/* With two shifts, the dot marks the shift instead. */}
+                        {markedOnShift ? null : <RequestDot waitingOn={line.waitingOn} />}
+                        <span>{line.status}</span>
+                      </div>
+                      {line.body ? (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-secondary)",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {line.body}
+                        </div>
+                      ) : null}
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--dg-color-text-muted)",
+                        }}
+                      >
+                        {line.asked}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {hasRichChanges ? (
                 <div
                   style={{
@@ -995,7 +1058,6 @@ function ShiftDetailHoverCard({
               ) : null}
               {!hasRichChanges &&
                 (indicators.length > 0 ||
-                  requestLabel ||
                   status ||
                   changeDetails.length > 0 ||
                   publicationLabel ||
@@ -1015,9 +1077,6 @@ function ShiftDetailHoverCard({
                       beside a change's details rather than giving way to them. */}
                     {indicators.length > 0 ? (
                       <div>Schedule notes: {indicators.join(", ")}</div>
-                    ) : null}
-                    {changeDetails.length === 0 && requestLabel ? (
-                      <div>Request: {requestLabel}</div>
                     ) : null}
                     {changeDetails.length === 0 && status ? <div>Status: {status}</div> : null}
                     {changeDetails.map((detail) => (
@@ -2194,9 +2253,11 @@ const SectionBlock = memo(function SectionBlock({
                             : viewerAction === "details"
                               ? "click for details"
                               : "click to volunteer";
-                        const openShiftHint = os.calledOffBy
-                          ? `Called off by ${os.calledOffBy}, ${actionHint}`
-                          : `${needed} needed, ${actionHint}`;
+                        const openShiftHint = os.claimedBy
+                          ? `Claimed by ${os.claimedBy}, awaiting approval, ${actionHint}`
+                          : os.calledOffBy
+                            ? `Called off by ${os.calledOffBy}, ${actionHint}`
+                            : `${needed} needed, ${actionHint}`;
                         return (
                           <MaybeHint key={os.id} content={openShiftHint} side="top">
                             <Button
@@ -2225,6 +2286,9 @@ const SectionBlock = memo(function SectionBlock({
                                 overflow: "hidden",
                               }}
                             >
+                              {os.claimedBy ? (
+                                <RequestCornerFold waitingOn="manager" label={openShiftHint} />
+                              ) : null}
                               {isMentoredOpenShift ? <MentoredShiftBadge compact /> : null}
                               <span
                                 style={{
@@ -2350,6 +2414,7 @@ const SectionBlock = memo(function SectionBlock({
                       draftKindForKey,
                       publishDiffForKey,
                       showPublishDiffOverlay,
+                      activeRequestForKey,
                       hasAbsenceType: (absenceTypeId) => !!absenceTypeMap?.has(absenceTypeId),
                     },
                     splitAtIndex,
@@ -2661,6 +2726,22 @@ const SectionBlock = memo(function SectionBlock({
                         const activeRequestLabel = activeRequest
                           ? formatActiveRequestLabel(activeRequest)
                           : null;
+                        // The shift a claimer would get, labeled as its pill would be.
+                        const wouldGetLabel =
+                          (activeRequest?.wouldGetAssignmentIds ?? [])
+                            .map((assignmentId) => {
+                              const assignment = assignmentById.get(assignmentId);
+                              if (!assignment) return null;
+                              const parts = getDisplayPartsByIdOrLabel(
+                                assignment.label,
+                                assignmentId,
+                              );
+                              return parts.secondaryLabel
+                                ? `${parts.primaryLabel} · ${parts.secondaryLabel}`
+                                : parts.primaryLabel;
+                            })
+                            .filter((label): label is string => !!label)
+                            .join(" / ") || null;
                         const restOfDayHoverEntries: ShiftDetailEntry[] = restOfDayAbsenceName
                           ? [
                               {
@@ -2759,6 +2840,12 @@ const SectionBlock = memo(function SectionBlock({
                                 // An absence beside the shift is why its times differ.
                                 isCustomTime: !!customTime && !restOfDayAbsenceName,
                                 isMentored: cellSegments[entryIndex]?.isMentored ?? false,
+                                requestWaitingOn:
+                                  cellCodeIds.length > 1
+                                    ? (activeRequest?.requests.find((line) =>
+                                        line.affectedSegmentIndexes.includes(entryIndex),
+                                      )?.waitingOn ?? null)
+                                    : null,
                               };
                             });
                         const hoverDetailEntries = [...shiftHoverEntries, ...restOfDayHoverEntries];
@@ -2891,7 +2978,12 @@ const SectionBlock = memo(function SectionBlock({
                             data-section-id={sectionId}
                             data-interactive={isDayInteractive ? "true" : "false"}
                             data-peer-editing={hasPeerEditor ? "true" : "false"}
-                            data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
+                            // A claimer's outline fills the day, so no "+" is drawn over it.
+                            data-empty={
+                              (!shiftLabel || shiftLabel === "OFF") && !wouldGetLabel
+                                ? "true"
+                                : "false"
+                            }
                             // The empty cell's "+" offers a new shift, so only
                             // someone who places shifts sees it.
                             data-addable={canDragShifts ? "true" : undefined}
@@ -3607,7 +3699,7 @@ const SectionBlock = memo(function SectionBlock({
                                             date={date}
                                             entries={hoverDetailEntries}
                                             indicators={hoverIndicatorNames}
-                                            requestLabel={activeRequestLabel}
+                                            request={activeRequest}
                                             status={hoverStatus}
                                             changeDetails={singleHoverChangeDetails}
                                             changes={hoverChanges}
@@ -3685,7 +3777,7 @@ const SectionBlock = memo(function SectionBlock({
                                             >
                                               {activeRequest && activeRequestLabel && (
                                                 <RequestCornerFold
-                                                  status={activeRequest.status}
+                                                  waitingOn={activeRequest.waitingOn}
                                                   label={activeRequestLabel}
                                                 />
                                               )}
@@ -4085,7 +4177,7 @@ const SectionBlock = memo(function SectionBlock({
                                           date={date}
                                           entries={hoverDetailEntries}
                                           indicators={hoverIndicatorNames}
-                                          requestLabel={activeRequestLabel}
+                                          request={activeRequest}
                                           status={hoverStatus}
                                           changeDetails={multiHoverChangeDetails}
                                           changes={hoverChanges}
@@ -4108,12 +4200,6 @@ const SectionBlock = memo(function SectionBlock({
                                               opacity: draftKind === "deleted" ? 0.5 : 1,
                                             }}
                                           >
-                                            {activeRequest && activeRequestLabel && (
-                                              <RequestCornerFold
-                                                status={activeRequest.status}
-                                                label={activeRequestLabel}
-                                              />
-                                            )}
                                             <div
                                               data-shift-layout={
                                                 stackShifts ? "stacked" : "side-by-side"
@@ -4338,6 +4424,17 @@ const SectionBlock = memo(function SectionBlock({
                                                       paddingRight: multiSidePadding,
                                                     }}
                                                   >
+                                                    {/* On the shift the request is about, not the first. */}
+                                                    {activeRequest &&
+                                                      activeRequestLabel &&
+                                                      activeRequest.affectedSegmentIndexes.includes(
+                                                        li,
+                                                      ) && (
+                                                        <RequestCornerFold
+                                                          waitingOn={activeRequest.waitingOn}
+                                                          label={activeRequestLabel}
+                                                        />
+                                                      )}
                                                     {pillBadge && (
                                                       <GridDiffBadge
                                                         badge={{
@@ -4927,7 +5024,7 @@ const SectionBlock = memo(function SectionBlock({
                                       date={date}
                                       entries={deletedHoverEntries}
                                       indicators={hoverIndicatorNames}
-                                      requestLabel={null}
+                                      request={null}
                                       status="Removed"
                                       changeDetails={[deletedTooltip ?? `Removed ${deletedLabel}.`]}
                                       changes={hoverChanges}
@@ -4961,6 +5058,35 @@ const SectionBlock = memo(function SectionBlock({
                                     </>
                                   );
                                 })()
+                              ) : wouldGetLabel && activeRequest && activeRequestLabel ? (
+                                <ShiftDetailHoverCard
+                                  enabled={showShiftDetailHoverCards}
+                                  employeeName={getEmployeeDisplayName(emp)}
+                                  date={date}
+                                  entries={[
+                                    {
+                                      label: "Nothing scheduled",
+                                      jobName: null,
+                                      focusAreaName: null,
+                                      timeLabel: null,
+                                      isCustomTime: false,
+                                      isMentored: false,
+                                    },
+                                  ]}
+                                  indicators={[]}
+                                  request={activeRequest}
+                                  status={null}
+                                  changeDetails={[]}
+                                  publicationLabel={null}
+                                >
+                                  <div style={{ position: "absolute", inset: 0 }}>
+                                    <RequestWouldGetOutline
+                                      label={wouldGetLabel}
+                                      waitingOn={activeRequest.waitingOn}
+                                      hint={activeRequestLabel}
+                                    />
+                                  </div>
+                                </ShiftDetailHoverCard>
                               ) : (
                                 <div
                                   style={{

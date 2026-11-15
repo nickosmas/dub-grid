@@ -1286,3 +1286,26 @@
         form. A sheet's discard asks in the system alert. The
         tab list is written once, the remaining platform files are tested,
         and screens can't branch on the platform.
+- [ ] 57. **Request marks on the schedule** - every shift a shift request
+      touches is marked on the web grid, while it waits and after it is
+      approved. Owner decisions, 2026-11-14; design reference: the
+      "Request marks on the schedule" canvas. Web only: the mobile app is
+      out of scope (owner, 2026-11-14).
+  - [x] 57a. **Waiting requests on every day involved** - the fold marks
+        each day in a waiting request, not only the asker's: the swap
+        partner, the teammate asked to pick up, and a claimer's day, which
+        shows the shift they would get as a dashed outline. Slate means
+        waiting for a teammate, amber means waiting for a manager. The
+        hover card and panel say what would happen and who asked or
+        accepted, and when.
+  - [ ] 57b. **Approvals recorded as changes** - approving a request
+        records the cells it wrote as a change linked to that request, the
+        way a publish does (one migration), so "since you last looked"
+        includes approvals.
+  - [ ] 57c. **Approved requests in Highlight changes** - the chip on each
+        day says what happened (Picked up, Given away, Swapped, Called off,
+        New for the open shift a call-off leaves). Its color says what
+        happened to the day: green gained a shift, amber changed, red lost
+        its shift. The hover card and panel say who approved it and when,
+        with "Was" where a shift the day had changed or was removed. The
+        banner counts approved requests apart from publishes.

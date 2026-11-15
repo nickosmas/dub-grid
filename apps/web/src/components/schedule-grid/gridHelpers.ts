@@ -255,14 +255,10 @@ export function publishCellLevelBadge(
  * Tooltip for the request corner fold: what kind of request is on this shift
  * and whether anyone still has to act on it.
  */
-export function formatActiveRequestLabel(request: ActiveShiftRequestSummary): string {
-  const kind =
-    request.type === "swap"
-      ? "Swap request"
-      : request.type === "calloff"
-        ? "Call-off"
-        : "Pickup request";
-  return request.status === "pending_approval" ? `${kind} awaiting approval` : `${kind} open`;
+export function formatActiveRequestLabel(summary: ActiveShiftRequestSummary): string {
+  const [first, ...rest] = summary.requests;
+  if (!first) return "";
+  return rest.length > 0 ? `${first.status} · ${rest.length} more` : first.status;
 }
 
 export function formatRelativePublishTime(isoDate: string): string {

@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 976b5c5bcdec89be7896cef0613678bb5d054e14a1dd77cea09fde502a85f434 -->
+<!-- blueprint:source-hash c62e54522c9911fd850aeeaa55978c7f47b57ab0af634027b607b8a3ef409932 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Every item has shipped except 40, which is
-in progress.
+in progress, and 57, which is in progress (57a shipped).
 
 - **1** - Multi-tenant organizations with subdomain isolation and organization-specific settings.
 - **2** - Four-tier RBAC with per-person Admin permissions.
@@ -89,6 +89,7 @@ in progress.
 - **54** - People away or absent all period sit last in their section, under a group row that folds.
 - **55** - One staff page holds everything stored about a person, in tabs that follow one chosen period.
 - **56** - The app feels built for each phone: native navigation, sheets and alerts, one DubGrid design, and a My schedule | Team switch.
+- **57** (in progress) - Every day a shift request touches is marked on the web grid while it waits and after approval; approvals count as changes in Highlight changes.
 
 Each item's parts, what each part shipped and its migration live in
 `blueprint/build-plan.md` (the checklist) and `blueprint/history/` (the
@@ -217,6 +218,20 @@ one it names.
   holds them.
 - My profile uses the same header and three tabs: **Overview**, **Schedule**
   and **Account**; old `?section=` links open Account at their heading.
+
+### Shift requests on the grid (item 57)
+
+- A waiting request marks every day it touches with a corner fold, not only
+  the asker's: slate while a teammate must answer, amber while a manager
+  must. A claimer's day shows the shift they would get as a dashed outline.
+  The hover card and panel say what would happen and who asked or accepted,
+  and when.
+- An approved request counts as a change in Highlight changes, like a
+  publish. Its chip says what happened (Picked up, Given away, Swapped,
+  Called off, New for the open shift a call-off leaves) and its color what
+  happened to the day: green gained a shift, amber changed, red lost its
+  shift. The hover card and panel say who approved it and when. Web only
+  (2026-11-14). Design: "Request marks on the schedule" canvas.
 
 ### Mobile (item 56)
 
