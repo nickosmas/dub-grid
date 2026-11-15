@@ -66,6 +66,7 @@ function renderBoard({
   canApprove = false,
   canViewAllRequests = false,
   isImpersonating = false,
+  focusRequestId,
 }: {
   openPickups?: ShiftRequest[];
   myRequests?: ShiftRequest[];
@@ -75,6 +76,7 @@ function renderBoard({
   canApprove?: boolean;
   canViewAllRequests?: boolean;
   isImpersonating?: boolean;
+  focusRequestId?: string;
 } = {}) {
   const onClaim = vi.fn();
   const onRespond = vi.fn();
@@ -99,6 +101,7 @@ function renderBoard({
       onCancel={onCancel}
       onClose={vi.fn()}
       assignmentNameMap={new Map()}
+      focusRequestId={focusRequestId}
     />,
     {
       wrapper: ({ children }) => (
@@ -492,5 +495,24 @@ describe("ShiftRequestBoard", () => {
     await confirmDialogAction(user, "Cancel request");
 
     expect(onCancel).toHaveBeenCalledWith("sw-2", "emp-1", "Covered another way");
+  });
+
+  it("opens on My requests with the request from a shift marked", () => {
+    const shown = makeRequest({ id: "mine-1", requesterEmpId: "emp-2" });
+    const other = makeRequest({ id: "mine-2", requesterEmpId: "emp-2" });
+    renderBoard({
+      myRequests: [shown, other],
+      openPickups: [makeRequest({ id: "open-1" })],
+      currentEmpId: "emp-2",
+      focusRequestId: "mine-1",
+    });
+
+    expect(screen.getByRole("tab", { name: /my requests/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    const marked = document.querySelectorAll('[aria-current="true"]');
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toHaveAttribute("data-request-id", "mine-1");
   });
 });

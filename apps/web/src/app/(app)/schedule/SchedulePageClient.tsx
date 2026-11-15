@@ -302,7 +302,10 @@ import PresenceAvatars, { type PresenceProfile } from "@/components/PresenceAvat
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
 import { toast } from "sonner";
-import ShiftContextMenu from "@/components/ShiftContextMenu";
+import ShiftContextMenu, {
+  resolveShiftRequestMenuState,
+  type ShiftRequestMenuState,
+} from "@/components/ShiftContextMenu";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
@@ -412,6 +415,7 @@ import {
   AssignmentDefinition,
   AbsenceType,
   ActiveShiftRequestSummary,
+  ShiftRequest,
   RecurringShift,
   SeriesFrequency,
   SeriesScope,
@@ -848,6 +852,8 @@ function SchedulerContent({
   // ── Shift Requests (pickup & swap) ────────────────────────────────────────
   const [showRequestBoard, setShowRequestBoard] = useState(openRequests !== null);
   const [requestBoardTab, setRequestBoardTab] = useState<RequestsParam | null>(openRequests);
+  // The request a shift's View request opened the board on.
+  const [requestBoardFocusId, setRequestBoardFocusId] = useState<string | null>(null);
   // A deep link that arrives while the page is already mounted (a bell click
   // from the schedule itself) moves the grid and opens the board the same way
   // a fresh load does; the caller then clears the parameters from the URL.
@@ -2159,6 +2165,19 @@ function SchedulerContent({
     setEditPanel(null);
     setEditSessionDraft(null);
   }, [announceEditingCell]);
+
+  // The board reads its tab and focus once, on opening, so both are set
+  // before it mounts.
+  const openRequestOnBoard = useCallback(
+    (requestId: string) => {
+      closeEditPanel();
+      setContextMenu(null);
+      setRequestBoardTab("mine");
+      setRequestBoardFocusId(requestId);
+      setShowRequestBoard(true);
+    },
+    [closeEditPanel],
+  );
 
   const endLocalScheduleEditor = useCallback(() => {
     localSessionEndedRef.current = true;
@@ -4023,15 +4042,24 @@ function SchedulerContent({
    * asked, not the person being asked: covering the other side needs a second
    * index keyed on targetEmpId/targetShiftDate, which nothing needs yet.
    */
+  const findActiveRequestForShift = useCallback(
+    (empId: string, date: Date): ShiftRequest | null => {
+      const dateKey = formatDateKey(date);
+      return (
+        shiftRequests.requests.find(
+          (r) =>
+            r.requesterEmpId === empId &&
+            r.requesterShiftDate === dateKey &&
+            (r.status === "open" || r.status === "pending_approval"),
+        ) ?? null
+      );
+    },
+    [shiftRequests.requests],
+  );
+
   const activeRequestForKey = useCallback(
     (empId: string, date: Date): ActiveShiftRequestSummary | null => {
-      const dateKey = formatDateKey(date);
-      const match = shiftRequests.requests.find(
-        (r) =>
-          r.requesterEmpId === empId &&
-          r.requesterShiftDate === dateKey &&
-          (r.status === "open" || r.status === "pending_approval"),
-      );
+      const match = findActiveRequestForShift(empId, date);
       if (!match) return null;
       // The find above already admitted only these two, so this narrows rather
       // than decides.
@@ -4040,13 +4068,19 @@ function SchedulerContent({
         status: match.status === "pending_approval" ? "pending_approval" : "open",
       };
     },
-    [shiftRequests.requests],
+    [findActiveRequestForShift],
   );
 
   const hasActiveRequestForShift = useCallback(
     (empId: string, date: Date): boolean => activeRequestForKey(empId, date) !== null,
     [activeRequestForKey],
   );
+
+  // The viewer's own request on the shift in the panel, which they can open or withdraw.
+  const panelOwnActiveRequest =
+    editPanel && currentEmpId && editPanel.empId === currentEmpId
+      ? findActiveRequestForShift(editPanel.empId, editPanel.date)
+      : null;
 
   const publishDiffKindForKey = useCallback(
     (
@@ -4299,6 +4333,18 @@ function SchedulerContent({
     [currentEmpId, isPublishedRequestableShift, isPublishedShiftStarted],
   );
 
+  const shiftRequestMenuStateFor = useCallback(
+    (empId: string, date: Date): ShiftRequestMenuState =>
+      resolveShiftRequestMenuState({
+        isOwnShift: !!currentEmpId && empId === currentEmpId,
+        canRequest:
+          !shifts[`${empId}_${formatDateKey(date)}`]?.absenceTypeId &&
+          canCreateOwnShiftRequest(empId, date),
+        hasActiveRequest: hasActiveRequestForShift(empId, date),
+      }),
+    [canCreateOwnShiftRequest, currentEmpId, hasActiveRequestForShift, shifts],
+  );
+
   const canOpenOwnRequestPanel = useCallback(
     (empId: string, date: Date): boolean =>
       !!currentEmpId &&
@@ -4314,6 +4360,14 @@ function SchedulerContent({
       return !!label && label !== "OFF";
     },
     [currentEmpId, shiftForKey],
+  );
+
+  // Someone who can't edit opens only their own shift, so the grid draws every
+  // other cell plain rather than inviting a click that does nothing.
+  const canViewerOpenCell = useCallback(
+    (empId: string, date: Date): boolean =>
+      canOpenOwnRequestPanel(empId, date) || canOpenOwnShiftDetails(empId, date),
+    [canOpenOwnRequestPanel, canOpenOwnShiftDetails],
   );
 
   const activeIndicatorIdsForKey = useCallback(
@@ -6347,14 +6401,10 @@ function SchedulerContent({
         (shiftEntry.assignmentIds.length > 0 || shiftEntry.absenceTypeId != null) &&
         !shiftEntry.isDelete
       );
-      const canRequestBase =
-        !shiftEntry?.absenceTypeId && canCreateOwnShiftRequest(cellId.empId, date);
-      const hasActiveRequest = hasActiveRequestForShift(cellId.empId, date);
-      const canRequest = canRequestBase && !hasActiveRequest;
       const hasEditActions = canEditShifts && (hasShift || !!clipboard);
-      const hasRequestActions = canRequest && !hasActiveRequest;
+      const hasRequestItems = hasShift && shiftRequestMenuStateFor(cellId.empId, date) !== "none";
 
-      if (!hasEditActions && !hasRequestActions) {
+      if (!hasEditActions && !hasRequestItems) {
         setContextMenu(null);
         return;
       }
@@ -6364,14 +6414,7 @@ function SchedulerContent({
         cellId,
       });
     },
-    [
-      canCreateOwnShiftRequest,
-      canEditShifts,
-      clipboard,
-      hasActiveRequestForShift,
-      isBulkDeleteMode,
-      shifts,
-    ],
+    [canEditShifts, clipboard, isBulkDeleteMode, shiftRequestMenuStateFor, shifts],
   );
 
   // Compute the auto-fill date range (reused by preview + apply)
@@ -8267,6 +8310,7 @@ function SchedulerContent({
           createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
           absenceTypeIdForKey,
           activeRequestForKey,
+          canOpenCell: isScheduleEditor ? undefined : canViewerOpenCell,
         },
       }),
     [
@@ -8324,6 +8368,8 @@ function SchedulerContent({
       createdByNameForKey,
       absenceTypeIdForKey,
       activeRequestForKey,
+      isScheduleEditor,
+      canViewerOpenCell,
     ],
   );
 
@@ -9169,7 +9215,10 @@ function SchedulerContent({
                   canEditShifts && !isMobile ? () => setShowAudit((prev) => !prev) : undefined
                 }
                 requestsBadgeCount={shiftRequests.badgeCount}
-                onRequestsToggle={() => setShowRequestBoard((prev) => !prev)}
+                onRequestsToggle={() => {
+                  setRequestBoardFocusId(null);
+                  setShowRequestBoard((prev) => !prev);
+                }}
                 onCoverageToggle={
                   canViewCoveragePanel ? () => setShowCoveragePanel((prev) => !prev) : undefined
                 }
@@ -9253,6 +9302,7 @@ function SchedulerContent({
                 certifications={certifications}
                 orgRoles={orgRoles}
                 isCellInteractive={canEditShifts || canEditNotes || !!currentEmpId}
+                canOpenCell={isScheduleEditor ? undefined : canViewerOpenCell}
                 noteMarksForKey={noteMarksForKey}
                 activeFocusArea={activeFocusArea}
                 draftKindForKey={draftKindForKey}
@@ -9288,28 +9338,29 @@ function SchedulerContent({
                 (cmShiftEntry.assignmentIds.length > 0 || cmShiftEntry.absenceTypeId != null) &&
                 !cmShiftEntry.isDelete
               );
-              const cmCanRequestBase =
-                !cmShiftEntry?.absenceTypeId &&
-                canCreateOwnShiftRequest(contextMenu.cellId.empId, contextMenuDate);
-              const cmCanRequest =
-                cmCanRequestBase &&
-                !hasActiveRequestForShift(contextMenu.cellId.empId, contextMenuDate);
-              const cmHasActiveRequest = hasActiveRequestForShift(
+              const cmRequestState = shiftRequestMenuStateFor(
                 contextMenu.cellId.empId,
                 contextMenuDate,
               );
+              const cmActiveRequest =
+                cmRequestState === "active"
+                  ? findActiveRequestForShift(contextMenu.cellId.empId, contextMenuDate)
+                  : null;
               // Only show the menu when at least one action is usable
               const hasEditActions = canEditShifts && (cmHasEntry || !!clipboard);
-              const hasRequestActions = cmCanRequest && !cmHasActiveRequest;
-              if (!hasEditActions && !hasRequestActions) return null;
+              const hasRequestItems = cmHasEntry && cmRequestState !== "none";
+              if (!hasEditActions && !hasRequestItems) return null;
               return (
                 <ShiftContextMenu
                   anchorEl={contextMenu.anchorEl}
                   hasShift={cmHasEntry}
                   hasClipboard={!!clipboard}
                   canEdit={canEditShifts}
-                  canRequest={cmCanRequest}
-                  hasActiveRequest={cmHasActiveRequest}
+                  canRequest={cmRequestState === "request"}
+                  hasActiveRequest={cmRequestState === "active"}
+                  onViewRequest={
+                    cmActiveRequest ? () => openRequestOnBoard(cmActiveRequest.id) : undefined
+                  }
                   onCopy={() => handleCopyGridCell(contextMenu.cellId)}
                   onPaste={() => handlePasteGridCell(contextMenu.cellId)}
                   onClear={() => handleClearShift(contextMenu.cellId.empId, contextMenuDate)}
@@ -9851,6 +9902,21 @@ function SchedulerContent({
               defaultShiftEnabled={org?.defaultShiftEnabled ?? true}
               isOwnShift={!!currentEmpId && editPanel.empId === currentEmpId}
               hasActiveRequest={hasActiveRequestForShift(editPanel.empId, editPanel.date)}
+              activeRequest={panelOwnActiveRequest}
+              onViewActiveRequest={
+                panelOwnActiveRequest
+                  ? () => openRequestOnBoard(panelOwnActiveRequest.id)
+                  : undefined
+              }
+              onCancelActiveRequest={
+                panelOwnActiveRequest
+                  ? () =>
+                      shiftRequests.cancel(
+                        panelOwnActiveRequest.id,
+                        panelOwnActiveRequest.requesterEmpId,
+                      )
+                  : undefined
+              }
               onMakeAvailable={
                 canCreateOwnShiftRequest(editPanel.empId, editPanel.date)
                   ? async (options) => {
@@ -9993,10 +10059,14 @@ function SchedulerContent({
               onCancel={(id, requesterEmpId, note) =>
                 shiftRequests.cancel(id, requesterEmpId, note)
               }
-              onClose={() => setShowRequestBoard(false)}
+              onClose={() => {
+                setShowRequestBoard(false);
+                setRequestBoardFocusId(null);
+              }}
               absenceTypeMap={absenceTypeObjectMap}
               assignmentNameMap={assignmentNameMap}
               initialTab={requestBoardTab ?? undefined}
+              focusRequestId={requestBoardFocusId}
             />
           )}
 

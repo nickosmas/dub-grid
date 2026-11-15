@@ -1,5 +1,5 @@
 import type { AbsencePillLayout } from "@/lib/absence-pill";
-import { render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { resolveAbsenceStripes } from "@dubgrid/design-tokens";
 import MobileDayView from "@/components/MobileDayView";
@@ -189,5 +189,60 @@ describe("MobileDayView absence for the rest of the day", () => {
 
     expect(screen.getByText("D: 1")).toBeInTheDocument();
     expect(screen.queryByText(/^S: /)).toBeNull();
+  });
+});
+
+describe("MobileDayView for a viewer who can't edit", () => {
+  function renderFor(
+    props: {
+      canOpenCell?: (empId: string, date: Date) => boolean;
+      filteredEmployees?: Employee[];
+    } = {},
+  ) {
+    const handleCellClick = vi.fn();
+    const view = render(
+      <MobileDayView
+        filteredEmployees={props.filteredEmployees ?? [employee]}
+        allEmployees={[employee]}
+        dates={dates}
+        shiftForKey={(_, date) => (formatDateKey(date) === shiftDay ? "D" : null)}
+        assignmentIdsForKey={(_, date) => (formatDateKey(date) === shiftDay ? [1] : [])}
+        getShiftStyle={() => assignments[0]}
+        handleCellClick={handleCellClick}
+        todayKey="2026-01-01"
+        focusAreas={focusAreas}
+        assignments={assignments}
+        shiftCategories={[]}
+        isCellInteractive
+        canOpenCell={props.canOpenCell}
+      />,
+    );
+    return { ...view, handleCellClick };
+  }
+
+  it("makes only the cells they can open into buttons", () => {
+    const editorButtons = renderFor().getAllByRole("button").length;
+    cleanup();
+
+    const ownShift = (_: string, date: Date) => formatDateKey(date) === shiftDay;
+    const { getAllByRole, getByText, handleCellClick } = renderFor({ canOpenCell: ownShift });
+
+    // Six of the seven days are plain for this viewer.
+    expect(getAllByRole("button")).toHaveLength(editorButtons - 6);
+    fireEvent.click(getByText("D"));
+    expect(handleCellClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't tell them to assign people when nobody shows", () => {
+    renderFor({ canOpenCell: () => false, filteredEmployees: [] });
+
+    expect(screen.getByText("No shifts found for this period")).toBeInTheDocument();
+    expect(screen.queryByText("Assign people here from the People page.")).toBeNull();
+  });
+
+  it("keeps the advice for someone who edits", () => {
+    renderFor({ filteredEmployees: [] });
+
+    expect(screen.getByText("Assign people here from the People page.")).toBeInTheDocument();
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 import { ArrowUpDown, ChevronLeft, Clock, Hourglass } from "lucide-react";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
@@ -21,6 +21,7 @@ import {
   ApprovalDraftWarning,
   loadApprovalDraftWarning,
 } from "@/components/shift-requests/approval-draft-warning";
+import { describeCancelRequestConfirmation } from "@/components/shift-requests/cancel-request-copy";
 import ProgressBar from "@/components/ProgressBar";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
@@ -52,6 +53,8 @@ import { FILLED_PILL_BORDER } from "@/lib/colors";
 interface ShiftRequestBoardProps {
   /** The tab to open on; a deep link from an alert names it. */
   initialTab?: Tab;
+  /** A request to open on and mark, such as the one on a shift the viewer opened. */
+  focusRequestId?: string | null;
   /** Needed for the history lookup, which fetches on its own terms. */
   orgId: string | null;
   /** Everyone the history lookup can filter by; defaults to nobody. */
@@ -114,11 +117,6 @@ type PendingConfirmation = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** The lead for cancelling a request its recipient has not answered. */
-function describeUnansweredRequest(request: Pick<ShiftRequest, "type">): string {
-  return `The other person hasn't responded to this ${request.type === "swap" ? "swap" : "pickup"} yet.`;
-}
-
 function formatShiftDate(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -149,6 +147,7 @@ const PILL_TONES: Record<ReturnType<typeof describeShiftRequestPill>["tone"], St
 
 export default function ShiftRequestBoard({
   initialTab,
+  focusRequestId = null,
   orgId,
   staffOptions = [],
   focusAreaNameMap,
@@ -176,10 +175,18 @@ export default function ShiftRequestBoard({
   // their own requests are the nearest tab that exists for them.
   const canReviewOrg = canApprove || canViewAllRequests;
   const [activeTab, setActiveTab] = useState<Tab>(() => {
-    if (!initialTab) return "available";
+    if (!initialTab) return focusRequestId ? "mine" : "available";
     if ((initialTab === "approval" || initialTab === "history") && !canReviewOrg) return "mine";
     return initialTab;
   });
+  // Brings the focused request into view once its tab has drawn it.
+  const panelBodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusRequestId) return;
+    panelBodyRef.current
+      ?.querySelector<HTMLElement>(`[data-request-id="${focusRequestId}"]`)
+      ?.scrollIntoView?.({ block: "nearest" });
+  }, [focusRequestId, activeTab, loading]);
 
   // History is a lookup rather than a live list: it fetches the decided
   // requests for a shift-date window on demand, and the staff and outcome
@@ -525,13 +532,21 @@ export default function ShiftRequestBoard({
       joinAssignmentNames(req.targetAssignmentDefinitionIds ?? [], assignmentNameMap) ||
       req.targetShiftLabel;
 
+    const isFocused = req.id === focusRequestId;
+
     return (
       <div
         key={req.id}
+        data-request-id={req.id}
+        aria-current={isFocused ? "true" : undefined}
         style={{
           border: isCalloff
             ? "1px solid var(--dg-color-danger-border, #FCA5A5)"
             : "1px solid var(--dg-color-border)",
+          // The request the viewer came here to see, from its shift.
+          ...(isFocused
+            ? { outline: "2px solid var(--dg-color-border-focus)", outlineOffset: 1 }
+            : {}),
           borderRadius: "var(--dg-radius-md)",
           padding: "14px 16px",
           background: "var(--dg-color-surface)",
@@ -860,10 +875,7 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Cancel request",
               key: `cancel:${req.id}`,
-              message: awaitingRecipient ? describeUnansweredRequest(req) : undefined,
-              points: awaitingRecipient
-                ? ["The request is withdrawn for both people.", "Nothing on the schedule changes."]
-                : undefined,
+              ...describeCancelRequestConfirmation(req),
               onConfirm: async () => {
                 const done = await onCancel(req.id, req.requesterEmpId, cancelNote);
                 if (cancelNote && done !== false) clearNote(req.id);
@@ -997,6 +1009,7 @@ export default function ShiftRequestBoard({
         {/* Scrollable content */}
         <div
           {...underlineTabPanelProps("shift-requests", activeTab)}
+          ref={panelBodyRef}
           style={{
             flex: 1,
             minHeight: 0,
