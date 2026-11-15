@@ -136,6 +136,7 @@ import { useStaffSelection } from "./useStaffSelection";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import ScrollableTabs from "@/components/ScrollableTabs";
+import { lockPageScroll } from "@/lib/page-scroll-lock";
 
 const REORDER_SETTLE_MS = 220;
 
@@ -475,11 +476,7 @@ export function MembersSection({
 
   useEffect(() => {
     if (!filterOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
+    return lockPageScroll();
   }, [filterOpen]);
 
   const { selectedIds, toggleSelect, toggleSelectAll, clearSelection, selectOnly } =

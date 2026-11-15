@@ -641,6 +641,13 @@ body {
      instantly while their children fade, so children look like they lag. */
   transition: background-color var(--dg-duration-fast) ease;
 }
+/* A mouse's scrollbar takes width; reserving it keeps pages from sliding
+   sideways. Chromium honors the gutter only when <html> sets overflow, so
+   lock scroll with lockPageScroll(). See e2e/scrollbar-stability.spec.ts. */
+html {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
 /* The root theme class is installed before paint by next-themes. If that
    pre-paint work is delayed during a hard refresh, keep category-pill layout
    stable without briefly showing the default neutral palette. */
