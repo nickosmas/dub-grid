@@ -327,6 +327,8 @@ interface LegacyScheduleGridProps {
   /** Returns the absence type ID for a given cell, or null/undefined if not an absence */
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
+  /** Narrows which cells open; every cell opens when omitted. */
+  canOpenCell?: (empId: string, date: Date) => boolean;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
   /** Whether roles and certifications use their saved compact labels. */
@@ -446,6 +448,7 @@ interface SectionBlockProps {
   absenceTypeMap?: Map<number, AbsenceType>;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
+  canOpenCell?: (empId: string, date: Date) => boolean;
   shiftDisplayMode?: ShiftDisplayMode;
   useCompactRoleCertificationLabels?: boolean;
   showShiftDetailHoverCards?: boolean;
@@ -1063,6 +1066,7 @@ const CELL_READ_KEYS = new Set<keyof SectionBlockProps>([
   "createdByNameForKey",
   "absenceTypeIdForKey",
   "activeRequestForKey",
+  "canOpenCell",
   "resolvePublisherName",
   "bulkSelectableCellKeys",
   "bulkSelectedCellKeys",
@@ -1117,6 +1121,7 @@ function readSectionCell(props: SectionBlockProps, empId: string, date: Date): u
     props.createdByNameForKey?.(empId, date),
     props.absenceTypeIdForKey?.(empId, date),
     props.activeRequestForKey?.(empId, date),
+    props.canOpenCell?.(empId, date),
     !!props.bulkSelectableCellKeys?.has(bulkCellKey),
     !!props.bulkSelectedCellKeys?.has(bulkCellKey),
   ];
@@ -1217,6 +1222,7 @@ const SectionBlock = memo(function SectionBlock({
   absenceTypeMap,
   absenceTypeIdForKey,
   activeRequestForKey,
+  canOpenCell,
   shiftDisplayMode = "code",
   useCompactRoleCertificationLabels = false,
   showShiftDetailHoverCards = true,
@@ -1647,7 +1653,7 @@ const SectionBlock = memo(function SectionBlock({
         return;
       }
 
-      if (isCellInteractive) {
+      if (isCellInteractive && (!canOpenCell || canOpenCell(emp.id, date))) {
         handleCellClick(emp, date, sectionName, trigger);
       }
     },
@@ -1655,6 +1661,7 @@ const SectionBlock = memo(function SectionBlock({
       buildCellId,
       bulkDeleteMode,
       bulkSelectableCellKeys,
+      canOpenCell,
       handleCellClick,
       isCellInteractive,
       onToggleBulkDeleteCell,
@@ -1675,10 +1682,11 @@ const SectionBlock = memo(function SectionBlock({
         return;
       }
       if (!onCellContextMenu || !isCellInteractive) return;
+      if (canOpenCell && !canOpenCell(emp.id, date)) return;
       event.preventDefault();
       onCellContextMenu(event, anchorEl, cellId, emp, date);
     },
-    [bulkDeleteMode, isCellInteractive, onCellContextMenu],
+    [bulkDeleteMode, canOpenCell, isCellInteractive, onCellContextMenu],
   );
 
   if (employees.length === 0 && (!openShifts || openShifts.length === 0)) {
@@ -2783,7 +2791,10 @@ const SectionBlock = memo(function SectionBlock({
                         // Days before a first day (51g4) carry its own label and no absence.
                         const awayRunBeforeFirstDay =
                           !!rowAwayRange && isBeforeRangeFirstDay(rowAwayRange, dateKey);
-                        const isDayInteractive = isCellInteractive && !isAwayLocked;
+                        const isDayInteractive =
+                          isCellInteractive &&
+                          !isAwayLocked &&
+                          (!canOpenCell || canOpenCell(emp.id, date));
                         // A past day is finished (53b): it opens for a correction,
                         // and nothing moves into or out of it.
                         const isPastDay = isPastDateKey(dateKey, todayKey);
@@ -2881,6 +2892,9 @@ const SectionBlock = memo(function SectionBlock({
                             data-interactive={isDayInteractive ? "true" : "false"}
                             data-peer-editing={hasPeerEditor ? "true" : "false"}
                             data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
+                            // The empty cell's "+" offers a new shift, so only
+                            // someone who places shifts sees it.
+                            data-addable={canDragShifts ? "true" : undefined}
                             data-slot="cell"
                             data-leading-divider={
                               index === 0 || absenceRunInside
@@ -5218,6 +5232,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   absenceTypeMap,
   absenceTypeIdForKey,
   activeRequestForKey,
+  canOpenCell,
   shiftDisplayMode = "code",
   useCompactRoleCertificationLabels = false,
   showShiftDetailHoverCards = true,
@@ -5574,7 +5589,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
               ? "No staff added yet"
               : filteredEmployees.length === 0
                 ? "No matching staff"
-                : isCellInteractive
+                : isCellInteractive && !canOpenCell
                   ? "Nobody assigned here yet"
                   : "No shifts found for this period"
           }
@@ -5583,7 +5598,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
               ? "Add people on the People page to start building the schedule."
               : filteredEmployees.length === 0
                 ? "Clear the search or filters to see everyone."
-                : isCellInteractive
+                : isCellInteractive && !canOpenCell
                   ? "Assign people here from the People page."
                   : "No shifts have been published for this period yet."
           }
@@ -5681,6 +5696,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     absenceTypeMap={absenceTypeMap}
                     absenceTypeIdForKey={absenceTypeIdForKey}
                     activeRequestForKey={activeRequestForKey}
+                    canOpenCell={canOpenCell}
                     shiftDisplayMode={shiftDisplayMode}
                     useCompactRoleCertificationLabels={useCompactRoleCertificationLabels}
                     showShiftDetailHoverCards={showShiftDetailHoverCards}
@@ -5925,6 +5941,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           absenceTypeMap={model.absenceTypeMap}
           absenceTypeIdForKey={model.accessors.absenceTypeIdForKey}
           activeRequestForKey={model.accessors.activeRequestForKey}
+          canOpenCell={model.accessors.canOpenCell}
           shiftDisplayMode={model.options.shiftDisplayMode}
           showShiftDetailHoverCards={model.options.showShiftDetailHoverCards}
           resolvePublisherName={model.resolvePublisherName}
