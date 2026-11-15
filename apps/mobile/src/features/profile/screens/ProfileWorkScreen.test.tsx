@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError } from "@dubgrid/api-client";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
@@ -320,6 +320,30 @@ describe("ProfileWorkScreen", () => {
   // The staff profile a manager opens names both, and reading your own record
   // told you neither: which department your focus areas place you in, or the
   // number an admin will ask you for.
+  it("names your status as staff see it, with the day you're back when Away", () => {
+    render(<ProfileWorkScreen />);
+    expect(screen.getByText("Active")).toBeInTheDocument();
+    cleanup();
+
+    useQuery.mockReturnValue({
+      data: {
+        ...profileData,
+        linkedEmployee: {
+          ...profileData.linkedEmployee,
+          status: "inactive",
+          awayUntil: "2026-12-01",
+        },
+      },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    render(<ProfileWorkScreen />);
+
+    expect(screen.getByText("Away until Dec 1")).toBeInTheDocument();
+    expect(screen.queryByText("Inactive")).not.toBeInTheDocument();
+  });
+
   it("names your departments and staff number alongside the focus areas", () => {
     render(<ProfileWorkScreen />);
 

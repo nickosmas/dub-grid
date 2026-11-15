@@ -199,6 +199,20 @@ describe("mobile profile routes", () => {
     expect(manager.linkedEmployee.contactNotes).toBe("Written by a manager");
   });
 
+  it("tells an Away person the day they're back", async () => {
+    fetchLinkedEmployeeForUser.mockResolvedValue({
+      ...(await fetchLinkedEmployeeForUser()),
+      status: "inactive",
+      awayUntil: "2026-12-01",
+    });
+    const { GET } = await import("./profile");
+
+    const body = await (
+      await GET(new Request("http://localhost/api/mobile/v1/profile") as never)
+    ).json();
+    expect(body.linkedEmployee).toMatchObject({ status: "inactive", awayUntil: "2026-12-01" });
+  });
+
   it("returns no joined date for a caller with no membership", async () => {
     requireMobileAuth.mockResolvedValue({ ...mockAuth(), membership: null });
 
