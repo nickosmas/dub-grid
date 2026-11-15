@@ -779,6 +779,18 @@ export default function ProfileWorkScreen() {
   );
 }
 
+/** Names in the order Settings lists them, the way a teammate's page reads them. */
+function namesInOrgOrder(
+  ids: number[],
+  items: { id: number; name: string; abbr?: string | null }[],
+  compact: boolean,
+): string {
+  const names = items
+    .filter((item) => ids.includes(item.id))
+    .map((item) => (compact && item.abbr) || item.name);
+  return names.length > 0 ? names.join(", ") : "None";
+}
+
 function EditPanel({
   canEditProfileDirectly,
   certificationLabel,
@@ -833,6 +845,8 @@ function EditPanel({
     isManagementUser && draft.focusAreaIds.length === 0
       ? ["Saving now removes you from the schedule. You'll stay on your administrative teams."]
       : [];
+
+  const isOnSchedule = draft.focusAreaIds.length > 0;
 
   const setField = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => {
     onChange({ ...draft, [key]: value });
@@ -996,6 +1010,44 @@ function EditPanel({
             </ProfilePanel>
           </ProfileSection>
         </>
+      ) : null}
+
+      {hasLinkedEmployee && !canEditProfileDirectly ? (
+        <ProfileSection title="Work">
+          <ProfileList>
+            <ProfileInfoRow
+              iconName="briefcase-outline"
+              isLast={!isOnSchedule}
+              label="Employment"
+              value={draft.employmentType === "part_time" ? "Part-time" : "Full-time"}
+            />
+            {/* As on web, someone who only manages has no schedule fields. */}
+            {isOnSchedule ? (
+              <>
+                <ProfileInfoRow
+                  iconName="ribbon-outline"
+                  label={certificationLabel}
+                  value={namesInOrgOrder(
+                    draft.certificationId == null ? [] : [draft.certificationId],
+                    certifications,
+                    useCompactRoleCertificationLabels,
+                  )}
+                />
+                <ProfileInfoRow
+                  iconName="albums-outline"
+                  label={focusAreaLabel}
+                  value={namesInOrgOrder(draft.focusAreaIds, focusAreas, false)}
+                />
+                <ProfileInfoRow
+                  iconName="people-circle-outline"
+                  isLast
+                  label={roleLabel}
+                  value={namesInOrgOrder(draft.roleIds, roles, useCompactRoleCertificationLabels)}
+                />
+              </>
+            ) : null}
+          </ProfileList>
+        </ProfileSection>
       ) : null}
 
       {isNameRequest ? (
