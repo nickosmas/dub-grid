@@ -38,8 +38,10 @@ import {
   ScheduleNoteShift,
   ShiftJobSegment,
   PublishChange,
+  ShiftRequest,
 } from "@/types";
 import CustomSelect from "./CustomSelect";
+import { describeCancelRequestConfirmation } from "@/components/shift-requests/cancel-request-copy";
 import { formatShiftWindow, type WorkingShift } from "@/lib/shift-picker-groups";
 import ShiftPicker from "./ShiftPicker";
 import {
@@ -252,6 +254,12 @@ interface ShiftEditPanelProps {
   isOwnShift?: boolean;
   /** True if there's already an active request for this shift. */
   hasActiveRequest?: boolean;
+  /** The viewer's own active request on this shift, for the cancel confirmation. */
+  activeRequest?: Pick<ShiftRequest, "type" | "status" | "targetEmpId"> | null;
+  /** Opens that request on the request board. */
+  onViewActiveRequest?: () => void;
+  /** Withdraws that request; omitted when the viewer can't. */
+  onCancelActiveRequest?: () => void | Promise<unknown>;
   /** Callback to submit an offer-for-pickup request for this shift. */
   onMakeAvailable?: (options?: {
     targetEmpId?: string;
@@ -499,6 +507,9 @@ export default function ShiftEditPanel({
   auditInfo,
   isOwnShift = false,
   hasActiveRequest = false,
+  activeRequest = null,
+  onViewActiveRequest,
+  onCancelActiveRequest,
   onMakeAvailable,
   onCallOff,
   employees = [],
@@ -602,6 +613,10 @@ export default function ShiftEditPanel({
     focusAreaLabel: string | null;
     targetSegmentIndex?: number;
   } | null>(null);
+  const [confirmCancelActiveRequest, setConfirmCancelActiveRequest] = useState(false);
+  const cancelActiveRequestCopy = activeRequest
+    ? describeCancelRequestConfirmation(activeRequest)
+    : {};
   const [pendingRequestConfirmation, setPendingRequestConfirmation] = useState<
     | { kind: "pickup"; requesterSegmentIndex?: number }
     | {
@@ -5017,6 +5032,37 @@ export default function ShiftEditPanel({
                   A request is already active for this shift
                 </Banner>
               )}
+              {isOwnShift && hasActiveRequest && (onViewActiveRequest || onCancelActiveRequest) && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                  }}
+                >
+                  {onViewActiveRequest && (
+                    <Button
+                      type="button"
+                      onClick={onViewActiveRequest}
+                      className="dg-btn dg-btn-secondary"
+                      style={{ gridColumn: onCancelActiveRequest ? undefined : "1 / -1" }}
+                    >
+                      View request
+                    </Button>
+                  )}
+                  {onCancelActiveRequest && (
+                    <Button
+                      type="button"
+                      onClick={() => setConfirmCancelActiveRequest(true)}
+                      className="dg-btn dg-btn-secondary"
+                      style={{ gridColumn: onViewActiveRequest ? undefined : "1 / -1" }}
+                    >
+                      Cancel request
+                    </Button>
+                  )}
+                </div>
+              )}
               {isStale && (
                 <Banner tone="danger" icon={RefreshCw} className="mt-4">
                   This shift changed in another tab or by another editor. Close and reopen it before
@@ -5292,6 +5338,24 @@ export default function ShiftEditPanel({
       </div>
 
       {renderPendingRequestConfirmation()}
+
+      {confirmCancelActiveRequest && onCancelActiveRequest && (
+        <ConfirmDialog
+          title={`Cancel your request for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`}
+          message={cancelActiveRequestCopy.message}
+          summary={
+            cancelActiveRequestCopy.points ? { points: cancelActiveRequestCopy.points } : undefined
+          }
+          confirmLabel="Cancel request"
+          variant="warning"
+          onConfirm={async () => {
+            // The hook resolves `false` on a failure it has already toasted.
+            const result = await onCancelActiveRequest();
+            if (result !== false) setConfirmCancelActiveRequest(false);
+          }}
+          onCancel={() => setConfirmCancelActiveRequest(false)}
+        />
+      )}
 
       {/* Confirm delete dialog */}
       {pendingDelete && pendingDelete.type === "all" && seriesId && (

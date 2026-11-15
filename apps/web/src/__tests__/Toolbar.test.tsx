@@ -136,7 +136,7 @@ describe("Toolbar — Tools dropdown", () => {
 
   it("renders Print inside Tools dropdown", async () => {
     const user = userEvent.setup();
-    render(<Toolbar {...defaultProps} onPrintOpen={vi.fn()} />);
+    render(<Toolbar {...defaultProps} onPrintOpen={vi.fn()} onPublishHistory={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: /Tools/i }));
     expect(screen.getByRole("menuitem", { name: /Print/i })).toBeInTheDocument();
   });
@@ -144,7 +144,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("Print calls onPrintOpen when clicked from Tools dropdown", async () => {
     const user = userEvent.setup();
     const onPrintOpen = vi.fn();
-    render(<Toolbar {...defaultProps} onPrintOpen={onPrintOpen} />);
+    render(<Toolbar {...defaultProps} onPrintOpen={onPrintOpen} onPublishHistory={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: /Tools/i }));
     await user.click(screen.getByRole("menuitem", { name: /Print/i }));
     expect(onPrintOpen).toHaveBeenCalledOnce();
@@ -313,6 +313,57 @@ describe("Toolbar — Tools dropdown", () => {
     expect(
       screen.getByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("Toolbar - someone who can't edit shifts", () => {
+  it("shows Requests with a quiet count and Print on the toolbar, with no Tools menu", async () => {
+    const user = userEvent.setup();
+    const onRequestsToggle = vi.fn();
+    const onPrintOpen = vi.fn();
+    render(
+      <Toolbar
+        {...defaultProps}
+        requestsBadgeCount={2}
+        onRequestsToggle={onRequestsToggle}
+        onPrintOpen={onPrintOpen}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^Tools/ })).not.toBeInTheDocument();
+    const requests = screen.getByRole("button", { name: /^Requests/ });
+    const count = requests.querySelector("[data-numeric-badge]");
+    expect(count).toHaveTextContent("2");
+    expect(count).toHaveAttribute("data-tone", "label");
+    expect(requests.querySelector("svg")).toBeNull();
+
+    await user.click(requests);
+    await user.click(screen.getByRole("button", { name: "Print" }));
+
+    expect(onRequestsToggle).toHaveBeenCalledOnce();
+    expect(onPrintOpen).toHaveBeenCalledOnce();
+  });
+
+  it("leaves Print off when the organization has printing turned off", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /^Requests/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Print" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the Tools menu for someone with editor tools", () => {
+    render(
+      <Toolbar
+        {...defaultProps}
+        onRequestsToggle={vi.fn()}
+        onPrintOpen={vi.fn()}
+        onPublishHistory={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /^Tools/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Requests/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Print" })).not.toBeInTheDocument();
   });
 });
 
