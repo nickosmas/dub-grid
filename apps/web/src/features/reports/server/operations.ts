@@ -3,6 +3,7 @@ import {
   singularLabelNoun,
   shiftDisplayName,
   DEFAULT_ORGANIZATION_LABELS,
+  readShiftRequestNote,
 } from "@dubgrid/domain";
 import { absenceSideOf } from "@dubgrid/schedule-core";
 import { Buffer } from "node:buffer";
@@ -203,7 +204,7 @@ export interface ShiftRequestReportRow {
   resolutionHours: number | null;
   /** Who decided it, when the deciding account is on the staff list. */
   decidedBy: string;
-  managerNote: string;
+  note: string;
 }
 
 export interface AbsenceCalloffReportRow {
@@ -222,7 +223,7 @@ export interface AbsenceCalloffReportRow {
   noticeHours: number | null;
   decidedAt: string;
   decidedBy: string;
-  managerNote: string;
+  note: string;
 }
 
 export interface RosterStatusReportRow {
@@ -1390,7 +1391,7 @@ export function buildOperationsReportPayload(
       decidedBy: request.admin_user_id
         ? (employeeNameByUserId.get(request.admin_user_id) ?? "Manager")
         : "",
-      managerNote: request.admin_note ?? "",
+      note: readShiftRequestNote(request.admin_note)?.text ?? "",
     };
   });
 
@@ -1508,7 +1509,7 @@ export function buildOperationsReportPayload(
     noticeHours: null,
     decidedAt: "",
     decidedBy: "",
-    managerNote: "",
+    note: "",
   }));
   // Every call-off in the range, whatever became of it: a manager reading
   // this wants to know who called off, when, and with how much notice, and a
@@ -1555,7 +1556,7 @@ export function buildOperationsReportPayload(
         decidedBy: request.admin_user_id
           ? (employeeNameByUserId.get(request.admin_user_id) ?? "Manager")
           : "",
-        managerNote: request.admin_note ?? "",
+        note: readShiftRequestNote(request.admin_note)?.text ?? "",
       };
     });
 
