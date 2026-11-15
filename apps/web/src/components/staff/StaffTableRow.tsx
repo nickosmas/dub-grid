@@ -195,7 +195,11 @@ function StaffRowCells({
   const profileHref = getEmployeeProfileHref(emp.id, emp.userId, currentUser?.id ?? null);
   const rankNumber = isReordering ? globalIndex + 1 : emp.employeeNumber;
   const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
-  const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const employmentLabel = !emp.employmentType
+    ? "-"
+    : emp.employmentType === "part_time"
+      ? "Part-time"
+      : "Full-time";
   const statusLabel = describeEmploymentStatus(
     emp.status,
     emp.awayUntil,
@@ -250,7 +254,7 @@ function StaffRowCells({
               />
             )}
             <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums">
-              {isReordering ? rankNumber : `#${rankNumber}`}
+              {isReordering ? rankNumber : rankNumber != null ? `#${rankNumber}` : "-"}
             </span>
           </div>
         </StaffCell>

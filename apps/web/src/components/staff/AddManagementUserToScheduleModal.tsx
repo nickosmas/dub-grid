@@ -55,7 +55,8 @@ export function AddManagementUserToScheduleModal({
   onClose,
   onAdded,
 }: AddManagementUserToScheduleModalProps) {
-  const [employmentType, setEmploymentType] = useState(employee.employmentType);
+  const savedEmploymentType = employee.employmentType ?? "full_time";
+  const [employmentType, setEmploymentType] = useState(savedEmploymentType);
   const [certificationId, setCertificationId] = useState<number | null>(person.certificationId);
   const [focusAreaIds, setFocusAreaIds] = useState<number[]>(person.focusAreaIds);
   const [roleIds, setRoleIds] = useState<number[]>(person.roleIds);
@@ -64,12 +65,12 @@ export function AddManagementUserToScheduleModal({
   const initialDraftSnapshot = useMemo(
     () =>
       JSON.stringify({
-        employmentType: employee.employmentType,
+        employmentType: savedEmploymentType,
         certificationId: person.certificationId,
         focusAreaIds: [...person.focusAreaIds].sort((left, right) => left - right),
         roleIds: [...person.roleIds].sort((left, right) => left - right),
       }),
-    [employee.employmentType, person],
+    [savedEmploymentType, person],
   );
   const hasUnsavedChanges =
     JSON.stringify({

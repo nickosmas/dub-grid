@@ -28,7 +28,7 @@ type RowEntry = {
   firstName: string;
   lastName: string;
   email: string;
-  employmentType: Employee["employmentType"];
+  employmentType: NonNullable<Employee["employmentType"]>;
   certificationId: number | null;
   focusAreaIds: number[];
   /** Their first day (YYYY-MM-DD, 51g4), or empty for none. */

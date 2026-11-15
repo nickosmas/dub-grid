@@ -178,6 +178,8 @@ describe("mobile person route", () => {
     expect(payload.person).toMatchObject({
       id: "d660d308-4e0d-4daf-84fd-6753405e6740",
       contactNotes: "Weekend availability",
+      employeeNumber: 1042,
+      employmentType: "full_time",
       managementDepartmentIds: [8],
       managementDeptAdminIds: [8],
       roleIds: [3],
@@ -313,7 +315,12 @@ describe("mobile person route", () => {
       plannedFrom: null,
       plannedUntil: null,
       firstDay: null,
+      // Seniority sets the roster order everyone sees.
+      seniority: 2,
     });
+    // HR facts for staff managers only (owner, 2026-11-14).
+    expect(payload.person).not.toHaveProperty("employeeNumber");
+    expect(payload.person).not.toHaveProperty("employmentType");
   });
 
   it("never gives regular users an Admin's permissions or account details", async () => {

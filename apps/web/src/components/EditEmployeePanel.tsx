@@ -153,7 +153,7 @@ export interface EditEmployeePanelHandle {
 type EditForm = {
   firstName: string;
   lastName: string;
-  employmentType: Employee["employmentType"];
+  employmentType: NonNullable<Employee["employmentType"]>;
   certificationId: number | null;
   focusAreaIds: number[];
   roleIds: number[];
