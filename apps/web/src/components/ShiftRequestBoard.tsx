@@ -1,7 +1,7 @@
 "use client";
 import { ArrowUpDown, ChevronLeft, Clock, Hourglass } from "lucide-react";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
@@ -21,6 +21,7 @@ import {
   ApprovalDraftWarning,
   loadApprovalDraftWarning,
 } from "@/components/shift-requests/approval-draft-warning";
+import { describeCancelRequestConfirmation } from "@/components/shift-requests/cancel-request-copy";
 import ProgressBar from "@/components/ProgressBar";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
@@ -32,6 +33,10 @@ import CustomSelect from "@/components/CustomSelect";
 import StaffMultiSelect, { type StaffOption } from "@/components/StaffMultiSelect";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import { fetchShiftRequests } from "@/features/schedule/client/api";
+import {
+  HISTORY_STATUSES,
+  filterRequestHistory,
+} from "@/components/shift-requests/request-history";
 import { queryKeys } from "@/lib/query-keys";
 import {
   describeAwaitingRecipient,
@@ -52,6 +57,8 @@ import { FILLED_PILL_BORDER } from "@/lib/colors";
 interface ShiftRequestBoardProps {
   /** The tab to open on; a deep link from an alert names it. */
   initialTab?: Tab;
+  /** A request to open on and mark, such as the one on a shift the viewer opened. */
+  focusRequestId?: string | null;
   /** Needed for the history lookup, which fetches on its own terms. */
   orgId: string | null;
   /** Everyone the history lookup can filter by; defaults to nobody. */
@@ -84,7 +91,6 @@ interface ShiftRequestBoardProps {
 
 type Tab = "available" | "mine" | "approval" | "history";
 
-const HISTORY_STATUSES: ShiftRequestStatus[] = ["approved", "rejected", "cancelled", "expired"];
 const HISTORY_DEFAULT_DAYS = 30;
 
 function isoDateDaysAgo(days: number): string {
@@ -113,11 +119,6 @@ type PendingConfirmation = {
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** The lead for cancelling a request its recipient has not answered. */
-function describeUnansweredRequest(request: Pick<ShiftRequest, "type">): string {
-  return `The other person hasn't responded to this ${request.type === "swap" ? "swap" : "pickup"} yet.`;
-}
 
 function formatShiftDate(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
@@ -149,6 +150,7 @@ const PILL_TONES: Record<ReturnType<typeof describeShiftRequestPill>["tone"], St
 
 export default function ShiftRequestBoard({
   initialTab,
+  focusRequestId = null,
   orgId,
   staffOptions = [],
   focusAreaNameMap,
@@ -176,15 +178,25 @@ export default function ShiftRequestBoard({
   // their own requests are the nearest tab that exists for them.
   const canReviewOrg = canApprove || canViewAllRequests;
   const [activeTab, setActiveTab] = useState<Tab>(() => {
-    if (!initialTab) return "available";
-    if ((initialTab === "approval" || initialTab === "history") && !canReviewOrg) return "mine";
+    if (!initialTab) return focusRequestId ? "mine" : "available";
+    if (initialTab === "approval" && !canReviewOrg) return "mine";
     return initialTab;
   });
+  // Brings the focused request into view once its tab has drawn it.
+  const panelBodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusRequestId) return;
+    panelBodyRef.current
+      ?.querySelector<HTMLElement>(`[data-request-id="${focusRequestId}"]`)
+      ?.scrollIntoView?.({ block: "nearest" });
+  }, [focusRequestId, activeTab, loading]);
 
   // History is a lookup rather than a live list: it fetches the decided
   // requests for a shift-date window on demand, and the staff and outcome
   // filters narrow that result in place, so a manager can answer "what did
   // Laura ask for in March" without paging through everything since launch.
+  // Anyone else gets their own: the route scopes them to requests they made
+  // or were asked to take, and `filterRequestHistory` holds to that too.
   const [historyFrom, setHistoryFrom] = useState(() => isoDateDaysAgo(HISTORY_DEFAULT_DAYS));
   const [historyTo, setHistoryTo] = useState("");
   const [historyType, setHistoryType] = useState<ShiftRequestType | "all">("all");
@@ -205,31 +217,25 @@ export default function ShiftRequestBoard({
         ...(historyFrom ? { startDate: historyFrom } : {}),
         ...(historyTo ? { endDate: historyTo } : {}),
       }),
-    enabled: Boolean(orgId) && canReviewOrg && activeTab === "history",
+    enabled: Boolean(orgId) && activeTab === "history",
     staleTime: 60_000,
   });
-  const historyRequests = useMemo(() => {
-    const people = new Set(historyStaff);
-    return (historyQuery.data ?? [])
-      .filter((r) => historyStatus === "all" || r.status === historyStatus)
-      .filter(
-        (r) =>
-          people.size === 0 ||
-          people.has(r.requesterEmpId) ||
-          (r.targetEmpId != null && people.has(r.targetEmpId)),
-      )
-      .sort(
-        (left, right) =>
-          new Date(right.resolvedAt ?? right.createdAt).getTime() -
-          new Date(left.resolvedAt ?? left.createdAt).getTime(),
-      );
-  }, [historyQuery.data, historyStaff, historyStatus]);
+  const historyRequests = useMemo(
+    () =>
+      filterRequestHistory(historyQuery.data ?? [], {
+        status: historyStatus,
+        people: historyStaff,
+        viewerEmpId: currentEmpId,
+        canReviewOrg,
+      }),
+    [canReviewOrg, currentEmpId, historyQuery.data, historyStaff, historyStatus],
+  );
   // The shift-date window is the lookup itself, with its own clear, so only
   // the narrowing filters count here.
   const historyFilterCount = [
     historyType !== "all",
     historyStatus !== "all",
-    historyStaff.length > 0,
+    canReviewOrg && historyStaff.length > 0,
   ].filter(Boolean).length;
   const clearHistoryFilters = () => {
     setHistoryType("all");
@@ -282,7 +288,7 @@ export default function ShiftRequestBoard({
       count: managerQueue.length,
       visible: canReviewOrg,
     },
-    { key: "history", label: "History", count: historyRequests.length, visible: canReviewOrg },
+    { key: "history", label: "History", count: historyRequests.length, visible: true },
   ];
 
   function getTabData(): ShiftRequest[] {
@@ -298,16 +304,22 @@ export default function ShiftRequestBoard({
     }
   }
 
-  function getEmptyMessage(): string {
+  function getEmptyMessage(): { title: string; description?: string } {
     switch (activeTab) {
       case "available":
-        return "No available shifts";
+        return { title: "No available shifts" };
       case "mine":
-        return "No requests yet";
+        return {
+          title: "No requests yet",
+          // Someone on nobody's schedule has no shift to start one from.
+          description: currentEmpId
+            ? "Open one of your shifts on the schedule to offer, swap or call it off."
+            : undefined,
+        };
       case "approval":
-        return canApprove ? "No active requests" : "No organization requests";
+        return { title: canApprove ? "No active requests" : "No organization requests" };
       case "history":
-        return "No decided requests match";
+        return { title: "No decided requests match" };
     }
   }
 
@@ -525,13 +537,21 @@ export default function ShiftRequestBoard({
       joinAssignmentNames(req.targetAssignmentDefinitionIds ?? [], assignmentNameMap) ||
       req.targetShiftLabel;
 
+    const isFocused = req.id === focusRequestId;
+
     return (
       <div
         key={req.id}
+        data-request-id={req.id}
+        aria-current={isFocused ? "true" : undefined}
         style={{
           border: isCalloff
             ? "1px solid var(--dg-color-danger-border, #FCA5A5)"
             : "1px solid var(--dg-color-border)",
+          // The request the viewer came here to see, from its shift.
+          ...(isFocused
+            ? { outline: "2px solid var(--dg-color-border-focus)", outlineOffset: 1 }
+            : {}),
           borderRadius: "var(--dg-radius-md)",
           padding: "14px 16px",
           background: "var(--dg-color-surface)",
@@ -860,10 +880,7 @@ export default function ShiftRequestBoard({
             setPendingConfirmation({
               confirmLabel: "Cancel request",
               key: `cancel:${req.id}`,
-              message: awaitingRecipient ? describeUnansweredRequest(req) : undefined,
-              points: awaitingRecipient
-                ? ["The request is withdrawn for both people.", "Nothing on the schedule changes."]
-                : undefined,
+              ...describeCancelRequestConfirmation(req),
               onConfirm: async () => {
                 const done = await onCancel(req.id, req.requesterEmpId, cancelNote);
                 if (cancelNote && done !== false) clearNote(req.id);
@@ -896,6 +913,7 @@ export default function ShiftRequestBoard({
   // ── Render ───────────────────────────────────────────────────────────────
 
   const tabData = getTabData();
+  const emptyMessage = getEmptyMessage();
   // The approval queue is split by what each request is waiting on: the
   // manager, a claimant, or the person it was aimed at. One column per group.
   const queueGroups = activeTab === "approval" ? groupManagerQueue(tabData) : null;
@@ -997,6 +1015,7 @@ export default function ShiftRequestBoard({
         {/* Scrollable content */}
         <div
           {...underlineTabPanelProps("shift-requests", activeTab)}
+          ref={panelBodyRef}
           style={{
             flex: 1,
             minHeight: 0,
@@ -1055,12 +1074,14 @@ export default function ShiftRequestBoard({
                 ]}
                 value={historyStatus}
               />
-              <StaffMultiSelect
-                style={{ flex: "1 1 auto" }}
-                onChange={setHistoryStaff}
-                options={staffOptions}
-                value={historyStaff}
-              />
+              {canReviewOrg ? (
+                <StaffMultiSelect
+                  style={{ flex: "1 1 auto" }}
+                  onChange={setHistoryStaff}
+                  options={staffOptions}
+                  value={historyStaff}
+                />
+              ) : null}
             </div>
           ) : null}
           {tabData.length === 0 ? (
@@ -1073,7 +1094,8 @@ export default function ShiftRequestBoard({
             ) : (
               <EmptyState
                 size="compact"
-                title={getEmptyMessage()}
+                title={emptyMessage.title}
+                description={emptyMessage.description}
                 action={
                   activeTab === "history" && historyFilterCount > 0 ? (
                     <ClearFiltersButton

@@ -215,7 +215,7 @@ type MobilePersonSource = {
   employeeNumber: number;
   firstName: string;
   lastName: string;
-  employmentType: MobilePerson["employmentType"];
+  employmentType: NonNullable<MobilePerson["employmentType"]>;
   phone: string;
   email: string;
   status: MobilePerson["status"];
@@ -577,16 +577,16 @@ export async function loadMobilePeoplePayload(
 /**
  * A colleague as a regular member sees them, in the People list and on their
  * profile: the roster facts the web directory shows them, not an account,
- * contact or status export. Every field is named, so a new one has to be
+ * contact, HR or status export. Every field is named, so a new one has to be
  * decided here. Someone Away reads as Active, as `withoutColleagueStatus` says.
+ * Employee number and employment type are for staff managers only, so they are
+ * left out (owner, 2026-11-14); seniority stays because it sets the roster order.
  */
 export function toColleagueMobilePerson(person: MobilePerson): MobilePerson {
   return {
     id: person.id,
-    employeeNumber: person.employeeNumber,
     firstName: person.firstName,
     lastName: person.lastName,
-    employmentType: person.employmentType,
     status: person.status === "inactive" ? "active" : person.status,
     orgRole: person.orgRole,
     certificationId: person.certificationId,

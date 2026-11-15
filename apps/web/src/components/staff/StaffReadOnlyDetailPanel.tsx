@@ -4,17 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
-import {
-  Award,
-  Briefcase,
-  Building2,
-  Calendar,
-  Layers,
-  Mail,
-  Phone,
-  Tag,
-  UserCircle,
-} from "lucide-react";
+import { Award, Briefcase, Building2, Layers, Mail, Phone, Tag, UserCircle } from "lucide-react";
 import type { Employee, FocusArea, NamedItem, OrganizationRole } from "@/types";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
@@ -101,7 +91,8 @@ export function StaffReadOnlyDetailPanel({
     employee.certificationId != null ? (certMap.get(employee.certificationId) ?? "Unknown") : "-";
   const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
   const isOnSchedule = employee.focusAreaIds.length > 0;
-  const showEmployment = isOnSchedule && canViewEmployeeDetails;
+  // A colleague's record for someone who doesn't manage staff carries none.
+  const showEmployment = isOnSchedule && canViewEmployeeDetails && employee.employmentType != null;
   // The employees API blanks a coworker's email and phone for viewers without
   // employee details, so for them this section was two dashes under a heading.
   const showContact = Boolean(employee.email || employee.phone);
@@ -291,29 +282,6 @@ export function StaffReadOnlyDetailPanel({
                 isLast
               />
             </ReadOnlySection>
-          )}
-
-          {employee.statusChangedAt && (
-            <div
-              style={{
-                marginTop: 4,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--dg-color-text-faint)",
-              }}
-            >
-              <Calendar size={12} strokeWidth={2} />
-              <span>
-                On staff since{" "}
-                {new Date(employee.statusChangedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
           )}
         </div>
         <ScrollOverflowCue />

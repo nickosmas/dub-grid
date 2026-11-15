@@ -22,7 +22,7 @@ import { mapEmployeeToMobilePerson } from "./routes/people";
  * what the optimistic-concurrency guards compare against.
  */
 export type LoadedMobilePerson = {
-  person: MobilePerson;
+  person: ReturnType<typeof mapEmployeeToMobilePerson>;
   userId: string | null;
   membership: MobileManagementMembershipRow | null;
   pendingInvitation: MobileInvitationRow | null;

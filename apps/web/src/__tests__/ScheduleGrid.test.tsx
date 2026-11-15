@@ -308,6 +308,7 @@ interface RenderGridOptions {
   absenceTypeMap?: Map<number, AbsenceType>;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
+  canOpenCell?: (empId: string, date: Date) => boolean;
   shiftDisplayMode?: "code" | "name";
   useCompactRoleCertificationLabels?: boolean;
   showShiftDetailHoverCards?: boolean;
@@ -446,6 +447,7 @@ function renderGrid(options: RenderGridOptions = {}) {
       createdByNameForKey: options.createdByNameForKey,
       absenceTypeIdForKey: options.absenceTypeIdForKey,
       activeRequestForKey: options.activeRequestForKey,
+      canOpenCell: options.canOpenCell,
     },
   });
 
@@ -2491,6 +2493,77 @@ describe("ScheduleGrid", () => {
           cellId: expect.objectContaining({ dateKey: formatDateKey(week1[1]) }),
         }),
       );
+    });
+  });
+
+  describe("a viewer who can't edit", () => {
+    const ownCell = (empId: string, date: Date) => empId === "emp-1" && isFirstDay(date);
+    const findCell = (empId: string, date: Date) =>
+      (screen.getAllByRole("gridcell") as HTMLElement[]).find(
+        (cell) => cell.dataset.empId === empId && cell.dataset.dateKey === formatDateKey(date),
+      )!;
+
+    it("opens only the cells they can act on and offers no new shift", () => {
+      observedWidth = 1600;
+      const onActivateCell = vi.fn();
+      const onOpenCellMenu = vi.fn();
+      renderGrid({
+        filteredEmployees: extendedEmployees,
+        allEmployees: extendedEmployees,
+        canOpenCell: ownCell,
+        canDragShifts: false,
+        shiftForKey: (empId, date) => (ownCell(empId, date) ? "D" : null),
+        assignmentIdsForKey: (empId, date) => (ownCell(empId, date) ? [1] : []),
+        onActivateCell,
+        onOpenCellMenu,
+      });
+
+      const own = findCell("emp-1", week1[0]);
+      const other = findCell("emp-1", week1[1]);
+      const teammate = findCell("emp-2", week1[0]);
+
+      expect(own.dataset.interactive).toBe("true");
+      expect(own.tabIndex).toBe(0);
+      for (const plain of [other, teammate]) {
+        expect(plain.dataset.interactive).toBe("false");
+        expect(plain.tabIndex).toBe(-1);
+      }
+      expect(
+        (screen.getAllByRole("gridcell") as HTMLElement[]).some((cell) => cell.dataset.addable),
+      ).toBe(false);
+
+      fireEvent.click(other);
+      fireEvent.contextMenu(teammate);
+      fireEvent.keyDown(teammate, { key: "Enter" });
+      expect(onActivateCell).not.toHaveBeenCalled();
+      expect(onOpenCellMenu).not.toHaveBeenCalled();
+
+      fireEvent.click(own);
+      fireEvent.keyDown(own, { key: "Enter" });
+      fireEvent.contextMenu(own);
+      expect(onActivateCell).toHaveBeenCalledTimes(2);
+      expect(onOpenCellMenu).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps every cell open, a tab stop and the new-shift hint for an editor", () => {
+      observedWidth = 1600;
+      const onActivateCell = vi.fn();
+      renderGrid({
+        filteredEmployees: extendedEmployees,
+        allEmployees: extendedEmployees,
+        canDragShifts: true,
+        shiftForKey: () => null,
+        assignmentIdsForKey: () => [],
+        onActivateCell,
+      });
+
+      const cells = screen.getAllByRole("gridcell") as HTMLElement[];
+      expect(cells.every((cell) => cell.dataset.interactive === "true")).toBe(true);
+      expect(cells.every((cell) => cell.tabIndex === 0)).toBe(true);
+      expect(cells.every((cell) => cell.dataset.addable === "true")).toBe(true);
+
+      fireEvent.keyDown(findCell("emp-2", week1[3]), { key: "Enter" });
+      expect(onActivateCell).toHaveBeenCalledTimes(1);
     });
   });
 

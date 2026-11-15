@@ -8,7 +8,7 @@ import {
   isAwaitingRecipient,
 } from "@dubgrid/domain";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -69,6 +69,7 @@ import {
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { isOnSchedule } from "../../auth/hooks/employmentStatus";
 import { useMobileShiftRequestsRealtime } from "../hooks/useMobileShiftRequestsRealtime";
 import {
   type MobileRequestActionFeedback,
@@ -76,6 +77,7 @@ import {
   getMobileRequestActionKey,
   getMobileRequestActionSuccessToast,
 } from "../lib/request-action-feedback";
+import { getMineEmptyState } from "../lib/mine-empty-state";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../../schedule/components/SplitShift";
 import {
   getOpenShiftFocusAreaName,
@@ -404,6 +406,8 @@ export default function RequestsScreen() {
   const canEditShifts = Boolean(bootstrapQuery.data?.permissions.canEditShifts);
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const canViewAllRequests = canApprove || canEditShifts || canManageEmployees;
+  const canViewScheduleTab = Boolean(bootstrapQuery.data?.permissions.canViewSchedule);
+  const hasOwnShifts = isOnSchedule(bootstrapQuery.data?.linkedEmployee?.focusAreaIds ?? []);
   const requestsQueryKey = useMemo(
     () => mobileQueryKeys.shiftRequests(accessToken, requestRange),
     [accessToken, requestRange.startDate, requestRange.endDate],
@@ -684,6 +688,13 @@ export default function RequestsScreen() {
 
     return [...requestById.values()];
   }, [historyQuery.data]);
+  const hasOwnHistory = Boolean(
+    linkedEmployeeId &&
+    historyRequests.some(
+      (request) =>
+        request.requesterEmpId === linkedEmployeeId || request.targetEmpId === linkedEmployeeId,
+    ),
+  );
   const contentState = useMobileContentState({
     // "The queries resolved", not "some derived bucket is non-empty". The old
     // form re-entered `loading` any time a refetch transiently emptied every
@@ -886,7 +897,10 @@ export default function RequestsScreen() {
             void refreshRequests();
           }}
         />
-      ) : contentState.kind === "empty" && activeTab !== "history" && activeTab !== "approval" ? (
+      ) : contentState.kind === "empty" &&
+        activeTab !== "history" &&
+        activeTab !== "approval" &&
+        activeTab !== "mine" ? (
         <EmptyStateCard
           fillScreen
           body="Pickup, swap and call-off requests show here."
@@ -967,11 +981,10 @@ export default function RequestsScreen() {
       ) : activeTab === "mine" ? (
         <View style={styles.section}>
           {myRequests.length === 0 ? (
-            <EmptyStateCard
-              fillScreen
-              body="Requests you make show here until they're decided, canceled or expire, or the shift starts."
-              scene="mine-none"
-              title="You haven't made any requests"
+            <MineEmptyState
+              canViewScheduleTab={canViewScheduleTab}
+              hasHistory={hasOwnHistory}
+              hasOwnShifts={hasOwnShifts}
             />
           ) : (
             myRequests.map((request) => (
@@ -1134,6 +1147,22 @@ export default function RequestsScreen() {
         />
       </BottomSheetModal>
     </Screen>
+  );
+}
+
+function MineEmptyState(props: Parameters<typeof getMineEmptyState>[0]) {
+  const state = getMineEmptyState(props);
+  const action = state.action;
+
+  return (
+    <EmptyStateCard
+      actionLabel={action?.label}
+      body={state.body}
+      fillScreen
+      onAction={action ? () => router.push(action.href) : undefined}
+      scene="mine-none"
+      title={state.title}
+    />
   );
 }
 

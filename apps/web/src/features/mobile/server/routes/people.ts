@@ -83,7 +83,8 @@ export function mapEmployeeToMobilePerson(person: MobilePersonSource) {
     employeeNumber: person.employeeNumber ?? 0,
     firstName: person.firstName,
     lastName: person.lastName,
-    employmentType: person.employmentType,
+    // A stored row always has one; the column defaults to full time.
+    employmentType: person.employmentType ?? "full_time",
     phone: person.phone,
     email: person.email,
     status: person.status,
