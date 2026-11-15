@@ -789,9 +789,10 @@ function Segments<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className="dg-span-tabs dg-span-tabs--light"
+      className="dg-span-tabs dg-span-tabs--light dg-span-tabs--even"
       // `.dg-span-tabs` is unlayered and sets `display: flex`, so this has to
       // be inline to shrink-wrap the control. Same override as PrintOptionsModal.
+      // On a phone `--even` stretches it across the row in equal segments.
       style={{ display: "inline-flex", flexShrink: 0 }}
     >
       {segments.map((segment) => {
@@ -807,7 +808,7 @@ function Segments<T extends string>({
             {segment.icon && (
               <span style={{ display: "inline-flex", marginRight: 6 }}>{segment.icon}</span>
             )}
-            {segment.label}
+            <span className="dg-span-tab-label">{segment.label}</span>
             <NumericBadge count={segment.count ?? 0} tone="label" className="dg-span-tab-count" />
           </Button>
         );
@@ -978,6 +979,7 @@ function Toolbar({
 
       <CustomSelect
         ariaLabel="Filter by category"
+        className="dg-alerts-half"
         value={category}
         options={categoryOptions}
         onChange={onCategoryChange}
@@ -989,6 +991,7 @@ function Toolbar({
 
       <CustomSelect
         ariaLabel="Filter by priority"
+        className="dg-alerts-half"
         value={priority}
         options={priorityOptions}
         onChange={onPriorityChange}
@@ -999,10 +1002,18 @@ function Toolbar({
       />
 
       {hasNotifications ? (
-        <div style={{ display: "flex", flex: "1 1 100%", alignItems: "center", gap: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            flex: "1 1 100%",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
           <Button
             type="button"
-            className="dg-btn dg-btn-ghost"
+            className="dg-btn dg-btn-secondary dg-alerts-half"
             onClick={onSortToggle}
             aria-label={`Sort ${sort === "desc" ? "newest" : "oldest"} first`}
           >
@@ -1012,6 +1023,7 @@ function Toolbar({
           {hasNotifications ? (
             <label
               htmlFor="alerts-select-all"
+              className="dg-alerts-select"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -1043,7 +1055,7 @@ function Toolbar({
           {includeArchived || !hasNotifications ? null : (
             <Button
               type="button"
-              className="dg-btn dg-btn-secondary"
+              className="dg-btn dg-btn-secondary dg-alerts-half"
               onClick={onMarkAllRead}
               disabled={!canMarkAllRead}
               aria-label="Mark all alerts as read"

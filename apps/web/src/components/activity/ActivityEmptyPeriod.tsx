@@ -35,8 +35,9 @@ export function ActivityEmptyPeriod({
       type="button"
       className="dg-btn dg-btn-secondary dg-btn-sm"
       onClick={previousActivity.onJump}
+      style={{ maxWidth: "100%", minWidth: 0 }}
     >
-      Jump to {previousActivity.label}
+      <span className="truncate">Jump to {previousActivity.label}</span>
     </Button>
   ) : undefined;
 
