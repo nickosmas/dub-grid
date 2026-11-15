@@ -16,9 +16,19 @@ vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
 
+// A sandbox session reads its own copy of the organization, whatever id it sends.
+const resolveEffectiveOrgId = vi.fn(
+  async (_req: unknown, _userId: string, orgId: string): Promise<string> => orgId,
+);
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
   fetchHiddenStaffIds: (...args: unknown[]) => fetchHiddenStaffIds(...args),
+  resolveEffectiveOrgId: (req: unknown, userId: string, orgId: string) =>
+    resolveEffectiveOrgId(req, userId, orgId),
+}));
+
+vi.mock("@/lib/api-auth", () => ({
+  requireAuthenticatedUser: async () => ({ user: { id: "actor-user" } }),
 }));
 
 vi.mock("@/app/api/shared/schedule", () => ({
@@ -126,6 +136,64 @@ describe("POST /api/schedule/requests", () => {
     expect(filters[0]).toContain(`target_emp_id.eq.${MY_EMP_ID}`);
     // Plus the volunteer pool, or the Available shifts tab would come up empty.
     expect(filters[0]).toContain("and(type.eq.pickup,status.eq.open,target_emp_id.is.null)");
+  });
+
+  it("keeps a staff caller's history to their own requests, whoever they ask about", async () => {
+    const requestsQuery = mockFetchContext({
+      isGridmaster: false,
+      isSuperAdmin: false,
+      canManageEmployees: false,
+      canApproveShiftRequests: false,
+      canEditShifts: false,
+      canViewSchedule: true,
+    });
+    const someoneElse = "33333333-3333-4333-8333-333333333333";
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/schedule/requests", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "fetchShiftRequests",
+          orgId: ORG_ID,
+          assignmentLabels: [],
+          status: ["approved", "rejected", "cancelled", "expired"],
+          empId: someoneElse,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(requestsQuery.in).toHaveBeenCalledWith("status", [
+      "approved",
+      "rejected",
+      "cancelled",
+      "expired",
+    ]);
+    // Each `or` narrows the one before: the caller's own scope comes first,
+    // and an `empId` can only narrow it further, never widen it.
+    const filters = requestsQuery.or.mock.calls.map((call) => call[0] as string);
+    expect(filters[0]).toBe(
+      `requester_emp_id.eq.${MY_EMP_ID},target_emp_id.eq.${MY_EMP_ID},and(type.eq.pickup,status.eq.open,target_emp_id.is.null)`,
+    );
+    expect(filters[1]).toBe(`requester_emp_id.eq.${someoneElse},target_emp_id.eq.${someoneElse}`);
+  });
+
+  it("reads a sandbox session's requests from its sandbox, not the id it sent", async () => {
+    const sandboxOrgId = "44444444-4444-4444-8444-444444444444";
+    resolveEffectiveOrgId.mockResolvedValueOnce(sandboxOrgId);
+    const requestsQuery = mockFetchContext({ canViewSchedule: true });
+
+    const response = await POST(fetchRequest());
+
+    expect(response.status).toBe(200);
+    expect(requireOrgPermissions).toHaveBeenCalledWith(
+      expect.anything(),
+      sandboxOrgId,
+      expect.any(Function),
+    );
+    expect(requestsQuery.eq).toHaveBeenCalledWith("org_id", sandboxOrgId);
+    expect(requestsQuery.eq).not.toHaveBeenCalledWith("org_id", ORG_ID);
   });
 
   it("leaves an approver's fetch unscoped", async () => {
