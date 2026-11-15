@@ -7930,7 +7930,8 @@ function SchedulerContent({
     employeeIds: string[];
   } | null>(null);
   // The period on screen, kept while the panel is closed, unlike coveragePeriodKey.
-  const schedulePeriodKey = `${formatDateKey(dates[0])}..${formatDateKey(dates[dates.length - 1])}`;
+  // From the publish window rather than `dates`, which is empty in Month view.
+  const schedulePeriodKey = `${formatDateKey(currentPublishWindow.startDate)}..${formatDateKey(currentPublishWindow.endDate)}`;
   if (buildExclusions && buildExclusions.periodKey !== schedulePeriodKey) {
     setBuildExclusions(null);
   }
