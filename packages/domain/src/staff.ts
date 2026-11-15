@@ -14,7 +14,8 @@ export interface Employee {
   employeeNumber?: number;
   firstName: string;
   lastName: string;
-  employmentType: EmployeeEmploymentType;
+  /** Absent on a colleague's record for someone who doesn't manage staff, as is `employeeNumber`. */
+  employmentType?: EmployeeEmploymentType;
   status: EmployeeStatus;
   statusChangedAt: string | null;
   statusNote: string;

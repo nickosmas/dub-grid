@@ -1030,7 +1030,13 @@ export default function PersonDetailScreen() {
     person.certificationId != null
       ? (maps.certifications.get(person.certificationId) ?? "Unknown")
       : "None";
-  const employmentLabel = person.employmentType === "part_time" ? "Part-time" : "Full-time";
+  // Both are absent from a colleague's record for anyone who doesn't manage
+  // staff, so their rows are drawn only when the value came.
+  const employmentLabel = person.employmentType
+    ? person.employmentType === "part_time"
+      ? "Part-time"
+      : "Full-time"
+    : null;
   const fullName = getFullName(person);
   const isOnSchedule = person.focusAreaIds.length > 0;
   // Inactive only takes someone off the schedule, so a management-only person
@@ -1967,7 +1973,7 @@ export default function PersonDetailScreen() {
                   how people are identified in payroll conversations. Regular
                   users have no business with a colleague's payroll identifier,
                   so it rides on the same permission web gates it behind. */}
-                {canViewEmployeeDetails ? (
+                {canViewEmployeeDetails && person.employeeNumber != null ? (
                   <ProfileInfoRow
                     iconName="card-outline"
                     label="Employee ID"
@@ -1976,7 +1982,7 @@ export default function PersonDetailScreen() {
                 ) : null}
                 {/* Full-time or part-time is an HR fact; the web roster hides
                   the column from regular users and so does this row. */}
-                {canViewEmployeeDetails ? (
+                {canViewEmployeeDetails && employmentLabel ? (
                   <ProfileInfoRow
                     iconName="briefcase-outline"
                     label="Employment"

@@ -111,7 +111,7 @@ type ManagementSortMode = "alphabetical" | "access";
  * Neither set says anything about the other list, so the sheet swaps with the
  * tab rather than offering filters the visible roster can't answer.
  */
-type EmploymentType = MobilePerson["employmentType"];
+type EmploymentType = NonNullable<MobilePerson["employmentType"]>;
 type OrgRole = NonNullable<MobileOrgRole>;
 type InvitationState = MobileManagementUser["source"];
 
@@ -513,7 +513,10 @@ export default function PeopleScreen() {
         const matchesRole = matchesAnyChoice(staffFilters.roleIds, person.roleIds);
         const matchesEmploymentType =
           regularUserMode ||
-          matchesAnyChoice(staffFilters.employmentTypes, [person.employmentType]);
+          matchesAnyChoice(
+            staffFilters.employmentTypes,
+            person.employmentType ? [person.employmentType] : [],
+          );
         // App access is an admin-only column on the row, and an admin-only
         // filter with it: nobody else is shown the hint it filters on.
         const matchesAppAccess =
