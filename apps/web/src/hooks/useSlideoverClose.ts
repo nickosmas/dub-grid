@@ -2,43 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
 import { useLatestRef } from "@/hooks/useLatestRef";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import type { UnsavedChangesSave } from "@/components/UnsavedChangesDialog";
+import { lockPageScroll } from "@/lib/page-scroll-lock";
 
 /** Matches .dg-panel's exit animation duration in globals.css. */
 export const SLIDEOVER_CLOSE_MS = 200;
-
-/**
- * Reference-counted so stacked or rapidly re-mounted panels don't have one
- * unmount's cleanup re-enable scroll while another panel is still open.
- */
-let lockCount = 0;
-let previousBodyOverflow = "";
-let previousBodyPaddingRight = "";
-
-function lockBodyScroll() {
-  if (lockCount === 0) {
-    previousBodyOverflow = document.body.style.overflow;
-    previousBodyPaddingRight = document.body.style.paddingRight;
-    // Removing the scrollbar shrinks the visual viewport, shifting fixed-
-    // position content (including the panel itself) sideways as the lock
-    // engages. Padding by the scrollbar's width keeps the layout width
-    // constant so nothing jumps when the panel opens.
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    document.body.style.overflow = "hidden";
-    if (scrollbarWidth > 0) {
-      const currentPaddingRight = parseFloat(getComputedStyle(document.body).paddingRight) || 0;
-      document.body.style.paddingRight = `${currentPaddingRight + scrollbarWidth}px`;
-    }
-  }
-  lockCount += 1;
-}
-
-function unlockBodyScroll() {
-  lockCount = Math.max(0, lockCount - 1);
-  if (lockCount === 0) {
-    document.body.style.overflow = previousBodyOverflow;
-    document.body.style.paddingRight = previousBodyPaddingRight;
-  }
-}
 
 /** Mounted panels, oldest first; only the most recent one answers Escape. */
 const escapeStack: RefObject<() => void>[] = [];
@@ -106,10 +73,7 @@ export function useSlideoverClose(
   const closingRef = useRef(false);
   const onCloseRef = useLatestRef(onClose);
 
-  useLayoutEffect(() => {
-    lockBodyScroll();
-    return unlockBodyScroll;
-  }, []);
+  useLayoutEffect(() => lockPageScroll(), []);
 
   const forceClose = useCallback(() => {
     if (closingRef.current) return;

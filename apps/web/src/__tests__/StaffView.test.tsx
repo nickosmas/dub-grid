@@ -687,14 +687,14 @@ describe("StaffView", () => {
       const user = userEvent.setup();
       renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
 
-      expect(document.body.style.overflow).toBe("");
+      expect(document.documentElement.style.overflow).toBe("");
 
       await user.click(screen.getByRole("button", { name: "Filter" }));
-      expect(document.body.style.overflow).toBe("hidden");
+      expect(document.documentElement.style.overflow).toBe("hidden");
 
       await user.click(screen.getByRole("button", { name: "Done" }));
       await waitFor(() => {
-        expect(document.body.style.overflow).toBe("");
+        expect(document.documentElement.style.overflow).toBe("");
       });
     });
 
