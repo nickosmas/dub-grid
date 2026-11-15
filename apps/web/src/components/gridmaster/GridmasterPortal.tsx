@@ -1084,11 +1084,10 @@ export default function GridmasterPortal() {
         {/* Main content */}
         <main
           ref={mainScrollerRef}
+          className="dg-own-scroll"
           aria-label="Gridmaster content"
           style={{
             flex: 1,
-            overflow: "auto",
-            scrollbarGutter: "stable",
             padding: `${isMobile ? 16 : 24}px var(--dg-page-gutter)`,
           }}
         >

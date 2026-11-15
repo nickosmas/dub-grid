@@ -471,339 +471,350 @@ export default function Header({ orgName }: HeaderProps) {
         className="dg-app-header-desktop"
         style={{
           background: "var(--dg-color-surface)",
-          // The logo sits on the canonical page gutter on every route, with no
-          // per-route exceptions — every page's left content edge uses the same
-          // token, so the logo never shifts as you navigate.
-          paddingLeft: "var(--dg-page-gutter)",
-          paddingRight: "var(--dg-page-gutter)",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
           height: 56,
           borderBottom: "1px solid var(--dg-color-border)",
         }}
       >
-        {/* Logo + Org Anchor */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexShrink: 0 }}>
-          {isTablet ? (
-            <DubGridLogo size={40} />
-          ) : (
-            <DubGridLockup fontSize={24} color="var(--dg-color-text-primary)" />
-          )}
-          {orgName && (
-            <>
-              <span
-                style={{
-                  color: "var(--dg-color-border)",
-                  fontSize: "var(--dg-fs-title)",
-                  userSelect: "none",
-                }}
-              >
-                |
-              </span>
-              <MaybeHint content={orgName} side="bottom">
-                <span
-                  style={{
-                    color: "var(--dg-color-text-muted)",
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 500,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    maxWidth: isTablet ? 112 : 200,
-                  }}
-                >
-                  {orgName}
-                </span>
-              </MaybeHint>
-            </>
-          )}
-        </div>
-
-        {/* Nav Tabs */}
         <div
           style={{
+            // The logo sits on the canonical page gutter on every route, with no
+            // per-route exceptions — every page's left content edge uses the same
+            // token, so the logo never shifts as you navigate.
+            paddingLeft: "var(--dg-page-gutter)",
+            paddingRight: "var(--dg-page-gutter)",
             display: "flex",
-            gap: isTablet ? 2 : 4,
-            alignItems: "center",
             flex: 1,
-            justifyContent: "center",
+            minWidth: 0,
+            alignItems: "center",
+            justifyContent: "space-between",
           }}
         >
-          {visibleNavItems.map((item) => {
-            const active = activeTab === item.id;
-            const Icon = item.Icon;
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`dg-nav-tab${active ? " active" : ""}`}
-                style={{ paddingInline: isTablet ? 8 : 14 }}
-              >
-                <Icon size={16} />
-                {item.label}
-              </Link>
-            );
-          })}
+          {/* Logo + Org Anchor */}
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexShrink: 0 }}
+          >
+            {isTablet ? (
+              <DubGridLogo size={40} />
+            ) : (
+              <DubGridLockup fontSize={24} color="var(--dg-color-text-primary)" />
+            )}
+            {orgName && (
+              <>
+                <span
+                  style={{
+                    color: "var(--dg-color-border)",
+                    fontSize: "var(--dg-fs-title)",
+                    userSelect: "none",
+                  }}
+                >
+                  |
+                </span>
+                <MaybeHint content={orgName} side="bottom">
+                  <span
+                    style={{
+                      color: "var(--dg-color-text-muted)",
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      maxWidth: isTablet ? 112 : 200,
+                    }}
+                  >
+                    {orgName}
+                  </span>
+                </MaybeHint>
+              </>
+            )}
+          </div>
 
-          {isGridmaster && (
+          {/* Nav Tabs */}
+          <div
+            style={{
+              display: "flex",
+              gap: isTablet ? 2 : 4,
+              alignItems: "center",
+              flex: 1,
+              justifyContent: "center",
+            }}
+          >
+            {visibleNavItems.map((item) => {
+              const active = activeTab === item.id;
+              const Icon = item.Icon;
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={`dg-nav-tab${active ? " active" : ""}`}
+                  style={{ paddingInline: isTablet ? 8 : 14 }}
+                >
+                  <Icon size={16} />
+                  {item.label}
+                </Link>
+              );
+            })}
+
+            {isGridmaster && (
+              <Button
+                onClick={() => router.push("/gridmaster")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  background: "transparent",
+                  border: "1px solid var(--dg-color-border)",
+                  color: "var(--dg-type-navigation-color)",
+                  borderRadius: "var(--dg-btn-radius)",
+                  padding: "5px 14px",
+                  fontSize: "var(--dg-type-navigation-size)",
+                  cursor: "pointer",
+                  fontWeight: "var(--dg-type-navigation-weight)",
+                  letterSpacing: "var(--dg-type-navigation-letter-spacing)",
+                  marginLeft: 8,
+                  fontFamily: "inherit",
+                  transition: "background 150ms ease, border-color 150ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--dg-color-bg-secondary)";
+                  e.currentTarget.style.borderColor = "var(--dg-color-border)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = "var(--dg-color-border)";
+                }}
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                Gridmaster
+              </Button>
+            )}
+          </div>
+
+          {/* Billing notice, theme, alerts */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {canShowBillingNotice && billingOrgId && !isHeaderNarrow && (
+              <HeaderBillingNotice orgId={billingOrgId} compact={isTablet} />
+            )}
+            <ThemeToggleButton appearance="header" />
+            {!isGridmaster && <NotificationBell hidden={onAlertsPage} />}
+          </div>
+          <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
             <Button
-              onClick={() => router.push("/gridmaster")}
+              onClick={() => setMenuOpen((o) => !o)}
+              ref={accountTriggerRef}
+              aria-label="Account menu"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 4,
-                background: "transparent",
-                border: "1px solid var(--dg-color-border)",
-                color: "var(--dg-type-navigation-color)",
+                gap: 8,
+                background: menuOpen ? "var(--dg-color-bg-secondary)" : "transparent",
+                border: "1px solid " + (menuOpen ? "var(--dg-color-border)" : "transparent"),
                 borderRadius: "var(--dg-btn-radius)",
-                padding: "5px 14px",
-                fontSize: "var(--dg-type-navigation-size)",
+                // At 125% zoom a normal desktop becomes the narrow-header
+                // layout. Match the billing-notice compaction above so the
+                // account text cannot force a horizontal page overflow.
+                padding: isTablet || isHeaderNarrow ? 4 : "4px 8px 4px 4px",
+                minHeight: 44,
                 cursor: "pointer",
-                fontWeight: "var(--dg-type-navigation-weight)",
-                letterSpacing: "var(--dg-type-navigation-letter-spacing)",
-                marginLeft: 8,
                 fontFamily: "inherit",
                 transition: "background 150ms ease, border-color 150ms ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--dg-color-bg-secondary)";
-                e.currentTarget.style.borderColor = "var(--dg-color-border)";
+                if (!menuOpen) {
+                  e.currentTarget.style.background = "var(--dg-color-bg-secondary)";
+                  e.currentTarget.style.borderColor = "var(--dg-color-border)";
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "var(--dg-color-border)";
+                if (!menuOpen) {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = "transparent";
+                }
               }}
             >
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <div
+                style={{
+                  ...getAvatarTypography(28),
+                  width: 28,
+                  height: 28,
+                  boxSizing: "border-box",
+                  borderRadius: "50%",
+                  background: avatarTone.backgroundColor,
+                  border: `1px solid ${avatarTone.borderColor}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: avatarTone.textColor,
+                  flexShrink: 0,
+                }}
               >
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-              Gridmaster
+                {initials}
+              </div>
+              {!isTablet && (
+                // Hidden by CSS at the narrow-header width, not by the hook, so it
+                // goes in the same frame as a resize instead of a render later.
+                <span className="dg-header-account-detail">
+                  <div style={{ textAlign: "left", maxWidth: 120 }}>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        fontWeight: 600,
+                        color: "var(--dg-color-text-primary)",
+                        lineHeight: 1.2,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {displayName}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--dg-color-text-muted)",
+                        lineHeight: 1.2,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {roleLabel}
+                    </div>
+                  </div>
+                  <ChevronDown
+                    size={12}
+                    strokeWidth={2.5}
+                    color="var(--dg-color-text-muted)"
+                    style={{
+                      flexShrink: 0,
+                      transition: "transform 150ms ease",
+                      transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    }}
+                  />
+                </span>
+              )}
             </Button>
-          )}
-        </div>
 
-        {/* Billing notice, theme, alerts */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {canShowBillingNotice && billingOrgId && !isHeaderNarrow && (
-            <HeaderBillingNotice orgId={billingOrgId} compact={isTablet} />
-          )}
-          <ThemeToggleButton appearance="header" />
-          {!isGridmaster && <NotificationBell hidden={onAlertsPage} />}
-        </div>
-        <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
-          <Button
-            onClick={() => setMenuOpen((o) => !o)}
-            ref={accountTriggerRef}
-            aria-label="Account menu"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              background: menuOpen ? "var(--dg-color-bg-secondary)" : "transparent",
-              border: "1px solid " + (menuOpen ? "var(--dg-color-border)" : "transparent"),
-              borderRadius: "var(--dg-btn-radius)",
-              // At 125% zoom a normal desktop becomes the narrow-header
-              // layout. Match the billing-notice compaction above so the
-              // account text cannot force a horizontal page overflow.
-              padding: isTablet || isHeaderNarrow ? 4 : "4px 8px 4px 4px",
-              minHeight: 44,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              transition: "background 150ms ease, border-color 150ms ease",
-            }}
-            onMouseEnter={(e) => {
-              if (!menuOpen) {
-                e.currentTarget.style.background = "var(--dg-color-bg-secondary)";
-                e.currentTarget.style.borderColor = "var(--dg-color-border)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!menuOpen) {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "transparent";
-              }
-            }}
-          >
-            <div
-              style={{
-                ...getAvatarTypography(28),
-                width: 28,
-                height: 28,
-                boxSizing: "border-box",
-                borderRadius: "50%",
-                background: avatarTone.backgroundColor,
-                border: `1px solid ${avatarTone.borderColor}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: avatarTone.textColor,
-                flexShrink: 0,
-              }}
-            >
-              {initials}
-            </div>
-            {!isTablet && (
-              // Hidden by CSS at the narrow-header width, not by the hook, so it
-              // goes in the same frame as a resize instead of a render later.
-              <span className="dg-header-account-detail">
-                <div style={{ textAlign: "left", maxWidth: 120 }}>
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      fontWeight: 600,
-                      color: "var(--dg-color-text-primary)",
-                      lineHeight: 1.2,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {displayName}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--dg-color-text-muted)",
-                      lineHeight: 1.2,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {roleLabel}
-                  </div>
-                </div>
-                <ChevronDown
-                  size={12}
-                  strokeWidth={2.5}
-                  color="var(--dg-color-text-muted)"
-                  style={{
-                    flexShrink: 0,
-                    transition: "transform 150ms ease",
-                    transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
+            {menuOpen && (
+              <div
+                className="dg-menu dg-profile-menu"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  zIndex: 200,
+                }}
+              >
+                <Button
+                  className="dg-menu-item"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    router.push("/profile");
                   }}
-                />
-              </span>
-            )}
-          </Button>
-
-          {menuOpen && (
-            <div
-              className="dg-menu dg-profile-menu"
-              style={{
-                position: "absolute",
-                top: "calc(100% + 6px)",
-                right: 0,
-                zIndex: 200,
-              }}
-            >
-              <Button
-                className="dg-menu-item"
-                onClick={() => {
-                  setMenuOpen(false);
-                  router.push("/profile");
-                }}
-              >
-                <User size={13} />
-                Profile
-              </Button>
-              {canOpenSandbox && (
-                <>
-                  <div className="dg-menu-divider" />
-                  <Button
-                    type="button"
-                    className="dg-menu-item"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setSandboxDialogOpen(true);
-                    }}
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="9" y1="3" x2="15" y2="3" />
-                      <path d="M10 3v6.5L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.5V3" />
-                      <line x1="7" y1="14" x2="17" y2="14" />
-                    </svg>
-                    Test sandbox
-                  </Button>
-                </>
-              )}
-              {actualLevel >= 2 && !isImpersonating && (
-                <>
-                  <div className="dg-menu-divider" />
-                  <Button
-                    className="dg-menu-item"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setUserViewActive(!isUserViewActive);
-                    }}
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    {isUserViewActive ? "Exit User view" : "View as a User"}
-                  </Button>
-                </>
-              )}
-              <div className="dg-menu-divider" />
-              <Button
-                className="dg-menu-item dg-menu-item--danger"
-                onClick={() => {
-                  setMenuOpen(false);
-                  handleSignOut();
-                }}
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
                 >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                Sign out
-              </Button>
-            </div>
-          )}
+                  <User size={13} />
+                  Profile
+                </Button>
+                {canOpenSandbox && (
+                  <>
+                    <div className="dg-menu-divider" />
+                    <Button
+                      type="button"
+                      className="dg-menu-item"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setSandboxDialogOpen(true);
+                      }}
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="9" y1="3" x2="15" y2="3" />
+                        <path d="M10 3v6.5L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.5V3" />
+                        <line x1="7" y1="14" x2="17" y2="14" />
+                      </svg>
+                      Test sandbox
+                    </Button>
+                  </>
+                )}
+                {actualLevel >= 2 && !isImpersonating && (
+                  <>
+                    <div className="dg-menu-divider" />
+                    <Button
+                      className="dg-menu-item"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setUserViewActive(!isUserViewActive);
+                      }}
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      {isUserViewActive ? "Exit User view" : "View as a User"}
+                    </Button>
+                  </>
+                )}
+                <div className="dg-menu-divider" />
+                <Button
+                  className="dg-menu-item dg-menu-item--danger"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleSignOut();
+                  }}
+                >
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  Sign out
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
+        <span className="dg-header-gutter" aria-hidden />
       </div>
     </>
   );
