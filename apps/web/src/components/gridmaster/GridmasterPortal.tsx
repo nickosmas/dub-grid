@@ -243,7 +243,7 @@ function OrgSearchCombobox({
               ? `${filtered.length} result${filtered.length !== 1 ? "s" : ""}`
               : `All Organizations (${organizations.length})`}
           </div>
-          <div style={{ maxHeight: 400, overflowY: "auto" }}>
+          <div style={{ maxHeight: 400, overflowY: "auto", scrollbarGutter: "stable" }}>
             {filtered.length === 0 ? (
               <div
                 style={{
@@ -1088,6 +1088,7 @@ export default function GridmasterPortal() {
           style={{
             flex: 1,
             overflow: "auto",
+            scrollbarGutter: "stable",
             padding: `${isMobile ? 16 : 24}px var(--dg-page-gutter)`,
           }}
         >
