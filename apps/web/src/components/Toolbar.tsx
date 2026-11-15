@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Printer,
   Repeat,
   Import as ImportIcon,
   Search,
@@ -191,6 +192,44 @@ function SortMenuButton({
         </Menu>
       )}
     </>
+  );
+}
+
+// The options modal is its own chunk; fetching it on the way to a click
+// usually means it opens from cache.
+const warmPrintOptions = () => void import("@/components/PrintOptionsModal");
+
+/** Print on the toolbar, for someone whose More tools menu would hold nothing else. */
+function PrintButton({
+  onClick,
+  disabled,
+  fill = false,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  /** Share a phone row equally with Shift requests. */
+  fill?: boolean;
+}) {
+  return (
+    <Button
+      onClick={onClick}
+      disabled={disabled}
+      onPointerEnter={warmPrintOptions}
+      onFocus={warmPrintOptions}
+      className="dg-btn dg-btn-ghost"
+      style={{
+        border: "1px solid var(--dg-color-border)",
+        borderRadius: "var(--dg-btn-radius)",
+        height: "var(--dg-toolbar-h)",
+        padding: "0 12px",
+        flex: fill ? "1 1 0" : "0 0 auto",
+        minWidth: 0,
+        gap: 8,
+      }}
+    >
+      <Printer aria-hidden size={14} strokeWidth={2.25} />
+      Print
+    </Button>
   );
 }
 
@@ -545,6 +584,21 @@ export default function Toolbar({
     ...focusAreas.map((fa) => ({ id: fa.id, name: fa.name })),
   ];
 
+  // Someone who can't edit shifts would find only Print in More tools, so
+  // Print sits on the toolbar instead (Shift requests always does).
+  const hasEditorTools = Boolean(
+    onAuditToggle ||
+    onExportCSV ||
+    onPublishHistory ||
+    onBulkDeleteToggle ||
+    (canApplyRecurringSchedule && onApplyRecurring) ||
+    (canImportPrevious && onImportPrevious),
+  );
+  const renderPrintButton = (fill: boolean) =>
+    hasEditorTools || !onPrintOpen ? null : (
+      <PrintButton onClick={onPrintOpen} disabled={scheduleEntryActionsDisabled} fill={fill} />
+    );
+
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsBtnRef = useRef<HTMLButtonElement>(null);
   const toggleTools = useCallback(() => setToolsOpen((p) => !p), []);
@@ -683,7 +737,8 @@ export default function Toolbar({
           {hasData && onRequestsToggle && (
             <ShiftRequestsButton count={requestsBadgeCount} onClick={onRequestsToggle} fill />
           )}
-          {hasData && (
+          {hasData && renderPrintButton(true)}
+          {hasData && hasEditorTools && (
             <Button
               ref={toolsBtnRef}
               onClick={toggleTools}
@@ -714,7 +769,7 @@ export default function Toolbar({
               />
             </Button>
           )}
-          {hasData && toolsOpen && (
+          {hasData && hasEditorTools && toolsOpen && (
             <ToolsMenu
               triggerRef={toolsBtnRef}
               onClose={closeTools}
@@ -982,38 +1037,42 @@ export default function Toolbar({
             <ShiftRequestsButton count={requestsBadgeCount} onClick={onRequestsToggle} />
           )}
 
-          {/* Tools dropdown */}
-          <Hint content={hint("Print, export, recurring shifts, and more")} side="bottom">
-            <Button
-              ref={toolsBtnRef}
-              onClick={toggleTools}
-              aria-expanded={toolsOpen}
-              aria-haspopup="menu"
-              className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
-              data-tour="toolbar-tools-btn"
-              style={{
-                borderRadius: "var(--dg-btn-radius)",
-                height: "var(--dg-toolbar-h)",
-                padding: "0 12px",
-                position: "relative",
-              }}
-            >
-              <ToolsIcon />
-              More tools
-              <ChevronDown
-                size={12}
-                strokeWidth={2.5}
-                aria-hidden
-                style={{
-                  color: "var(--dg-color-text-faint)",
-                  transition: "transform 150ms ease",
-                  transform: toolsOpen ? "rotate(180deg)" : "rotate(0deg)",
-                }}
-              />
-            </Button>
-          </Hint>
+          {renderPrintButton(false)}
 
-          {toolsOpen && (
+          {/* More tools dropdown, for editors; everyone else has Print on the toolbar */}
+          {hasEditorTools && (
+            <Hint content={hint("Print, export, recurring shifts, and more")} side="bottom">
+              <Button
+                ref={toolsBtnRef}
+                onClick={toggleTools}
+                aria-expanded={toolsOpen}
+                aria-haspopup="menu"
+                className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
+                data-tour="toolbar-tools-btn"
+                style={{
+                  borderRadius: "var(--dg-btn-radius)",
+                  height: "var(--dg-toolbar-h)",
+                  padding: "0 12px",
+                  position: "relative",
+                }}
+              >
+                <ToolsIcon />
+                More tools
+                <ChevronDown
+                  size={12}
+                  strokeWidth={2.5}
+                  aria-hidden
+                  style={{
+                    color: "var(--dg-color-text-faint)",
+                    transition: "transform 150ms ease",
+                    transform: toolsOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  }}
+                />
+              </Button>
+            </Hint>
+          )}
+
+          {hasEditorTools && toolsOpen && (
             <ToolsMenu
               triggerRef={toolsBtnRef}
               onClose={closeTools}

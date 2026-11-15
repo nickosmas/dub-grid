@@ -391,6 +391,14 @@ function renderRequestPanel(
     currentShift?: string;
     currentAssignmentIds?: number[];
     currentSegments?: ShiftJobSegment[];
+    hasActiveRequest?: boolean;
+    activeRequest?: {
+      type: "pickup" | "swap" | "calloff";
+      status: "open";
+      targetEmpId: string | null;
+    };
+    onViewActiveRequest?: MockFn;
+    onCancelActiveRequest?: MockFn;
   } = {},
 ) {
   const onMakeAvailable = overrides.onMakeAvailable ?? vi.fn();
@@ -416,6 +424,10 @@ function renderRequestPanel(
       focusAreas={focusAreas}
       certifications={certifications}
       isOwnShift
+      hasActiveRequest={overrides.hasActiveRequest}
+      activeRequest={overrides.activeRequest}
+      onViewActiveRequest={overrides.onViewActiveRequest}
+      onCancelActiveRequest={overrides.onCancelActiveRequest}
       onMakeAvailable={onMakeAvailable}
       onCallOff={onCallOff}
       employees={employees}
@@ -2896,6 +2908,75 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Back" }));
       await editDays(/This and later days/);
       expect(screen.queryByRole("button", { name: "Add an absence" })).toBeNull();
+    });
+  });
+
+  describe("A request already active on the shift", () => {
+    it("lets the requester view the request or cancel it after confirming", async () => {
+      const user = userEvent.setup();
+      const onViewActiveRequest = vi.fn();
+      const onCancelActiveRequest = vi.fn(async () => true);
+      renderRequestPanel({
+        hasActiveRequest: true,
+        activeRequest: { type: "pickup", status: "open", targetEmpId: null },
+        onViewActiveRequest,
+        onCancelActiveRequest,
+      });
+
+      expect(screen.getByText("A request is already active for this shift")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Drop shift" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "View request" }));
+      expect(onViewActiveRequest).toHaveBeenCalledOnce();
+
+      await user.click(screen.getByRole("button", { name: "Cancel request" }));
+      const dialog = screen.getByRole("alertdialog", { name: /^Cancel your request for your / });
+      expect(onCancelActiveRequest).not.toHaveBeenCalled();
+      await user.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+
+      expect(onCancelActiveRequest).toHaveBeenCalledOnce();
+      await waitFor(() => {
+        expect(
+          screen.queryByRole("alertdialog", { name: /^Cancel your request/ }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("warns that a teammate hasn't answered yet before withdrawing it", async () => {
+      const user = userEvent.setup();
+      renderRequestPanel({
+        hasActiveRequest: true,
+        activeRequest: { type: "swap", status: "open", targetEmpId: "emp-2" },
+        onViewActiveRequest: vi.fn(),
+        onCancelActiveRequest: vi.fn(async () => true),
+      });
+
+      await user.click(screen.getByRole("button", { name: "Cancel request" }));
+      const dialog = screen.getByRole("alertdialog", { name: /^Cancel your request/ });
+
+      expect(
+        within(dialog).getByText("The other person hasn't responded to this swap yet."),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("The request is withdrawn for both people."),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the dialog open when cancelling fails", async () => {
+      const user = userEvent.setup();
+      const onCancelActiveRequest = vi.fn(async () => false);
+      renderRequestPanel({
+        hasActiveRequest: true,
+        activeRequest: { type: "pickup", status: "open", targetEmpId: null },
+        onCancelActiveRequest,
+      });
+
+      await user.click(screen.getByRole("button", { name: "Cancel request" }));
+      const dialog = screen.getByRole("alertdialog", { name: /^Cancel your request/ });
+      await user.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+
+      expect(onCancelActiveRequest).toHaveBeenCalledOnce();
+      expect(screen.getByRole("alertdialog", { name: /^Cancel your request/ })).toBeInTheDocument();
     });
   });
 

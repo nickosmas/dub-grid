@@ -84,7 +84,7 @@ describe("Toolbar — Shift requests button", () => {
   });
 
   it("names the menu More tools, with its icon and a chevron", () => {
-    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} />);
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} onPublishHistory={vi.fn()} />);
     const button = screen.getByRole("button", { name: "More tools" });
     expect(button).toHaveTextContent(/^More tools$/);
     expect(button.querySelectorAll("svg")).toHaveLength(2);
@@ -98,7 +98,14 @@ describe("Toolbar — Shift requests button", () => {
   });
 
   it("leaves More tools without a count", () => {
-    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} requestsBadgeCount={4} />);
+    render(
+      <Toolbar
+        {...defaultProps}
+        onRequestsToggle={vi.fn()}
+        onPublishHistory={vi.fn()}
+        requestsBadgeCount={4}
+      />,
+    );
     expect(
       screen.getByRole("button", { name: "More tools" }).querySelector("[data-numeric-badge]"),
     ).toBeNull();
@@ -190,7 +197,7 @@ describe("Toolbar — Tools dropdown", () => {
 
   it("renders Print inside Tools dropdown", async () => {
     const user = userEvent.setup();
-    render(<Toolbar {...defaultProps} onPrintOpen={vi.fn()} />);
+    render(<Toolbar {...defaultProps} onPrintOpen={vi.fn()} onPublishHistory={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "More tools" }));
     expect(screen.getByRole("menuitem", { name: /Print/i })).toBeInTheDocument();
   });
@@ -198,7 +205,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("Print calls onPrintOpen when clicked from Tools dropdown", async () => {
     const user = userEvent.setup();
     const onPrintOpen = vi.fn();
-    render(<Toolbar {...defaultProps} onPrintOpen={onPrintOpen} />);
+    render(<Toolbar {...defaultProps} onPrintOpen={onPrintOpen} onPublishHistory={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "More tools" }));
     await user.click(screen.getByRole("menuitem", { name: /Print/i }));
     expect(onPrintOpen).toHaveBeenCalledOnce();
@@ -367,6 +374,56 @@ describe("Toolbar — Tools dropdown", () => {
     expect(
       screen.getByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("Toolbar - someone who can't edit shifts", () => {
+  it("has Shift requests and Print on the toolbar, with no More tools menu", async () => {
+    const user = userEvent.setup();
+    const onRequestsToggle = vi.fn();
+    const onPrintOpen = vi.fn();
+    render(
+      <Toolbar
+        {...defaultProps}
+        requestsBadgeCount={2}
+        onRequestsToggle={onRequestsToggle}
+        onPrintOpen={onPrintOpen}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "More tools" })).not.toBeInTheDocument();
+    const requests = screen.getByRole("button", { name: /Shift requests/ });
+    expect(requests.querySelector("[data-numeric-badge]")).toHaveTextContent("2");
+
+    await user.click(requests);
+    const print = screen.getByRole("button", { name: "Print" });
+    expect(print.firstElementChild).toHaveClass("lucide-printer");
+    await user.click(print);
+
+    expect(onRequestsToggle).toHaveBeenCalledOnce();
+    expect(onPrintOpen).toHaveBeenCalledOnce();
+  });
+
+  it("leaves Print off when the organization has printing turned off", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /Shift requests/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Print" })).not.toBeInTheDocument();
+  });
+
+  it("keeps More tools, holding Print, for someone with editor tools", () => {
+    render(
+      <Toolbar
+        {...defaultProps}
+        onRequestsToggle={vi.fn()}
+        onPrintOpen={vi.fn()}
+        onPublishHistory={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "More tools" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Shift requests/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Print" })).not.toBeInTheDocument();
   });
 });
 
