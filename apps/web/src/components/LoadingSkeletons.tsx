@@ -154,7 +154,7 @@ export function PersonPageSkeleton({
 }) {
   return (
     <div
-      className="h-[calc(100dvh-var(--dg-app-shell-header-height))] overflow-y-auto px-[var(--dg-page-gutter)] py-4 md:py-6 xl:py-8"
+      className="h-[calc(100dvh-var(--dg-app-shell-header-height))] overflow-y-auto [scrollbar-gutter:stable] px-[var(--dg-page-gutter)] py-4 md:py-6 xl:py-8"
       aria-busy="true"
       aria-label={variant === "staff" ? "Loading this person" : "Loading your profile"}
     >

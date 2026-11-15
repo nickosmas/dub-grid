@@ -23,14 +23,14 @@ A shift that runs past midnight counts by its real times, so a night shift from 
 
 ## How a request moves
 
-| Status                | Meaning                                                                                                        |
-| --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Open**              | Waiting for a teammate: someone to take the pickup, or the teammate you asked to accept the swap.              |
-| **Awaiting approval** | Waiting for a manager. A call-off request starts here.                                                         |
-| **Approved**          | The change is on the published schedule.                                                                       |
-| **Rejected**          | A manager declined it, or the teammate you asked declined.                                                     |
-| **Cancelled**         | The person who asked cancelled it.                                                                             |
-| **Expired**           | Nobody settled it within 72 hours of the request. Automatic expiry may not be available in every organization. |
+| Status                | Meaning                                                                                                                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Open**              | Waiting for a teammate: someone to take the pickup, or the teammate you asked to accept the swap.                                                                                                               |
+| **Awaiting approval** | Waiting for a manager. A call-off request starts here.                                                                                                                                                          |
+| **Approved**          | The change is on the published schedule.                                                                                                                                                                        |
+| **Rejected**          | A manager declined it, or the teammate you asked declined.                                                                                                                                                      |
+| **Cancelled**         | The person who asked or a manager cancelled it, or another approved request or call-off changed the shift first. A request cancelled automatically says why; only a manager's own words show as a manager note. |
+| **Expired**           | Nobody settled it within 72 hours of the request. Automatic expiry may not be available in every organization.                                                                                                  |
 
 - A **pickup** you offer stays open until a teammate claims it; then it waits for approval.
 - A **swap** or a pickup offered to a named teammate waits for that teammate to **Accept** or **Decline** first. Declining closes the request, and the person who asked keeps their shift.

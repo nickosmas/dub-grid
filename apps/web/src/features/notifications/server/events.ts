@@ -2,6 +2,7 @@ import {
   describeEmploymentStatus,
   orderFocusAreasByDepartment,
   resolveOrganizationLabel,
+  managerNoteOf,
 } from "@dubgrid/domain";
 import { getServiceClient } from "@/lib/supabase-service";
 import { listPermissionChanges, summarizePermissionChanges } from "@/lib/permission-labels";
@@ -19,6 +20,12 @@ import { sendNotification } from "./sender";
 import type { NotificationType } from "@/types";
 import type { NotificationEmailDetail } from "@/emails/NotificationEmail";
 import { formatEmailDate, formatEmailDateTime, resolveEmailTimeZone } from "@/emails/email-time";
+
+// Quotes a manager's own words only; a reason the database recorded is not theirs.
+function managerNoteSuffix(adminNote: string | undefined): string {
+  const note = managerNoteOf(adminNote);
+  return note ? ` Manager's note: ${note}` : "";
+}
 
 export type NotificationEvent =
   | {
@@ -935,13 +942,13 @@ async function dispatchNotificationEventInternal(
     case "shift_request_cancelled": {
       const requestInfo = await getRequestInfo(event.requestId);
       const typeLabel = getShiftRequestTypeLabel(requestInfo.requestType ?? "swap");
-      const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
+      const noteText = managerNoteSuffix(event.adminNote);
       const facts = await getRequestEmailFacts(
         event.orgId,
         requestInfo,
         requestInfo.requestType ?? "swap",
       );
-      const note = event.adminNote;
+      const note = managerNoteOf(event.adminNote) ?? undefined;
       const metadata = {
         requestId: event.requestId,
         requestType: requestInfo.requestType ?? "swap",
@@ -990,13 +997,13 @@ async function dispatchNotificationEventInternal(
       const typeLabel = getShiftRequestTypeLabel(requestType);
       const { requesterUserId } = requestInfo;
       const facts = await getRequestEmailFacts(event.orgId, requestInfo, requestType);
-      const note = event.adminNote;
+      const note = managerNoteOf(event.adminNote) ?? undefined;
       if (requesterUserId && requesterUserId !== actorUserId) {
         const status = event.approved ? "approved" : "rejected";
         const type: NotificationType = event.approved
           ? "shift_request_approved"
           : "shift_request_rejected";
-        const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
+        const noteText = managerNoteSuffix(event.adminNote);
         // An auto-approved request reaches its requester only when the
         // other party's acceptance settled it, so say that rather than
         // quoting the requester their own name from the note.
@@ -1042,7 +1049,7 @@ async function dispatchNotificationEventInternal(
       const { targetUserId } = requestInfo;
       if (targetUserId && targetUserId !== requesterUserId && targetUserId !== actorUserId) {
         const status = event.approved ? "approved" : "rejected";
-        const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
+        const noteText = managerNoteSuffix(event.adminNote);
         const intro =
           requestType === "swap"
             ? `The swap with ${requestInfo.requesterName} was ${status}.`
@@ -1073,7 +1080,7 @@ async function dispatchNotificationEventInternal(
       if (!event.approved && !requestInfo.targetUserId && event.previousTargetEmpId) {
         const claimantUserId = await getEmployeeUserId(event.previousTargetEmpId);
         if (claimantUserId && claimantUserId !== actorUserId) {
-          const noteText = event.adminNote ? ` Manager's note: ${event.adminNote}` : "";
+          const noteText = managerNoteSuffix(event.adminNote);
           await sendNotification(
             claimantUserId,
             event.orgId,

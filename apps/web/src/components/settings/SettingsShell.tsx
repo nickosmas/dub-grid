@@ -287,6 +287,7 @@ export function SettingsShell<TId extends string = string>({
             minWidth: 0,
             height: "100%",
             overflowY: "auto",
+            scrollbarGutter: "stable",
             padding: `${isMobile ? 16 : isTablet ? 24 : 32}px var(--dg-page-gutter)`,
             display: "flex",
             flexDirection: "column" as const,

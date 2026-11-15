@@ -363,7 +363,7 @@ export function buildOperationsReportPreviewTable(
           { label: "Decided" },
           { label: "Decided by" },
           { label: "Time to resolution" },
-          { label: "Manager note" },
+          { label: "Note" },
         ],
         rows: payload.reports.shiftRequests.map((row) => [
           formatKnownReportValue(row.type),
@@ -385,7 +385,7 @@ export function buildOperationsReportPreviewTable(
           row.resolvedAt ? formatReportTimestampForDisplay(row.resolvedAt) : "-",
           formatListValue(row.decidedBy, "-"),
           formatResolutionHours(row.resolutionHours),
-          formatListValue(row.managerNote, "-"),
+          formatListValue(row.note, "-"),
         ]),
         emptyText: "No matching requests for this range",
       };
@@ -405,7 +405,7 @@ export function buildOperationsReportPreviewTable(
           { label: "Notice given" },
           { label: "Decided" },
           { label: "Decided by" },
-          { label: "Manager note" },
+          { label: "Note" },
         ],
         rows: payload.reports.absencesCalloffs.map((row) => [
           formatKnownReportValue(row.kind),
@@ -420,7 +420,7 @@ export function buildOperationsReportPreviewTable(
           formatNoticeHours(row.noticeHours),
           row.decidedAt ? formatReportTimestampForDisplay(row.decidedAt) : "-",
           formatListValue(row.decidedBy, "-"),
-          formatListValue(row.managerNote, "-"),
+          formatListValue(row.note, "-"),
         ]),
         emptyText: "No absences or call-offs for this range",
       };
