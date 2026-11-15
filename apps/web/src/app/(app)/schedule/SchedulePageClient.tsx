@@ -222,6 +222,12 @@ import {
 } from "@/lib/assignable-shifts";
 import { createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
 import { mergeCellPublishChanges } from "@/lib/shift-change-web";
+import {
+  describeOtherPeriodPublishes,
+  describeOwnChangedDays,
+  groupPublishesByPeriod,
+  ownChangedDays,
+} from "@/lib/publish-notice";
 import { seriesScopeRange } from "@/lib/series-dates";
 import {
   buildScheduleCellEntryFromInput,
@@ -2001,6 +2007,28 @@ function SchedulerContent({
           ),
       ),
     [publishHistory, publishWindowDateRange.endDateKey, publishWindowDateRange.startDateKey],
+  );
+
+  // Whoever edits or publishes hears about everyone's changes. Anyone else
+  // hears only about their own shifts: a count of everyone's tells them
+  // nothing they can act on, so a bar with none of theirs doesn't show.
+  const seesOrgPublishChanges = isScheduleEditor || canNavigatePublishHistory;
+  const ownPublishNotice = useMemo(
+    () =>
+      seesOrgPublishChanges
+        ? null
+        : describeOwnChangedDays(ownChangedDays(inWindowPublishHistory, currentEmpId)),
+    [currentEmpId, inWindowPublishHistory, seesOrgPublishChanges],
+  );
+  const showInWindowPublishBanner =
+    inWindowPublishHistory.length > 0 && (seesOrgPublishChanges || ownPublishNotice != null);
+  const outOfWindowPublishGroups = useMemo(
+    () =>
+      groupPublishesByPeriod(outOfWindowPublishHistory, {
+        seesOrgChanges: seesOrgPublishChanges,
+        empId: currentEmpId,
+      }),
+    [currentEmpId, outOfWindowPublishHistory, seesOrgPublishChanges],
   );
 
   // Per-banner dismissals, persisted to sessionStorage so the X actually
@@ -8900,34 +8928,9 @@ function SchedulerContent({
                 </div>
               )}
             {!isBulkDeleteMode &&
-              outOfWindowPublishHistory.length > 0 &&
+              outOfWindowPublishGroups.length > 0 &&
               !outOfWindowPublishesDismissed &&
               (() => {
-                type PublishGroup = {
-                  key: string;
-                  startDate: string;
-                  endDate: string;
-                  changeCount: number;
-                };
-                const groups = new Map<string, PublishGroup>();
-                for (const entry of outOfWindowPublishHistory) {
-                  const key = `${entry.startDate}_${entry.endDate}`;
-                  const existing = groups.get(key);
-                  if (existing) {
-                    existing.changeCount += entry.changeCount;
-                  } else {
-                    groups.set(key, {
-                      key,
-                      startDate: entry.startDate,
-                      endDate: entry.endDate,
-                      changeCount: entry.changeCount,
-                    });
-                  }
-                }
-                const sortedGroups = [...groups.values()].sort((a, b) =>
-                  a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0,
-                );
-                const totalChanges = sortedGroups.reduce((s, g) => s + g.changeCount, 0);
                 const noun =
                   spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
                 return (
@@ -8935,10 +8938,14 @@ function SchedulerContent({
                     <BannerIcon tone="info" icon={CalendarCheck} />
                     <span style={{ fontWeight: 600 }}>Recently published:</span>
                     <span>
-                      {`${totalChanges} change${totalChanges === 1 ? "" : "s"} in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`}
+                      {describeOtherPeriodPublishes(
+                        outOfWindowPublishGroups,
+                        noun,
+                        seesOrgPublishChanges,
+                      )}
                     </span>
                     <div className="dg-draft-banner-actions" style={{ flexWrap: "wrap" }}>
-                      {sortedGroups.map((group) => {
+                      {outOfWindowPublishGroups.map((group) => {
                         const [sy, sm, sd] = group.startDate.split("-").map(Number);
                         const startDate = new Date(sy, sm - 1, sd);
                         const [ey, em, ed] = group.endDate.split("-").map(Number);
@@ -8982,10 +8989,17 @@ function SchedulerContent({
                 );
               })()}
             {!isBulkDeleteMode &&
-              inWindowPublishHistory.length > 0 &&
+              showInWindowPublishBanner &&
               !publishBannerDismissed &&
               (() => {
-                const latest = inWindowPublishHistory[0];
+                // Staff are told when their own shifts last changed, not when
+                // anyone's did.
+                const latest =
+                  (!seesOrgPublishChanges &&
+                    inWindowPublishHistory.find((entry) =>
+                      entry.changes.some((change) => change.empId === currentEmpId),
+                    )) ||
+                  inWindowPublishHistory[0];
                 return (
                   <div className="dg-draft-banner dg-draft-banner--info no-print">
                     <BannerIcon tone="info" icon={CalendarCheck} />
@@ -9005,8 +9019,12 @@ function SchedulerContent({
                     {/* The counts are the key: each kind is named, counted
                         and colored once, and only the kinds this publish
                         actually contains appear at all. */}
-                    <ChangeCountChips counts={publishChangeCounts} />
-                    {inWindowPublishHistory.length > 1 && (
+                    {seesOrgPublishChanges ? (
+                      <ChangeCountChips counts={publishChangeCounts} />
+                    ) : (
+                      <span>{ownPublishNotice}</span>
+                    )}
+                    {seesOrgPublishChanges && inWindowPublishHistory.length > 1 && (
                       <span style={{ marginLeft: 4 }}>
                         across {inWindowPublishHistory.length} publishes
                       </span>
