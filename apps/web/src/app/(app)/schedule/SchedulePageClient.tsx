@@ -74,6 +74,11 @@ import {
 } from "./_lib/open-shift-staffing";
 import { OpenShiftStaffingModal } from "@/components/schedule/OpenShiftStaffingModal";
 import { Hint } from "@/components/ui/hint";
+import {
+  BannerPeriodButtons,
+  orderBannerPeriods,
+  otherPeriodsTitle,
+} from "@/components/ui/BannerPeriodButtons";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
 import { BannerDismissButton, BannerIcon } from "@/components/ui/Banner";
 import { hint } from "@/components/ui/hint.types";
@@ -278,7 +283,6 @@ import {
 import {
   computeDraftBreakdown,
   computeOutOfWindowDraftGroups,
-  describeStatusDrafts,
   describeKeptStatusDrafts,
   extractDateKeyFromCellKey,
   statusDraftEmpIds,
@@ -1082,14 +1086,6 @@ function SchedulerContent({
       ),
     [shifts, notes, publishWindowDateRange, spanWeeks, payPeriodStartDate, isStatusDraftDay],
   );
-  const outOfWindowStatusLabels = useMemo(
-    () =>
-      outOfWindowDraftGroups.map((group) =>
-        describeStatusDrafts(group, (empId) => employeeNamesById.get(empId) ?? null),
-      ),
-    [outOfWindowDraftGroups, employeeNamesById],
-  );
-
   // Formatted "start–end" label per out-of-window group, shared by the
   // summary sentence (so it names every period, not just a count) and the
   // jump-to-period buttons below it.
@@ -1104,6 +1100,8 @@ function SchedulerContent({
       }),
     [outOfWindowDraftGroups, spanWeeks],
   );
+
+  const periodNoun = spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
 
   const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
 
@@ -9072,29 +9070,27 @@ function SchedulerContent({
                     : ""}
                 </span>
                 <div className="dg-draft-banner-actions">
-                  <Button
-                    type="button"
-                    className="dg-btn dg-btn-secondary"
-                    onClick={handleSelectVisibleBulkDeleteEntries}
-                    disabled={visibleBulkDeleteTargets.length === 0}
-                    style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
-                  >
-                    Select all
-                  </Button>
-                  <Button
-                    type="button"
-                    className="dg-btn dg-btn-secondary"
-                    onClick={() => setBulkDeleteSelectedKeys(new Set())}
-                    disabled={bulkDeleteSelectedKeys.size === 0}
-                    style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      padding: "5px 12px",
-                      color: "var(--dg-color-danger-text)",
-                      borderColor: "var(--dg-color-danger-border)",
-                    }}
-                  >
-                    Clear selection
-                  </Button>
+                  {/* One place for both: the banner holds two buttons and Cancel. */}
+                  {bulkDeleteSelectedKeys.size > 0 ? (
+                    <Button
+                      type="button"
+                      className="dg-btn dg-btn-secondary"
+                      onClick={() => setBulkDeleteSelectedKeys(new Set())}
+                      style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                    >
+                      Clear selection
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="dg-btn dg-btn-secondary"
+                      onClick={handleSelectVisibleBulkDeleteEntries}
+                      disabled={visibleBulkDeleteTargets.length === 0}
+                      style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                    >
+                      Select all
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     className="dg-btn dg-btn-danger"
@@ -9108,10 +9104,7 @@ function SchedulerContent({
                     type="button"
                     className="dg-btn dg-btn-ghost"
                     onClick={handleCancelBulkDeleteMode}
-                    style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      color: "var(--dg-color-danger-text)",
-                    }}
+                    style={{ fontSize: "var(--dg-fs-caption)" }}
                   >
                     Cancel
                   </Button>
@@ -9134,41 +9127,26 @@ function SchedulerContent({
               !outOfWindowDraftsDismissed && (
                 <div className="dg-draft-banner no-print" data-tour="draft-banner-other-weeks">
                   <BannerIcon tone="warning" icon={FilePen} />
-                  {/* Each button names its period and count, so the title
-                      needs no total. Counted from the loaded dates only. */}
-                  <span style={{ fontWeight: 700 }}>
-                    {spanWeeks === "month"
-                      ? "Drafts in other months"
-                      : spanWeeks === 2
-                        ? "Drafts in other pay periods"
-                        : "Drafts in other weeks"}
+                  {/* Each button names its period and count; the title says
+                      how many periods. Counted from the loaded dates only. */}
+                  <span className="dg-draft-banner-title">
+                    {otherPeriodsTitle("Drafts in", outOfWindowDraftGroups.length, periodNoun)}
                   </span>
-                  <div className="dg-draft-banner-actions" style={{ flexWrap: "wrap" }}>
-                    {outOfWindowDraftGroups.map((group, index) => (
-                      <Hint
-                        key={group.periodKey}
-                        content={hint(`Jump to this period to publish or discard its drafts`)}
-                        side="bottom"
-                      >
-                        <Button
-                          type="button"
-                          onClick={() => setWeekStart(group.periodStart)}
-                          className="dg-btn dg-btn-secondary dg-btn-sm"
-                        >
-                          {outOfWindowDraftGroupRanges[index]}{" "}
-                          <span style={{ marginLeft: 4 }}>({group.count})</span>
-                          {outOfWindowStatusLabels[index] ? (
-                            // Whose Away the drafts are, so the period isn't a puzzle.
-                            <span
-                              data-status-drafts=""
-                              style={{ marginLeft: 6, color: "var(--dg-color-text-secondary)" }}
-                            >
-                              · {outOfWindowStatusLabels[index]}
-                            </span>
-                          ) : null}
-                        </Button>
-                      </Hint>
-                    ))}
+                  <div className="dg-draft-banner-actions">
+                    <BannerPeriodButtons
+                      countNoun="draft"
+                      buttonHint="Jump to this period to publish or discard its drafts"
+                      periods={orderBannerPeriods(
+                        outOfWindowDraftGroups.map((group, index) => ({
+                          start: group.periodStart,
+                          key: group.periodKey,
+                          label: outOfWindowDraftGroupRanges[index],
+                          count: group.count,
+                          onSelect: () => setWeekStart(group.periodStart),
+                        })),
+                        weekStart,
+                      )}
+                    />
                     <Hint
                       content={hint("Hide this banner for the rest of this session")}
                       side="bottom"
@@ -9182,53 +9160,50 @@ function SchedulerContent({
               outOfWindowPublishGroups.length > 0 &&
               !outOfWindowPublishesDismissed &&
               (() => {
-                const noun =
-                  spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
                 return (
                   <div className="dg-draft-banner dg-draft-banner--info no-print">
                     <BannerIcon tone="info" icon={CalendarCheck} />
-                    <span style={{ fontWeight: 600 }}>Recently published:</span>
-                    <span>
+                    <span className="dg-draft-banner-title" style={{ fontWeight: 600 }}>
+                      Recently published:
+                    </span>
+                    <span className="dg-draft-banner-text">
                       {describeOtherPeriodPublishes(
                         outOfWindowPublishGroups,
-                        noun,
+                        periodNoun,
                         seesOrgPublishChanges,
                       )}
                     </span>
-                    <div className="dg-draft-banner-actions" style={{ flexWrap: "wrap" }}>
-                      {outOfWindowPublishGroups.map((group) => {
-                        const [sy, sm, sd] = group.startDate.split("-").map(Number);
-                        const startDate = new Date(sy, sm - 1, sd);
-                        const [ey, em, ed] = group.endDate.split("-").map(Number);
-                        const endDate = new Date(ey, em - 1, ed);
-                        return (
-                          <Hint
-                            key={group.key}
-                            content={hint("Jump to this period to view what changed")}
-                            side="bottom"
-                          >
-                            <Button
-                              type="button"
-                              onClick={() =>
-                                // Snap to the current span's own period start.
-                                // A raw publish start (a month's 1st, say) drops
-                                // a 1-week grid onto an arbitrary weekday.
+                    <div className="dg-draft-banner-actions">
+                      <BannerPeriodButtons
+                        countNoun="change"
+                        buttonHint="Jump to this period to view what changed"
+                        periods={orderBannerPeriods(
+                          outOfWindowPublishGroups.map((group) => {
+                            const [sy, sm, sd] = group.startDate.split("-").map(Number);
+                            const startDate = new Date(sy, sm - 1, sd);
+                            const [ey, em, ed] = group.endDate.split("-").map(Number);
+                            const endDate = new Date(ey, em - 1, ed);
+                            return {
+                              start: startDate,
+                              key: group.key,
+                              label: `${formatDate(startDate)} - ${formatDate(endDate)}`,
+                              count: group.changeCount,
+                              // Snap to the current span's own period start. A
+                              // raw publish start (a month's 1st, say) drops a
+                              // 1-week grid onto an arbitrary weekday.
+                              onSelect: () =>
                                 setWeekStart(
                                   getScheduleStartForSpan({
                                     date: startDate,
                                     span: spanWeeks,
                                     payPeriodStartDate,
                                   }),
-                                )
-                              }
-                              className="dg-btn dg-btn-secondary dg-btn-sm"
-                            >
-                              {`${formatDate(startDate)} - ${formatDate(endDate)}`}{" "}
-                              <span style={{ marginLeft: 4 }}>({group.changeCount})</span>
-                            </Button>
-                          </Hint>
-                        );
-                      })}
+                                ),
+                            };
+                          }),
+                          weekStart,
+                        )}
+                      />
                       <Hint
                         content={hint("Hide this banner for the rest of this session")}
                         side="bottom"
