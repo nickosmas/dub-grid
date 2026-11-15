@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   MAX_MOBILE_SCHEDULE_RANGE_DAYS,
@@ -25,6 +25,7 @@ import {
   SheetActions,
   SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
+import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { Button } from "../../../shared/components/Button";
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { PressableRow } from "../../../shared/components/PressableRow";
@@ -138,7 +139,6 @@ import {
   hasAnyRequestableScheduleEntrySegment,
   hasScheduleEntrySegmentStarted,
   hasScheduledWorkedAssignment,
-  hasWorkedAssignment,
   isGeneralDetailEntry,
   isGeneralDetailSegment,
   readOptionalColor,
@@ -159,6 +159,8 @@ import {
   shouldShowMePrimaryTitle,
   type JobChip,
 } from "../lib/scheduleScreenChips";
+import { getShiftRequestAvailability } from "../lib/shiftRequestAvailability";
+import { useShiftRequestActionFlow } from "../../shift-requests/hooks/useShiftRequestActionFlow";
 import {
   ACTION_SEGMENT_OPTION_RADIUS,
   ACTION_SEGMENT_PANEL_PADDING,
@@ -477,22 +479,15 @@ export default function ShiftDetailScreen() {
   const isCheckingExistingRequests = shouldCheckExistingRequests && requestsQuery.isLoading;
   const showExistingRequestsSkeleton = useSkeletonGate(isCheckingExistingRequests);
   const showSwapOptionsSkeleton = useSkeletonGate(swapOptionsQuery.isLoading);
-  const shiftRequestCheckError =
-    shouldCheckExistingRequests && requestsQuery.error
-      ? getQueryErrorMessage(
-          requestsQuery.error,
-          "We couldn't check whether you already asked about this shift. Try again.",
-        )
-      : null;
-  useEffect(() => {
-    if (shouldCheckExistingRequests && requestsQuery.error) {
-      pushClientFriendlyErrorToast(pushToast, {
-        error: requestsQuery.error,
-        title: "Couldn't check your requests",
-        fallbackMessage: "We couldn't check whether you already asked about this shift. Try again.",
-      });
-    }
-  }, [shouldCheckExistingRequests, requestsQuery.error, pushToast]);
+  // Said once, beside the actions it turns off (see `requestAvailability`),
+  // with a Try again there rather than a toast that leaves no way back.
+  const hasShiftRequestCheckError = shouldCheckExistingRequests && Boolean(requestsQuery.error);
+  const cancelRequestFlow = useShiftRequestActionFlow({
+    accessToken,
+    viewerCanApprove: canApproveShiftRequests,
+    requests: requestsQuery.data?.requests,
+    onSucceeded: () => requestsQuery.refetch(),
+  });
   const shiftmates = useMemo(() => {
     if (!shiftEntry) {
       return [];
@@ -713,21 +708,16 @@ export default function ShiftDetailScreen() {
       : (activeAbsenceTypes.find(
           (absenceType) => absenceType.id === selectedCalloffAbsenceTypeId,
         ) ?? null);
-  const canCreateRequestsForShift = Boolean(
-    shiftEntry &&
-    linkedEmployeeId &&
-    shiftEntry.employeeId === linkedEmployeeId &&
-    shiftEntry.change?.kind !== "deleted" &&
-    hasAnyRequestableScheduleEntrySegment(shiftEntry, timeZone) &&
-    getScheduleEntryAbsenceTypeId(shiftEntry) == null &&
-    hasWorkedAssignment(shiftEntry) &&
-    !isCheckingExistingRequests &&
-    !shiftRequestCheckError &&
-    !activeShiftRequest,
-  );
-  const canCreateSwapForShift = Boolean(
-    canCreateRequestsForShift && shiftEntry && hasScheduledWorkedAssignment(shiftEntry),
-  );
+  const requestAvailability = getShiftRequestAvailability({
+    entry: shiftEntry,
+    linkedEmployeeId,
+    timeZone,
+    isCheckingExistingRequests,
+    hasExistingRequestCheckError: hasShiftRequestCheckError,
+    hasActiveRequest: activeShiftRequest != null,
+  });
+  const canCreateRequestsForShift = requestAvailability.canDrop;
+  const canCreateSwapForShift = requestAvailability.canSwap;
   const canSubmitRequest = Boolean(
     linkedEmployeeId && shiftEntry && requestMode === "swap" && selectedTargetEntry,
   );
@@ -1558,6 +1548,23 @@ export default function ShiftDetailScreen() {
                 ) : null}
               </View>
             ) : null}
+            {requestAvailability.notice ? (
+              <View style={styles.detailActionNotice}>
+                <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.detailActionNoticeText}>
+                  {requestAvailability.notice}
+                </Text>
+                {requestAvailability.canRetry ? (
+                  <Button
+                    fullWidth={false}
+                    label="Try again"
+                    loading={requestsQuery.isFetching}
+                    onPress={() => requestsQuery.refetch()}
+                    size="sm"
+                    tone="secondary"
+                  />
+                ) : null}
+              </View>
+            ) : null}
 
             <PreviousShiftFooter entry={shiftEntry} focusAreaFieldLabel={focusAreaFieldLabel} />
 
@@ -1610,14 +1617,44 @@ export default function ShiftDetailScreen() {
               title="You already asked about this shift"
               body={`Your ${formatShiftRequestType(activeShiftRequest.type).toLowerCase()} request is ${formatShiftRequestStatus(activeShiftRequest.status).toLowerCase()} for this shift.`}
               detail={
-                formatShiftRequestNote(activeShiftRequest.adminNote) ? (
-                  <Text style={styles.detailFootnote}>
-                    {formatShiftRequestNote(activeShiftRequest.adminNote)}
-                  </Text>
-                ) : undefined
+                <View style={styles.activeRequestDetail}>
+                  {formatShiftRequestNote(activeShiftRequest.adminNote) ? (
+                    <Text style={styles.detailFootnote}>
+                      {formatShiftRequestNote(activeShiftRequest.adminNote)}
+                    </Text>
+                  ) : null}
+                  <ActionButtons
+                    primaryAction={
+                      <Button
+                        label="View in Requests"
+                        onPress={() =>
+                          router.push({
+                            pathname: "/(tabs)/requests",
+                            params: { tab: "mine", requestId: activeShiftRequest.id },
+                          })
+                        }
+                        size="sm"
+                      />
+                    }
+                  >
+                    <Button
+                      label="Cancel request"
+                      loading={cancelRequestFlow.pendingAction != null}
+                      onPress={() =>
+                        cancelRequestFlow.runRequestAction(activeShiftRequest.id, {
+                          action: "cancel",
+                          empId: activeShiftRequest.requesterEmpId,
+                        })
+                      }
+                      size="sm"
+                      tone="secondary"
+                    />
+                  </ActionButtons>
+                </View>
               }
             />
           ) : null}
+          {cancelRequestFlow.confirmationModal}
         </>
       )}
       {/* Drop and pickup are a short choice and stay in the bottom sheet.
