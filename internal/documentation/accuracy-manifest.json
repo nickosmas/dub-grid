@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:db2ef14889caee37b1347d033b8dafbe4fccc8b5c62280b9640467424a26a6ab"
+      "evidenceFingerprint": "sha256:d182aece9fbecc03243c032d39dfbc1e83ea9c06709e5baf6f51692c9d0d0b9d"
     },
     {
       "id": "introduction",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:a2a7be4b289eddadcca647c9f92fc3cecbab5d0eeab8852afc19144fa8a98ece"
+      "evidenceFingerprint": "sha256:885142981e0b507d94a3e588a99d7d7ded3427fba854518aed8fc66a4e904dca"
     },
     {
       "id": "quickstart",
@@ -238,7 +238,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:33477ba23368e547ebb4baa5cdef75f51c50272c6aded936ba98be35f9ca5c5c"
+      "evidenceFingerprint": "sha256:ccbfac7046e9eda73e068b94b9c7ce29b99e1f83baf37da3a7be4b12e7b09640"
     },
     {
       "id": "onboarding",
@@ -386,7 +386,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:abc60f47197245fdeed8afbd030b787c25235b6721a1179b7caa2ab87373b118"
+      "evidenceFingerprint": "sha256:877d3799d280be67dac86d77a058c720130100d6fa5d52e312510786aaa22639"
     },
     {
       "id": "draft-publish",
@@ -444,7 +444,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fc1422aed51acd5bc8b74c31661df75a47ff1c1c9936995dd7c4b0751de9a34b"
+      "evidenceFingerprint": "sha256:e5b9233e47ed2d7b114e9ad440edc08ea4f46d3ecac0164be95eb7d302517087"
     },
     {
       "id": "recurring-shifts",
@@ -499,7 +499,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:91a2d1505f44053895d19f2a23d08a0185b86cb4277fc74c132a6ee0eb9d51b7"
+      "evidenceFingerprint": "sha256:5f29e0e101b1facb99ef4612864f9a84d5415211f14fbbebecf3220e920dd6ce"
     },
     {
       "id": "realtime",
@@ -546,7 +546,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:93e3110b970bcbdc6afe2a12e12c8eb11a4076a87dc8269e874bd6e830ec50fb"
+      "evidenceFingerprint": "sha256:70f9eced5b90539bd94d0ee1da54bdd42422d9e59da64b8f146ba1647017f7d7"
     },
     {
       "id": "shift-requests",
@@ -616,7 +616,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5bad00dbc75c1107e7363e359571c072cfb47d89cac291a003b68bcd8b2ca2c8"
+      "evidenceFingerprint": "sha256:b6838c52ad386f6cc2f569f9477e00211f2f4557659157ba855e43a82be0823c"
     },
     {
       "id": "dashboard",
@@ -1322,7 +1322,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:85dd53dd6ba458faac705bc795fd1a6018c5592d5da13cb4ddf87026840eb09a"
+      "evidenceFingerprint": "sha256:ba1d1a22882a9d185f51ca6014c369acaca13ecc178ad24e7db8e78041389314"
     },
     {
       "id": "alerts",
@@ -1518,7 +1518,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9a9c4ab0c4e725b5f979179e594bdc112ffe995ac5c8bcf8a09282dc8dc124d0"
+      "evidenceFingerprint": "sha256:8b68c026f54dbd4c05cdd55c5c3ecaf3da6ab2c50e1385f96b28ec897cca25bf"
     },
     {
       "id": "security-sessions",
@@ -1996,7 +1996,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:8e66d219e714bcbd33239184f8181343358baedcae42bbdeb5799cbd6518c71e"
+      "evidenceFingerprint": "sha256:cee6576499cc096a58fe595c9e76e8854d1b5516fc7c44b439e49a92abe5efd7"
     },
     {
       "id": "coverage-open-shifts",
@@ -2047,7 +2047,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:247362293007182619b14c898008a56bae92b38d45e0be09738186c8ee3413aa"
+      "evidenceFingerprint": "sha256:bb263803b35d38f0e767879165185d0851db03e0d3e9cce3bf47ef64ecf2076a"
     },
     {
       "id": "mobile-schedule",
@@ -2102,7 +2102,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:8ca6b8c9699242d92e3af42e2e87c8c90482fe74eb990ba70a12981510fc37f5"
+      "evidenceFingerprint": "sha256:3a7e865755388354724baf00bacb1c540efd5ab627ee0cf770b1e22c19508815"
     },
     {
       "id": "integrations-exports",
@@ -2160,7 +2160,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:8d4ce58ad52372a7afcc047eccabec066452a0e96e54e9b58074ece50b100708"
+      "evidenceFingerprint": "sha256:afed4c8740653e689a90d3d2509fb5f9a614d58f757f375e504f7a5fbae13de5"
     }
   ],
   "surfaceExclusions": [

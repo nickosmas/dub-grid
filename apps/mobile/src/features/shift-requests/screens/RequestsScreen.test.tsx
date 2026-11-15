@@ -18,6 +18,7 @@ const useQueryClient = vi.fn(() => queryClientStub);
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
+const routerPush = vi.fn();
 const pushToast = vi.fn();
 const { getShiftRequestHistory, getShiftRequests } = vi.hoisted(() => ({
   getShiftRequestHistory: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("expo-router", () => ({
+  router: { push: routerPush },
   useLocalSearchParams,
 }));
 
@@ -107,6 +109,7 @@ describe("RequestsScreen", () => {
     useAccessToken.mockReset();
     useBootstrap.mockReset();
     useLocalSearchParams.mockReset();
+    routerPush.mockReset();
     pushToast.mockReset();
     getShiftRequestHistory.mockReset();
     getShiftRequests.mockReset();
@@ -351,6 +354,94 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(screen.getByText("No requests yet")).toBeInTheDocument();
+  });
+
+  it("points an empty Mine tab at the schedule and at past requests", () => {
+    const bootstrap = useBootstrap();
+    useBootstrap.mockReturnValue({
+      ...bootstrap,
+      data: {
+        ...bootstrap.data,
+        permissions: { ...bootstrap.data.permissions, canViewSchedule: true },
+      },
+    });
+    useLocalSearchParams.mockReturnValue({ tab: "mine" });
+    useQuery.mockReturnValue({
+      data: { requests: [], openShifts: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useInfiniteQuery.mockReturnValue({
+      data: {
+        pages: [
+          {
+            requests: [
+              {
+                ...buildHistoryRequest("history-1", "Alex Kim", "2025-12-01"),
+                requesterEmpId: "emp-1",
+              },
+            ],
+            nextCursor: null,
+          },
+        ],
+      },
+      error: null,
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("No open requests")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Open one of your shifts in Schedule to drop or swap it. Your past requests are in History.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No requests yet")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Go to Schedule" }));
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/team");
+  });
+
+  it("leaves History out of an empty Mine tab when only other people's requests are there", () => {
+    useLocalSearchParams.mockReturnValue({ tab: "mine" });
+    useQuery.mockReturnValue({
+      data: { requests: [], openShifts: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useInfiniteQuery.mockReturnValue({
+      data: {
+        pages: [
+          {
+            requests: [buildHistoryRequest("history-1", "Saved History", "2025-12-01")],
+            nextCursor: null,
+          },
+        ],
+      },
+      error: null,
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    // No Schedule tab for this viewer, so their own shifts are on Home.
+    expect(
+      screen.getByText("Open one of your shifts on Home to drop or swap it."),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Go to Home" }));
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/home");
   });
 
   it("shows coverage-gap open shifts and volunteers from the requests tab", () => {

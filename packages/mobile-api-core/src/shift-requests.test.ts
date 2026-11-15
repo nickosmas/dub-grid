@@ -216,6 +216,35 @@ describe("loadMobileShiftRequestsPayload", () => {
     expect((await load).requests[0].draftCells).toBeNull();
   });
 
+  it.each([
+    ["staff", {}, false],
+    ["an approver", { canApproveShiftRequests: true }, false],
+    ["a scheduler", { canEditShifts: true }, true],
+  ])(
+    "counts open shifts from drafts only for a scheduler: %s",
+    async (_who, permissions, drafts) => {
+      const { auth } = makeContext({ data: [], error: null });
+      auth.permissions = { ...auth.permissions, ...permissions };
+      const fetchMobileOpenShifts = vi.fn(async () => []);
+
+      await loadMobileShiftRequestsPayload(
+        auth,
+        {},
+        {
+          fetchLinkedEmployeeForUser: vi.fn(async () => ({ id: EMP_ID }) as never),
+          fetchMobileOpenShifts,
+          fetchMobileScheduleEntries: vi.fn(async () => []),
+          fetchMobileShiftRequests: vi.fn(async () => []),
+        },
+      );
+
+      expect(fetchMobileOpenShifts).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ includeDrafts: drafts }),
+      );
+    },
+  );
+
   it("does not check for a viewer who cannot approve", async () => {
     const { load, rpc } = payloadFor({ canEditShifts: true }, { data: [], error: null });
 

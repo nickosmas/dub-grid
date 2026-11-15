@@ -9,9 +9,11 @@ import type { ShiftRequest } from "@/types";
 const fetchShiftRequestDraftCells = vi.fn(
   async (..._args: unknown[]): Promise<ShiftRequestDraftCell[] | null> => [],
 );
+const fetchShiftRequests = vi.fn(async (..._args: unknown[]): Promise<ShiftRequest[]> => []);
 vi.mock("@/features/schedule/client/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/schedule/client/api")>()),
   fetchShiftRequestDraftCells: (...args: unknown[]) => fetchShiftRequestDraftCells(...args),
+  fetchShiftRequests: (...args: unknown[]) => fetchShiftRequests(...args),
 }));
 
 function makeRequest(overrides: Partial<ShiftRequest> = {}): ShiftRequest {
@@ -409,6 +411,63 @@ describe("ShiftRequestBoard", () => {
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(screen.getByText("Swap request")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
+  it("tells someone with no requests how to start one", async () => {
+    const user = userEvent.setup();
+    renderBoard({ currentEmpId: "emp-2" });
+
+    await user.click(screen.getByRole("tab", { name: /my requests/i }));
+
+    expect(screen.getByText("No requests yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("Open one of your shifts on the schedule to offer, swap or call it off."),
+    ).toBeInTheDocument();
+  });
+
+  it("gives staff a history of their own decided requests, with the outcome and note", async () => {
+    const user = userEvent.setup();
+    fetchShiftRequests.mockResolvedValueOnce([
+      makeRequest({
+        id: "mine-rejected",
+        type: "calloff",
+        status: "rejected",
+        requesterEmpId: "emp-2",
+        requesterName: "Me Myself",
+        adminNote: "We're short that day",
+        resolvedAt: "2026-04-15T09:00:00.000Z",
+      }),
+      makeRequest({
+        id: "someone-elses",
+        status: "approved",
+        requesterEmpId: "emp-7",
+        requesterName: "Other Person",
+        resolvedAt: "2026-04-15T09:00:00.000Z",
+      }),
+    ]);
+    renderBoard({ currentEmpId: "emp-2" });
+
+    await user.click(screen.getByRole("tab", { name: /history/i }));
+
+    expect(await screen.findByText("Manager note: We're short that day")).toBeInTheDocument();
+    expect(screen.getAllByText(/Rejected/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Other Person/)).not.toBeInTheDocument();
+    // Only a reviewer can look up other people.
+    expect(screen.queryByRole("button", { name: "Staff" })).not.toBeInTheDocument();
+    expect(fetchShiftRequests).toHaveBeenLastCalledWith(
+      "org-1",
+      expect.any(Map),
+      expect.objectContaining({ status: ["approved", "rejected", "cancelled", "expired"] }),
+    );
+  });
+
+  it("keeps the person filter on a reviewer's history", async () => {
+    const user = userEvent.setup();
+    renderBoard({ canApprove: true });
+
+    await user.click(screen.getByRole("tab", { name: /history/i }));
+
+    expect(screen.getByRole("button", { name: "Staff" })).toBeInTheDocument();
   });
 
   it("lets a requester cancel their own open request", async () => {
