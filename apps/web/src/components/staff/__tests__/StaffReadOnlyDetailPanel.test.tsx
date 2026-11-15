@@ -77,4 +77,14 @@ describe("StaffReadOnlyDetailPanel", () => {
     expect(screen.getByText("Contact")).toBeInTheDocument();
     expect(screen.getByText("pat@example.com")).toBeInTheDocument();
   });
+
+  // The date is the last status change, not when they started.
+  it("doesn't present the last status change as a start date", () => {
+    renderPanel({
+      canViewEmployeeDetails: true,
+      employee: { ...coworker, statusChangedAt: "2026-10-01T12:00:00Z" },
+    });
+
+    expect(screen.queryByText(/On staff since/)).not.toBeInTheDocument();
+  });
 });
