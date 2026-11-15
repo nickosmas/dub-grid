@@ -232,7 +232,8 @@ export function ProfilePage() {
       ? [
           namesOf(employee.roleIds, orgRoles).join(", "),
           namesOf(employee.focusAreaIds, focusAreas).join(", "),
-          employee.employmentType === "part_time" ? "Part-time" : "Full-time",
+          employee.employmentType &&
+            (employee.employmentType === "part_time" ? "Part-time" : "Full-time"),
         ]
           .filter(Boolean)
           .join(" · ")

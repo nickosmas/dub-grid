@@ -870,7 +870,7 @@ export function MembersSection({
 
   const employmentSummary = useMemo(
     () => ({
-      fullTime: employees.filter((employee) => employee.employmentType !== "part_time").length,
+      fullTime: employees.filter((employee) => employee.employmentType === "full_time").length,
       partTime: employees.filter((employee) => employee.employmentType === "part_time").length,
     }),
     [employees],
