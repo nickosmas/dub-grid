@@ -42,6 +42,7 @@ import {
   groupManagerQueue,
   isAwaitingRecipient,
   SHIFT_REQUEST_DECLINE_MESSAGE,
+  formatShiftRequestNote,
 } from "@dubgrid/domain";
 import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
@@ -655,11 +656,11 @@ export default function ShiftRequestBoard({
               ? `Decided ${formatResolvedAt(req.resolvedAt)}`
               : `Requested ${formatShiftDate(req.createdAt.slice(0, 10))}`}
         </div>
-        {req.adminNote ? (
+        {formatShiftRequestNote(req.adminNote) ? (
           <div
             style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-secondary)" }}
           >
-            Manager note: {req.adminNote}
+            {formatShiftRequestNote(req.adminNote)}
           </div>
         ) : null}
 
