@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import { useMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import { Button } from "@/components/Button";
 import type { AvatarTone } from "@dubgrid/design-tokens";
+import { lockPageScroll } from "@/lib/page-scroll-lock";
 
 interface MainNavItem {
   id: string;
@@ -99,13 +100,9 @@ export default function MobileNavSheet({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, close]);
 
-  // Lock body scroll when open
   useEffect(() => {
     if (!open) return;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    return lockPageScroll();
   }, [open]);
 
   // Focus first element on open
