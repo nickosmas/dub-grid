@@ -54,6 +54,8 @@ const documentedNeutralOutputExceptions = new Set([
   "app/twitter-image.tsx",
   "components/PrintScheduleView.tsx",
   "components/print-document.ts",
+  // The print window carries no theme variables, so its neutrals are literals.
+  "components/print-palette.ts",
   "components/settings/AbsenceTypes.tsx",
 ]);
 
