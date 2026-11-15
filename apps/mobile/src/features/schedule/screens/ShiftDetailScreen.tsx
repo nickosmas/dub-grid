@@ -17,6 +17,7 @@ import {
   describeShiftRequestSubmitted,
   singularLabelNoun,
   DEFAULT_ORGANIZATION_LABELS,
+  formatShiftRequestNote,
 } from "@dubgrid/domain";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import {
@@ -1617,9 +1618,9 @@ export default function ShiftDetailScreen() {
               body={`Your ${formatShiftRequestType(activeShiftRequest.type).toLowerCase()} request is ${formatShiftRequestStatus(activeShiftRequest.status).toLowerCase()} for this shift.`}
               detail={
                 <View style={styles.activeRequestDetail}>
-                  {activeShiftRequest.adminNote ? (
+                  {formatShiftRequestNote(activeShiftRequest.adminNote) ? (
                     <Text style={styles.detailFootnote}>
-                      Manager note: {activeShiftRequest.adminNote}
+                      {formatShiftRequestNote(activeShiftRequest.adminNote)}
                     </Text>
                   ) : null}
                   <ActionButtons

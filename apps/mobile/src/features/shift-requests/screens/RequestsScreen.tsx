@@ -6,6 +6,7 @@ import {
   describeShiftRequestPill,
   groupManagerQueue,
   isAwaitingRecipient,
+  formatShiftRequestNote,
 } from "@dubgrid/domain";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
@@ -1315,11 +1316,11 @@ function RequestCard({
           />
         )}
       </View>
-      {request.adminNote ? (
+      {formatShiftRequestNote(request.adminNote) ? (
         <>
           <View style={styles.cardSeparator} />
           <View style={styles.cardRow}>
-            <Text style={styles.metaText}>Manager note: {request.adminNote}</Text>
+            <Text style={styles.metaText}>{formatShiftRequestNote(request.adminNote)}</Text>
           </View>
         </>
       ) : null}

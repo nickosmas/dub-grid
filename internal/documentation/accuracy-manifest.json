@@ -386,7 +386,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:35be6d24f942e80e8ee9db38aa2410cc381a7d24327efe8f1c8b32e9cb46afcc"
+      "evidenceFingerprint": "sha256:e79481880f4f93ac053cc0df2eee8748bd11d15d1a5ee4b46f1b5a039cb370ac"
     },
     {
       "id": "draft-publish",
@@ -444,7 +444,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:032dc5afedb40b8f48e83fcaa3d8072d08b924e927e4e46adf3e7e06a15b0d2f"
+      "evidenceFingerprint": "sha256:8f823b24707c30e8475bfd3cb462152eadd3c12258f27f5f077b3dcc647f08f5"
     },
     {
       "id": "recurring-shifts",
@@ -616,7 +616,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:95d81ad5c15f8880096c8279b8722c8ab9e1416903ef1d22f484340611c24872"
+      "evidenceFingerprint": "sha256:141c094064946b26f212eab83e9acfaaf0405667439236ee55def58fd126c405"
     },
     {
       "id": "dashboard",
@@ -1322,7 +1322,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cfa37c3c8359c3defbb50801d078e4e532e508a7dd2b7beb86d9a93d883c758e"
+      "evidenceFingerprint": "sha256:09ca91ccadf316b65ac1726acaee2b1841ac352d2134db6e69a02eb5de9fe83a"
     },
     {
       "id": "alerts",
@@ -1440,7 +1440,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bbe21e5ab0b88acb244890555f385cc27ec6ef298ead2333df60ed22cdc9f619"
+      "evidenceFingerprint": "sha256:06dcc6788ced4cbcfb1adfe05735bb8eadb2d5a1fdc2bc672b8a788ebe68c39c"
     },
     {
       "id": "profile",
@@ -1597,7 +1597,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fca1695956dde3de12700209d3bcc7b219fa5df4c0b96ad637c9b3c3b4331071"
+      "evidenceFingerprint": "sha256:8051155b41a1a4964a97cf3f8c04a5fdba447e7f2b9a9d5d395708248ddb8373"
     },
     {
       "id": "privacy-controls",
@@ -2102,7 +2102,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:3a7e865755388354724baf00bacb1c540efd5ab627ee0cf770b1e22c19508815"
+      "evidenceFingerprint": "sha256:e1a4dc5ce349ad7a784a19f44196e4f6d0a205e967b013b710be789b8608edc1"
     },
     {
       "id": "integrations-exports",
