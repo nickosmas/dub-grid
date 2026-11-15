@@ -76,6 +76,7 @@ export interface ScheduleGridAccessors {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  publishedCellStateForKey?: (empId: string, date: Date) => ScheduleCellState | null;
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Where that absence sits and the time it covers (item 50d). */
   restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;

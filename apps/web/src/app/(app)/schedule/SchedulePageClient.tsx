@@ -179,6 +179,7 @@ import {
   jobIdIsArchived,
 } from "@/lib/archived-jobs";
 import { awayRangesById, withoutAwayDays } from "./_lib/away-coverage";
+import { isAwayOn, isBeforeRangeFirstDay } from "@/components/schedule-grid/awayRuns";
 import { buildSchedulableOn } from "./_lib/schedulable-on";
 import {
   CORRECTION_ADMIN_WINDOW_DAYS,
@@ -277,6 +278,10 @@ import {
 import {
   computeDraftBreakdown,
   computeOutOfWindowDraftGroups,
+  describeStatusDrafts,
+  describeKeptStatusDrafts,
+  extractDateKeyFromCellKey,
+  statusDraftEmpIds,
   countShiftsAddedToPublishedCell,
 } from "@/lib/draft-utils";
 import { exportScheduleCSV, withOtherFocusAreas, withRestOfDayAbsence } from "@/lib/export-csv";
@@ -983,6 +988,61 @@ function SchedulerContent({
     [shifts, notes, publishWindowDateRange],
   );
 
+  // Drafts that exist in the loaded ±90-day data but fall OUTSIDE the current
+  // publish window. Surfaced as a secondary notice so the user can navigate
+  // to those periods and publish them.
+  // Days someone is Away hold drafts their status change wrote; discard
+  // leaves those (migration 143).
+  const isStatusDraftDay = useCallback(
+    (empId: string, dateKey: string) => {
+      const range = awayRanges.get(empId);
+      return (
+        !!range &&
+        !range.lastDay &&
+        !isBeforeRangeFirstDay(range, dateKey) &&
+        isAwayOn(range, dateKey)
+      );
+    },
+    [awayRanges],
+  );
+  const employeeNamesById = useMemo(
+    () =>
+      new Map(
+        [...employees, ...inactiveEmployees].map((employee) => [
+          employee.id,
+          getEmployeeDisplayName(employee),
+        ]),
+      ),
+    [employees, inactiveEmployees],
+  );
+  const keptStatusDraftsNote = useMemo(
+    () =>
+      describeKeptStatusDrafts(
+        statusDraftEmpIds(shifts, publishWindowDateRange, isStatusDraftDay).flatMap((empId) => {
+          const name = employeeNamesById.get(empId);
+          return name ? [name] : [];
+        }),
+      ),
+    [shifts, publishWindowDateRange, isStatusDraftDay, employeeNamesById],
+  );
+  // What a discard can remove: it leaves the drafts on someone's Away days
+  // (migration 143), so the dialog doesn't count them.
+  const discardableShifts = useMemo(() => {
+    const kept: typeof shifts = {};
+    for (const [key, entry] of Object.entries(shifts)) {
+      const dateKey = extractDateKeyFromCellKey(key);
+      const empId = key.split("_")[0];
+      if (entry?.draftKind != null && dateKey && empId && isStatusDraftDay(empId, dateKey)) {
+        continue;
+      }
+      kept[key] = entry;
+    }
+    return kept;
+  }, [shifts, isStatusDraftDay]);
+  const discardAllBreakdown = useMemo(
+    () => computeDraftBreakdown(discardableShifts, notes, publishWindowDateRange),
+    [discardableShifts, notes, publishWindowDateRange],
+  );
   // Local "my drafts" breakdown — filter shifts by updatedBy. Notes can't be
   // filtered client-side (no updatedBy on the local ScheduleNote shape), so
   // they're included whole; the server-side discard with scope="mine" filters
@@ -990,17 +1050,13 @@ function SchedulerContent({
   // for the dialog summary.
   const mineBreakdown = useMemo(() => {
     const uid = authUser?.id ?? null;
-    if (!uid) return draftBreakdown;
+    if (!uid) return discardAllBreakdown;
     const mineShifts: typeof shifts = {};
-    for (const [key, entry] of Object.entries(shifts)) {
+    for (const [key, entry] of Object.entries(discardableShifts)) {
       if (entry?.updatedBy === uid) mineShifts[key] = entry;
     }
     return computeDraftBreakdown(mineShifts, notes, publishWindowDateRange);
-  }, [authUser?.id, draftBreakdown, shifts, notes, publishWindowDateRange]);
-
-  // Drafts that exist in the loaded ±90-day data but fall OUTSIDE the current
-  // publish window. Surfaced as a secondary notice so the user can navigate
-  // to those periods and publish them.
+  }, [authUser?.id, discardAllBreakdown, discardableShifts, notes, publishWindowDateRange]);
   const outOfWindowDraftGroups = useMemo(
     () =>
       computeOutOfWindowDraftGroups(
@@ -1022,8 +1078,16 @@ function SchedulerContent({
           const [y, m, d] = periodKey.split("-").map((n) => Number(n));
           return new Date(y, m - 1, d);
         },
+        isStatusDraftDay,
       ),
-    [shifts, notes, publishWindowDateRange, spanWeeks, payPeriodStartDate],
+    [shifts, notes, publishWindowDateRange, spanWeeks, payPeriodStartDate, isStatusDraftDay],
+  );
+  const outOfWindowStatusLabels = useMemo(
+    () =>
+      outOfWindowDraftGroups.map((group) =>
+        describeStatusDrafts(group, (empId) => employeeNamesById.get(empId) ?? null),
+      ),
+    [outOfWindowDraftGroups, employeeNamesById],
   );
 
   // Formatted "start–end" label per out-of-window group, shared by the
@@ -1050,7 +1114,7 @@ function SchedulerContent({
   // Super admins see both "discard mine" and "discard all" options only when
   // the org actually has drafts from other editors (i.e. mine totals differ).
   const showOrganizationDiscardScope =
-    isSuperAdmin && mineBreakdown.totalChanges !== draftBreakdown.totalChanges;
+    isSuperAdmin && mineBreakdown.totalChanges !== discardAllBreakdown.totalChanges;
 
   const openDiscardConfirm = useCallback(() => {
     setShowDiscardConfirm(true);
@@ -3395,6 +3459,10 @@ function SchedulerContent({
     [shifts],
   );
 
+  const publishedCellStateForKey = useCallback(
+    (empId: string, date: Date) => shifts[`${empId}_${formatDateKey(date)}`]?.published ?? null,
+    [shifts],
+  );
   const publishedAbsenceTypeIdForKey = useCallback(
     (empId: string, date: Date): number | null => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
@@ -8455,6 +8523,7 @@ function SchedulerContent({
           publishedLabelForKey,
           publishedAssignmentIdsForKey,
           publishedAbsenceTypeIdForKey,
+          publishedCellStateForKey,
           restOfDayAbsenceTypeIdForKey,
           restOfDayAbsenceLayoutForKey,
           publishedRestOfDayAbsenceTypeIdForKey,
@@ -8512,6 +8581,7 @@ function SchedulerContent({
       publishedLabelForKey,
       publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey,
+      publishedCellStateForKey,
       restOfDayAbsenceTypeIdForKey,
       restOfDayAbsenceLayoutForKey,
       publishedRestOfDayAbsenceTypeIdForKey,
@@ -9086,6 +9156,15 @@ function SchedulerContent({
                         >
                           {outOfWindowDraftGroupRanges[index]}{" "}
                           <span style={{ marginLeft: 4 }}>({group.count})</span>
+                          {outOfWindowStatusLabels[index] ? (
+                            // Whose Away the drafts are, so the period isn't a puzzle.
+                            <span
+                              data-status-drafts=""
+                              style={{ marginLeft: 6, color: "var(--dg-color-text-secondary)" }}
+                            >
+                              · {outOfWindowStatusLabels[index]}
+                            </span>
+                          ) : null}
                         </Button>
                       </Hint>
                     ))}
@@ -10386,7 +10465,7 @@ function SchedulerContent({
                     {showOrganizationDiscardScope ? (
                       <DraftReviewSummary
                         title="All drafts"
-                        breakdown={draftBreakdown}
+                        breakdown={discardAllBreakdown}
                         emptyMessage="No organization drafts"
                       />
                     ) : null}
@@ -10397,6 +10476,7 @@ function SchedulerContent({
                 points: [
                   "The published schedule stays live.",
                   "Drafts in other periods are left alone.",
+                  ...(keptStatusDraftsNote ? [keptStatusDraftsNote] : []),
                 ],
               }}
               confirmLabel="Discard my drafts"
@@ -10412,7 +10492,7 @@ function SchedulerContent({
                 showOrganizationDiscardScope ? "Discard all drafts" : undefined
               }
               isSecondaryLoading={cancelingMode === "all"}
-              secondaryConfirmDisabled={draftBreakdown.totalChanges === 0}
+              secondaryConfirmDisabled={discardAllBreakdown.totalChanges === 0}
               onSecondaryConfirm={
                 showOrganizationDiscardScope ? () => handleCancelChanges(true) : undefined
               }

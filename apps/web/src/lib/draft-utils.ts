@@ -208,6 +208,10 @@ export interface OutOfWindowDraftGroup {
   periodStart: Date;
   /** Total draft count (shifts + notes) in this period. */
   count: number;
+  /** Of those, the drafts a status change wrote (someone Away), by whose. */
+  statusCount: number;
+  /** Whose status changes they are, in the order first met. */
+  statusEmpIds: string[];
 }
 
 /**
@@ -226,19 +230,27 @@ export function computeOutOfWindowDraftGroups(
   window: DateRangeFilter,
   getPeriodKey: (dateKey: string) => string,
   parsePeriodKey: (periodKey: string) => Date,
+  /** Whether a day's draft is a status change's own: they're Away that day. */
+  isStatusDay?: (empId: string, dateKey: string) => boolean,
 ): OutOfWindowDraftGroup[] {
   const counts = new Map<string, number>();
+  const statusCounts = new Map<string, number>();
+  const statusEmpIds = new Map<string, string[]>();
 
-  const tally = (dateKey: string | null, count: number) => {
+  const tally = (dateKey: string | null, count: number, empId?: string) => {
     if (!dateKey) return;
     if (isInRange(dateKey, window)) return;
     const periodKey = getPeriodKey(dateKey);
     counts.set(periodKey, (counts.get(periodKey) ?? 0) + count);
+    if (!empId || !isStatusDay?.(empId, dateKey)) return;
+    statusCounts.set(periodKey, (statusCounts.get(periodKey) ?? 0) + count);
+    const ids = statusEmpIds.get(periodKey) ?? [];
+    if (!ids.includes(empId)) statusEmpIds.set(periodKey, [...ids, empId]);
   };
 
   for (const [key, entry] of Object.entries(shifts)) {
     if (entry.draftKind == null) continue;
-    tally(extractDateKeyFromCellKey(key), countDraftEntryChanges(entry));
+    tally(extractDateKeyFromCellKey(key), countDraftEntryChanges(entry), key.split("_")[0]);
   }
 
   for (const [key, noteList] of Object.entries(notes)) {
@@ -258,7 +270,31 @@ export function computeOutOfWindowDraftGroups(
       periodKey,
       periodStart: parsePeriodKey(periodKey),
       count,
+      statusCount: statusCounts.get(periodKey) ?? 0,
+      statusEmpIds: statusEmpIds.get(periodKey) ?? [],
     }));
+}
+
+/**
+ * Whose Away a period's drafts come from, beside its count: "Laura Marshall
+ * Away", "includes Laura Marshall and Diane Patterson Away" when other drafts
+ * share the period, "3 people Away" for more. Null when none are.
+ */
+export function describeStatusDrafts(
+  group: Pick<OutOfWindowDraftGroup, "count" | "statusCount" | "statusEmpIds">,
+  nameOf: (empId: string) => string | null,
+): string | null {
+  const names = group.statusEmpIds
+    .map((empId) => nameOf(empId))
+    .filter((name): name is string => !!name);
+  if (group.statusCount === 0 || names.length === 0) return null;
+  const who =
+    names.length === 1
+      ? names[0]
+      : names.length === 2
+        ? `${names[0]} and ${names[1]}`
+        : `${names.length} people`;
+  return `${group.statusCount < group.count ? "includes " : ""}${who} Away`;
 }
 
 export function draftBreakdownsEqual(left: DraftBreakdown, right: DraftBreakdown): boolean {
@@ -300,4 +336,31 @@ export function formatDraftBreakdownSummary(breakdown: DraftBreakdown): string {
   }
 
   return parts.length > 0 ? parts.join(", ") : "No unpublished changes";
+}
+
+/** Whose status-change drafts fall in `window`, in the order first met. */
+export function statusDraftEmpIds(
+  shifts: ShiftMap,
+  window: DateRangeFilter,
+  isStatusDay: (empId: string, dateKey: string) => boolean,
+): string[] {
+  const ids: string[] = [];
+  for (const [key, entry] of Object.entries(shifts)) {
+    if (entry.draftKind == null) continue;
+    const dateKey = extractDateKeyFromCellKey(key);
+    const empId = key.split("_")[0];
+    if (!dateKey || !isInRange(dateKey, window) || !empId) continue;
+    if (isStatusDay(empId, dateKey) && !ids.includes(empId)) ids.push(empId);
+  }
+  return ids;
+}
+
+/** The discard confirmation's word on Away drafts it leaves (migration 143). */
+export function describeKeptStatusDrafts(names: readonly string[]): string | null {
+  if (names.length === 0) return null;
+  const subject =
+    names.length === 1
+      ? `${names[0]}'s Away changes`
+      : `Away changes for ${names.length === 2 ? `${names[0]} and ${names[1]}` : `${names.length} people`}`;
+  return `${subject} stay. Change their status to undo them.`;
 }
