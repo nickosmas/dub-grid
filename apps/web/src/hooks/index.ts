@@ -55,6 +55,7 @@ export {
   DESKTOP,
   HEADER_NARROW,
   COMPACT_TOOLBAR,
+  ROOMY_TOOLBAR,
 } from "./useMediaQuery";
 
 export { useShiftRequests } from "./useShiftRequests";

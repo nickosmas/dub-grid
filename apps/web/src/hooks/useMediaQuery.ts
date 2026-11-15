@@ -26,6 +26,8 @@ export const HEADER_NARROW = "(max-width: 1200px)";
 // Below a standard laptop window the schedule toolbar's buttons drop their
 // labels, so the whole toolbar still fits one row.
 export const COMPACT_TOOLBAR = "(max-width: 1439px)";
+// Wide enough for Sort staff and the staff search field in full on the same row.
+export const ROOMY_TOOLBAR = "(min-width: 1700px)";
 
 /**
  * Returns true when the given media query matches.
