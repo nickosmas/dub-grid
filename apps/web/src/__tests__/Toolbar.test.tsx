@@ -83,12 +83,18 @@ describe("Toolbar — Shift requests button", () => {
     expect(badge).toHaveAttribute("data-tone", "neutral");
   });
 
-  it("names the menu More tools and marks it with a chevron, not an icon", () => {
+  it("names the menu More tools, with its icon and a chevron", () => {
     render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} />);
     const button = screen.getByRole("button", { name: "More tools" });
     expect(button).toHaveTextContent(/^More tools$/);
-    expect(button.querySelector("svg.lucide-chevron-down")).not.toBeNull();
-    expect(button.querySelectorAll("svg")).toHaveLength(1);
+    expect(button.querySelectorAll("svg")).toHaveLength(2);
+    expect(button.lastElementChild).toHaveClass("lucide-chevron-down");
+  });
+
+  it("gives Shift requests an icon like its neighbors", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} />);
+    const button = screen.getByRole("button", { name: /Shift requests/ });
+    expect(button.firstElementChild).toHaveClass("lucide-repeat");
   });
 
   it("leaves More tools without a count", () => {
