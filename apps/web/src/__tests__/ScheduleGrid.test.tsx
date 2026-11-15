@@ -3555,6 +3555,54 @@ describe("ScheduleGrid", () => {
     expect(firstCell.querySelector("[data-request-fold]")).not.toBeNull();
   });
 
+  it("puts the hover card's dot on the shift a request is about on a double", async () => {
+    observedWidth = 1600;
+    const localAssignments: AssignmentDefinition[] = [
+      { ...assignments[0], jobId: 101 },
+      { ...assignments[0], id: 2, label: "N", name: "Night Shift", jobId: 102, sortOrder: 2 },
+    ];
+    renderGrid({
+      showShiftDetailHoverCards: true,
+      assignments: localAssignments,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        affectedSegmentIndexes: [1],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Call-off",
+            affectedSegmentIndexes: [1],
+            waitingOn: "manager",
+            status: "Call-off (Sick) · awaiting approval",
+            body: null,
+            asked: "Called off.",
+          },
+        ],
+      }),
+    });
+
+    const pill = screen
+      .getAllByRole("gridcell")[0]
+      .querySelector("[data-shift-pill]") as HTMLElement;
+    fireEvent.mouseEnter(pill);
+
+    await waitFor(() => {
+      expect(screen.getByText("Call-off (Sick) · awaiting approval")).toBeInTheDocument();
+    });
+    // One dot, beside the second shift's name, and none on the request line.
+    const dots = document.querySelectorAll("[data-request-dot]");
+    expect(dots).toHaveLength(1);
+    expect(dots[0]?.getAttribute("data-request-dot")).toBe("manager");
+    const entry = dots[0]?.parentElement?.parentElement as HTMLElement;
+    expect(Array.from(entry.parentElement?.children ?? []).indexOf(entry)).toBe(1);
+  });
+
   it("lists each waiting request in the hover card, with what would happen and when it was asked", async () => {
     observedWidth = 1600;
     renderGrid({

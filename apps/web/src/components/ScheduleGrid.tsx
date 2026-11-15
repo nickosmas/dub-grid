@@ -77,6 +77,7 @@ import {
   CoverageRequirement,
   AbsenceType,
   ActiveShiftRequestSummary,
+  RequestWaitingOn,
   ShiftDisplayMode,
   GridOpenShift,
   ScheduleCellState,
@@ -581,6 +582,8 @@ type ShiftDetailEntry = {
   timeLabel: string | null;
   isCustomTime: boolean;
   isMentored: boolean;
+  /** On a day with two shifts, who acts next on a waiting request about this one. */
+  requestWaitingOn?: RequestWaitingOn | null;
 };
 
 const EMPTY_ID_SET = new Set<number>();
@@ -778,6 +781,7 @@ function ShiftDetailHoverCard({
   const shownCorrectionNotes = correctionLabel ? correctionNotes : [];
   const hasRichChanges =
     shownChanges.length > 0 || !!shownCorrection || shownCorrectionNotes.length > 0;
+  const markedOnShift = entries.some((entry) => entry.requestWaitingOn);
 
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
@@ -851,11 +855,17 @@ function ShiftDetailHoverCard({
                 >
                   <div
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 700,
                     }}
                   >
-                    {entry.label}
+                    {entry.requestWaitingOn ? (
+                      <RequestDot waitingOn={entry.requestWaitingOn} />
+                    ) : null}
+                    <span>{entry.label}</span>
                   </div>
                   {entry.jobName ? (
                     <div
@@ -925,7 +935,8 @@ function ShiftDetailHoverCard({
                           color: "var(--dg-color-text-primary)",
                         }}
                       >
-                        <RequestDot waitingOn={line.waitingOn} />
+                        {/* With two shifts, the dot marks the shift instead. */}
+                        {markedOnShift ? null : <RequestDot waitingOn={line.waitingOn} />}
                         <span>{line.status}</span>
                       </div>
                       {line.body ? (
@@ -2821,6 +2832,12 @@ const SectionBlock = memo(function SectionBlock({
                                 // An absence beside the shift is why its times differ.
                                 isCustomTime: !!customTime && !restOfDayAbsenceName,
                                 isMentored: cellSegments[entryIndex]?.isMentored ?? false,
+                                requestWaitingOn:
+                                  cellCodeIds.length > 1
+                                    ? (activeRequest?.requests.find((line) =>
+                                        line.affectedSegmentIndexes.includes(entryIndex),
+                                      )?.waitingOn ?? null)
+                                    : null,
                               };
                             });
                         const hoverDetailEntries = [...shiftHoverEntries, ...restOfDayHoverEntries];
