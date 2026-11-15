@@ -242,7 +242,7 @@ export function ProfilePage() {
   return (
     <div
       ref={scrollerRef}
-      className="h-[calc(100dvh-var(--dg-app-shell-header-height))] overflow-y-auto px-[var(--dg-page-gutter)] py-4 md:py-6 xl:py-8"
+      className="h-[calc(100dvh-var(--dg-app-shell-header-height))] overflow-y-auto [scrollbar-gutter:stable] px-[var(--dg-page-gutter)] py-4 md:py-6 xl:py-8"
     >
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6">
         <ProfileHeader

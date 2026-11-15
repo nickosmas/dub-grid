@@ -1077,6 +1077,39 @@ describe("dispatchNotificationEvent", () => {
     },
   );
 
+  it("never quotes a reason the app recorded as a manager's note", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "shift_requests") {
+        return makeShiftRequestBuilder({
+          status: "approved",
+          type: "swap",
+          requester: { user_id: "requester-user", first_name: "Sam", last_name: "Lee" },
+          target: { user_id: "partner-user", first_name: "Ada", last_name: "Ng" },
+        });
+      }
+      return makeSingleRowBuilder(null);
+    });
+
+    await dispatchNotificationEvent("admin-user", {
+      action: "shift_request_resolved",
+      orgId: "org-1",
+      requestId: "req-1",
+      requestType: "swap",
+      approved: true,
+      adminNote: "Assigned through the published schedule",
+    });
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      "partner-user",
+      "org-1",
+      "shift_request_approved",
+      "Swap approved",
+      "The swap with Sam Lee was approved.",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
   it("tells both people, with the note, when a manager withdraws a swap awaiting its recipient", async () => {
     fromMock.mockImplementation((table: string) => {
       if (table === "shift_requests") {

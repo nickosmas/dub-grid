@@ -281,7 +281,7 @@ describe("operations reports", () => {
       absenceType: "Sick",
       resolutionHours: 2.5,
       decidedBy: "",
-      managerNote: "",
+      note: "",
     });
     expect(payload.reports.absencesCalloffs).toEqual(
       expect.arrayContaining([
@@ -576,7 +576,7 @@ describe("operations reports", () => {
           submittedAt: "2026-05-02T18:00:00.000Z",
           noticeHours: 20,
           decidedAt: "2026-05-02T19:00:00.000Z",
-          managerNote: "Feel better",
+          note: "Feel better",
         }),
       ]),
     );
@@ -1343,7 +1343,7 @@ describe("operations reports", () => {
           "Decided",
           "Decided by",
           "Time to resolution",
-          "Manager note",
+          "Note",
         ],
         firstRow: [
           "Call-off",
@@ -1383,7 +1383,7 @@ describe("operations reports", () => {
           "Notice given",
           "Decided",
           "Decided by",
-          "Manager note",
+          "Note",
         ],
         // The fixture's call-off carries no shift snapshot, so the shift and
         // notice columns are blank; the timing test below covers them.
