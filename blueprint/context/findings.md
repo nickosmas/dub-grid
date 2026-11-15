@@ -788,14 +788,14 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. 51j already stops delivery to Suspended and Offboarded people; the gap is a revoked session for someone still a member.
 
-### F-206 [P2] open - The mobile API shows staff more than the organization's settings allow
+### F-206 [P2] fixed - The mobile API shows staff more than the organization's settings allow
 
 **File:** `apps/web/src/features/mobile/server/routes/shift-swap-options.ts:207`; `packages/mobile-api-core/src/read.ts:574`; `apps/web/src/features/mobile/server/routes/person.ts:174`; `apps/web/src/features/mobile/server/data.ts:1356`
 **Found:** 2026-11-06 by /audit (scope: full; lens: security)
 **Why it matters:** Inside one organization: swap options return entries without `withScheduleVisibility`, so item 46f's hidden publisher and change details reach staff. `/people` and `/people/[id]` leave a coworker's suspension, planned status and dates, first day, `orgRole` and `adminPermissions` in the response, and the detail route has no internal-account filter. Staff open shifts are computed from draft rows, so unpublished edits can be inferred. Traced, not run.
 **Suggested fix:** Apply the visibility helper to swap options, build the staff response from an allowed-fields list rather than a strip list, and use published rows for anyone who can't edit.
-**Resolution:**
 **Update 2026-11-13 (re-check against dev):** partly fixed: #515 blanks colleague status in the list and detail and drops admin permissions from the list. Still open: the detail route returns `adminPermissions`, has no internal-account filter, swap options skip `withScheduleVisibility`, and open shifts come from draft rows. An allowed-fields list must keep `orgRole`, roles and departments (#515, 56e).
+**Resolution:** Fixed on fix/f206-staff-visibility (2026-11-14). A regular member's view of a colleague, in the People list and on their profile, is built from named fields (`toColleagueMobilePerson` in `packages/mobile-api-core/src/read.ts`). It keeps orgRole, roles, departments and administrative teams and returns no admin permissions, account or contact details, or status. The profile route answers an internal account as not found to anyone the list hides it from. Swap options apply `withScheduleVisibility`. The open-shifts list counts drafts only for someone who can edit shifts, as the dashboard does. Tests cover each. Only GET on the profile route checks internal accounts; the manager-only person sub-routes were not changed.
 
 ### F-207 [P2] fixed - Telemetry sends staff emails to third parties and can't be tied to an organization
 

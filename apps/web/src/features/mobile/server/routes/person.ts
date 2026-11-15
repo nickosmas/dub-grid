@@ -6,7 +6,8 @@ import {
   type MobilePerson,
 } from "@dubgrid/contracts";
 import { updateMobileEmployeeDetailsRow } from "@dubgrid/data-access";
-import { requireMobileAuth } from "@/features/mobile/server";
+import { toColleagueMobilePerson } from "@dubgrid/mobile-api-core";
+import { fetchMobileHiddenPeople, requireMobileAuth } from "@/features/mobile/server";
 import {
   getLoginEmailChange,
   LINKED_EMAIL_OWNER_ONLY_MESSAGE,
@@ -23,7 +24,7 @@ import {
   getStaffFieldErrorsFromZod,
   validateStaffOrgReferences,
 } from "@/lib/staff-validation";
-import { changedElsewhereMessage, withoutColleagueStatus } from "@dubgrid/domain";
+import { changedElsewhereMessage } from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -146,8 +147,13 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   }
 
   const { id } = await context.params;
-  const person = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, id);
-  if (!person) {
+  const [person, hiddenUserIds] = await Promise.all([
+    loadMobilePerson(auth.serviceClient, auth.currentOrg.id, id),
+    fetchMobileHiddenPeople(auth),
+  ]);
+  // An internal (QA) account is left out of the People list, so its profile
+  // answers as if it didn't exist.
+  if (!person || (person.userId && hiddenUserIds.includes(person.userId))) {
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
 
@@ -163,25 +169,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }
 
-    // A colleague's basic profile, an Admin's included: name, access role,
-    // qualifications, where they work and their administrative teams.
+    // A colleague's basic profile, an Admin's included: the same entry the
+    // People list gives them.
     return NextResponse.json(
-      mobilePersonResponseSchema.parse({
-        person: {
-          ...withoutColleagueStatus(person),
-          contactNotes: "",
-          // The people list already withholds these from a non-manager
-          // (packages/mobile-api-core/src/read.ts); the detail screen was
-          // handing back the same coworker's address and mobile anyway.
-          email: "",
-          phone: "",
-          deptAdminIds: [],
-          managementDeptAdminIds: [],
-          pendingInvitation: null,
-          statusNote: "",
-          userId: null,
-        },
-      }),
+      mobilePersonResponseSchema.parse({ person: toColleagueMobilePerson(person) }),
     );
   }
 
