@@ -77,6 +77,7 @@ import {
   CoverageRequirement,
   AbsenceType,
   ActiveShiftRequestSummary,
+  RequestWaitingOn,
   ShiftDisplayMode,
   GridOpenShift,
   ScheduleCellState,
@@ -147,6 +148,8 @@ import {
   LOCK_CORNER_CLEARANCE,
   MENTORED_CORNER_CLEARANCE,
   RequestCornerFold,
+  RequestDot,
+  RequestWouldGetOutline,
   noteMarksWidth,
   NOTE_LANE_INSET,
   AuthorBadge,
@@ -156,6 +159,7 @@ import { NoteDots, type ScheduleNoteMark } from "./schedule-grid/noteDots";
 import { fitGridText, gridFitLine, gridFitSize } from "./schedule-grid/gridFit";
 import { AbsenceRunBar, AwayRunBar, setAbsenceRunHover } from "./schedule-grid/absenceRunBar";
 import { buildRowAbsenceRuns } from "./schedule-grid/absenceRuns";
+import type { AwayRunChanges, AwayRunDayChange } from "./schedule-grid/awayRunChanges";
 import {
   awayLockedHint,
   awayRangeOf,
@@ -290,6 +294,8 @@ interface LegacyScheduleGridProps {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** The day's whole published cell, null when it has none; a removal's Before. */
+  publishedCellStateForKey?: (empId: string, date: Date) => ScheduleCellState | null;
   /** A worked cell's absence for the rest of the day (item 45), drawn as its last pill. */
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
@@ -417,6 +423,8 @@ interface SectionBlockProps {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  /** The day's whole published cell, null when it has none; a removal's Before. */
+  publishedCellStateForKey?: (empId: string, date: Date) => ScheduleCellState | null;
   /** A worked cell's absence for the rest of the day (item 45), drawn as its last pill. */
   restOfDayAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   restOfDayAbsenceLayoutForKey?: (empId: string, date: Date) => AbsencePillLayout | null;
@@ -582,6 +590,8 @@ type ShiftDetailEntry = {
   timeLabel: string | null;
   isCustomTime: boolean;
   isMentored: boolean;
+  /** On a day with two shifts, who acts next on a waiting request about this one. */
+  requestWaitingOn?: RequestWaitingOn | null;
 };
 
 const EMPTY_ID_SET = new Set<number>();
@@ -734,7 +744,7 @@ function ShiftDetailHoverCard({
   date,
   entries,
   indicators,
-  requestLabel,
+  request = null,
   status,
   changeDetails,
   changes = [],
@@ -749,7 +759,8 @@ function ShiftDetailHoverCard({
   date: Date;
   entries: ShiftDetailEntry[];
   indicators: string[];
-  requestLabel: string | null;
+  /** The waiting requests on this day, each with what would happen. */
+  request?: ActiveShiftRequestSummary | null;
   status: string | null;
   /** Per-cell change explanations, already scoped to the affected segment(s). */
   changeDetails: string[];
@@ -778,6 +789,7 @@ function ShiftDetailHoverCard({
   const shownCorrectionNotes = correctionLabel ? correctionNotes : [];
   const hasRichChanges =
     shownChanges.length > 0 || !!shownCorrection || shownCorrectionNotes.length > 0;
+  const markedOnShift = entries.some((entry) => entry.requestWaitingOn);
 
   const trigger = React.cloneElement(children, {
     ref: (node: HTMLDivElement | null) => {
@@ -851,11 +863,17 @@ function ShiftDetailHoverCard({
                 >
                   <div
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 700,
                     }}
                   >
-                    {entry.label}
+                    {entry.requestWaitingOn ? (
+                      <RequestDot waitingOn={entry.requestWaitingOn} />
+                    ) : null}
+                    <span>{entry.label}</span>
                   </div>
                   {entry.jobName ? (
                     <div
@@ -902,6 +920,56 @@ function ShiftDetailHoverCard({
                   ) : null}
                 </div>
               ))}
+              {request && request.requests.length > 0 ? (
+                <div
+                  data-request-detail
+                  style={{
+                    paddingTop: 10,
+                    borderTop: "1px solid var(--dg-color-border-light)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  {request.requests.map((line, index) => (
+                    <div key={index} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 600,
+                          color: "var(--dg-color-text-primary)",
+                        }}
+                      >
+                        {/* With two shifts, the dot marks the shift instead. */}
+                        {markedOnShift ? null : <RequestDot waitingOn={line.waitingOn} />}
+                        <span>{line.status}</span>
+                      </div>
+                      {line.body ? (
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--dg-color-text-secondary)",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          {line.body}
+                        </div>
+                      ) : null}
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--dg-color-text-muted)",
+                        }}
+                      >
+                        {line.asked}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {hasRichChanges ? (
                 <div
                   style={{
@@ -995,7 +1063,6 @@ function ShiftDetailHoverCard({
               ) : null}
               {!hasRichChanges &&
                 (indicators.length > 0 ||
-                  requestLabel ||
                   status ||
                   changeDetails.length > 0 ||
                   publicationLabel ||
@@ -1015,9 +1082,6 @@ function ShiftDetailHoverCard({
                       beside a change's details rather than giving way to them. */}
                     {indicators.length > 0 ? (
                       <div>Schedule notes: {indicators.join(", ")}</div>
-                    ) : null}
-                    {changeDetails.length === 0 && requestLabel ? (
-                      <div>Request: {requestLabel}</div>
                     ) : null}
                     {changeDetails.length === 0 && status ? <div>Status: {status}</div> : null}
                     {changeDetails.map((detail) => (
@@ -1058,6 +1122,7 @@ const CELL_READ_KEYS = new Set<keyof SectionBlockProps>([
   "publishedLabelForKey",
   "publishedAssignmentIdsForKey",
   "publishedAbsenceTypeIdForKey",
+  "publishedCellStateForKey",
   "restOfDayAbsenceTypeIdForKey",
   "restOfDayAbsenceLayoutForKey",
   "publishedRestOfDayAbsenceTypeIdForKey",
@@ -1205,6 +1270,7 @@ const SectionBlock = memo(function SectionBlock({
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
+  publishedCellStateForKey,
   restOfDayAbsenceTypeIdForKey,
   restOfDayAbsenceLayoutForKey,
   publishedRestOfDayAbsenceTypeIdForKey,
@@ -1724,7 +1790,82 @@ const SectionBlock = memo(function SectionBlock({
   const releaseRowIndex = Math.max(0, employees.length - STICKY_RELEASE_ROWS);
   const renderedEmployees =
     renderedRows === undefined ? employees : employees.slice(0, renderedRows);
+  // A day's draft and published change, for the Away bar that covers its cell.
+  const describeDayChanges = (
+    empId: string,
+    date: Date,
+  ): { draft: AwayRunDayChange | null; published: AwayRunDayChange | null } => {
+    const dateKey = formatDateKey(date);
+    const spans = restOfDayAbsenceLayoutForKey?.(empId, date) ?? null;
+    const draftKind = draftKindForKey?.(empId, date) ?? null;
+    let draft: AwayRunDayChange | null = null;
+    if (draftKind) {
+      const absenceTypeId = absenceTypeIdForKey?.(empId, date) ?? null;
+      const current =
+        draftKind === "deleted"
+          ? null
+          : cellStateFromParts({
+              segments: segmentsForKey?.(empId, date) ?? [],
+              absenceTypeId,
+              restOfDayAbsenceTypeId:
+                absenceTypeId == null
+                  ? (restOfDayAbsenceTypeIdForKey?.(empId, date) ?? null)
+                  : null,
+              restOfDayAbsenceTimes: spans?.range ?? null,
+              customTimes: getCustomShiftTimes?.(empId, date) ?? null,
+            });
+      // The whole published cell, when the page gives it: a pending removal
+      // reports no published parts, so this is its only Before.
+      const published = publishedCellStateForKey?.(empId, date) ?? null;
+      const publishedSegments = publishedSegmentsForKey?.(empId, date) ?? [];
+      const publishedAbsenceTypeId = publishedAbsenceTypeIdForKey?.(empId, date) ?? null;
+      const before =
+        published ??
+        (publishedSegments.length > 0 || publishedAbsenceTypeId != null
+          ? cellStateFromParts({
+              segments: publishedSegments,
+              absenceTypeId: publishedAbsenceTypeId,
+              restOfDayAbsenceTypeId: publishedRestOfDayAbsenceTypeIdForKey?.(empId, date) ?? null,
+              restOfDayAbsenceTimes: spans?.publishedRange ?? null,
+              customTimes: getPublishedCustomShiftTimes?.(empId, date) ?? null,
+            })
+          : null);
+      draft = {
+        dateKey,
+        kind: draftKind,
+        view:
+          draftKind === "new" || before
+            ? describeCellStateChange(before, current, dateKey, shiftChangeResolvers)
+            : null,
+      };
+    }
+    const publishDiff = showPublishDiffOverlay ? (publishDiffForKey?.(empId, date) ?? null) : null;
+    const published: AwayRunDayChange | null = publishDiff
+      ? {
+          dateKey,
+          kind: publishDiff.kind,
+          view: publishChangeHasStates(publishDiff)
+            ? describeCellStateChange(
+                publishDiff.fromState,
+                publishDiff.toState,
+                dateKey,
+                shiftChangeResolvers,
+              )
+            : null,
+        }
+      : null;
+    return { draft, published };
+  };
+
   const awayAllPeriodPeople = employees.filter((employee) => awayAllPeriod?.has(employee.id));
+  // Folded, the group hides its people's Away bars, so it says what they hold.
+  const awayAllPeriodDraftDays = awayAllPeriodFolded
+    ? awayAllPeriodPeople.reduce(
+        (total, employee) =>
+          total + weekDates.filter((date) => draftKindForKey?.(employee.id, date) != null).length,
+        0,
+      )
+    : 0;
   const firstAwayAllPeriodIndex = renderedEmployees.findIndex((employee) =>
     awayAllPeriod?.has(employee.id),
   );
@@ -1781,6 +1922,15 @@ const SectionBlock = memo(function SectionBlock({
               Away all period
             </span>
             <span>· {awayAllPeriodPeople.length}</span>
+            {awayAllPeriodDraftDays > 0 && (
+              <span
+                data-away-all-period-drafts={awayAllPeriodDraftDays}
+                style={{ color: "var(--dg-color-warning-text, var(--dg-color-text-secondary))" }}
+              >
+                · {awayAllPeriodDraftDays} unpublished{" "}
+                {awayAllPeriodDraftDays === 1 ? "change" : "changes"}
+              </span>
+            )}
             {awayAllPeriodFolded && (
               <span
                 style={{
@@ -2194,9 +2344,11 @@ const SectionBlock = memo(function SectionBlock({
                             : viewerAction === "details"
                               ? "click for details"
                               : "click to volunteer";
-                        const openShiftHint = os.calledOffBy
-                          ? `Called off by ${os.calledOffBy}, ${actionHint}`
-                          : `${needed} needed, ${actionHint}`;
+                        const openShiftHint = os.claimedBy
+                          ? `Claimed by ${os.claimedBy}, awaiting approval, ${actionHint}`
+                          : os.calledOffBy
+                            ? `Called off by ${os.calledOffBy}, ${actionHint}`
+                            : `${needed} needed, ${actionHint}`;
                         return (
                           <MaybeHint key={os.id} content={openShiftHint} side="top">
                             <Button
@@ -2225,6 +2377,9 @@ const SectionBlock = memo(function SectionBlock({
                                 overflow: "hidden",
                               }}
                             >
+                              {os.claimedBy ? (
+                                <RequestCornerFold waitingOn="manager" label={openShiftHint} />
+                              ) : null}
                               {isMentoredOpenShift ? <MentoredShiftBadge compact /> : null}
                               <span
                                 style={{
@@ -2325,6 +2480,19 @@ const SectionBlock = memo(function SectionBlock({
                 todayKey,
                 splitAtIndex,
               );
+              // Each Away bar carries its days' changes, since it covers their cells.
+              const rowAwayRunChanges = new Map<number, AwayRunChanges>();
+              rowAwayDays?.runs.forEach((runDay, index) => {
+                if (!runDay) return;
+                const entry = rowAwayRunChanges.get(runDay.runIndex) ?? {
+                  draft: [],
+                  published: [],
+                };
+                const { draft, published } = describeDayChanges(emp.id, weekDates[index]);
+                if (draft) entry.draft.push(draft);
+                if (published) entry.published.push(published);
+                rowAwayRunChanges.set(runDay.runIndex, entry);
+              });
               const rowAwayAbsenceTypeId =
                 rowAwayRange?.from != null ? emp.plannedAbsenceTypeId : emp.awayAbsenceTypeId;
               const rowAwayAbsence =
@@ -2350,6 +2518,7 @@ const SectionBlock = memo(function SectionBlock({
                       draftKindForKey,
                       publishDiffForKey,
                       showPublishDiffOverlay,
+                      activeRequestForKey,
                       hasAbsenceType: (absenceTypeId) => !!absenceTypeMap?.has(absenceTypeId),
                     },
                     splitAtIndex,
@@ -2661,6 +2830,22 @@ const SectionBlock = memo(function SectionBlock({
                         const activeRequestLabel = activeRequest
                           ? formatActiveRequestLabel(activeRequest)
                           : null;
+                        // The shift a claimer would get, labeled as its pill would be.
+                        const wouldGetLabel =
+                          (activeRequest?.wouldGetAssignmentIds ?? [])
+                            .map((assignmentId) => {
+                              const assignment = assignmentById.get(assignmentId);
+                              if (!assignment) return null;
+                              const parts = getDisplayPartsByIdOrLabel(
+                                assignment.label,
+                                assignmentId,
+                              );
+                              return parts.secondaryLabel
+                                ? `${parts.primaryLabel} · ${parts.secondaryLabel}`
+                                : parts.primaryLabel;
+                            })
+                            .filter((label): label is string => !!label)
+                            .join(" / ") || null;
                         const restOfDayHoverEntries: ShiftDetailEntry[] = restOfDayAbsenceName
                           ? [
                               {
@@ -2759,6 +2944,12 @@ const SectionBlock = memo(function SectionBlock({
                                 // An absence beside the shift is why its times differ.
                                 isCustomTime: !!customTime && !restOfDayAbsenceName,
                                 isMentored: cellSegments[entryIndex]?.isMentored ?? false,
+                                requestWaitingOn:
+                                  cellCodeIds.length > 1
+                                    ? (activeRequest?.requests.find((line) =>
+                                        line.affectedSegmentIndexes.includes(entryIndex),
+                                      )?.waitingOn ?? null)
+                                    : null,
                               };
                             });
                         const hoverDetailEntries = [...shiftHoverEntries, ...restOfDayHoverEntries];
@@ -2891,7 +3082,12 @@ const SectionBlock = memo(function SectionBlock({
                             data-section-id={sectionId}
                             data-interactive={isDayInteractive ? "true" : "false"}
                             data-peer-editing={hasPeerEditor ? "true" : "false"}
-                            data-empty={!shiftLabel || shiftLabel === "OFF" ? "true" : "false"}
+                            // A claimer's outline fills the day, so no "+" is drawn over it.
+                            data-empty={
+                              (!shiftLabel || shiftLabel === "OFF") && !wouldGetLabel
+                                ? "true"
+                                : "false"
+                            }
                             // The empty cell's "+" offers a new shift, so only
                             // someone who places shifts sees it.
                             data-addable={canDragShifts ? "true" : undefined}
@@ -3042,6 +3238,8 @@ const SectionBlock = memo(function SectionBlock({
                               {awayRunDay?.position === "start" && (
                                 <AwayRunBar
                                   runIndex={awayRunDay.runIndex}
+                                  changes={rowAwayRunChanges.get(awayRunDay.runIndex) ?? null}
+                                  personName={getEmployeeDisplayName(emp)}
                                   label={
                                     awayRunBeforeFirstDay && rowAwayRange?.firstDay
                                       ? startsRunLabel(rowAwayRange.firstDay)
@@ -3607,7 +3805,7 @@ const SectionBlock = memo(function SectionBlock({
                                             date={date}
                                             entries={hoverDetailEntries}
                                             indicators={hoverIndicatorNames}
-                                            requestLabel={activeRequestLabel}
+                                            request={activeRequest}
                                             status={hoverStatus}
                                             changeDetails={singleHoverChangeDetails}
                                             changes={hoverChanges}
@@ -3685,7 +3883,7 @@ const SectionBlock = memo(function SectionBlock({
                                             >
                                               {activeRequest && activeRequestLabel && (
                                                 <RequestCornerFold
-                                                  status={activeRequest.status}
+                                                  waitingOn={activeRequest.waitingOn}
                                                   label={activeRequestLabel}
                                                 />
                                               )}
@@ -4085,7 +4283,7 @@ const SectionBlock = memo(function SectionBlock({
                                           date={date}
                                           entries={hoverDetailEntries}
                                           indicators={hoverIndicatorNames}
-                                          requestLabel={activeRequestLabel}
+                                          request={activeRequest}
                                           status={hoverStatus}
                                           changeDetails={multiHoverChangeDetails}
                                           changes={hoverChanges}
@@ -4108,12 +4306,6 @@ const SectionBlock = memo(function SectionBlock({
                                               opacity: draftKind === "deleted" ? 0.5 : 1,
                                             }}
                                           >
-                                            {activeRequest && activeRequestLabel && (
-                                              <RequestCornerFold
-                                                status={activeRequest.status}
-                                                label={activeRequestLabel}
-                                              />
-                                            )}
                                             <div
                                               data-shift-layout={
                                                 stackShifts ? "stacked" : "side-by-side"
@@ -4338,6 +4530,17 @@ const SectionBlock = memo(function SectionBlock({
                                                       paddingRight: multiSidePadding,
                                                     }}
                                                   >
+                                                    {/* On the shift the request is about, not the first. */}
+                                                    {activeRequest &&
+                                                      activeRequestLabel &&
+                                                      activeRequest.affectedSegmentIndexes.includes(
+                                                        li,
+                                                      ) && (
+                                                        <RequestCornerFold
+                                                          waitingOn={activeRequest.waitingOn}
+                                                          label={activeRequestLabel}
+                                                        />
+                                                      )}
                                                     {pillBadge && (
                                                       <GridDiffBadge
                                                         badge={{
@@ -4927,7 +5130,7 @@ const SectionBlock = memo(function SectionBlock({
                                       date={date}
                                       entries={deletedHoverEntries}
                                       indicators={hoverIndicatorNames}
-                                      requestLabel={null}
+                                      request={null}
                                       status="Removed"
                                       changeDetails={[deletedTooltip ?? `Removed ${deletedLabel}.`]}
                                       changes={hoverChanges}
@@ -4961,6 +5164,35 @@ const SectionBlock = memo(function SectionBlock({
                                     </>
                                   );
                                 })()
+                              ) : wouldGetLabel && activeRequest && activeRequestLabel ? (
+                                <ShiftDetailHoverCard
+                                  enabled={showShiftDetailHoverCards}
+                                  employeeName={getEmployeeDisplayName(emp)}
+                                  date={date}
+                                  entries={[
+                                    {
+                                      label: "Nothing scheduled",
+                                      jobName: null,
+                                      focusAreaName: null,
+                                      timeLabel: null,
+                                      isCustomTime: false,
+                                      isMentored: false,
+                                    },
+                                  ]}
+                                  indicators={[]}
+                                  request={activeRequest}
+                                  status={null}
+                                  changeDetails={[]}
+                                  publicationLabel={null}
+                                >
+                                  <div style={{ position: "absolute", inset: 0 }}>
+                                    <RequestWouldGetOutline
+                                      label={wouldGetLabel}
+                                      waitingOn={activeRequest.waitingOn}
+                                      hint={activeRequestLabel}
+                                    />
+                                  </div>
+                                </ShiftDetailHoverCard>
                               ) : (
                                 <div
                                   style={{
@@ -5217,6 +5449,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
+  publishedCellStateForKey,
   restOfDayAbsenceTypeIdForKey,
   restOfDayAbsenceLayoutForKey,
   publishedRestOfDayAbsenceTypeIdForKey,
@@ -5679,6 +5912,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     publishedLabelForKey={publishedLabelForKey}
                     publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
                     publishedAbsenceTypeIdForKey={publishedAbsenceTypeIdForKey}
+                    publishedCellStateForKey={publishedCellStateForKey}
                     restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
                     restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
                     publishedRestOfDayAbsenceTypeIdForKey={publishedRestOfDayAbsenceTypeIdForKey}
@@ -5924,6 +6158,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           publishedLabelForKey={model.accessors.publishedLabelForKey}
           publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
           publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
+          publishedCellStateForKey={model.accessors.publishedCellStateForKey}
           restOfDayAbsenceTypeIdForKey={model.accessors.restOfDayAbsenceTypeIdForKey}
           restOfDayAbsenceLayoutForKey={model.accessors.restOfDayAbsenceLayoutForKey}
           publishedRestOfDayAbsenceTypeIdForKey={

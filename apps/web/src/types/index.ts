@@ -1389,21 +1389,36 @@ export interface ShiftRequest {
   updatedAt: string;
 }
 
-/**
- * The two statuses that mean a request is still live. The resolved ones can
- * never reach the grid, so naming them here keeps the fold's color table total
- * instead of carrying four unreachable entries and a fallback.
- */
-export type ActiveShiftRequestStatus = Extract<ShiftRequestStatus, "open" | "pending_approval">;
+/** Who acts next on a waiting request: a teammate, or a manager. */
+export type RequestWaitingOn = "teammate" | "manager";
 
 /**
- * The little the schedule grid needs to know about a request sitting on a cell:
- * enough to tint its corner fold and name it in a tooltip, without handing the
- * grid the whole request.
+ * The waiting requests on one day of the grid: enough to color its corner
+ * fold and to list each request in the hover card, without handing the grid
+ * the requests themselves.
  */
 export interface ActiveShiftRequestSummary {
-  type: ShiftRequestType;
-  status: ActiveShiftRequestStatus;
+  /** A manager's turn colors the fold when any request on the day waits for one. */
+  waitingOn: RequestWaitingOn;
+  /** Each request on the day, a manager's turn first. */
+  requests: Array<{
+    requestId: string;
+    waitingOn: RequestWaitingOn;
+    status: string;
+    body: string | null;
+    asked: string;
+    /** "Call-off", "Swap" or "Pickup", for the chip on the shift it touches. */
+    kind: string;
+    /** The day's shifts this request is about, by index; the first when none match. */
+    affectedSegmentIndexes: number[];
+  }>;
+  /** Every shift on the day a waiting request is about, by index, for the fold. */
+  affectedSegmentIndexes: number[];
+  /**
+   * The assignments a claimer or volunteer would get, for the dashed outline
+   * on an empty day; empty when nobody here would gain a shift.
+   */
+  wouldGetAssignmentIds?: number[];
 }
 
 // ── Grid Open Shifts ────────────────────────────────────────────────────────
@@ -1427,6 +1442,8 @@ export interface GridOpenShift {
   customStartTime: string | null;
   customEndTime: string | null;
   calledOffBy?: string;
+  /** Who claimed a call-off's open shift, while that claim waits for a manager. */
+  claimedBy?: string;
   requestId?: string;
   /** Number of staff still needed for this open shift. */
   needed?: number;

@@ -185,7 +185,13 @@ describe("computeDraftBreakdown", () => {
     );
     expect(countDraftEntryChanges(baseEntry)).toBe(1);
     expect(groups).toEqual([
-      { periodKey: "2026-09", periodStart: new Date("2026-09-01T00:00:00"), count: 1 },
+      {
+        periodKey: "2026-09",
+        periodStart: new Date("2026-09-01T00:00:00"),
+        count: 1,
+        statusCount: 0,
+        statusEmpIds: [],
+      },
     ]);
   });
 });

@@ -394,7 +394,13 @@ test("productive typography keeps its hierarchy across routes, themes, widths, a
         page.locator("h1").filter({ hasNotText: AUTH_TRANSITION_TITLES }).first(),
       ).toBeVisible({ timeout: 15_000 });
     } else {
-      await expect(page.getByRole("textbox", { name: "Search staff", exact: true })).toBeVisible();
+      // On a desktop width search is a button that opens the field; a phone
+      // shows the field itself.
+      await expect(
+        page
+          .getByRole("textbox", { name: "Search staff", exact: true })
+          .or(page.getByRole("button", { name: "Search staff", exact: true })),
+      ).toBeVisible();
     }
 
     for (const theme of themes) {
@@ -465,9 +471,13 @@ test("productive typography keeps its hierarchy across routes, themes, widths, a
               expect(hierarchy.titleWeight).toBe("700");
               expect(hierarchy.titleColor).not.toBe(hierarchy.descriptionColor);
             } else {
-              const controlFontSize = await page
-                .getByRole("textbox", { name: "Search staff", exact: true })
-                .evaluate((control) => getComputedStyle(control).fontSize);
+              const searchField = page.getByRole("textbox", { name: "Search staff", exact: true });
+              if (!(await searchField.isVisible())) {
+                await page.getByRole("button", { name: "Search staff", exact: true }).click();
+              }
+              const controlFontSize = await searchField.evaluate(
+                (control) => getComputedStyle(control).fontSize,
+              );
               expect(controlFontSize).toBe("14px");
             }
             // The schedule grid is intentionally horizontally scrollable (the

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   computeDraftBreakdown,
   computeOutOfWindowDraftGroups,
+  describeStatusDrafts,
+  describeKeptStatusDrafts,
+  statusDraftEmpIds,
   extractDateKeyFromCellKey,
 } from "@/lib/draft-utils";
 import type { ShiftMap } from "@/types";
@@ -101,7 +104,76 @@ describe("computeDraftBreakdown", () => {
   });
 });
 
+describe("statusDraftEmpIds and describeKeptStatusDrafts", () => {
+  it("finds whose Away drafts the period holds and says they stay", () => {
+    const shifts = {
+      "emp-a_2026-11-23": { draftKind: "deleted" },
+      "emp-b_2026-11-24": { draftKind: "new" },
+      "emp-a_2026-12-01": { draftKind: "deleted" },
+    } as unknown as Parameters<typeof statusDraftEmpIds>[0];
+    expect(
+      statusDraftEmpIds(
+        shifts,
+        { startDateKey: "2026-11-22", endDateKey: "2026-11-28" },
+        (empId) => empId === "emp-a",
+      ),
+    ).toEqual(["emp-a"]);
+    expect(describeKeptStatusDrafts(["Laura Marshall"])).toBe(
+      "Laura Marshall's Away changes stay. Change their status to undo them.",
+    );
+    expect(describeKeptStatusDrafts(["Laura Marshall", "Diane Patterson"])).toBe(
+      "Away changes for Laura Marshall and Diane Patterson stay. Change their status to undo them.",
+    );
+    expect(describeKeptStatusDrafts([])).toBeNull();
+  });
+});
+
+describe("describeStatusDrafts", () => {
+  const names: Record<string, string> = {
+    a: "Laura Marshall",
+    b: "Diane Patterson",
+    c: "Carol Henderson",
+  };
+  const nameOf = (id: string) => names[id] ?? null;
+
+  it("names whose Away a period's drafts are", () => {
+    expect(describeStatusDrafts({ count: 3, statusCount: 3, statusEmpIds: ["a"] }, nameOf)).toBe(
+      "Laura Marshall Away",
+    );
+    expect(
+      describeStatusDrafts({ count: 5, statusCount: 5, statusEmpIds: ["a", "b"] }, nameOf),
+    ).toBe("Laura Marshall and Diane Patterson Away");
+    expect(
+      describeStatusDrafts({ count: 9, statusCount: 9, statusEmpIds: ["a", "b", "c"] }, nameOf),
+    ).toBe("3 people Away");
+  });
+
+  it("says includes when other drafts share the period, and nothing without any", () => {
+    expect(describeStatusDrafts({ count: 7, statusCount: 3, statusEmpIds: ["a"] }, nameOf)).toBe(
+      "includes Laura Marshall Away",
+    );
+    expect(describeStatusDrafts({ count: 4, statusCount: 0, statusEmpIds: [] }, nameOf)).toBeNull();
+  });
+});
+
 describe("computeOutOfWindowDraftGroups", () => {
+  it("counts the drafts on someone's Away days, by whose", () => {
+    const shifts = {
+      "emp-a_2026-11-23": { draftKind: "deleted" },
+      "emp-a_2026-11-24": { draftKind: "deleted" },
+      "emp-b_2026-11-24": { draftKind: "new" },
+    } as unknown as Parameters<typeof computeOutOfWindowDraftGroups>[0];
+    const [group] = computeOutOfWindowDraftGroups(
+      shifts,
+      {},
+      { startDateKey: "2026-11-08", endDateKey: "2026-11-21" },
+      () => "2026-11-22",
+      () => new Date(2026, 10, 22),
+      (empId) => empId === "emp-a",
+    );
+    expect(group).toMatchObject({ count: 3, statusCount: 2, statusEmpIds: ["emp-a"] });
+  });
+
   const shifts: ShiftMap = {
     "e1_2026-05-17": shiftEntry("new"), // in window
     "e1_2026-05-18": shiftEntry("modified"), // in window

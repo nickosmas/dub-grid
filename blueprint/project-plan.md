@@ -181,6 +181,11 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
 - Absence runs in the grid: a whole-day absence on days in a row reads as
   one bar per week, labeled with its name and a count of days ("Vacation
   ×4"), while each day stays its own cell to click, change or remove.
+- Request marks on the schedule: every day a shift request touches is
+  marked on the web grid while it waits (who acts next) and after approval
+  (what happened, who approved it and when), and an approved request counts
+  as a change in Highlight changes like a publish. Web only (owner,
+  2026-11-14).
 - Platform and access rules (owner, 2026-11-08 and 2026-11-13): the mobile
   app stays signed in until the person signs out, while web sessions end
   after 35 minutes idle; suspending or offboarding someone ends only their

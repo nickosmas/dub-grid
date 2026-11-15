@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { ShiftChange } from "@dubgrid/schedule-core";
+import { RequestDot } from "@/components/schedule-grid/badges";
 import { ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 
 export interface PanelViewDetail {
@@ -196,6 +197,62 @@ function ChangeCard({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** One waiting request on the day, as the grid's hover card lists it (item 57a). */
+export interface PanelRequestCard {
+  requestId: string;
+  waitingOn: "teammate" | "manager";
+  status: string;
+  body: string | null;
+  asked: string;
+  /** True while it waits for a manager, the only time Approve and Reject apply. */
+  awaitingApproval: boolean;
+  /** The note field's prompt, naming who the note goes to, as on the Requests board. */
+  notePlaceholder: string;
+  /** "Call-off", "Swap" or "Pickup", for the chip on the shift it concerns. */
+  kind: string;
+  /** The day's shifts the request concerns, by index. */
+  affectedSegmentIndexes: number[];
+}
+
+/**
+ * A waiting request on this day: who acts next (the fold), what would happen
+ * and when it was asked, with any actions the viewer may take below.
+ */
+export function RequestCard({ card, actions }: { card: PanelRequestCard; actions?: ReactNode }) {
+  return (
+    <div data-request-card={card.waitingOn} style={{ ...statusCard, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <RequestDot waitingOn={card.waitingOn} />
+        <div
+          style={{
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            color: "var(--dg-color-text-primary)",
+          }}
+        >
+          {card.status}
+        </div>
+      </div>
+      {card.body ? (
+        <p
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--dg-color-text-secondary)",
+            lineHeight: 1.45,
+          }}
+        >
+          {card.body}
+        </p>
+      ) : null}
+      <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
+        {card.asked}
+      </div>
+      {actions}
     </div>
   );
 }

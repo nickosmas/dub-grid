@@ -62,18 +62,13 @@ test.describe("schedule states", () => {
     await expect(loading).toHaveCount(0, { timeout: 15_000 });
   });
 
-  test("opens and closes the Tools menu's Print dialog", async ({ page }) => {
+  test("opens and closes the More tools menu's Print dialog", async ({ page }) => {
     test.setTimeout(60_000);
     await loginAsQaSuperAdmin(page, QA_CALM_HAVEN_ORIGIN);
     await page.goto(`${QA_CALM_HAVEN_ORIGIN}/schedule`);
     await page.waitForLoadState("networkidle");
 
-    // Anchored, not exact: the requests badge inside the button joins its
-    // accessible name once the organization has active requests ("Tools 4
-    // active requests"), and the seed leaves Calm Haven with four. Next.js's
-    // own dev-tools button ("Open Next.js Dev Tools") contains "Tools" but
-    // does not start with it.
-    const toolsButton = page.getByRole("button", { name: /^Tools\b/ });
+    const toolsButton = page.getByRole("button", { name: "More tools" });
     await expect(toolsButton).toBeVisible({ timeout: 15_000 });
     await toolsButton.click();
     await page.getByRole("menuitem", { name: "Print" }).click();

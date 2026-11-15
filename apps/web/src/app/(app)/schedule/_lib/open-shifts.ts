@@ -147,9 +147,11 @@ export function buildGridCalloffOpenShiftsFromRequests({
   );
 
   return requests.reduce<GridOpenShift[]>((openShifts, request) => {
+    // A claimed one stays until a manager decides: it isn't filled yet.
+    const claimed = request.status === "pending_approval" && request.targetEmpId != null;
     if (
       request.type !== "pickup" ||
-      request.status !== "open" ||
+      (request.status !== "open" && !claimed) ||
       request.parentRequestId == null ||
       request.requesterShiftDate < startDate ||
       request.requesterShiftDate > endDate
@@ -177,6 +179,7 @@ export function buildGridCalloffOpenShiftsFromRequests({
       customStartTime: request.requesterCustomStartTime,
       customEndTime: request.requesterCustomEndTime,
       calledOffBy: request.requesterName || undefined,
+      claimedBy: claimed ? request.targetName || "a teammate" : undefined,
       requestId: request.id,
       needed: 1,
     });

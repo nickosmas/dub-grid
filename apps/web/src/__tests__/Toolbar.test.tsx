@@ -51,6 +51,67 @@ describe("Toolbar — Schedule Builder button", () => {
   });
 });
 
+describe("Toolbar — Shift requests button", () => {
+  it("sits after Schedule Builder and opens the board", async () => {
+    const user = userEvent.setup();
+    const onRequestsToggle = vi.fn();
+    render(
+      <Toolbar
+        {...defaultProps}
+        onCoverageToggle={vi.fn()}
+        onRequestsToggle={onRequestsToggle}
+        requestsBadgeCount={3}
+      />,
+    );
+    const buttons = screen.getAllByRole("button").map((button) => button.textContent);
+    const builder = buttons.indexOf("Schedule Builder");
+    expect(buttons[builder + 1]).toBe("Shift requests3");
+    await user.click(screen.getByRole("button", { name: /Shift requests/ }));
+    expect(onRequestsToggle).toHaveBeenCalledOnce();
+    const badge = screen
+      .getByRole("button", { name: /Shift requests/ })
+      .querySelector("[data-numeric-badge]");
+    expect(badge).toHaveAttribute("data-tone", "danger");
+  });
+
+  it("always shows its count, a quiet 0 when nothing is waiting", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} requestsBadgeCount={0} />);
+    const badge = screen
+      .getByRole("button", { name: /Shift requests/ })
+      .querySelector("[data-numeric-badge]");
+    expect(badge).toHaveTextContent("0");
+    expect(badge).toHaveAttribute("data-tone", "neutral");
+  });
+
+  it("names the menu More tools, with its icon and a chevron", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} onPublishHistory={vi.fn()} />);
+    const button = screen.getByRole("button", { name: "More tools" });
+    expect(button).toHaveTextContent(/^More tools$/);
+    expect(button.querySelectorAll("svg")).toHaveLength(2);
+    expect(button.lastElementChild).toHaveClass("lucide-chevron-down");
+  });
+
+  it("gives Shift requests an icon like its neighbors", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} />);
+    const button = screen.getByRole("button", { name: /Shift requests/ });
+    expect(button.firstElementChild).toHaveClass("lucide-repeat");
+  });
+
+  it("leaves More tools without a count", () => {
+    render(
+      <Toolbar
+        {...defaultProps}
+        onRequestsToggle={vi.fn()}
+        onPublishHistory={vi.fn()}
+        requestsBadgeCount={4}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "More tools" }).querySelector("[data-numeric-badge]"),
+    ).toBeNull();
+  });
+});
+
 describe("Toolbar — schedule mode rendering", () => {
   it("renders previous period button", () => {
     render(<Toolbar {...defaultProps} />);
@@ -80,9 +141,105 @@ describe("Toolbar — schedule mode rendering", () => {
     expect(screen.getByRole("button", { name: "South" })).toBeInTheDocument();
   });
 
-  it("renders staff search input with placeholder Search staff", () => {
+  it("opens staff search from its button and keeps the area tabs in view", async () => {
+    const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    expect(screen.getByPlaceholderText("Search staff")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search staff")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Search staff" }));
+    expect(screen.getByPlaceholderText("Search staff")).toHaveFocus();
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+  });
+
+  it("collapses the buttons to its right to icons while the field is open", async () => {
+    const user = userEvent.setup();
+    render(
+      <Toolbar
+        {...defaultProps}
+        onCoverageToggle={vi.fn()}
+        onRequestsToggle={vi.fn()}
+        onPublishHistory={vi.fn()}
+      />,
+    );
+    const builder = screen.getByRole("button", { name: "Schedule Builder" });
+    expect(builder).toHaveTextContent("Schedule Builder");
+    await user.click(screen.getByRole("button", { name: "Search staff" }));
+    expect(screen.getByRole("button", { name: "Schedule Builder" })).toHaveTextContent(/^$/);
+    expect(screen.getByRole("button", { name: /Shift requests/ })).not.toHaveTextContent(
+      "Shift requests",
+    );
+    expect(screen.getByRole("button", { name: "More tools" })).toHaveTextContent(/^$/);
+
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Schedule Builder" })).toHaveTextContent(
+      "Schedule Builder",
+    );
+  });
+
+  it("clears with Escape, then closes and hands focus back to its button", async () => {
+    const user = userEvent.setup();
+    const onStaffSearchChange = vi.fn();
+    const { rerender } = render(
+      <Toolbar {...defaultProps} staffSearch="Al" onStaffSearchChange={onStaffSearchChange} />,
+    );
+    await user.click(screen.getByRole("button", { name: /Search staff/ }));
+    await user.keyboard("{Escape}");
+    expect(onStaffSearchChange).toHaveBeenLastCalledWith("");
+    rerender(
+      <Toolbar {...defaultProps} staffSearch="" onStaffSearchChange={onStaffSearchChange} />,
+    );
+    await user.keyboard("{Escape}");
+    expect(screen.queryByPlaceholderText("Search staff")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search staff" })).toHaveFocus();
+  });
+
+  it("Close search clears the search and closes the field", async () => {
+    const user = userEvent.setup();
+    const onStaffSearchChange = vi.fn();
+    render(
+      <Toolbar {...defaultProps} staffSearch="Al" onStaffSearchChange={onStaffSearchChange} />,
+    );
+    await user.click(screen.getByRole("button", { name: /Search staff/ }));
+    await user.click(screen.getByRole("button", { name: "Close search" }));
+    expect(onStaffSearchChange).toHaveBeenCalledWith("");
+    expect(screen.queryByPlaceholderText("Search staff")).not.toBeInTheDocument();
+  });
+
+  it("keeps an active search visible on its button once the field closes", () => {
+    render(<Toolbar {...defaultProps} staffSearch="Mar" />);
+    const button = screen.getByRole("button", { name: 'Search staff, showing "Mar"' });
+    expect(button).toHaveClass("dg-btn-toggled");
+  });
+
+  it("shows Sort staff and the search field in full on a wide window", () => {
+    const matchMedia = vi.mocked(window.matchMedia);
+    const original = matchMedia.getMockImplementation();
+    matchMedia.mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === "(min-width: 1700px)",
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        }) as unknown as MediaQueryList,
+    );
+    try {
+      render(<Toolbar {...defaultProps} />);
+      expect(screen.getByPlaceholderText("Search staff")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Sort staff" })).toHaveTextContent("Sort staff");
+      expect(screen.queryByRole("button", { name: "Search staff" })).not.toBeInTheDocument();
+    } finally {
+      if (original) matchMedia.mockImplementation(original);
+    }
+  });
+
+  it("shows sort as an icon button with its name", () => {
+    render(<Toolbar {...defaultProps} />);
+    const sort = screen.getByRole("button", { name: "Sort staff" });
+    expect(sort).toHaveTextContent(/^$/);
   });
 });
 
@@ -122,7 +279,7 @@ describe("Toolbar — Tools dropdown", () => {
     const onAuditToggle = vi.fn();
     render(<Toolbar {...defaultProps} showAudit onAuditToggle={onAuditToggle} />);
 
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     const authorsItem = screen.getByRole("menuitem", { name: /Authors/i });
     const switchVisual = authorsItem.querySelector('[data-slot="switch"]');
 
@@ -137,7 +294,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("renders Print inside Tools dropdown", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} onPrintOpen={vi.fn()} onPublishHistory={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     expect(screen.getByRole("menuitem", { name: /Print/i })).toBeInTheDocument();
   });
 
@@ -145,7 +302,7 @@ describe("Toolbar — Tools dropdown", () => {
     const user = userEvent.setup();
     const onPrintOpen = vi.fn();
     render(<Toolbar {...defaultProps} onPrintOpen={onPrintOpen} onPublishHistory={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     await user.click(screen.getByRole("menuitem", { name: /Print/i }));
     expect(onPrintOpen).toHaveBeenCalledOnce();
   });
@@ -153,7 +310,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("uses an upload arrow for Export CSV", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} onExportCSV={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     const exportItem = screen.getByRole("menuitem", { name: /Export CSV/i });
 
     expect(exportItem.querySelector(".lucide-upload")).toBeInTheDocument();
@@ -162,7 +319,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("uses an import arrow for Import Previous Schedule", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} canImportPrevious onImportPrevious={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     const importItem = screen.getByRole("menuitem", {
       name: /Import Previous Schedule/i,
     });
@@ -189,9 +346,9 @@ describe("Toolbar — Tools dropdown", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
 
-    expect(screen.getByRole("menuitem", { name: /Requests/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Requests/i })).toBeNull();
     expect(screen.getByRole("menuitem", { name: /Print/i })).toHaveAttribute(
       "aria-disabled",
       "true",
@@ -238,9 +395,9 @@ describe("Toolbar — Tools dropdown", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
 
-    expect(screen.getByRole("menuitem", { name: /Requests/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Requests/i })).toBeNull();
     expect(screen.getByRole("menuitem", { name: /Authors/i })).toHaveAttribute(
       "aria-disabled",
       "true",
@@ -283,7 +440,7 @@ describe("Toolbar — Tools dropdown", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
 
     expect(screen.getByRole("menuitem", { name: /Exit Bulk Delete/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /Exit Bulk Delete/i })).not.toBeDisabled();
@@ -299,7 +456,7 @@ describe("Toolbar — Tools dropdown", () => {
         onImportPrevious={vi.fn()}
       />,
     );
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).toBeInTheDocument();
     expect(
       screen.queryByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
@@ -309,7 +466,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("shows Fill from Recurring Schedules only when recurring apply permission is granted", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} canApplyRecurringSchedule onApplyRecurring={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     expect(
       screen.getByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
     ).toBeInTheDocument();
@@ -317,7 +474,7 @@ describe("Toolbar — Tools dropdown", () => {
 });
 
 describe("Toolbar - someone who can't edit shifts", () => {
-  it("shows Requests with a quiet count and Print on the toolbar, with no Tools menu", async () => {
+  it("has Shift requests and Print on the toolbar, with no More tools menu", async () => {
     const user = userEvent.setup();
     const onRequestsToggle = vi.fn();
     const onPrintOpen = vi.fn();
@@ -330,15 +487,14 @@ describe("Toolbar - someone who can't edit shifts", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /^Tools/ })).not.toBeInTheDocument();
-    const requests = screen.getByRole("button", { name: /^Requests/ });
-    const count = requests.querySelector("[data-numeric-badge]");
-    expect(count).toHaveTextContent("2");
-    expect(count).toHaveAttribute("data-tone", "label");
-    expect(requests.querySelector("svg")).toBeNull();
+    expect(screen.queryByRole("button", { name: "More tools" })).not.toBeInTheDocument();
+    const requests = screen.getByRole("button", { name: /Shift requests/ });
+    expect(requests.querySelector("[data-numeric-badge]")).toHaveTextContent("2");
 
     await user.click(requests);
-    await user.click(screen.getByRole("button", { name: "Print" }));
+    const print = screen.getByRole("button", { name: "Print" });
+    expect(print.firstElementChild).toHaveClass("lucide-printer");
+    await user.click(print);
 
     expect(onRequestsToggle).toHaveBeenCalledOnce();
     expect(onPrintOpen).toHaveBeenCalledOnce();
@@ -347,11 +503,11 @@ describe("Toolbar - someone who can't edit shifts", () => {
   it("leaves Print off when the organization has printing turned off", () => {
     render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: /^Requests/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Shift requests/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Print" })).not.toBeInTheDocument();
   });
 
-  it("keeps the Tools menu for someone with editor tools", () => {
+  it("keeps More tools, holding Print, for someone with editor tools", () => {
     render(
       <Toolbar
         {...defaultProps}
@@ -361,8 +517,8 @@ describe("Toolbar - someone who can't edit shifts", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /^Tools/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Requests/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More tools" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Shift requests/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Print" })).not.toBeInTheDocument();
   });
 });
@@ -436,26 +592,10 @@ describe("Toolbar — callbacks", () => {
 });
 
 describe("Toolbar — staff search", () => {
-  it("clear button appears when staffSearch is non-empty", () => {
-    render(<Toolbar {...defaultProps} staffSearch="Alice" />);
-    expect(screen.getByRole("button", { name: "Clear search" })).toBeInTheDocument();
-  });
-
-  it("clear button is absent when staffSearch is empty", () => {
-    render(<Toolbar {...defaultProps} staffSearch="" />);
-    expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
-  });
-
-  it("clicking clear button calls onStaffSearchChange with empty string", async () => {
-    const user = userEvent.setup();
-    render(<Toolbar {...defaultProps} staffSearch="Alice" />);
-    await user.click(screen.getByRole("button", { name: "Clear search" }));
-    expect(defaultProps.onStaffSearchChange).toHaveBeenCalledWith("");
-  });
-
   it("typing in search input calls onStaffSearchChange with typed value", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "Search staff" }));
     const input = screen.getByPlaceholderText("Search staff");
     await user.type(input, "B");
     // The input is controlled (value=staffSearch stays ""), so each keystroke fires

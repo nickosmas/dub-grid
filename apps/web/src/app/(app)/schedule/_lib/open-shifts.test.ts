@@ -160,6 +160,34 @@ function buildCoverageGap(overrides: Partial<CoverageGap> = {}): CoverageGap {
 }
 
 describe("buildGridCalloffOpenShiftsFromRequests", () => {
+  it("keeps a claimed call-off open shift while the claim waits, naming who claimed it", () => {
+    const [claimed] = buildGridCalloffOpenShiftsFromRequests({
+      requests: [
+        buildShiftRequest({
+          status: "pending_approval",
+          targetEmpId: "emp-2",
+          targetName: "Thomas Crawford",
+          targetShiftDate: "2026-04-21",
+        }),
+      ],
+      employees: [buildEmployee()],
+      startDate: "2026-04-20",
+      endDate: "2026-04-27",
+    });
+    expect(claimed).toMatchObject({ id: "request-1", claimedBy: "Thomas Crawford" });
+
+    const settled = buildGridCalloffOpenShiftsFromRequests({
+      requests: [
+        buildShiftRequest({ status: "approved", targetEmpId: "emp-2" }),
+        buildShiftRequest({ id: "unclaimed-pending", status: "pending_approval" }),
+      ],
+      employees: [buildEmployee()],
+      startDate: "2026-04-20",
+      endDate: "2026-04-27",
+    });
+    expect(settled).toEqual([]);
+  });
+
   it("maps open pickup requests spawned from calloffs into grid open shifts", () => {
     const openShiftRequests = [
       buildShiftRequest(),

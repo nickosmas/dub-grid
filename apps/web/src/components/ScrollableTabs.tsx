@@ -1,19 +1,30 @@
 "use client";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useLayoutEffect } from "react";
 import { Button } from "@/components/Button";
 
 interface ScrollableTabsProps {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
+  /** Show at most this many items; the rest scroll into view. */
+  maxVisibleItems?: number;
+  /** And never wider than this, in pixels, for long item names. */
+  maxVisibleWidth?: number;
 }
 
-export default function ScrollableTabs({ children, className, style }: ScrollableTabsProps) {
+export default function ScrollableTabs({
+  children,
+  className,
+  style,
+  maxVisibleItems,
+  maxVisibleWidth,
+}: ScrollableTabsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [capWidth, setCapWidth] = useState<number | null>(null);
 
   const frameRef = useRef<number | null>(null);
 
@@ -31,6 +42,29 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
     });
   }, []);
 
+  // Where the last item allowed in view ends, plus the track's own inset.
+  // Measured before paint, so a long list never flashes at full width.
+  const measureCap = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || (!maxVisibleItems && !maxVisibleWidth)) {
+      setCapWidth(null);
+      return;
+    }
+    const last =
+      maxVisibleItems && el.children.length > maxVisibleItems
+        ? (el.children[maxVisibleItems - 1] as HTMLElement)
+        : null;
+    const byCount = last
+      ? last.offsetLeft + last.offsetWidth + parseFloat(getComputedStyle(el).paddingRight || "0")
+      : el.scrollWidth;
+    const cap = Math.ceil(maxVisibleWidth ? Math.min(byCount, maxVisibleWidth) : byCount);
+    setCapWidth(cap < el.scrollWidth ? cap : null);
+  }, [maxVisibleItems, maxVisibleWidth]);
+
+  useLayoutEffect(() => {
+    measureCap();
+  }, [children, measureCap]);
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -38,7 +72,10 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
     el.addEventListener("scroll", checkScroll, { passive: true });
     let ro: ResizeObserver | undefined;
     if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(checkScroll);
+      ro = new ResizeObserver(() => {
+        checkScroll();
+        measureCap();
+      });
       ro.observe(el);
     }
     return () => {
@@ -49,7 +86,7 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
         frameRef.current = null;
       }
     };
-  }, [checkScroll]);
+  }, [checkScroll, measureCap]);
 
   // Re-check when children change (e.g. dynamic tab list)
   useEffect(() => {
@@ -63,7 +100,13 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
   };
 
   return (
-    <div className={`dg-scrollable-tabs${className ? ` ${className}` : ""}`} style={style}>
+    <div
+      className={`dg-scrollable-tabs${className ? ` ${className}` : ""}`}
+      // A plain length, not min(…, 100%): a percentage limit is ignored when
+      // the row around it sizes itself, which then saves room for every item.
+      style={capWidth != null ? { ...style, maxWidth: capWidth } : style}
+      data-capped={capWidth != null ? "" : undefined}
+    >
       {/* Left fade + chevron */}
       <div
         className={`dg-scroll-fade dg-scroll-fade--left${canScrollLeft ? " visible" : ""}`}

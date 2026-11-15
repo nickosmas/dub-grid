@@ -67,6 +67,7 @@ import { AbsenceDayBar } from "./AbsenceDayBar";
 import { SpanTabs } from "@/components/ui/span-tabs";
 import { buildAssignableShiftDisplayMap, buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import ConfirmDialog from "./ConfirmDialog";
+import { ApprovalDraftWarning } from "@/components/shift-requests/approval-draft-warning";
 import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -98,7 +99,9 @@ import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import {
   CorrectedDayCard,
   PublishedChangeCard,
+  RequestCard,
   ShiftPanelView,
+  type PanelRequestCard,
   type PanelViewDetail,
   type PanelViewStatus,
 } from "@/components/shift-panel/ShiftPanelView";
@@ -123,6 +126,7 @@ import {
   type CellChangeBadge,
 } from "@/components/schedule-grid/cellChangeBadges";
 import { formatPublishedMetadata } from "@/components/schedule-grid/gridHelpers";
+import { RequestDot } from "@/components/schedule-grid/badges";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import {
   cellStateToChangeDay,
@@ -217,6 +221,12 @@ interface ShiftEditPanelProps {
   resolvePublisherName?: (userId: string) => string | null;
   /** The organization's time zone for the publication time. */
   publicationTimeZone?: string | null;
+  /** The waiting requests on this day, each with what would happen (item 57a). */
+  requestCards?: PanelRequestCard[];
+  /** Approves or rejects a request awaiting approval; absent for someone who can't approve. */
+  onResolveRequest?: (requestId: string, approved: boolean, note?: string) => Promise<boolean>;
+  /** The draft warning read before an approval is confirmed, as on the Requests board. */
+  loadRequestApprovalWarning?: (requestId: string) => Promise<string[]>;
   /** Commits the current local draft to the server. */
   onConfirmDraft?: (seriesScope?: SeriesScope) => void | Promise<boolean>;
   /**
@@ -405,6 +415,17 @@ function getPanelDiffBadgeBackground(kind: CellChangeBadge["kind"]): string {
   }
 }
 
+const CORNER_CHIP: React.CSSProperties = {
+  whiteSpace: "nowrap",
+  fontSize: "var(--dg-fs-badge)",
+  fontWeight: 600,
+  letterSpacing: "0.05em",
+  borderRadius: 3,
+  padding: "3px 8px",
+  lineHeight: 1,
+  boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+};
+
 // The colored header sits inset in its card. Concentric corners need the outer
 // radius to equal the header's plus the gap between them (padding and border).
 const SHIFT_EDIT_CARD_INSET = 5;
@@ -494,6 +515,9 @@ export default function ShiftEditPanel({
   historicalAssignments,
   resolvePublisherName,
   publicationTimeZone = null,
+  requestCards = [],
+  onResolveRequest,
+  loadRequestApprovalWarning,
   onConfirmDraft,
   correction = null,
   pastDayNotice = null,
@@ -639,6 +663,13 @@ export default function ShiftEditPanel({
     | null
   >(null);
   const [isSubmittingRequestConfirmation, setIsSubmittingRequestConfirmation] = useState(false);
+  const [requestNotes, setRequestNotes] = useState<Record<string, string>>({});
+  const [requestDecision, setRequestDecision] = useState<{
+    requestId: string;
+    approved: boolean;
+    warning: string[];
+  } | null>(null);
+  const [isResolvingRequest, setIsResolvingRequest] = useState(false);
   const repeatFormRef = useRef<RepeatFormHandle | null>(null);
   // Time off stands in for a colleague's absence; nobody calls off with it.
   const activeAbsenceTypes = absenceTypes.filter(
@@ -3282,32 +3313,63 @@ export default function ShiftEditPanel({
     );
   }
 
+  // A shift's corner holds its change chip, then a chip per waiting request
+  // about it, so the request reads on the shift it concerns.
   function renderShiftDiffBadge(badge: CellChangeBadge | null, index?: number) {
-    if (!badge) return null;
+    const requests = requestCards.filter((card) =>
+      card.affectedSegmentIndexes.includes(index ?? 0),
+    );
+    if (!badge && requests.length === 0) return null;
     return (
       <span
-        data-shift-diff-badge={badge.kind}
-        data-shift-diff-source={badge.source}
-        data-shift-diff-index={index != null ? String(index) : undefined}
-        aria-label={`${badge.text}: ${badge.detail}`}
+        data-shift-corner={index != null ? String(index) : "0"}
+        // On the shift's own top-left corner, centered on its edge, as on the grid.
         style={{
           position: "absolute",
-          top: -10,
-          left: 12,
-          fontSize: "var(--dg-fs-badge)",
-          fontWeight: 600,
-          letterSpacing: "0.05em",
-          background: getPanelDiffBadgeBackground(badge.kind),
-          color: "var(--dg-color-text-inverse)",
-          borderRadius: 3,
-          padding: "3px 8px",
-          lineHeight: 1,
+          top: 0,
+          left: 8,
+          transform: "translateY(-50%)",
+          display: "flex",
+          gap: 4,
           pointerEvents: "none",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
           zIndex: 2,
         }}
       >
-        {badge.text}
+        {badge && (
+          <span
+            data-shift-diff-badge={badge.kind}
+            data-shift-diff-source={badge.source}
+            data-shift-diff-index={index != null ? String(index) : undefined}
+            aria-label={`${badge.text}: ${badge.detail}`}
+            style={{
+              ...CORNER_CHIP,
+              background: getPanelDiffBadgeBackground(badge.kind),
+              color: "var(--dg-color-text-inverse)",
+            }}
+          >
+            {badge.text}
+          </span>
+        )}
+        {requests.map((card) => (
+          <span
+            key={card.requestId}
+            data-shift-request-chip={card.waitingOn}
+            aria-label={`${card.kind}: ${card.status}`}
+            style={{
+              ...CORNER_CHIP,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              background: "var(--dg-color-surface)",
+              color: "var(--dg-color-text)",
+              border: "1px solid var(--dg-color-border)",
+              padding: "2px 8px 2px 6px",
+            }}
+          >
+            <RequestDot waitingOn={card.waitingOn} size={7} />
+            {card.kind}
+          </span>
+        ))}
       </span>
     );
   }
@@ -3537,7 +3599,6 @@ export default function ShiftEditPanel({
                 background: "var(--dg-color-surface)",
               }}
             >
-              {renderShiftDiffBadge(pillChangeBadges[i] ?? null, i)}
               {/* Pill header */}
               <div
                 data-shift-edit-card-header={i}
@@ -3554,6 +3615,7 @@ export default function ShiftEditPanel({
                   gap: 2,
                 }}
               >
+                {renderShiftDiffBadge(pillChangeBadges[i] ?? null, i)}
                 <div
                   style={{ textAlign: "center", maxWidth: "calc(100% - 48px)", overflow: "hidden" }}
                 >
@@ -4009,9 +4071,6 @@ export default function ShiftEditPanel({
           background: "var(--dg-color-surface)",
         }}
       >
-        {renderShiftDiffBadge(
-          restOfDayPillIndex != null ? (pillChangeBadges[restOfDayPillIndex] ?? null) : null,
-        )}
         <div
           style={{
             background: colors.background,
@@ -4024,6 +4083,9 @@ export default function ShiftEditPanel({
             position: "relative",
           }}
         >
+          {renderShiftDiffBadge(
+            restOfDayPillIndex != null ? (pillChangeBadges[restOfDayPillIndex] ?? null) : null,
+          )}
           <MaybeHint content={absenceLabel} side="top">
             <span
               style={{
@@ -4643,6 +4705,81 @@ export default function ShiftEditPanel({
               detail={correctedLabel}
             />
           )}
+          {requestCards.map((card) => (
+            <RequestCard
+              key={card.requestId}
+              card={card}
+              actions={
+                onResolveRequest && card.awaitingApproval ? (
+                  <>
+                    <textarea
+                      aria-label={card.notePlaceholder}
+                      placeholder={card.notePlaceholder}
+                      value={requestNotes[card.requestId] ?? ""}
+                      onChange={(event) =>
+                        setRequestNotes((notes) => ({
+                          ...notes,
+                          [card.requestId]: event.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        minHeight: 56,
+                        padding: "8px 10px",
+                        border: "1px solid var(--dg-color-border)",
+                        borderRadius: "var(--dg-radius-md)",
+                        fontSize: "var(--dg-fs-caption)",
+                        fontFamily: "inherit",
+                        color: "var(--dg-color-text-primary)",
+                        background: "var(--dg-color-field)",
+                        resize: "vertical",
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                        gap: 8,
+                      }}
+                    >
+                      <Button
+                        type="button"
+                        className="dg-btn dg-btn-secondary"
+                        disabled={requestDecision != null}
+                        onClick={() =>
+                          setRequestDecision({
+                            requestId: card.requestId,
+                            approved: false,
+                            warning: [],
+                          })
+                        }
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        type="button"
+                        className="dg-btn dg-btn-primary"
+                        disabled={requestDecision != null}
+                        onClick={async () => {
+                          const warning =
+                            (await loadRequestApprovalWarning?.(card.requestId)) ?? [];
+                          setRequestDecision({
+                            requestId: card.requestId,
+                            approved: true,
+                            warning,
+                          });
+                        }}
+                      >
+                        Approve
+                      </Button>
+                    </div>
+                  </>
+                ) : undefined
+              }
+            />
+          ))}
           {publishedChangeLabel && (
             <PublishedChangeCard
               change={publishedChangeView}
@@ -5027,7 +5164,7 @@ export default function ShiftEditPanel({
                     {renderRequestControls({ standalone: false })}
                   </div>
                 )}
-              {isOwnShift && hasActiveRequest && (
+              {isOwnShift && hasActiveRequest && requestCards.length === 0 && (
                 <Banner tone="warning" icon={Hourglass} className="mt-4">
                   A request is already active for this shift
                 </Banner>
@@ -5339,6 +5476,64 @@ export default function ShiftEditPanel({
 
       {renderPendingRequestConfirmation()}
 
+      {requestDecision &&
+        (() => {
+          const card = requestCards.find((item) => item.requestId === requestDecision.requestId);
+          if (!card) return null;
+          const note = requestNotes[card.requestId]?.trim() || undefined;
+          const verb = requestDecision.approved ? "Approve" : "Reject";
+          return (
+            <ConfirmDialog
+              title={`${verb} this request?`}
+              confirmLabel={verb}
+              variant={
+                !requestDecision.approved || requestDecision.warning.length ? "warning" : "info"
+              }
+              isLoading={isResolvingRequest}
+              message={
+                <>
+                  <div>
+                    <strong>{card.status}</strong>
+                  </div>
+                  {requestDecision.approved ? (
+                    card.body ? (
+                      <div>{card.body}</div>
+                    ) : null
+                  ) : (
+                    <div>The original schedule stays in place.</div>
+                  )}
+                  {note ? (
+                    <div>
+                      Your note: <em>{note}</em>
+                    </div>
+                  ) : null}
+                  {requestDecision.approved ? (
+                    <ApprovalDraftWarning lines={requestDecision.warning} />
+                  ) : null}
+                </>
+              }
+              onCancel={() => {
+                if (!isResolvingRequest) setRequestDecision(null);
+              }}
+              onConfirm={async () => {
+                if (!onResolveRequest) return;
+                setIsResolvingRequest(true);
+                try {
+                  const done = await onResolveRequest(
+                    card.requestId,
+                    requestDecision.approved,
+                    note,
+                  );
+                  setRequestDecision(null);
+                  // The day changes under the panel once a manager decides.
+                  if (done) forceClose();
+                } finally {
+                  setIsResolvingRequest(false);
+                }
+              }}
+            />
+          );
+        })()}
       {confirmCancelActiveRequest && onCancelActiveRequest && (
         <ConfirmDialog
           title={`Cancel your request for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`}
