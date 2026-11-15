@@ -1837,6 +1837,27 @@ button.dg-cc-sg-main {
 .dg-app-shell-header-placeholder {
   height: var(--header-height);
 }
+/* A page that scrolls inside its own box never scrolls <html>, so <html>
+   neither scrolls nor reserves space there. The box takes the reserved space
+   so its scrollbar meets the window edge, and the top bar reserves the same
+   width (.dg-header-gutter) to keep its buttons in place. */
+html:has(.dg-own-scroll) {
+  overflow-y: hidden;
+  scrollbar-gutter: auto;
+}
+.dg-own-scroll {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.dg-header-gutter {
+  display: none;
+}
+html:has(.dg-own-scroll) .dg-header-gutter {
+  display: block;
+  flex: none;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
 /* Set by useClipTrailingWhitespace when the only thing left to scroll to is
    bottom padding. Screen only, so printing never clips a page. */
 @media screen {
