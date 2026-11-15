@@ -53,6 +53,8 @@ interface MobileDayViewProps {
   shiftCategories: ShiftCategory[];
   indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
+  /** Narrows which cells open on tap for a viewer who can't edit; every cell opens when omitted. */
+  canOpenCell?: (empId: string, date: Date) => boolean;
   /** The page's note marks, so each shift shows its indicators by name and colour. */
   noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   activeFocusArea?: number | null;
@@ -90,6 +92,7 @@ export default function MobileDayView({
   focusAreas,
   assignments,
   isCellInteractive = false,
+  canOpenCell,
   indicatorTypes = [],
   noteMarksForKey,
   activeFocusArea,
@@ -566,27 +569,26 @@ export default function MobileDayView({
                         ),
                     );
 
-                    return (
-                      <Button
-                        key={dk}
-                        onClick={() => {
-                          if (isCellInteractive) handleCellClick(emp, date, sectionName);
-                        }}
-                        style={{
-                          minHeight: 36,
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: isToday ? "var(--dg-color-today-bg)" : "transparent",
-                          border: "none",
-                          borderLeft: "1px solid var(--dg-color-border)",
-                          cursor: isCellInteractive ? "pointer" : "default",
-                          padding: "2px 1px",
-                          fontFamily: "inherit",
-                          gap: 0,
-                        }}
-                      >
+                    // A cell the viewer can't open is plain: no button, no
+                    // pointer and no tab stop.
+                    const opensOnTap =
+                      isCellInteractive && (!canOpenCell || canOpenCell(emp.id, date));
+                    const cellStyle: React.CSSProperties = {
+                      minHeight: 36,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: isToday ? "var(--dg-color-today-bg)" : "transparent",
+                      border: "none",
+                      borderLeft: "1px solid var(--dg-color-border)",
+                      cursor: opensOnTap ? "pointer" : "default",
+                      padding: "2px 1px",
+                      fontFamily: "inherit",
+                      gap: 0,
+                    };
+                    const cellContent = (
+                      <>
                         {pills.length > 0 ? (
                           pills.map((pill, pillIdx) => {
                             const fs = pills.length > 1 ? 8 : 10;
@@ -697,7 +699,21 @@ export default function MobileDayView({
                           placement="inline"
                           style={{ flexWrap: "wrap", justifyContent: "center" }}
                         />
+                      </>
+                    );
+
+                    return opensOnTap ? (
+                      <Button
+                        key={dk}
+                        onClick={() => handleCellClick(emp, date, sectionName)}
+                        style={cellStyle}
+                      >
+                        {cellContent}
                       </Button>
+                    ) : (
+                      <div key={dk} style={cellStyle}>
+                        {cellContent}
+                      </div>
                     );
                   })}
                 </div>
@@ -762,9 +778,13 @@ export default function MobileDayView({
       {!hasAnySectionContent && (
         <EmptyState
           size="compact"
-          title={isCellInteractive ? "Nobody assigned here yet" : "No shifts found for this period"}
+          title={
+            isCellInteractive && !canOpenCell
+              ? "Nobody assigned here yet"
+              : "No shifts found for this period"
+          }
           description={
-            isCellInteractive
+            isCellInteractive && !canOpenCell
               ? "Assign people here from the People page."
               : "No shifts have been published for this period yet."
           }
