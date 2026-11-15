@@ -422,6 +422,7 @@ import {
   AssignmentDefinition,
   AbsenceType,
   ActiveShiftRequestSummary,
+  ShiftRequest,
   RecurringShift,
   SeriesFrequency,
   SeriesScope,
@@ -4055,10 +4056,35 @@ function SchedulerContent({
     [allAssignmentDefinitions, shiftCategories, jobs, allAbsenceTypes, focusAreas],
   );
   const summarizeRequestMarks = useCallback(
-    (marks: readonly RequestCellMark[] | undefined): ActiveShiftRequestSummary | null => {
+    (
+      marks: readonly RequestCellMark[] | undefined,
+      daySegments: ReadonlyArray<{ shiftId: number | null; jobId: number }> = [],
+    ): ActiveShiftRequestSummary | null => {
       const waitingOn = foldWaitingOn(marks);
       if (!waitingOn || !marks) return null;
       const requestsById = new Map(shiftRequests.requests.map((request) => [request.id, request]));
+      // The shifts of the day a request is about: what the asker offers, or
+      // what a swap partner gives. A whole-day absence, or nothing to match,
+      // is the first.
+      const affectedIndexes = (mark: RequestCellMark, request: ShiftRequest): number[] => {
+        const state =
+          mark.role === "asker"
+            ? request.requesterState
+            : mark.role === "partner" && request.type === "swap"
+              ? request.targetState
+              : null;
+        const pairs = new Set(
+          (state?.segments ?? []).map((segment) =>
+            buildShiftJobPairKey(segment.shiftId, segment.jobId),
+          ),
+        );
+        const indexes = daySegments.flatMap((segment, index) =>
+          pairs.has(buildShiftJobPairKey(segment.shiftId, segment.jobId)) ? [index] : [],
+        );
+        return indexes.length > 0 ? indexes : [0];
+      };
+      const kindLabel = (type: ShiftRequest["type"]) =>
+        type === "calloff" ? "Call-off" : type === "swap" ? "Swap" : "Pickup";
       const requests = marks.flatMap((mark) => {
         const request = requestsById.get(mark.requestId);
         return request
@@ -4066,6 +4092,8 @@ function SchedulerContent({
               {
                 requestId: mark.requestId,
                 waitingOn: mark.waitingOn,
+                kind: kindLabel(request.type),
+                affectedSegmentIndexes: affectedIndexes(mark, request),
                 ...describeRequestMark({
                   mark,
                   request,
@@ -4086,7 +4114,10 @@ function SchedulerContent({
         );
         return assignment ? [assignment.id] : [];
       });
-      return { waitingOn, requests, wouldGetAssignmentIds };
+      const affectedSegmentIndexes = [
+        ...new Set(requests.flatMap((line) => line.affectedSegmentIndexes)),
+      ].sort((left, right) => left - right);
+      return { waitingOn, requests, wouldGetAssignmentIds, affectedSegmentIndexes };
     },
     [org?.timezone, requestMarkResolvers, segmentCompatibility, shiftRequests.requests],
   );
@@ -4094,8 +4125,11 @@ function SchedulerContent({
   /** The waiting requests on a day: its corner fold and hover lines. */
   const activeRequestForKey = useCallback(
     (empId: string, date: Date): ActiveShiftRequestSummary | null =>
-      summarizeRequestMarks(requestMarks.byCell.get(`${empId}_${formatDateKey(date)}`)),
-    [requestMarks, summarizeRequestMarks],
+      summarizeRequestMarks(
+        requestMarks.byCell.get(`${empId}_${formatDateKey(date)}`),
+        segmentsForKey(empId, date),
+      ),
+    [requestMarks, segmentsForKey, summarizeRequestMarks],
   );
 
   // The waiting requests on the open panel's day, for its request cards.
@@ -4103,6 +4137,7 @@ function SchedulerContent({
     if (!editPanel) return [];
     const summary = summarizeRequestMarks(
       requestMarks.byCell.get(`${editPanel.empId}_${formatDateKey(editPanel.date)}`),
+      segmentsForKey(editPanel.empId, editPanel.date),
     );
     const requestsById = new Map(shiftRequests.requests.map((request) => [request.id, request]));
     return (summary?.requests ?? []).map((line) => {
@@ -4115,7 +4150,7 @@ function SchedulerContent({
           : "Note (Optional)",
       };
     });
-  }, [editPanel, requestMarks, shiftRequests.requests, summarizeRequestMarks]);
+  }, [editPanel, requestMarks, segmentsForKey, shiftRequests.requests, summarizeRequestMarks]);
 
   /** Whether the person's own shift that day already has a request they made. */
   const hasActiveRequestForShift = useCallback(

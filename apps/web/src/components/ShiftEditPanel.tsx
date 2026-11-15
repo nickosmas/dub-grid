@@ -124,6 +124,7 @@ import {
   type CellChangeBadge,
 } from "@/components/schedule-grid/cellChangeBadges";
 import { formatPublishedMetadata } from "@/components/schedule-grid/gridHelpers";
+import { REQUEST_FOLD_COLORS } from "@/components/schedule-grid/badges";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import {
   cellStateToChangeDay,
@@ -405,6 +406,17 @@ function getPanelDiffBadgeBackground(kind: CellChangeBadge["kind"]): string {
       return "var(--dg-color-warning)";
   }
 }
+
+const CORNER_CHIP: React.CSSProperties = {
+  whiteSpace: "nowrap",
+  fontSize: "var(--dg-fs-badge)",
+  fontWeight: 600,
+  letterSpacing: "0.05em",
+  borderRadius: 3,
+  padding: "3px 8px",
+  lineHeight: 1,
+  boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+};
 
 // The colored header sits inset in its card. Concentric corners need the outer
 // radius to equal the header's plus the gap between them (padding and border).
@@ -3286,35 +3298,72 @@ export default function ShiftEditPanel({
     );
   }
 
+  // A shift's corner holds its change chip, then a chip per waiting request
+  // about it, so the request reads on the shift it concerns.
   function renderShiftDiffBadge(badge: CellChangeBadge | null, index?: number) {
-    if (!badge) return null;
+    const requests = requestCards.filter((card) =>
+      card.affectedSegmentIndexes.includes(index ?? 0),
+    );
+    if (!badge && requests.length === 0) return null;
     return (
       <span
-        data-shift-diff-badge={badge.kind}
-        data-shift-diff-source={badge.source}
-        data-shift-diff-index={index != null ? String(index) : undefined}
-        aria-label={`${badge.text}: ${badge.detail}`}
+        data-shift-corner={index != null ? String(index) : "0"}
         // On the shift's own top-left corner, centered on its edge, as on the grid.
         style={{
           position: "absolute",
           top: 0,
           left: 8,
           transform: "translateY(-50%)",
-          whiteSpace: "nowrap",
-          fontSize: "var(--dg-fs-badge)",
-          fontWeight: 600,
-          letterSpacing: "0.05em",
-          background: getPanelDiffBadgeBackground(badge.kind),
-          color: "var(--dg-color-text-inverse)",
-          borderRadius: 3,
-          padding: "3px 8px",
-          lineHeight: 1,
+          display: "flex",
+          gap: 4,
           pointerEvents: "none",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
           zIndex: 2,
         }}
       >
-        {badge.text}
+        {badge && (
+          <span
+            data-shift-diff-badge={badge.kind}
+            data-shift-diff-source={badge.source}
+            data-shift-diff-index={index != null ? String(index) : undefined}
+            aria-label={`${badge.text}: ${badge.detail}`}
+            style={{
+              ...CORNER_CHIP,
+              background: getPanelDiffBadgeBackground(badge.kind),
+              color: "var(--dg-color-text-inverse)",
+            }}
+          >
+            {badge.text}
+          </span>
+        )}
+        {requests.map((card) => (
+          <span
+            key={card.requestId}
+            data-shift-request-chip={card.waitingOn}
+            aria-label={`${card.kind}: ${card.status}`}
+            style={{
+              ...CORNER_CHIP,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              background: "var(--dg-color-surface)",
+              color: "var(--dg-color-text)",
+              border: "1px solid var(--dg-color-border)",
+              padding: "2px 8px 2px 6px",
+            }}
+          >
+            {/* The grid's fold, so the chip reads as the same mark. */}
+            <span
+              aria-hidden="true"
+              style={{
+                width: 0,
+                height: 0,
+                borderTop: `7px solid ${REQUEST_FOLD_COLORS[card.waitingOn]}`,
+                borderRight: "7px solid transparent",
+              }}
+            />
+            {card.kind}
+          </span>
+        ))}
       </span>
     );
   }

@@ -1407,7 +1407,13 @@ export interface ActiveShiftRequestSummary {
     status: string;
     body: string | null;
     asked: string;
+    /** "Call-off", "Swap" or "Pickup", for the chip on the shift it touches. */
+    kind: string;
+    /** The day's shifts this request is about, by index; the first when none match. */
+    affectedSegmentIndexes: number[];
   }>;
+  /** Every shift on the day a waiting request is about, by index, for the fold. */
+  affectedSegmentIndexes: number[];
   /**
    * The assignments a claimer or volunteer would get, for the dashed outline
    * on an empty day; empty when nobody here would gain a shift.

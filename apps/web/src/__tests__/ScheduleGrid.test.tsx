@@ -3392,9 +3392,12 @@ describe("ScheduleGrid", () => {
     renderGrid({
       activeRequestForKey: () => ({
         waitingOn: "teammate",
+        affectedSegmentIndexes: [0],
         requests: [
           {
             requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
             waitingOn: "teammate",
             status: "Offered for pickup · waiting for a teammate",
             body: null,
@@ -3418,9 +3421,12 @@ describe("ScheduleGrid", () => {
     renderGrid({
       activeRequestForKey: () => ({
         waitingOn: "manager",
+        affectedSegmentIndexes: [0],
         requests: [
           {
             requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
             waitingOn: "teammate",
             status: "Swap with Carol Henderson · awaiting approval",
             body: null,
@@ -3428,6 +3434,8 @@ describe("ScheduleGrid", () => {
           },
           {
             requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
             waitingOn: "teammate",
             status: "Offered for pickup · waiting for a teammate",
             body: null,
@@ -3447,6 +3455,45 @@ describe("ScheduleGrid", () => {
     expect(fold?.style.borderTop).toBe(`${REQUEST_FOLD_SIZE}px solid var(--dg-color-warning)`);
   });
 
+  it("folds only the pill a request is about on a double", () => {
+    const localAssignments: AssignmentDefinition[] = [
+      { ...assignments[0], jobId: 101 },
+      { ...assignments[0], id: 2, label: "N", name: "Night Shift", jobId: 102, sortOrder: 2 },
+    ];
+    renderGrid({
+      assignments: localAssignments,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      activeRequestForKey: () => ({
+        waitingOn: "manager",
+        affectedSegmentIndexes: [1],
+        requests: [
+          {
+            requestId: "r",
+            kind: "Call-off",
+            affectedSegmentIndexes: [1],
+            waitingOn: "manager",
+            status: "Call-off · awaiting approval",
+            body: null,
+            asked: "Asked.",
+          },
+        ],
+      }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
+    expect(pills).toHaveLength(2);
+    expect(pills[0]?.querySelector("[data-request-fold]")).toBeNull();
+    expect(pills[1]?.querySelector("[data-request-fold]")).not.toBeNull();
+  });
+
   it("outlines the shift a claimer would get on an empty day", () => {
     observedWidth = 1600;
 
@@ -3455,9 +3502,12 @@ describe("ScheduleGrid", () => {
       assignmentIdsForKey: () => [],
       activeRequestForKey: () => ({
         waitingOn: "manager",
+        affectedSegmentIndexes: [0],
         requests: [
           {
             requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
             waitingOn: "teammate",
             status: "Claiming Laura Marshall's shift · awaiting approval",
             body: null,
@@ -3484,9 +3534,12 @@ describe("ScheduleGrid", () => {
     renderGrid({
       activeRequestForKey: () => ({
         waitingOn: "manager",
+        affectedSegmentIndexes: [0],
         requests: [
           {
             requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
             waitingOn: "teammate",
             status: "Claiming a shift · awaiting approval",
             body: null,
@@ -3508,9 +3561,12 @@ describe("ScheduleGrid", () => {
       showShiftDetailHoverCards: true,
       activeRequestForKey: () => ({
         waitingOn: "manager",
+        affectedSegmentIndexes: [0],
         requests: [
           {
             requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
             waitingOn: "manager",
             status: "Swap with Carol Henderson · awaiting approval",
             body: "Laura would work Carol's Evening Shift. Carol would work Laura's Day Shift.",
@@ -3518,6 +3574,8 @@ describe("ScheduleGrid", () => {
           },
           {
             requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
             waitingOn: "teammate",
             status: "Offered for pickup · waiting for a teammate",
             body: "Laura keeps this shift until a claim is approved.",
@@ -3562,9 +3620,12 @@ describe("ScheduleGrid", () => {
       assignments: twoPillAssignmentDefinitions,
       activeRequestForKey: () => ({
         waitingOn: "teammate",
+        affectedSegmentIndexes: [0],
         requests: [
           {
             requestId: "r",
+            kind: "Swap",
+            affectedSegmentIndexes: [0],
             waitingOn: "teammate",
             status: "Offered for pickup · waiting for a teammate",
             body: null,

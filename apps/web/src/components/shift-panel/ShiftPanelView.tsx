@@ -211,6 +211,10 @@ export interface PanelRequestCard {
   awaitingApproval: boolean;
   /** The note field's prompt, naming who the note goes to, as on the Requests board. */
   notePlaceholder: string;
+  /** "Call-off", "Swap" or "Pickup", for the chip on the shift it concerns. */
+  kind: string;
+  /** The day's shifts the request concerns, by index. */
+  affectedSegmentIndexes: number[];
 }
 
 /**

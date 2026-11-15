@@ -248,19 +248,11 @@ export function MentoredShiftBadge({
 }
 
 /**
- * Fill for the request fold, deliberately not `SHIFT_REQUEST_STATUS_COLORS`.
- * That table is built for the requests board's soft chips — a pale background
- * carrying dark text — and a 12px solid triangle drawn in its `border` tint is
- * all but invisible against a shift pill, near-black in dark mode. These two
- * hold their value in both themes because `--color-danger` and
- * `--color-warning` are the same hex in each.
- *
- * Red is the unclaimed state: an open request is coverage nobody has taken yet,
- * which is what a scheduler has to chase. Orange is the in-motion state, and
- * keeps pending approval on the same warning axis the board already puts it on.
+ * Fill for the request fold: gray while a teammate must answer, amber while a
+ * manager must. Not the requests board's soft chip tints, which vanish as a
+ * small solid triangle on a shift pill. Red stays for destructive actions.
  */
-/** Gray while a teammate must answer, amber while a manager must. Red means destructive. */
-const REQUEST_FOLD_COLORS: Record<RequestWaitingOn, string> = {
+export const REQUEST_FOLD_COLORS: Record<RequestWaitingOn, string> = {
   teammate: "var(--dg-color-text-muted)",
   manager: "var(--dg-color-warning)",
 };

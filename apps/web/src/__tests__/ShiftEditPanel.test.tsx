@@ -2111,7 +2111,26 @@ describe("ShiftEditPanel", () => {
       asked: "Asked Nov 14, 2026, 8:02 AM PST.",
       awaitingApproval: true,
       notePlaceholder: "Note to Laura Marshall and Carol Henderson? (Optional)",
+      kind: "Swap",
+      affectedSegmentIndexes: [0],
     };
+
+    it("marks only the shift a request is about on a double", () => {
+      renderDay({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        currentSegments: [daySegment, eveningSegment],
+        requestCards: [{ ...swapCard, kind: "Call-off", affectedSegmentIndexes: [1] }],
+      });
+      const chips = document.querySelectorAll("[data-shift-request-chip]");
+      expect(chips).toHaveLength(1);
+      expect(chips[0]).toHaveAttribute("data-shift-request-chip", "manager");
+      expect(chips[0]).toHaveTextContent("Call-off");
+      expect(chips[0]?.closest("[data-shift-edit-card-header]")).toHaveAttribute(
+        "data-shift-edit-card-header",
+        "1",
+      );
+    });
 
     it("shows each waiting request on the day, read-only for someone who can't approve", () => {
       renderDay({ requestCards: [swapCard] });

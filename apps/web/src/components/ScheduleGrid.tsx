@@ -4181,12 +4181,6 @@ const SectionBlock = memo(function SectionBlock({
                                               opacity: draftKind === "deleted" ? 0.5 : 1,
                                             }}
                                           >
-                                            {activeRequest && activeRequestLabel && (
-                                              <RequestCornerFold
-                                                waitingOn={activeRequest.waitingOn}
-                                                label={activeRequestLabel}
-                                              />
-                                            )}
                                             <div
                                               data-shift-layout={
                                                 stackShifts ? "stacked" : "side-by-side"
@@ -4411,6 +4405,17 @@ const SectionBlock = memo(function SectionBlock({
                                                       paddingRight: multiSidePadding,
                                                     }}
                                                   >
+                                                    {/* On the shift the request is about, not the first. */}
+                                                    {activeRequest &&
+                                                      activeRequestLabel &&
+                                                      activeRequest.affectedSegmentIndexes.includes(
+                                                        li,
+                                                      ) && (
+                                                        <RequestCornerFold
+                                                          waitingOn={activeRequest.waitingOn}
+                                                          label={activeRequestLabel}
+                                                        />
+                                                      )}
                                                     {pillBadge && (
                                                       <GridDiffBadge
                                                         badge={{
