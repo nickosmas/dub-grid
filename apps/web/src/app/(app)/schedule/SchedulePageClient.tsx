@@ -10416,6 +10416,7 @@ function SchedulerContent({
               absenceTypeMap={absenceTypeObjectMap}
               getShiftStyle={getShiftStyle}
               getCustomShiftTimes={getCustomShiftTimes}
+              segmentsForKey={segmentsForKey}
               onClose={() => setActivePrintConfig(null)}
               focusAreaLabel={org?.focusAreaLabel}
               shiftDisplayMode={org?.shiftDisplayMode}
