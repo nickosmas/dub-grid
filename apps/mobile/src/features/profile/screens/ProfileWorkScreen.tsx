@@ -68,7 +68,6 @@ import {
   ProfilePanel,
   ProfileSection,
   ProfileTextInput,
-  formatProfileStatus,
 } from "../components/ProfilePrimitives";
 import { isRoleCertificationBlocked } from "../lib/role-certification";
 import {
@@ -90,7 +89,7 @@ import {
   OWN_PHONE_TAKEN_MESSAGE,
 } from "../../people/lib/contactConflicts";
 import { getMobileStepUpMethod } from "../lib/step-up";
-import { ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
+import { ADMINISTRATIVE_TEAM_LABELS, describeEmploymentStatus } from "@dubgrid/domain";
 
 const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
 
@@ -648,7 +647,10 @@ export default function ProfileWorkScreen() {
                     <ProfileInfoRow
                       iconName="pulse-outline"
                       label="Status"
-                      value={formatProfileStatus(linkedEmployee.status)}
+                      value={describeEmploymentStatus(
+                        linkedEmployee.status,
+                        linkedEmployee.awayUntil,
+                      )}
                     />
                     {linkedEmployee.employeeNumber != null ? (
                       <ProfileInfoRow
