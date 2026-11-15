@@ -252,7 +252,7 @@ export function MentoredShiftBadge({
  * manager must. Not the requests board's soft chip tints, which vanish as a
  * small solid triangle on a shift pill. Red stays for destructive actions.
  */
-export const REQUEST_FOLD_COLORS: Record<RequestWaitingOn, string> = {
+const REQUEST_FOLD_COLORS: Record<RequestWaitingOn, string> = {
   teammate: "var(--dg-color-text-muted)",
   manager: "var(--dg-color-warning)",
 };
@@ -292,6 +292,32 @@ export function RequestCornerFold({
         }}
       />
     </MaybeHint>
+  );
+}
+
+/**
+ * The request mark away from a pill's corner (a hover card line, a panel card
+ * or chip): a dot in the fold's color, since a fold only reads on a corner.
+ */
+export function RequestDot({
+  waitingOn,
+  size = 8,
+}: {
+  waitingOn: RequestWaitingOn;
+  size?: number;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      data-request-dot={waitingOn}
+      style={{
+        flexShrink: 0,
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: REQUEST_FOLD_COLORS[waitingOn],
+      }}
+    />
   );
 }
 

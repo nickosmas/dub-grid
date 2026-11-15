@@ -2126,6 +2126,8 @@ describe("ShiftEditPanel", () => {
       expect(chips).toHaveLength(1);
       expect(chips[0]).toHaveAttribute("data-shift-request-chip", "manager");
       expect(chips[0]).toHaveTextContent("Call-off");
+      // Away from a pill's corner the mark is a dot, not the grid's fold.
+      expect(chips[0]?.querySelector('[data-request-dot="manager"]')).not.toBeNull();
       expect(chips[0]?.closest("[data-shift-edit-card-header]")).toHaveAttribute(
         "data-shift-edit-card-header",
         "1",
@@ -2136,6 +2138,7 @@ describe("ShiftEditPanel", () => {
       renderDay({ requestCards: [swapCard] });
       const card = document.querySelector("[data-request-card]");
       expect(card).toHaveAttribute("data-request-card", "manager");
+      expect(card?.querySelector('[data-request-dot="manager"]')).not.toBeNull();
       expect(card).toHaveTextContent("Swap with Carol Henderson · awaiting approval");
       expect(card).toHaveTextContent("Asked Nov 14, 2026, 8:02 AM PST.");
       expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();

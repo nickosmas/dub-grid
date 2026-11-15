@@ -147,6 +147,7 @@ import {
   LOCK_CORNER_CLEARANCE,
   MENTORED_CORNER_CLEARANCE,
   RequestCornerFold,
+  RequestDot,
   RequestWouldGetOutline,
   noteMarksWidth,
   NOTE_LANE_INSET,
@@ -924,20 +925,7 @@ function ShiftDetailHoverCard({
                           color: "var(--dg-color-text-primary)",
                         }}
                       >
-                        <span
-                          aria-hidden="true"
-                          style={{
-                            flexShrink: 0,
-                            width: 0,
-                            height: 0,
-                            borderTop: `12px solid ${
-                              line.waitingOn === "manager"
-                                ? "var(--dg-color-warning)"
-                                : "var(--dg-color-text-muted)"
-                            }`,
-                            borderRight: "12px solid transparent",
-                          }}
-                        />
+                        <RequestDot waitingOn={line.waitingOn} />
                         <span>{line.status}</span>
                       </div>
                       {line.body ? (

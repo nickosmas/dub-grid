@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { ShiftChange } from "@dubgrid/schedule-core";
+import { RequestDot } from "@/components/schedule-grid/badges";
 import { ShiftChangeWas } from "@/components/shift-change/ShiftChangeCard";
 
 export interface PanelViewDetail {
@@ -225,20 +226,7 @@ export function RequestCard({ card, actions }: { card: PanelRequestCard; actions
   return (
     <div data-request-card={card.waitingOn} style={{ ...statusCard, marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span
-          aria-hidden="true"
-          style={{
-            flexShrink: 0,
-            width: 0,
-            height: 0,
-            borderTop: `12px solid ${
-              card.waitingOn === "manager"
-                ? "var(--dg-color-warning)"
-                : "var(--dg-color-text-muted)"
-            }`,
-            borderRight: "12px solid transparent",
-          }}
-        />
+        <RequestDot waitingOn={card.waitingOn} />
         <div
           style={{
             fontSize: "var(--dg-fs-label)",

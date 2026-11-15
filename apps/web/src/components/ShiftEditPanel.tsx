@@ -124,7 +124,7 @@ import {
   type CellChangeBadge,
 } from "@/components/schedule-grid/cellChangeBadges";
 import { formatPublishedMetadata } from "@/components/schedule-grid/gridHelpers";
-import { REQUEST_FOLD_COLORS } from "@/components/schedule-grid/badges";
+import { RequestDot } from "@/components/schedule-grid/badges";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import {
   cellStateToChangeDay,
@@ -3351,16 +3351,7 @@ export default function ShiftEditPanel({
               padding: "2px 8px 2px 6px",
             }}
           >
-            {/* The grid's fold, so the chip reads as the same mark. */}
-            <span
-              aria-hidden="true"
-              style={{
-                width: 0,
-                height: 0,
-                borderTop: `7px solid ${REQUEST_FOLD_COLORS[card.waitingOn]}`,
-                borderRight: "7px solid transparent",
-              }}
-            />
+            <RequestDot waitingOn={card.waitingOn} size={7} />
             {card.kind}
           </span>
         ))}

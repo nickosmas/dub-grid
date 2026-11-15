@@ -3601,6 +3601,9 @@ describe("ScheduleGrid", () => {
     expect(screen.getByText("Asked Nov 14, 2026, 8:02 AM PST.")).toBeInTheDocument();
     expect(screen.getByText("Offered for pickup · waiting for a teammate")).toBeInTheDocument();
     expect(screen.queryByText(/^Request: /)).toBeNull();
+    // The card's lines carry a dot; the fold stays on the pill's corner.
+    expect(document.querySelectorAll("[data-request-detail] [data-request-dot]")).toHaveLength(2);
+    expect(document.querySelector("[data-request-detail] [data-request-fold]")).toBeNull();
   });
 
   it("leaves a shift with no request unfolded", () => {
