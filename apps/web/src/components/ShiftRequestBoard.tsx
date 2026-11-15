@@ -32,6 +32,10 @@ import CustomSelect from "@/components/CustomSelect";
 import StaffMultiSelect, { type StaffOption } from "@/components/StaffMultiSelect";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import { fetchShiftRequests } from "@/features/schedule/client/api";
+import {
+  HISTORY_STATUSES,
+  filterRequestHistory,
+} from "@/components/shift-requests/request-history";
 import { queryKeys } from "@/lib/query-keys";
 import {
   describeAwaitingRecipient,
@@ -85,7 +89,6 @@ interface ShiftRequestBoardProps {
 
 type Tab = "available" | "mine" | "approval" | "history";
 
-const HISTORY_STATUSES: ShiftRequestStatus[] = ["approved", "rejected", "cancelled", "expired"];
 const HISTORY_DEFAULT_DAYS = 30;
 
 function isoDateDaysAgo(days: number): string {
@@ -178,7 +181,7 @@ export default function ShiftRequestBoard({
   const canReviewOrg = canApprove || canViewAllRequests;
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (!initialTab) return "available";
-    if ((initialTab === "approval" || initialTab === "history") && !canReviewOrg) return "mine";
+    if (initialTab === "approval" && !canReviewOrg) return "mine";
     return initialTab;
   });
 
@@ -186,6 +189,8 @@ export default function ShiftRequestBoard({
   // requests for a shift-date window on demand, and the staff and outcome
   // filters narrow that result in place, so a manager can answer "what did
   // Laura ask for in March" without paging through everything since launch.
+  // Anyone else gets their own: the route scopes them to requests they made
+  // or were asked to take, and `filterRequestHistory` holds to that too.
   const [historyFrom, setHistoryFrom] = useState(() => isoDateDaysAgo(HISTORY_DEFAULT_DAYS));
   const [historyTo, setHistoryTo] = useState("");
   const [historyType, setHistoryType] = useState<ShiftRequestType | "all">("all");
@@ -206,31 +211,25 @@ export default function ShiftRequestBoard({
         ...(historyFrom ? { startDate: historyFrom } : {}),
         ...(historyTo ? { endDate: historyTo } : {}),
       }),
-    enabled: Boolean(orgId) && canReviewOrg && activeTab === "history",
+    enabled: Boolean(orgId) && activeTab === "history",
     staleTime: 60_000,
   });
-  const historyRequests = useMemo(() => {
-    const people = new Set(historyStaff);
-    return (historyQuery.data ?? [])
-      .filter((r) => historyStatus === "all" || r.status === historyStatus)
-      .filter(
-        (r) =>
-          people.size === 0 ||
-          people.has(r.requesterEmpId) ||
-          (r.targetEmpId != null && people.has(r.targetEmpId)),
-      )
-      .sort(
-        (left, right) =>
-          new Date(right.resolvedAt ?? right.createdAt).getTime() -
-          new Date(left.resolvedAt ?? left.createdAt).getTime(),
-      );
-  }, [historyQuery.data, historyStaff, historyStatus]);
+  const historyRequests = useMemo(
+    () =>
+      filterRequestHistory(historyQuery.data ?? [], {
+        status: historyStatus,
+        people: historyStaff,
+        viewerEmpId: currentEmpId,
+        canReviewOrg,
+      }),
+    [canReviewOrg, currentEmpId, historyQuery.data, historyStaff, historyStatus],
+  );
   // The shift-date window is the lookup itself, with its own clear, so only
   // the narrowing filters count here.
   const historyFilterCount = [
     historyType !== "all",
     historyStatus !== "all",
-    historyStaff.length > 0,
+    canReviewOrg && historyStaff.length > 0,
   ].filter(Boolean).length;
   const clearHistoryFilters = () => {
     setHistoryType("all");
@@ -283,7 +282,7 @@ export default function ShiftRequestBoard({
       count: managerQueue.length,
       visible: canReviewOrg,
     },
-    { key: "history", label: "History", count: historyRequests.length, visible: canReviewOrg },
+    { key: "history", label: "History", count: historyRequests.length, visible: true },
   ];
 
   function getTabData(): ShiftRequest[] {
@@ -299,16 +298,22 @@ export default function ShiftRequestBoard({
     }
   }
 
-  function getEmptyMessage(): string {
+  function getEmptyMessage(): { title: string; description?: string } {
     switch (activeTab) {
       case "available":
-        return "No available shifts";
+        return { title: "No available shifts" };
       case "mine":
-        return "No requests yet";
+        return {
+          title: "No requests yet",
+          // Someone on nobody's schedule has no shift to start one from.
+          description: currentEmpId
+            ? "Open one of your shifts on the schedule to offer, swap or call it off."
+            : undefined,
+        };
       case "approval":
-        return canApprove ? "No active requests" : "No organization requests";
+        return { title: canApprove ? "No active requests" : "No organization requests" };
       case "history":
-        return "No decided requests match";
+        return { title: "No decided requests match" };
     }
   }
 
@@ -897,6 +902,7 @@ export default function ShiftRequestBoard({
   // ── Render ───────────────────────────────────────────────────────────────
 
   const tabData = getTabData();
+  const emptyMessage = getEmptyMessage();
   // The approval queue is split by what each request is waiting on: the
   // manager, a claimant, or the person it was aimed at. One column per group.
   const queueGroups = activeTab === "approval" ? groupManagerQueue(tabData) : null;
@@ -1056,12 +1062,14 @@ export default function ShiftRequestBoard({
                 ]}
                 value={historyStatus}
               />
-              <StaffMultiSelect
-                style={{ flex: "1 1 auto" }}
-                onChange={setHistoryStaff}
-                options={staffOptions}
-                value={historyStaff}
-              />
+              {canReviewOrg ? (
+                <StaffMultiSelect
+                  style={{ flex: "1 1 auto" }}
+                  onChange={setHistoryStaff}
+                  options={staffOptions}
+                  value={historyStaff}
+                />
+              ) : null}
             </div>
           ) : null}
           {tabData.length === 0 ? (
@@ -1074,7 +1082,8 @@ export default function ShiftRequestBoard({
             ) : (
               <EmptyState
                 size="compact"
-                title={getEmptyMessage()}
+                title={emptyMessage.title}
+                description={emptyMessage.description}
                 action={
                   activeTab === "history" && historyFilterCount > 0 ? (
                     <ClearFiltersButton
