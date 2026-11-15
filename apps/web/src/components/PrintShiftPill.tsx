@@ -26,11 +26,22 @@ export interface PrintShiftPillProps {
   isNameMode: boolean;
   /** The grid's mentored M, in the pill's corner. */
   mentored?: boolean;
+  /** The cell's schedule notes, as the grid's dots in the pill's bottom-right corner. */
+  notes?: readonly PrintNoteDot[];
   /** Edges where this pill touches its neighbour, which drop their border and rounding. */
   seams?: readonly PillSeam[];
   /** Space before this pill when it does not touch the one before it. */
   spacing?: CSSProperties;
 }
+
+export interface PrintNoteDot {
+  id: number;
+  name: string;
+  color: string;
+}
+
+// Two dots and then a count, as on the grid.
+const PRINT_VISIBLE_NOTE_DOTS = 2;
 
 // The print window has no app CSS variables, so the corners are literal, in em
 // so they scale with the chosen print size: the grid's 8px and 6px against
@@ -60,6 +71,7 @@ export function PrintShiftPill({
   variant,
   isNameMode,
   mentored = false,
+  notes = [],
   seams = [],
   spacing,
 }: PrintShiftPillProps) {
@@ -137,6 +149,45 @@ export function PrintShiftPill({
           M
         </span>
       )}
+      {notes.length > 0 && (
+        <span
+          data-print-indicators="true"
+          aria-label={`Schedule notes: ${notes.map((note) => note.name).join(", ")}`}
+          style={{
+            position: "absolute",
+            right: "0.15em",
+            bottom: "0.15em",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.15em",
+          }}
+        >
+          {notes.slice(0, PRINT_VISIBLE_NOTE_DOTS).map((note) => (
+            <span
+              key={note.id}
+              data-print-note-dot={note.id}
+              style={{
+                width: "0.55em",
+                height: "0.55em",
+                borderRadius: "50%",
+                background: note.color,
+                // Rimmed in the pill's text colour, so a note the shift's own
+                // colour still shows.
+                boxShadow: `inset 0 0 0 1px ${color}`,
+                flexShrink: 0,
+              }}
+            />
+          ))}
+          {notes.length > PRINT_VISIBLE_NOTE_DOTS && (
+            <span
+              data-print-note-more={notes.length - PRINT_VISIBLE_NOTE_DOTS}
+              style={{ fontSize: "0.55em", fontWeight: 700, lineHeight: 1, color }}
+            >
+              +{notes.length - PRINT_VISIBLE_NOTE_DOTS}
+            </span>
+          )}
+        </span>
+      )}
       <div
         style={{
           flex: 1,
@@ -148,6 +199,8 @@ export function PrintShiftPill({
           gap: "0.1em",
           // Room on both sides for the M in the corner keeps the label centred.
           padding: mentored ? "0.2em 1.05em" : isNameMode ? "0.2em 0.3em" : "0.2em 0.2em",
+          // Room under the label for the notes in the bottom-right corner.
+          ...(notes.length > 0 ? { paddingBottom: "0.75em" } : null),
           lineHeight: 1.15,
         }}
       >

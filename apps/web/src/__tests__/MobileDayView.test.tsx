@@ -96,8 +96,11 @@ describe("MobileDayView indicators", () => {
     );
     renderView(lookup);
 
-    expect(screen.getByLabelText("Float")).toBeInTheDocument();
-    expect(screen.getByLabelText("Training")).toBeInTheDocument();
+    const dots = screen.getByLabelText("2 notes: Float, Training");
+    // In the pill's bottom-right corner, as on the grid, not under it.
+    expect(dots.dataset.noteDots).toBe("overlay");
+    expect(dots.style.position).toBe("absolute");
+    expect(dots.querySelectorAll("[data-note-mark]")).toHaveLength(2);
     expect(lookup).toHaveBeenCalledWith("emp-1", dates[1], 1);
   });
 

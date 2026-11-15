@@ -897,7 +897,10 @@ describe("ShiftEditPanel", () => {
       expect(list).not.toBeNull();
       expect(within(list!).getByText("Float")).toBeInTheDocument();
       expect(within(list!).queryByText("Training")).toBeNull();
-      expect(list!.querySelectorAll("[data-note-icon]")).toHaveLength(1);
+      const dots = list!.querySelectorAll<HTMLElement>("[data-read-only-note-dot]");
+      expect(dots).toHaveLength(1);
+      expect(dots[0]).toHaveStyle({ background: indicatorTypes[0].color });
+      expect(list!.querySelector("svg")).toBeNull();
       expect(screen.queryByRole("button", { name: /schedule note$/ })).toBeNull();
     });
 

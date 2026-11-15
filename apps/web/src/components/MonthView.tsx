@@ -16,8 +16,15 @@ import {
   IndicatorType,
   ShiftDisplayMode,
 } from "@/types";
-import { NoteDots, type ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import {
+  NoteDots,
+  overlayNoteDotsWidth,
+  type ScheduleNoteMark,
+} from "@/components/schedule-grid/noteDots";
 import { DRAFT_BORDER_COLORS, FILLED_PILL_BORDER, resolveShiftPillColors } from "@/lib/colors";
+
+/** A day chip is one short line, too small for the grid's 9px dots. */
+const MONTH_NOTE_DOT_SIZE = 7;
 
 function pillText(label: string, max: number): string {
   if (label.length <= max) return label;
@@ -223,12 +230,20 @@ function DayPopover({
                             >
                               <div
                                 style={{
+                                  position: "relative",
                                   background: s.color,
                                   border: dk
                                     ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}`
                                     : FILLED_PILL_BORDER,
                                   borderRadius: "var(--dg-radius-xs)",
                                   padding: isNameMode ? "3px 6px" : dk ? "1px 5px" : "2px 6px",
+                                  ...(marks.length > 0
+                                    ? {
+                                        paddingRight:
+                                          (dk ? 5 : 6) +
+                                          overlayNoteDotsWidth(marks.length, MONTH_NOTE_DOT_SIZE),
+                                      }
+                                    : null),
                                   fontSize: "var(--dg-fs-footnote)",
                                   fontWeight: 600,
                                   color: s.text,
@@ -241,6 +256,14 @@ function DayPopover({
                                 }}
                               >
                                 {isNameMode ? pillText(shift, 14) : shift}
+                                <NoteDots
+                                  marks={marks}
+                                  indicatorTypes={indicatorTypes}
+                                  placement="overlay"
+                                  rimColor={s.text}
+                                  isDark={isDarkTheme}
+                                  dotSize={MONTH_NOTE_DOT_SIZE}
+                                />
                               </div>
                               <span
                                 style={{
@@ -256,11 +279,6 @@ function DayPopover({
                               >
                                 {shortName(name)}
                               </span>
-                              <NoteDots
-                                marks={marks}
-                                indicatorTypes={indicatorTypes}
-                                placement="inline"
-                              />
                             </div>
                           );
                         },
