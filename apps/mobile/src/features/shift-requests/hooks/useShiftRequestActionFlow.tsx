@@ -13,6 +13,7 @@ import {
 } from "../lib/request-action-feedback";
 
 export type RequestActionBody =
+  | { action: "cancel"; empId: string }
   | { action: "claim"; claimerEmpId: string }
   | {
       action: "volunteer_open_shift";
@@ -35,8 +36,9 @@ type RequestActionConfirmation = {
 } | null;
 
 /**
- * Claim, volunteer and respond, each confirmed first, as Home's personal
- * sections run them. `onSucceeded` refetches the screen that asked.
+ * Claim, volunteer, respond and cancel, each confirmed first, as Home's
+ * personal sections and a shift's detail page run them. `onSucceeded`
+ * refetches the screen that asked.
  */
 export function useShiftRequestActionFlow({
   accessToken,

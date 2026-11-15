@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireMobileAuth = vi.fn();
 const requireMobileSensitiveActionAuth = vi.fn();
+const fetchMobileHiddenPeople = vi.fn();
 const updateUserById = vi.fn();
 const followUpLinkedLoginEmailChange = vi.fn();
 const fetchMobileEmployeeRowById = vi.fn();
@@ -28,6 +29,7 @@ vi.mock("@/features/employees/server/focus-area-shifts", () => ({
 }));
 
 vi.mock("@/features/mobile/server", () => ({
+  fetchMobileHiddenPeople,
   requireMobileAuth,
   requireMobileSensitiveActionAuth,
 }));
@@ -116,6 +118,7 @@ describe("mobile person route", () => {
     rowToEmployee.mockReturnValue(makeEmployee());
     mockManagementMemberships([{ user_id: PERSON_USER_ID, department_ids: [8] }]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(null);
+    fetchMobileHiddenPeople.mockResolvedValue([]);
     validateStaffOrgReferences.mockResolvedValue({});
     requireMobileSensitiveActionAuth.mockResolvedValue(makeAuth());
     updateUserById.mockResolvedValue({ error: null });
@@ -311,6 +314,55 @@ describe("mobile person route", () => {
       plannedUntil: null,
       firstDay: null,
     });
+  });
+
+  it("never gives regular users an Admin's permissions or account details", async () => {
+    requireMobileAuth.mockResolvedValue(
+      makeAuth({ canManageEmployees: false, canViewStaff: true }),
+    );
+    fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([
+      {
+        user_id: PERSON_USER_ID,
+        department_ids: [8],
+        dept_admin_ids: [8],
+        org_role: "admin",
+        admin_permissions: { canManageEmployees: true, canPublishSchedule: false },
+        updated_at: "2026-11-01T00:00:00.000Z",
+      },
+    ]);
+
+    const { GET } = await import("./person");
+    const response = await GET(
+      new Request(
+        "http://localhost/api/mobile/v1/people/d660d308-4e0d-4daf-84fd-6753405e6740",
+      ) as never,
+      { params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).person).toMatchObject({
+      orgRole: "admin",
+      managementDepartmentIds: [8],
+      adminPermissions: null,
+      adminPermissionCount: null,
+      membershipUpdatedAt: null,
+    });
+  });
+
+  it("answers an internal account's profile as not found to anyone the list hides it from", async () => {
+    requireMobileAuth.mockResolvedValue(makeAuth());
+    fetchMobileHiddenPeople.mockResolvedValue([PERSON_USER_ID]);
+
+    const { GET } = await import("./person");
+    const response = await GET(
+      new Request(
+        "http://localhost/api/mobile/v1/people/d660d308-4e0d-4daf-84fd-6753405e6740",
+      ) as never,
+      { params: Promise.resolve({ id: "d660d308-4e0d-4daf-84fd-6753405e6740" }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Employee not found" });
   });
 
   it("does not return the signed-in user's own employee through the person endpoint", async () => {

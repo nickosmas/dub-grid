@@ -214,6 +214,46 @@ describe("loadMobilePeoplePayload", () => {
     });
   });
 
+  it("gives a regular member a colleague built from named fields, never an Admin's permissions", async () => {
+    const admin = makePerson({
+      id: "employee-admin",
+      userId: "user-admin",
+      orgRole: "admin",
+      managementDepartmentIds: [8],
+      adminPermissions: { canManageEmployees: true },
+      adminPermissionCount: { granted: 1, total: 25 },
+      membershipUpdatedAt: "2026-11-01T00:00:00.000Z",
+      // A field added to the record later stays out until it is decided.
+      undecidedField: "private",
+    });
+
+    const payload = await loadMobilePeoplePayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        user: { id: USER_ID },
+        permissions: {
+          canManageEmployees: false,
+          canViewStaff: true,
+          canViewEmployeeDetails: false,
+        },
+      } as never,
+      {
+        fetchMobilePeople: vi.fn(async () => [admin]),
+        mapEmployeeToMobilePerson: vi.fn((person) => person),
+      } as never,
+    );
+
+    expect(payload.people[0]).toMatchObject({
+      orgRole: "admin",
+      managementDepartmentIds: [8],
+      adminPermissions: null,
+      adminPermissionCount: null,
+      membershipUpdatedAt: null,
+    });
+    expect(payload.people[0]).not.toHaveProperty("undecidedField");
+  });
+
   it("keeps administrator directory data unchanged", async () => {
     const self = makePerson({ id: "employee-self", userId: USER_ID });
 
