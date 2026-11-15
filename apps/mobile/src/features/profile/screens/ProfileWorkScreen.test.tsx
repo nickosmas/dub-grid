@@ -333,6 +333,93 @@ describe("ProfileWorkScreen", () => {
     expect(screen.getByText("#87")).toBeInTheDocument();
   });
 
+  function viewAsSomeoneWhoCantEdit({
+    linkedEmployee = {},
+    compactLabels = false,
+  }: {
+    linkedEmployee?: Partial<Omit<typeof profileData.linkedEmployee, "certificationId">> & {
+      certificationId?: number | null;
+    };
+    compactLabels?: boolean;
+  } = {}) {
+    const bootstrap = useBootstrap();
+    useBootstrap.mockReturnValue({
+      ...bootstrap,
+      data: {
+        ...bootstrap.data,
+        permissions: { canManageEmployees: false },
+        currentOrg: { useCompactRoleCertificationLabels: compactLabels },
+        certifications: [{ id: 5, name: "Registered Nurse", abbr: "RN" }],
+        roles: [
+          { id: 3, name: "Supervisor", abbr: "SUP" },
+          { id: 4, name: "Charge", abbr: "CHG" },
+        ],
+      },
+    });
+    useQuery.mockReturnValue({
+      data: {
+        ...profileData,
+        currentOrg: {
+          ...profileData.currentOrg,
+          labels: {
+            ...profileData.currentOrg.labels,
+            focusArea: "Wings",
+            certification: "Skill Level",
+            role: "Duties",
+          },
+        },
+        managementDepartmentIds: [],
+        linkedEmployee: { ...profileData.linkedEmployee, ...linkedEmployee },
+      },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+  }
+
+  // Someone who can't edit their profile used to find their own work facts
+  // nowhere, though the profile hub sends them here for them.
+  it("shows someone who can't edit their work facts read-only, in the organization's terms", () => {
+    viewAsSomeoneWhoCantEdit({
+      linkedEmployee: { employmentType: "part_time", certificationId: 5, roleIds: [4, 3] },
+    });
+    render(<ProfileWorkScreen />);
+
+    expect(screen.getByText("Work")).toBeInTheDocument();
+    expect(screen.getByText("Employment")).toBeInTheDocument();
+    expect(screen.getByText("Part-time")).toBeInTheDocument();
+    expect(screen.getByText("Skill Level")).toBeInTheDocument();
+    expect(screen.getByText("Registered Nurse")).toBeInTheDocument();
+    expect(screen.getByText("Wings")).toBeInTheDocument();
+    expect(screen.getByText("ICU")).toBeInTheDocument();
+    expect(screen.getByText("Duties")).toBeInTheDocument();
+    // In the order Settings lists them, not the order they were given.
+    expect(screen.getByText("Supervisor, Charge")).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Contact notes")).not.toBeInTheDocument();
+  });
+
+  it("uses the organization's short names when it prefers them, and None when unset", () => {
+    viewAsSomeoneWhoCantEdit({ compactLabels: true, linkedEmployee: { certificationId: null } });
+    render(<ProfileWorkScreen />);
+
+    expect(screen.getByText("Full-time")).toBeInTheDocument();
+    expect(screen.getByText("None")).toBeInTheDocument();
+    expect(screen.getByText("SUP")).toBeInTheDocument();
+    expect(screen.queryByText("Supervisor")).not.toBeInTheDocument();
+  });
+
+  it("shows only employment to someone who manages and isn't on the schedule", () => {
+    viewAsSomeoneWhoCantEdit({ linkedEmployee: { focusAreaIds: [] } });
+    render(<ProfileWorkScreen />);
+
+    expect(screen.getByText("Employment")).toBeInTheDocument();
+    expect(screen.queryByText("Skill Level")).not.toBeInTheDocument();
+    expect(screen.queryByText("Wings")).not.toBeInTheDocument();
+    expect(screen.queryByText("Duties")).not.toBeInTheDocument();
+  });
+
   function grantManagementAccessPermission() {
     // Reads the value `beforeEach` installed and layers the permission on it.
     const bootstrap = useBootstrap();
