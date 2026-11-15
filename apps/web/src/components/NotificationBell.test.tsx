@@ -104,9 +104,12 @@ describe("NotificationBell rows", () => {
     markNotificationRead.mockResolvedValue(undefined);
   });
 
-  it("renders nothing while the reader is already on the alerts page", () => {
-    renderBell({ hidden: true });
+  it("keeps only an empty slot while the reader is already on the alerts page", () => {
+    const { container } = renderBell({ hidden: true });
     expect(screen.queryByRole("button", { name: /^Alerts/ })).toBeNull();
+    const slot = container.firstElementChild as HTMLElement;
+    expect(slot.getAttribute("aria-hidden")).toBe("true");
+    expect(slot.style.width).toBe("36px");
   });
 
   it("links every row to the alert's subject", async () => {

@@ -1837,6 +1837,15 @@ button.dg-cc-sg-main {
 .dg-app-shell-header-placeholder {
   height: var(--header-height);
 }
+.dg-header-gutter {
+  display: none;
+}
+html:has(.dg-own-scroll) .dg-header-gutter {
+  display: block;
+  flex: none;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
 /* Set by useClipTrailingWhitespace when the only thing left to scroll to is
    bottom padding. Screen only, so printing never clips a page. */
 @media screen {
