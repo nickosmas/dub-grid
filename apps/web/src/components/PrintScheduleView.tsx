@@ -1,7 +1,14 @@
 "use client";
 
 import type { AbsencePillLayout } from "@/lib/absence-pill";
-import { Fragment, useLayoutEffect, useMemo, useRef } from "react";
+import {
+  Fragment,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import {
   AbsenceType,
   Employee,
@@ -15,6 +22,12 @@ import {
 } from "@/types";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
+import { buildRowAbsenceRuns } from "@/components/schedule-grid/absenceRuns";
+import {
+  getCrossFocusBadgePalette,
+  getFocusAreaInitials,
+  stacksShifts,
+} from "@/components/schedule-grid/gridHelpers";
 import {
   addDays,
   formatDateKey,
@@ -31,13 +44,18 @@ import {
   borderColor,
   DESIGNATION_COLORS,
   DEFAULT_DESIG_COLOR,
+  FILLED_PILL_BORDER,
   getReadableTextOnSurface,
 } from "@/lib/colors";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
-import { MaybeHint } from "@/components/ui/hint";
 import { legendGroupsByFocusArea } from "@/components/PrintLegend";
 import { printFontSizeLabel } from "@/components/print-font-sizes";
-import { PrintShiftPill, type PrintShiftPillProps } from "@/components/PrintShiftPill";
+import {
+  PrintShiftPill,
+  PRINT_PILL_RADIUS,
+  type PrintShiftPillProps,
+} from "@/components/PrintShiftPill";
+import { PRINT_INK } from "@/components/print-palette";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { attachedPillSeams, gapBefore, timesMeet } from "@/lib/attached-pill";
 import { fitPrintText, PRINT_FIT_LINE as FIT_TEXT } from "@/components/print-fit";
@@ -46,10 +64,11 @@ import {
   collectFontFaceCss,
   whenPrintReady,
 } from "@/components/print-document";
-import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
+import { DEFAULT_ORGANIZATION_LABELS, shiftDisplayName } from "@dubgrid/domain";
+import { formatAbsenceRunLabel } from "@dubgrid/schedule-core";
 
-const BRAND_MUTED = "#4A607F";
-const BRAND_SEPARATOR = "#94A3B8";
+const BRAND_MUTED = PRINT_INK.muted;
+const BRAND_SEPARATOR = "#D4D4D4";
 
 // public/lockup.png is the symbol and a 16 px wordmark at 8x (616x192),
 // padded so its center is the wordmark's optical center: centering it in a
@@ -106,29 +125,38 @@ function formatPrintedAt(date: Date): string {
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}`;
 }
 
-function getFocusAreaInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 3);
-}
-
-function getCrossFocusBadgePalette(style?: Pick<AssignmentDefinition, "color" | "text"> | null) {
-  return {
-    background: style?.color ?? "#FFFFFF",
-    color: style?.text ?? "#334155",
-  };
-}
+/** What a printed cell reads to put the grid's mentored M on a shift. */
+export type PrintSegmentsForKey = (
+  empId: string,
+  date: Date,
+) => readonly { isMentored?: boolean | null }[];
 
 // ── Per-section print grid ─────────────────────────────────────────────────
 
 // The print window carries none of the app's CSS variables, so every colour
 // here is a literal. An archived or unknown indicator prints in plain grey.
-const PRINT_UNKNOWN_INDICATOR = "#94A3B8";
+const PRINT_UNKNOWN_INDICATOR = PRINT_INK.borderStrong;
 
-const PRINT_PILL_GAP = "0.15em";
+const PRINT_PILL_GAP = "0.2em";
+const CELL_INSET_Y = "0.3em";
+
+// The preview lays out on a landscape Letter page with half-inch margins,
+// which is also what the print window asks for.
+const PAGE_WIDTH_IN = 11;
+const PAGE_MARGIN_IN = 0.5;
+const NAME_COLUMN_EM = 16;
+// The grid sets names at 14px, the size the print's base size stands for.
+const GRID_NAME_PX = 14;
+
+/**
+ * A printed day's width as the grid would measure it, so a cell's shifts
+ * stack on paper exactly when they would on a grid that narrow.
+ */
+export function gridEquivalentColumnWidth(fontSize: number, dayCount: number): number {
+  const contentPx = (PAGE_WIDTH_IN - 2 * PAGE_MARGIN_IN) * 96;
+  const dayPx = (contentPx - NAME_COLUMN_EM * fontSize) / dayCount;
+  return (dayPx * GRID_NAME_PX) / fontSize;
+}
 
 /**
  * An absence prints in its light stripes with a dashed edge, so it still reads
@@ -200,11 +228,52 @@ interface PrintSectionProps {
     empId: string,
     date: Date,
   ) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
+  segmentsForKey?: PrintSegmentsForKey;
   splitAtIndex?: number;
   fontSize: number;
   shiftDisplayMode?: ShiftDisplayMode;
   noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   indicatorTypes: IndicatorType[];
+}
+
+type CellPill = Omit<PrintShiftPillProps, "variant" | "isNameMode">;
+
+/** One whole-day absence across days in a row (item 52), drawn from its first cell. */
+function PrintAbsenceRun({
+  absence,
+  length,
+  insetX,
+}: {
+  absence: AbsenceType;
+  length: number;
+  insetX: string;
+}) {
+  return (
+    <div
+      data-print-absence-run={length}
+      style={{
+        position: "absolute",
+        top: CELL_INSET_Y,
+        bottom: CELL_INSET_Y,
+        left: insetX,
+        // Day columns share one width, and each day after the first adds its
+        // 1px dividing line, which the bar covers as the grid's does.
+        right: `calc(${1 - length} * (100% + 1px) + ${insetX})`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0 0.5em",
+        borderRadius: PRINT_PILL_RADIUS.single,
+        ...printAbsenceFill(absence),
+      }}
+    >
+      <span data-print-fit="" style={{ ...FIT_TEXT, textAlign: "center" }}>
+        <span style={{ fontSize: "0.9em", fontWeight: 600 }}>
+          {formatAbsenceRunLabel(absence.name || absence.label, length)}
+        </span>
+      </span>
+    </div>
+  );
 }
 
 function PrintSection({
@@ -226,6 +295,7 @@ function PrintSection({
   orgRoles,
   focusAreas,
   getCustomShiftTimes,
+  segmentsForKey,
   splitAtIndex,
   fontSize,
   shiftDisplayMode = "code",
@@ -283,73 +353,99 @@ function PrintSection({
     [categoryById, getStyleByIdOrLabel, jobById, shiftDisplayMode],
   );
 
-  // Set of shift code IDs that belong to this section's focus area
-  const sectionCodeIds = useMemo(() => {
-    return new Set(assignments.filter((sc) => sc.focusAreaId === focusAreaId).map((sc) => sc.id));
-  }, [assignments, focusAreaId]);
-
-  const tallyLabelResolver = useMemo(
-    () => (isNameMode ? (code: AssignmentDefinition) => code.name || code.label : undefined),
-    [isNameMode],
+  // The grid counts this section's shifts and the ones every area shares.
+  const countableCodeIds = useMemo(
+    () =>
+      new Set(
+        assignments
+          .filter((sc) => sc.focusAreaId === focusAreaId || sc.focusAreaId == null)
+          .map((sc) => sc.id),
+      ),
+    [assignments, focusAreaId],
   );
 
-  const dailyTallies = useMemo(() => {
-    const fn = assignmentIdsForKey ?? (() => []);
-    return dates.map((date) =>
-      computeDailyTallies(employees, date, fn, assignmentById, sectionCodeIds, tallyLabelResolver),
-    );
-  }, [dates, employees, assignmentIdsForKey, assignmentById, sectionCodeIds, tallyLabelResolver]);
-
-  // Derive tally rows from actual data so tallies always show when categorized shifts exist
+  // One row per shift, each day's count of people on it, as the grid totals them.
   const tallyRows = useMemo(() => {
-    const allCatIds = new Set<number>();
-    for (const dayTally of dailyTallies) {
-      for (const catId of Object.keys(dayTally).map(Number)) {
-        allCatIds.add(catId);
+    const idsFor = assignmentIdsForKey ?? (() => []);
+    const countsByCategory = new Map<number, number[]>();
+    dates.forEach((date, dayIndex) => {
+      const tallies = computeDailyTallies(
+        employees,
+        date,
+        idsFor,
+        assignmentById,
+        countableCodeIds,
+      );
+      for (const [categoryId, byLabel] of Object.entries(tallies)) {
+        const id = Number(categoryId);
+        const counts = countsByCategory.get(id) ?? dates.map(() => 0);
+        counts[dayIndex] = Object.values(byLabel).reduce((sum, count) => sum + count, 0);
+        countsByCategory.set(id, counts);
       }
-    }
-    if (allCatIds.size === 0) return [];
-    return shiftCategories
-      .filter((cat) => allCatIds.has(cat.id))
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((cat) => ({ id: cat.id, name: cat.name }));
-  }, [dailyTallies, shiftCategories]);
+    });
+    const areaName = (id: number) => focusAreas.find((area) => area.id === id)?.name;
+    return Array.from(countsByCategory, ([id, counts]) => ({
+      id,
+      category: categoryById.get(id),
+      counts,
+    }))
+      .sort(
+        (left, right) =>
+          (left.category?.sortOrder ?? Number.MAX_SAFE_INTEGER) -
+            (right.category?.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
+          (left.category?.name ?? "").localeCompare(right.category?.name ?? ""),
+      )
+      .map(({ id, category, counts }) => ({
+        id,
+        label: category ? shiftDisplayName(category, shiftCategories, areaName) : `Category ${id}`,
+        counts,
+      }));
+  }, [
+    dates,
+    employees,
+    assignmentIdsForKey,
+    assignmentById,
+    countableCodeIds,
+    categoryById,
+    shiftCategories,
+    focusAreas,
+  ]);
 
   if (employees.length === 0) return null;
 
   // Two weeks leave each day half the room, so the pills sit closer to the
   // cell edge.
-  const cellInsetX = dates.length > 7 ? "0.2em" : "0.4em";
-
+  const cellInsetX = dates.length > 7 ? "0.2em" : "0.35em";
   const cellH = `${fontSize * 3.4}px`;
-  const stackedCellH = `${fontSize * 5.4}px`;
-  const tallyH = `${fontSize * 2.8}px`;
-
-  type CellPill = Omit<PrintShiftPillProps, "variant" | "isNameMode" | "wingOnTop">;
+  const columnWidth = gridEquivalentColumnWidth(fontSize, dates.length);
 
   function resolveCellPills(
+    empId: string,
+    date: Date,
     assignment: string,
-    cellCodeIds: number[],
-    absenceTypeId: number | null,
-    customTimes: ReturnType<NonNullable<PrintSectionProps["getCustomShiftTimes"]>>,
-    restOfDayAbsenceTypeId: number | null = null,
-    absenceLayout: AbsencePillLayout | null = null,
-  ): CellPill[] {
+  ): { pills: CellPill[]; stacked: boolean } {
+    const customTimes = getCustomShiftTimes?.(empId, date) ?? null;
     // An absence carries no assignment id, so a label lookup would resolve it
     // against the assignment list: either finding nothing (printing vacation
     // in the fallback grey) or, worse, an assignment sharing its label and
     // printing someone's day off in that shift's colors.
+    const absenceTypeId = absenceTypeIdForKey?.(empId, date) ?? null;
     const absence = absenceTypeId != null ? (absenceTypeMap?.get(absenceTypeId) ?? null) : null;
     if (absence) {
-      return [
-        {
-          primaryLabel: isNameMode ? absence.name || absence.label : assignment,
-          time: customTimes,
-          ...printAbsenceFill(absence),
-        },
-      ];
+      return {
+        pills: [
+          {
+            primaryLabel: isNameMode ? absence.name || absence.label : assignment,
+            time: customTimes,
+            ...printAbsenceFill(absence),
+          },
+        ],
+        stacked: false,
+      };
     }
 
+    const cellCodeIds = assignmentIdsForKey?.(empId, date) ?? [];
+    const segments = segmentsForKey?.(empId, date) ?? [];
     // "/" joins the segments of a worked cell, so it is what splits it into pills.
     const labels = assignment.split("/");
     const spans: { start?: string | null; end?: string | null }[] = [];
@@ -365,7 +461,6 @@ function PrintSection({
       const foreground = homeFocusArea
         ? getReadableTextOnSurface(style.color, style.text)
         : style.text;
-      const wingPalette = getCrossFocusBadgePalette(style);
       const ownTime =
         customTimes?.perPill?.[li] ?? (li === 0 && !customTimes?.perPill ? customTimes : null);
       const category =
@@ -377,23 +472,27 @@ function PrintSection({
       return {
         primaryLabel: displayParts.primaryLabel,
         secondaryLabel: displayParts.secondaryLabel,
-        time:
-          labels.length === 1
-            ? customTimes
-            : (customTimes?.perPill?.[li] ??
-              (li === 0 && !customTimes?.perPill ? customTimes : null)),
-        background: homeFocusArea ? "#FFFFFF" : style.color,
+        time: labels.length === 1 ? customTimes : ownTime,
+        // A filled pill has no visible edge on the grid; a shift from another
+        // area is white, edged in its own text color.
+        background: homeFocusArea ? PRINT_INK.surface : style.color,
         color: foreground,
-        border: `1px solid ${borderColor(foreground)}`,
+        border: homeFocusArea ? `1px solid ${borderColor(foreground)}` : FILLED_PILL_BORDER,
         wing: homeFocusArea
-          ? { initials: getFocusAreaInitials(homeFocusArea.name), ...wingPalette }
+          ? {
+              initials: getFocusAreaInitials(homeFocusArea.name),
+              ...getCrossFocusBadgePalette(style),
+            }
           : null,
+        mentored: segments[li]?.isMentored === true,
       };
     });
 
     // The absence beside the shifts prints in time order with the time it
     // covers (item 50d): first when they arrived late. An untimed one, saved
     // before then, prints last with no time.
+    const restOfDayAbsenceTypeId = restOfDayAbsenceTypeIdForKey?.(empId, date) ?? null;
+    const absenceLayout = restOfDayAbsenceLayoutForKey?.(empId, date) ?? null;
     const restOfDay =
       restOfDayAbsenceTypeId != null ? (absenceTypeMap?.get(restOfDayAbsenceTypeId) ?? null) : null;
     const absencePill: CellPill | null = restOfDay
@@ -410,31 +509,40 @@ function PrintSection({
         ? [absencePill, ...workedPills]
         : [...workedPills, absencePill]
       : workedPills;
+    // Pills stack where the grid would stack them at this column's width, and
+    // three always do.
+    const stacked = pills.length >= 3 || stacksShifts(columnWidth, pills.length, isNameMode);
+    const axis = stacked ? "stacked" : "side-by-side";
     // Pills touch only when connected in time: a shift that runs straight into
     // the next, or a shift and the absence that meets it.
-    const axis = pills.length >= 3 ? "stacked" : "side-by-side";
     const shiftJoins = spans.slice(1).map((span, li) => timesMeet(spans[li].end, span.start));
     const absenceJoins = absencePill ? [absenceLayout?.joinsShift ?? true] : [];
     const seams = attachedPillSeams(
       axis,
       absenceFirst ? [...absenceJoins, ...shiftJoins] : [...shiftJoins, ...absenceJoins],
     );
-    return pills.map((pill, pi) => ({
-      ...pill,
-      seams: seams[pi],
-      spacing: gapBefore(pi, seams[pi], axis, PRINT_PILL_GAP),
-    }));
+    return {
+      pills: pills.map((pill, pi) => ({
+        ...pill,
+        seams: seams[pi],
+        spacing: gapBefore(pi, seams[pi], axis, PRINT_PILL_GAP),
+      })),
+      stacked,
+    };
   }
 
+  const lineBetweenDays = (index: number) =>
+    `1px solid ${splitAtIndex !== undefined && index === splitAtIndex ? PRINT_INK.divider : PRINT_INK.border}`;
+
   return (
-    <div style={{ marginBottom: "1.4em" }}>
+    <div style={{ marginBottom: "1.6em" }}>
       <div
         style={{
-          fontSize: "1.3em",
-          fontWeight: 700,
-          color: "#1A2640",
-          marginBottom: "0.5em",
-          paddingLeft: "0.3em",
+          fontSize: "1.5em",
+          fontWeight: 600,
+          color: PRINT_INK.heading,
+          lineHeight: 1.2,
+          marginBottom: "0.4em",
           breakAfter: "avoid",
           pageBreakAfter: "avoid",
         }}
@@ -448,105 +556,104 @@ function PrintSection({
           tableLayout: "fixed",
           borderCollapse: "separate",
           borderSpacing: 0,
-          background: "#fff",
-          border: "1px solid #9EB4D4",
-          borderRadius: 6,
+          background: PRINT_INK.surface,
+          border: `1px solid ${PRINT_INK.border}`,
+          borderRadius: "0.55em",
           overflow: "hidden",
         }}
       >
         <colgroup>
-          <col style={{ width: "16em" }} />
+          <col style={{ width: `${NAME_COLUMN_EM}em` }} />
           {dates.map((date) => (
             <col key={formatDateKey(date)} />
           ))}
         </colgroup>
 
-        {/* Header row */}
         <thead>
           <tr>
             <th
               style={{
                 textAlign: "left",
-                padding: "0.5em 0.8em",
-                fontWeight: 700,
+                padding: "0.55em 0.85em",
+                fontWeight: 600,
                 fontSize: "0.85em",
-                color: "#4D6080",
-                letterSpacing: "0.08em",
-                borderRight: "1px solid #C8D6EC",
-                borderBottom: "2px solid #0F1724",
-                background: "#F5F7FA",
+                color: PRINT_INK.subtle,
+                letterSpacing: "0.04em",
+                borderRight: `1px solid ${PRINT_INK.border}`,
+                borderBottom: `1px solid ${PRINT_INK.divider}`,
+                background: PRINT_INK.headerFill,
               }}
             >
-              STAFF NAME
+              Staff
             </th>
-            {dates.map((date, i) => {
-              const isSplit = splitAtIndex !== undefined && i === splitAtIndex;
-              return (
-                <th
-                  key={formatDateKey(date)}
+            {dates.map((date, i) => (
+              <th
+                key={formatDateKey(date)}
+                style={{
+                  textAlign: "center",
+                  padding: "0.4em 0",
+                  fontWeight: 400,
+                  borderLeft: lineBetweenDays(i),
+                  borderBottom: `1px solid ${PRINT_INK.divider}`,
+                }}
+              >
+                <div
                   style={{
-                    textAlign: "center",
-                    padding: "0.4em 0",
-                    fontWeight: 400,
-                    borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
-                    borderBottom: "2px solid #0F1724",
+                    fontSize: "0.85em",
+                    fontWeight: 600,
+                    color: PRINT_INK.subtle,
+                    letterSpacing: "0.04em",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: "0.8em",
-                      fontWeight: 600,
-                      color: "#94A3B8",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    {DAY_LABELS[date.getDay()]}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "1.2em",
-                      fontWeight: 700,
-                      color: "#1A2640",
-                      lineHeight: 1.2,
-                      marginTop: "0.05em",
-                    }}
-                  >
-                    {date.getDate()}
-                  </div>
-                </th>
-              );
-            })}
+                  {DAY_LABELS[date.getDay()]}
+                </div>
+                <div
+                  style={{
+                    fontSize: "1.15em",
+                    fontWeight: 700,
+                    color: PRINT_INK.text,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {date.getDate()}
+                </div>
+              </th>
+            ))}
           </tr>
         </thead>
 
-        {/* Employee rows */}
         <tbody>
           {employees.map((emp, ri) => {
-            // Always compact: a printed name cell has no room for a full
+            // Always compact, as on the grid: a name cell has no room for a full
             // certification name, and DESIGNATION_COLORS is keyed by abbreviation.
             const certAbbr = getCertAbbr(emp.certificationId, certifications, true);
             const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
+            const displayName = getEmployeeDisplayName(emp);
+            const rowLine = ri > 0 ? `1px solid ${PRINT_INK.border}` : undefined;
+            // Whole-day absences on days in a row print as one bar per week (item 52).
+            const absenceRuns = buildRowAbsenceRuns(
+              emp.id,
+              dates,
+              {
+                shiftForKey,
+                absenceTypeIdForKey,
+                hasAbsenceType: (absenceTypeId) => !!absenceTypeMap?.has(absenceTypeId),
+              },
+              splitAtIndex,
+            );
 
             return (
-              <tr
-                key={emp.id}
-                style={{
-                  background: "#fff",
-                  breakInside: "avoid",
-                  pageBreakInside: "avoid",
-                }}
-              >
-                {/* Name cell */}
+              <tr key={emp.id} style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
                 <td
                   style={{
                     padding: 0,
-                    borderTop: ri > 0 ? "1px solid #C8D6EC" : undefined,
-                    borderRight: "1px solid #C8D6EC",
+                    borderTop: rowLine,
+                    borderRight: `1px solid ${PRINT_INK.border}`,
                   }}
                 >
                   <div
                     style={{
-                      padding: "0.3em 0.6em 0.3em 0.8em",
+                      padding: "0.3em 0.6em 0.3em 0.85em",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
@@ -560,22 +667,22 @@ function PrintSection({
                         <span
                           style={{
                             fontWeight: 600,
-                            color: "#1A2640",
+                            color: PRINT_INK.text,
                             lineHeight: 1.1,
                             fontSize:
-                              getEmployeeDisplayName(emp).length > 25
+                              displayName.length > 25
                                 ? "0.85em"
-                                : getEmployeeDisplayName(emp).length > 18
+                                : displayName.length > 18
                                   ? "0.95em"
                                   : "1em",
                           }}
                         >
-                          {getEmployeeDisplayName(emp)}
+                          {displayName}
                         </span>
                       </span>
                       {emp.roleIds.length > 0 && (
                         <span data-print-fit="" style={{ ...FIT_TEXT, marginTop: "0.1em" }}>
-                          <span style={{ fontSize: "0.8em", color: "#4D6080" }}>
+                          <span style={{ fontSize: "0.85em", color: PRINT_INK.subtle }}>
                             {getRoleAbbrs(emp.roleIds, orgRoles, true).join(", ")}
                           </span>
                         </span>
@@ -584,15 +691,14 @@ function PrintSection({
                     {certAbbr && certAbbr !== "-" && (
                       <span
                         style={{
-                          fontSize: "0.8em",
+                          fontSize: "0.82em",
                           fontWeight: 700,
                           background: dc.bg,
                           color: dc.text,
-                          padding: "0.15em 0.5em",
+                          padding: "0.15em 0.55em",
                           borderRadius: 20,
                           whiteSpace: "nowrap",
                           flexShrink: 0,
-                          letterSpacing: "0.01em",
                         }}
                       >
                         {certAbbr}
@@ -601,24 +707,15 @@ function PrintSection({
                   </div>
                 </td>
 
-                {/* Shift cells */}
                 {dates.map((date, di) => {
-                  const isSplit = splitAtIndex !== undefined && di === splitAtIndex;
                   const assignment = shiftForKey(emp.id, date);
-                  const pills =
-                    assignment && assignment !== "OFF"
-                      ? resolveCellPills(
-                          assignment,
-                          assignmentIdsForKey?.(emp.id, date) ?? [],
-                          absenceTypeIdForKey?.(emp.id, date) ?? null,
-                          getCustomShiftTimes?.(emp.id, date) ?? null,
-                          restOfDayAbsenceTypeIdForKey?.(emp.id, date) ?? null,
-                          restOfDayAbsenceLayoutForKey?.(emp.id, date) ?? null,
-                        )
-                      : [];
-                  // Three items (two shifts and an absence) stack in a taller
-                  // row rather than squeezing side by side.
-                  const stacksPills = pills.length >= 3;
+                  const runDay = absenceRuns.days[di];
+                  const run = runDay ? absenceRuns.runs[runDay.runIndex] : null;
+                  const runAbsence = run ? (absenceTypeMap?.get(run.absenceTypeId) ?? null) : null;
+                  const { pills, stacked } =
+                    !runDay && assignment && assignment !== "OFF"
+                      ? resolveCellPills(emp.id, date, assignment)
+                      : { pills: [], stacked: false };
 
                   return (
                     <td
@@ -626,51 +723,57 @@ function PrintSection({
                       style={{
                         padding: 0,
                         verticalAlign: "middle",
-                        borderTop: ri > 0 && !isSplit ? "1px solid #C8D6EC" : undefined,
-                        boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 #C8D6EC" : undefined,
-                        borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
+                        borderTop: rowLine,
+                        borderLeft: lineBetweenDays(di),
                       }}
                     >
                       <div
-                        data-print-cell-layout={stacksPills ? "stacked" : undefined}
+                        data-print-cell-layout={stacked ? "stacked" : undefined}
                         style={{
-                          minHeight: stacksPills ? stackedCellH : cellH,
+                          minHeight: cellH,
                           display: "flex",
-                          flexDirection: stacksPills ? "column" : "row",
+                          flexDirection: stacked ? "column" : "row",
                           alignItems: "stretch",
                           justifyContent: "center",
-                          padding: `0.3em ${cellInsetX}`,
+                          padding: `${CELL_INSET_Y} ${cellInsetX}`,
                           position: "relative",
                         }}
                       >
+                        {runDay?.position === "start" && runAbsence && (
+                          <PrintAbsenceRun
+                            absence={runAbsence}
+                            length={runDay.length}
+                            insetX={cellInsetX}
+                          />
+                        )}
+                        {pills.map((pill, pi) => (
+                          <PrintShiftPill
+                            key={pi}
+                            {...pill}
+                            variant={pills.length === 1 ? "single" : "multi"}
+                            isNameMode={isNameMode}
+                          />
+                        ))}
+                        {!runDay && assignment === "OFF" && (
+                          <span
+                            style={{
+                              alignSelf: "center",
+                              margin: "auto",
+                              fontSize: "0.75em",
+                              fontWeight: 600,
+                              letterSpacing: "0.06em",
+                              color: PRINT_INK.faint,
+                            }}
+                          >
+                            OFF
+                          </span>
+                        )}
                         <PrintIndicatorDots
                           ids={printedIndicatorIds(
                             noteMarksForKey?.(emp.id, date, focusAreaId) ?? [],
                           )}
                           indicatorTypes={indicatorTypes}
                         />
-                        {pills.length > 0 ? (
-                          pills.map((pill, pi) => (
-                            <PrintShiftPill
-                              key={pi}
-                              {...pill}
-                              variant={pills.length === 1 ? "single" : "multi"}
-                              isNameMode={isNameMode}
-                              wingOnTop={pills.length > 1}
-                            />
-                          ))
-                        ) : (
-                          <div
-                            style={{
-                              alignSelf: "center",
-                              margin: "auto",
-                              width: "1.2em",
-                              height: "0.18em",
-                              background: assignment === "OFF" ? "#9EB4D4" : "#C8D6EC",
-                              borderRadius: 2,
-                            }}
-                          />
-                        )}
                       </div>
                     </td>
                   );
@@ -679,15 +782,13 @@ function PrintSection({
             );
           })}
 
-          {/* Tally rows — one per active tally category for this section */}
           {tallyRows.map((row, ci) => (
             <TallyRow
               key={row.id}
-              label={row.name}
-              bgColor="#fff"
-              height={tallyH}
-              splitAtIndex={splitAtIndex}
-              dailyTallies={dailyTallies.map((t) => t[row.id] ?? {})}
+              label={row.label}
+              height={`${fontSize * 2.4}px`}
+              lineBetweenDays={lineBetweenDays}
+              counts={row.counts}
               isFirst={ci === 0}
             />
           ))}
@@ -699,67 +800,59 @@ function PrintSection({
 
 function TallyRow({
   label,
-  bgColor,
   height,
-  splitAtIndex,
-  dailyTallies,
+  lineBetweenDays,
+  counts,
   isFirst,
 }: {
   label: string;
-  bgColor: string;
   height: string;
-  splitAtIndex?: number;
-  dailyTallies: Record<string, number>[];
-  isFirst?: boolean;
+  lineBetweenDays: (index: number) => string;
+  counts: number[];
+  isFirst: boolean;
 }) {
+  const rowLine = `1px solid ${PRINT_INK.border}`;
   return (
-    <tr style={{ background: bgColor }}>
+    <tr data-print-tally-row="" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
       <td
         style={{
-          padding: "0.3em 0.8em",
-          fontSize: "0.8em",
-          fontWeight: 700,
-          color: "#1A2640",
-          letterSpacing: "0.04em",
+          padding: "0.3em 0.85em",
           height,
-          borderRight: "1px solid #9EB4D4",
-          borderTop: isFirst ? "2px solid #0F1724" : "1px solid #9EB4D4",
+          borderRight: rowLine,
+          borderTop: isFirst ? `1px solid ${PRINT_INK.borderStrong}` : rowLine,
         }}
       >
-        {label}
-      </td>
-      {dailyTallies.map((tally, i) => {
-        const entries = Object.entries(tally);
-        const isSplit = splitAtIndex !== undefined && i === splitAtIndex;
-        return (
-          <td
-            key={i}
+        <span data-print-fit="" style={FIT_TEXT}>
+          <span
             style={{
-              textAlign: "center",
-              padding: "0.25em 0.2em",
-              borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #9EB4D4",
-              borderTop: isFirst ? "2px solid #0F1724" : "1px solid #9EB4D4",
               fontSize: "0.8em",
               fontWeight: 700,
-              color: entries.length > 0 ? "#1A2640" : "#94A3B8",
-              lineHeight: 1.3,
-              height,
+              color: PRINT_INK.muted,
+              letterSpacing: "0.04em",
             }}
           >
-            {entries.length === 0
-              ? "-"
-              : entries.map(([lbl, cnt]) => (
-                  // One line per count, so a long shift name shrinks rather
-                  // than wrapping into the next count.
-                  <MaybeHint key={lbl} content={`${lbl}: ${cnt}`} side="top">
-                    <span data-print-fit="" style={{ ...FIT_TEXT, textAlign: "center" }}>
-                      {lbl}: {cnt}
-                    </span>
-                  </MaybeHint>
-                ))}
-          </td>
-        );
-      })}
+            {label}
+          </span>
+        </span>
+      </td>
+      {counts.map((count, i) => (
+        <td
+          key={i}
+          data-print-tally-count={count}
+          style={{
+            textAlign: "center",
+            padding: 0,
+            height,
+            borderLeft: lineBetweenDays(i),
+            borderTop: isFirst ? `1px solid ${PRINT_INK.borderStrong}` : rowLine,
+            fontSize: "0.85em",
+            fontWeight: 600,
+            color: count > 0 ? PRINT_INK.muted : PRINT_INK.faint,
+          }}
+        >
+          {count}
+        </td>
+      ))}
     </tr>
   );
 }
@@ -792,6 +885,8 @@ interface PrintScheduleViewProps {
     empId: string,
     date: Date,
   ) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
+  /** A cell's segments, for the grid's mentored M. */
+  segmentsForKey?: PrintSegmentsForKey;
   onClose: () => void;
   focusAreaLabel?: string;
   shiftDisplayMode?: ShiftDisplayMode;
@@ -801,6 +896,66 @@ interface PrintScheduleViewProps {
 }
 
 const NO_INDICATORS: IndicatorType[] = [];
+
+const KEY_GRID: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(11em, 1fr))",
+  gap: "0.5em 1.5em",
+};
+
+function KeyHeading({ children }: { children: string }) {
+  return (
+    <div
+      style={{ fontSize: "1em", fontWeight: 600, color: PRINT_INK.heading, marginBottom: "0.7em" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function KeyGroupTitle({ children, first }: { children: string; first: boolean }) {
+  return (
+    <div
+      style={{
+        fontSize: "0.85em",
+        fontWeight: 600,
+        color: PRINT_INK.subtle,
+        letterSpacing: "0.04em",
+        margin: first ? "0 0 0.4em" : "0.9em 0 0.4em",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function KeyItem({ swatch, name }: { swatch: ReactNode; name: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.5em", minWidth: 0 }}>
+      {swatch}
+      <span style={{ fontSize: "0.9em", color: PRINT_INK.text }}>{name}</span>
+    </div>
+  );
+}
+
+function KeySwatch({ label, style }: { label: string; style: CSSProperties }) {
+  return (
+    <span
+      style={{
+        borderRadius: PRINT_PILL_RADIUS.multi,
+        padding: "0.15em 0.5em",
+        fontSize: "0.9em",
+        fontWeight: 600,
+        flexShrink: 0,
+        minWidth: "2.5em",
+        textAlign: "center",
+        ...style,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
 export default function PrintScheduleView({
   orgName,
@@ -822,6 +977,7 @@ export default function PrintScheduleView({
   absenceTypeMap,
   getShiftStyle,
   getCustomShiftTimes,
+  segmentsForKey,
   onClose,
   focusAreaLabel = DEFAULT_ORGANIZATION_LABELS.focusArea,
   shiftDisplayMode = "code",
@@ -843,21 +999,85 @@ export default function PrintScheduleView({
     [weekStart, spanWeeks],
   );
 
-  // Filter focus areas to print
-  const printFocusAreas = useMemo(
-    () => focusAreas.filter((w) => selectedWings.includes(w.name)),
-    [focusAreas, selectedWings],
-  );
+  // Each printed area with its rows: everyone home there with something
+  // scheduled in the range, then anyone working one of its shifts as a guest.
+  const sections = useMemo(() => {
+    return focusAreas
+      .filter((focusArea) => selectedWings.includes(focusArea.name))
+      .map((focusArea) => {
+        const ownCodeIds = new Set(
+          assignments.filter((st) => st.focusAreaId === focusArea.id).map((st) => st.id),
+        );
+        const homeEmps = employees.filter(
+          (e) =>
+            e.focusAreaIds.includes(focusArea.id) &&
+            dates.some((date) => {
+              const assignment = shiftForKey(e.id, date);
+              return !!assignment && assignment !== "OFF";
+            }),
+        );
+        const guestEmps = allEmployees.filter(
+          (e) =>
+            e.focusAreaIds.length > 0 &&
+            !e.focusAreaIds.includes(focusArea.id) &&
+            dates.some((date) =>
+              (assignmentIdsForKey?.(e.id, date) ?? []).some((id) => ownCodeIds.has(id)),
+            ),
+        );
+        return { focusArea, employees: [...homeEmps, ...guestEmps] };
+      })
+      .filter((section) => section.employees.length > 0);
+  }, [
+    focusAreas,
+    selectedWings,
+    assignments,
+    employees,
+    allEmployees,
+    dates,
+    shiftForKey,
+    assignmentIdsForKey,
+  ]);
 
-  // Exclusive code IDs per section (matches ScheduleGrid approach)
-  const exclusiveCodeIdsPerSection = useMemo(() => {
-    return Object.fromEntries(
-      printFocusAreas.map((w) => [
-        w.name,
-        new Set(assignments.filter((st) => st.focusAreaId === w.id).map((st) => st.id)),
-      ]),
-    );
-  }, [printFocusAreas, assignments]);
+  // What the printed rows show, so the key lists only what appears.
+  const printed = useMemo(() => {
+    const indicatorIds = new Set<number>();
+    const absenceIds = new Set<number>();
+    let mentored = false;
+    for (const { focusArea, employees: rows } of sections) {
+      for (const emp of rows) {
+        for (const date of dates) {
+          for (const mark of noteMarksForKey?.(emp.id, date, focusArea.id) ?? []) {
+            indicatorIds.add(mark.indicatorTypeId);
+          }
+          for (const id of [
+            absenceTypeIdForKey?.(emp.id, date),
+            restOfDayAbsenceTypeIdForKey?.(emp.id, date),
+          ]) {
+            if (id != null && absenceTypeMap?.has(id)) absenceIds.add(id);
+          }
+          if (segmentsForKey?.(emp.id, date).some((segment) => segment.isMentored === true)) {
+            mentored = true;
+          }
+        }
+      }
+    }
+    return {
+      indicators: indicatorTypes.filter((type) => indicatorIds.has(type.id)),
+      absences: Array.from(absenceTypeMap?.values() ?? [])
+        .filter((absence) => absenceIds.has(absence.id))
+        .sort((left, right) => left.sortOrder - right.sortOrder),
+      mentored,
+    };
+  }, [
+    sections,
+    dates,
+    noteMarksForKey,
+    absenceTypeIdForKey,
+    restOfDayAbsenceTypeIdForKey,
+    absenceTypeMap,
+    segmentsForKey,
+    indicatorTypes,
+  ]);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -904,23 +1124,15 @@ export default function PrintScheduleView({
     });
   }
 
-  const legendItems = assignments.filter((s) => !EXCLUDED_LEGEND.has(s.label));
-
-  // The indicator key lists only the indicators this printout shows.
-  const printedIndicators = useMemo(() => {
-    if (!noteMarksForKey || indicatorTypes.length === 0) return [];
-    const ids = new Set<number>();
-    for (const focusArea of printFocusAreas) {
-      for (const emp of allEmployees) {
-        for (const date of dates) {
-          for (const id of printedIndicatorIds(noteMarksForKey(emp.id, date, focusArea.id))) {
-            ids.add(id);
-          }
-        }
-      }
-    }
-    return indicatorTypes.filter((type) => ids.has(type.id));
-  }, [noteMarksForKey, indicatorTypes, printFocusAreas, allEmployees, dates]);
+  // Full shift names already say what each pill is, so only codes need a key.
+  const legendGroups = isNameMode
+    ? []
+    : legendGroupsByFocusArea(
+        assignments.filter((s) => !EXCLUDED_LEGEND.has(s.label)),
+        focusAreas,
+      );
+  const keyedAbsences = isNameMode ? [] : printed.absences;
+  const hasKey = legendGroups.length > 0 || keyedAbsences.length > 0 || printed.mentored;
 
   return (
     <div
@@ -929,7 +1141,7 @@ export default function PrintScheduleView({
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        background: "#fff",
+        background: PRINT_INK.surface,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -943,8 +1155,8 @@ export default function PrintScheduleView({
           alignItems: "center",
           gap: 12,
           padding: "12px 20px",
-          borderBottom: "1px solid #C8D6EC",
-          background: "#F5F7FA",
+          borderBottom: `1px solid ${PRINT_INK.border}`,
+          background: PRINT_INK.headerFill,
           flexShrink: 0,
         }}
       >
@@ -967,7 +1179,7 @@ export default function PrintScheduleView({
             style={{
               fontSize: "var(--dg-fs-label)",
               fontWeight: 500,
-              color: "#334766",
+              color: PRINT_INK.text,
               lineHeight: 1,
             }}
           >
@@ -985,10 +1197,10 @@ export default function PrintScheduleView({
           <span
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "#4D6080",
+              color: PRINT_INK.subtle,
             }}
           >
-            {printFontSizeLabel(fontSize)} · {`${spanWeeks}W`} ·{" "}
+            {printFontSizeLabel(fontSize)} · {spanWeeks === 1 ? "1 week" : "2 weeks"} ·{" "}
             {selectedWings.length === focusAreas.length
               ? `All ${focusAreaLabel.toLowerCase()}`
               : selectedWings.join(", ")}
@@ -1024,7 +1236,7 @@ export default function PrintScheduleView({
           flex: 1,
           overflow: "auto",
           padding: "24px",
-          background: "#9EB4D4",
+          background: "#E5E5E5",
         }}
       >
         {/* Paper simulation on screen */}
@@ -1032,17 +1244,18 @@ export default function PrintScheduleView({
           ref={contentRef}
           className="print-schedule-content"
           style={{
-            background: "#fff",
+            background: PRINT_INK.surface,
+            color: PRINT_INK.text,
             fontSize: `${fontSize}px`,
             fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             fontVariantNumeric: "tabular-nums",
             // A landscape Letter page: the preview lays out at the printed
             // width, so it wraps and shortens text where the printout will.
-            width: "11in",
+            width: `${PAGE_WIDTH_IN}in`,
             minHeight: "8.5in",
             margin: "0 auto",
-            padding: "0.5in",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
+            padding: `${PAGE_MARGIN_IN}in`,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.08)",
             borderRadius: "var(--dg-radius-xs)",
           }}
         >
@@ -1052,13 +1265,12 @@ export default function PrintScheduleView({
               display: "flex",
               alignItems: "flex-end",
               justifyContent: "space-between",
-              marginBottom: "1.2em",
-              paddingBottom: "0.6em",
-              borderBottom: "2px solid #0F1724",
+              marginBottom: "1.4em",
+              paddingBottom: "0.7em",
+              borderBottom: `1px solid ${PRINT_INK.divider}`,
             }}
           >
             <div>
-              {/* Logo + Wordmark + Org Name in one line */}
               <div style={{ marginBottom: "0.7em" }}>
                 <PrintBrandLockup
                   orgName={orgName}
@@ -1068,21 +1280,15 @@ export default function PrintScheduleView({
                 />
               </div>
 
-              <div
-                style={{
-                  fontSize: "1.1em",
-                  fontWeight: 600,
-                  color: "#334766",
-                }}
-              >
+              <div style={{ fontSize: "1.15em", fontWeight: 600, color: PRINT_INK.text }}>
                 Schedule: {dateRangeLabel}
               </div>
             </div>
             <div
               data-printed-at=""
               style={{
-                fontSize: "0.9em",
-                color: "#4D6080",
+                fontSize: "0.85em",
+                color: PRINT_INK.subtle,
                 textAlign: "right",
               }}
             >
@@ -1090,163 +1296,135 @@ export default function PrintScheduleView({
             </div>
           </div>
 
-          {/* Focus area sections */}
-          {printFocusAreas.map((focusArea) => {
-            const exclusiveCodeIds =
-              exclusiveCodeIdsPerSection[focusArea.name] ?? new Set<number>();
-            // A row with nothing scheduled in the printed range is left off.
-            const homeEmps = employees.filter(
-              (e) =>
-                e.focusAreaIds.includes(focusArea.id) &&
-                dates.some((date) => {
-                  const assignment = shiftForKey(e.id, date);
-                  return !!assignment && assignment !== "OFF";
-                }),
-            );
-            const guestEmps = allEmployees.filter(
-              (e) =>
-                e.focusAreaIds.length > 0 &&
-                !e.focusAreaIds.includes(focusArea.id) &&
-                dates.some((date) => {
-                  const codeIds = assignmentIdsForKey?.(e.id, date) ?? [];
-                  return codeIds.some((id) => exclusiveCodeIds.has(id));
-                }),
-            );
-            const sectionEmps = [...homeEmps, ...guestEmps];
-            if (sectionEmps.length === 0) return null;
+          {sections.map(({ focusArea, employees: sectionEmps }) => (
+            <PrintSection
+              key={focusArea.name}
+              sectionName={focusArea.name}
+              focusAreaId={focusArea.id}
+              employees={sectionEmps}
+              dates={dates}
+              shiftForKey={shiftForKey}
+              absenceTypeIdForKey={absenceTypeIdForKey}
+              restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
+              restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
+              absenceTypeMap={absenceTypeMap}
+              assignmentIdsForKey={assignmentIdsForKey}
+              getShiftStyle={getShiftStyle}
+              assignments={assignments}
+              shiftCategories={shiftCategories}
+              jobs={jobs}
+              certifications={certifications}
+              orgRoles={orgRoles}
+              focusAreas={focusAreas}
+              getCustomShiftTimes={getCustomShiftTimes}
+              segmentsForKey={segmentsForKey}
+              splitAtIndex={splitAtIndex}
+              fontSize={fontSize}
+              shiftDisplayMode={shiftDisplayMode}
+              noteMarksForKey={noteMarksForKey}
+              indicatorTypes={indicatorTypes}
+            />
+          ))}
 
-            return (
-              <PrintSection
-                key={focusArea.name}
-                sectionName={focusArea.name}
-                focusAreaId={focusArea.id}
-                employees={sectionEmps}
-                dates={dates}
-                shiftForKey={shiftForKey}
-                absenceTypeIdForKey={absenceTypeIdForKey}
-                restOfDayAbsenceTypeIdForKey={restOfDayAbsenceTypeIdForKey}
-                restOfDayAbsenceLayoutForKey={restOfDayAbsenceLayoutForKey}
-                absenceTypeMap={absenceTypeMap}
-                assignmentIdsForKey={assignmentIdsForKey}
-                getShiftStyle={getShiftStyle}
-                assignments={assignments}
-                shiftCategories={shiftCategories}
-                jobs={jobs}
-                certifications={certifications}
-                orgRoles={orgRoles}
-                focusAreas={focusAreas}
-                getCustomShiftTimes={getCustomShiftTimes}
-                splitAtIndex={splitAtIndex}
-                fontSize={fontSize}
-                shiftDisplayMode={shiftDisplayMode}
-                noteMarksForKey={noteMarksForKey}
-                indicatorTypes={indicatorTypes}
-              />
-            );
-          })}
-
-          {/* Full shift names already say what each pill is, so only codes need a key. */}
-          {!isNameMode && legendItems.length > 0 && (
+          {hasKey && (
             <div
               data-print-legend="true"
               style={{
                 marginTop: "1.5em",
                 paddingTop: "0.8em",
-                borderTop: "1px solid #C8D6EC",
+                borderTop: `1px solid ${PRINT_INK.border}`,
               }}
             >
-              <div
-                style={{
-                  fontSize: "1em",
-                  fontWeight: 700,
-                  color: "#1A2640",
-                  marginBottom: "0.7em",
-                }}
-              >
-                Shift key
-              </div>
-              {legendGroupsByFocusArea(legendItems, focusAreas).map((group, index) => (
+              <KeyHeading>{isNameMode ? "Key" : "Shift key"}</KeyHeading>
+              {legendGroups.map((group, index) => (
                 <Fragment key={group.title ?? `group-${index}`}>
                   {group.title ? (
-                    <div
-                      style={{
-                        fontSize: "0.85em",
-                        fontWeight: 600,
-                        color: "#334766",
-                        margin: index === 0 ? "0 0 0.4em" : "0.9em 0 0.4em",
-                      }}
-                    >
-                      {group.title}
-                    </div>
+                    <KeyGroupTitle first={index === 0}>{group.title}</KeyGroupTitle>
                   ) : null}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(10em, 1fr))",
-                      gap: "0.5em 1.5em",
-                    }}
-                  >
+                  <div style={KEY_GRID}>
                     {group.items.map((s) => (
-                      <div
+                      <KeyItem
                         key={s.id}
-                        style={{ display: "flex", alignItems: "center", gap: "0.5em" }}
-                      >
-                        <span
-                          style={{
-                            background: s.color,
-                            border: `1px solid ${borderColor(s.text)}`,
-                            color: s.text,
-                            borderRadius: "0.3em",
-                            padding: "0.15em 0.5em",
-                            fontSize: "0.9em",
-                            fontWeight: 700,
-                            flexShrink: 0,
-                            minWidth: "2.5em",
-                            textAlign: "center",
-                          }}
-                        >
-                          {s.label}
-                        </span>
-                        <span style={{ fontSize: "0.9em", color: "#334766" }}>{s.name}</span>
-                      </div>
+                        name={s.name}
+                        swatch={
+                          <KeySwatch
+                            label={s.label}
+                            style={{
+                              background: s.color,
+                              color: s.text,
+                              border: FILLED_PILL_BORDER,
+                            }}
+                          />
+                        }
+                      />
                     ))}
                   </div>
                 </Fragment>
               ))}
+              {keyedAbsences.length > 0 && (
+                <div data-print-absence-key="">
+                  <KeyGroupTitle first={legendGroups.length === 0}>Absences</KeyGroupTitle>
+                  <div style={KEY_GRID}>
+                    {keyedAbsences.map((absence) => (
+                      <KeyItem
+                        key={absence.id}
+                        name={absence.name || absence.label}
+                        swatch={
+                          <KeySwatch label={absence.label} style={printAbsenceFill(absence)} />
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {printed.mentored && (
+                <div data-print-mentored-key="" style={{ marginTop: "0.9em" }}>
+                  <KeyItem
+                    name="Mentored assignment"
+                    swatch={
+                      <span
+                        style={{
+                          width: "1.15em",
+                          height: "1.15em",
+                          borderRadius: 999,
+                          border: `1px solid ${PRINT_INK.border}`,
+                          color: PRINT_INK.text,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "0.85em",
+                          fontWeight: 600,
+                          lineHeight: 1,
+                          flexShrink: 0,
+                        }}
+                      >
+                        M
+                      </span>
+                    }
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          {printedIndicators.length > 0 && (
+          {printed.indicators.length > 0 && (
             <div
               data-print-indicator-legend="true"
               data-print-legend="true"
-              style={{ marginTop: "1em", paddingTop: "0.8em", borderTop: "1px solid #C8D6EC" }}
+              style={{
+                marginTop: "1em",
+                paddingTop: "0.8em",
+                borderTop: `1px solid ${PRINT_INK.border}`,
+              }}
             >
-              <div
-                style={{
-                  fontSize: "1em",
-                  fontWeight: 700,
-                  color: "#1A2640",
-                  marginBottom: "0.7em",
-                }}
-              >
-                Schedule notes
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(10em, 1fr))",
-                  gap: "0.5em 1.5em",
-                }}
-              >
-                {printedIndicators.map((indicator) => (
-                  <div
+              <KeyHeading>Schedule notes</KeyHeading>
+              <div style={KEY_GRID}>
+                {printed.indicators.map((indicator) => (
+                  <KeyItem
                     key={indicator.id}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5em" }}
-                  >
-                    <ScheduleNoteIcon color="#334766" size="1em" />
-                    <span style={{ fontSize: "0.9em", color: "#334766" }}>{indicator.name}</span>
-                  </div>
+                    name={indicator.name}
+                    swatch={<ScheduleNoteIcon color={PRINT_INK.text} size="1em" />}
+                  />
                 ))}
               </div>
             </div>

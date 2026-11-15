@@ -2,7 +2,10 @@ import type { AbsencePillLayout } from "@/lib/absence-pill";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import PrintScheduleView from "@/components/PrintScheduleView";
+import PrintScheduleView, { gridEquivalentColumnWidth } from "@/components/PrintScheduleView";
+import { PRINT_PILL_RADIUS } from "@/components/PrintShiftPill";
+import { PRINT_INK } from "@/components/print-palette";
+import { stacksShifts } from "@/components/schedule-grid/gridHelpers";
 import { buildPrintDocument, collectFontFaceCss } from "@/components/print-document";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { formatDateKey } from "@/lib/utils";
@@ -121,18 +124,49 @@ function renderPrintView(indicators?: {
 }
 
 describe("PrintScheduleView", () => {
-  it("prints an absence in its own colors on one pill", () => {
-    renderPrintView();
+  it("prints a whole-day absence on days in a row as one bar in its own colors (item 52)", () => {
+    const { container } = renderPrintView();
 
-    // One cell per printed day, each holding a single absence pill.
-    const pills = screen.getAllByText(vacation.label);
+    const bars = container.querySelectorAll<HTMLElement>("[data-print-absence-run]");
+    expect(bars).toHaveLength(1);
+    expect(bars[0].dataset.printAbsenceRun).toBe("7");
+    expect(bars[0].textContent).toBe("Vacation or Flex ×7");
+    expect(bars[0].style.background).toContain("repeating-linear-gradient(135deg");
+    expect(bars[0].style.borderStyle).toBe("dashed");
+    expect(container.querySelectorAll("[data-print-pill]")).toHaveLength(0);
+  });
 
-    expect(pills.length).toBe(7);
-    for (const pill of pills) {
-      const surface = pill.closest("div[style*='border-radius']") as HTMLElement | null;
-      expect(surface?.style.background).toContain("repeating-linear-gradient(135deg");
-      expect(surface?.style.borderStyle).toBe("dashed");
-    }
+  it("breaks an absence bar at the week and prints a lone day as its own pill", () => {
+    // A gap on the second Friday leaves Saturday on its own.
+    const gapDay = formatDateKey(new Date(2024, 0, 19));
+    const { container } = render(
+      <PrintScheduleView
+        weekStart={new Date(2024, 0, 7)}
+        config={{ fontSize: 11, selectedFocusAreas: ["North"], spanWeeks: 2 }}
+        employees={employees}
+        allEmployees={employees}
+        focusAreas={focusAreas}
+        assignments={assignments}
+        shiftCategories={shiftCategories}
+        jobs={[]}
+        certifications={[]}
+        orgRoles={[]}
+        shiftForKey={(_, date) => (formatDateKey(date) === gapDay ? null : vacation.label)}
+        assignmentIdsForKey={() => []}
+        absenceTypeIdForKey={(_, date) => (formatDateKey(date) === gapDay ? null : vacation.id)}
+        absenceTypeMap={new Map([[vacation.id, vacation]])}
+        getShiftStyle={() => assignments[0]}
+        onClose={() => {}}
+      />,
+    );
+
+    const bars = Array.from(container.querySelectorAll<HTMLElement>("[data-print-absence-run]"));
+    expect(bars.map((bar) => bar.textContent)).toEqual([
+      "Vacation or Flex ×7",
+      "Vacation or Flex ×5",
+    ]);
+    const pills = Array.from(container.querySelectorAll("[data-print-pill]"));
+    expect(pills.map((pill) => pill.textContent)).toEqual([vacation.label]);
   });
 
   // 42a: the printout shows each cell's indicators and keys only those present.
@@ -152,7 +186,9 @@ describe("PrintScheduleView", () => {
       const legend = container.querySelector<HTMLElement>("[data-print-indicator-legend]");
       expect(legend?.textContent).toContain("Float");
       expect(legend?.textContent).not.toContain("Training");
-      expect(legend?.querySelector("[data-note-icon]")?.getAttribute("stroke")).toBe("#334766");
+      expect(legend?.querySelector("[data-note-icon]")?.getAttribute("stroke")).toBe(
+        PRINT_INK.text,
+      );
     });
 
     it("prints no indicator key when no indicator appears", () => {
@@ -239,7 +275,7 @@ describe("PrintScheduleView", () => {
       const pills = Array.from(container.querySelectorAll<HTMLElement>("[data-print-pill]"));
       expect(pills).toHaveLength(14);
       for (const pill of pills) {
-        expect(pill.style.borderRadius).toBe("0.3em");
+        expect(pill.style.borderRadius).toBe(PRINT_PILL_RADIUS.multi);
         expect(pill.outerHTML).not.toContain("var(--");
       }
     });
@@ -255,7 +291,7 @@ describe("PrintScheduleView", () => {
       expect(wing?.nextElementSibling?.textContent).not.toBe("");
     });
 
-    it("sets a single shift's wing at its side and a double shift's on top", () => {
+    it("stacks the initials upright at the pill's side, as the grid does", () => {
       const single = render(
         <PrintScheduleView
           weekStart={new Date(2024, 0, 7)}
@@ -277,17 +313,24 @@ describe("PrintScheduleView", () => {
           onClose={() => {}}
         />,
       );
-      expect(
-        single.container
-          .querySelector("[data-print-pill-wing]")
-          ?.getAttribute("data-print-pill-wing"),
-      ).toBe("side");
+      const singleWing = single.container.querySelector<HTMLElement>("[data-print-pill-wing]");
+      expect(singleWing?.getAttribute("data-print-pill-wing")).toBe("side");
+      expect(singleWing?.style.writingMode).toBe("vertical-rl");
       single.unmount();
 
       const { container } = renderCrossFocusDouble();
-      expect(
-        container.querySelector("[data-print-pill-wing]")?.getAttribute("data-print-pill-wing"),
-      ).toBe("top");
+      const doubleWing = container.querySelector<HTMLElement>("[data-print-pill-wing]");
+      expect(doubleWing?.getAttribute("data-print-pill-wing")).toBe("side");
+      expect(doubleWing?.style.writingMode).toBe("vertical-rl");
+    });
+
+    it("edges only a shift from another area, as the grid leaves filled pills unedged", () => {
+      const { container } = renderCrossFocusDouble();
+      const [own, guest] = Array.from(container.querySelectorAll<HTMLElement>("[data-print-pill]"));
+
+      expect(own.style.borderTopColor).toBe("transparent");
+      expect(guest.style.background).toBe("rgb(255, 255, 255)");
+      expect(guest.style.borderTopColor).not.toBe("transparent");
     });
 
     it("never cuts printed text off with an ellipsis or a line clamp", () => {
@@ -313,12 +356,13 @@ describe("PrintScheduleView", () => {
     const firstDay = formatDateKey(new Date(2024, 0, 7));
     const secondDay = formatDateKey(new Date(2024, 0, 8));
 
-    function renderMixed(layout: AbsencePillLayout | null = null) {
+    // Small type on one week leaves room for two pills side by side.
+    function renderMixed(layout: AbsencePillLayout | null = null, fontSize = 9) {
       return render(
         <PrintScheduleView
           restOfDayAbsenceLayoutForKey={() => layout}
           weekStart={new Date(2024, 0, 7)}
-          config={{ fontSize: 12, selectedFocusAreas: ["North"], spanWeeks: 1 }}
+          config={{ fontSize, selectedFocusAreas: ["North"], spanWeeks: 1 }}
           employees={employees}
           allEmployees={employees}
           focusAreas={focusAreas}
@@ -389,18 +433,27 @@ describe("PrintScheduleView", () => {
       expect(pills[0].style.borderRightStyle).toBe("none");
     });
 
-    it("stacks a three-item cell in a taller row and keeps two items side by side", () => {
-      const { container } = renderMixed();
-      const layouts = Array.from(container.querySelectorAll<HTMLElement>("td > div")).filter(
+    function cellLayouts(container: HTMLElement) {
+      return Array.from(container.querySelectorAll<HTMLElement>("td > div")).filter(
         (cell) => cellPills(cell).length > 0,
       );
+    }
 
-      const [two, three] = layouts;
+    it("always stacks three items and keeps two side by side where the column has room", () => {
+      const [two, three] = cellLayouts(renderMixed().container);
+
       expect(two.dataset.printCellLayout).toBeUndefined();
       expect(two.style.flexDirection).toBe("row");
       expect(three.dataset.printCellLayout).toBe("stacked");
       expect(three.style.flexDirection).toBe("column");
-      expect(parseFloat(three.style.minHeight)).toBeGreaterThan(parseFloat(two.style.minHeight));
+    });
+
+    it("stacks two items where the grid would, on a column too narrow for both", () => {
+      const [two] = cellLayouts(renderMixed(null, 11).container);
+
+      expect(two.dataset.printCellLayout).toBe("stacked");
+      // Stacked, the shift and the absence below it meet along one edge.
+      expect(cellPills(two)[0].style.borderBottomStyle).toBe("none");
     });
   });
 
@@ -429,6 +482,130 @@ describe("PrintScheduleView", () => {
     expect(container.textContent).toContain("Alex Taylor");
     expect(container.textContent).not.toContain("Idle Person");
     expect(container.textContent).not.toContain("Off Only");
+  });
+
+  it("leaves an empty day blank, as the grid does, and marks a plain day off", () => {
+    const firstDay = formatDateKey(new Date(2024, 0, 7));
+    const secondDay = formatDateKey(new Date(2024, 0, 8));
+    const { container } = render(
+      <PrintScheduleView
+        weekStart={new Date(2024, 0, 7)}
+        config={{ fontSize: 11, selectedFocusAreas: ["North"], spanWeeks: 1 }}
+        employees={employees}
+        allEmployees={employees}
+        focusAreas={focusAreas}
+        assignments={assignments}
+        shiftCategories={shiftCategories}
+        jobs={[]}
+        certifications={[]}
+        orgRoles={[]}
+        shiftForKey={(_, date) => {
+          const key = formatDateKey(date);
+          return key === firstDay ? "D" : key === secondDay ? "OFF" : null;
+        }}
+        assignmentIdsForKey={(_, date) => (formatDateKey(date) === firstDay ? [1] : [])}
+        getShiftStyle={() => assignments[0]}
+        onClose={() => {}}
+      />,
+    );
+
+    const dayCells = Array.from(container.querySelectorAll("tbody tr:first-child td")).slice(1);
+    expect(dayCells[1].textContent).toBe("OFF");
+    expect(dayCells.slice(2).every((cell) => cell.textContent === "")).toBe(true);
+  });
+
+  it("marks a mentored shift with the grid's M and keys it", () => {
+    const { container } = render(
+      <PrintScheduleView
+        weekStart={new Date(2024, 0, 7)}
+        config={{ fontSize: 11, selectedFocusAreas: ["North"], spanWeeks: 1 }}
+        employees={employees}
+        allEmployees={employees}
+        focusAreas={focusAreas}
+        assignments={assignments}
+        shiftCategories={shiftCategories}
+        jobs={[]}
+        certifications={[]}
+        orgRoles={[]}
+        shiftForKey={() => "D"}
+        assignmentIdsForKey={() => [1]}
+        segmentsForKey={(_, date) => [{ isMentored: date.getDay() === 1 }]}
+        getShiftStyle={() => assignments[0]}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(container.querySelectorAll("[data-print-mentored]")).toHaveLength(1);
+    expect(container.querySelector("[data-print-mentored-key]")?.textContent).toContain(
+      "Mentored assignment",
+    );
+  });
+
+  it("totals each shift per day as the grid does, counting shifts every area shares", () => {
+    const anywhere: AssignmentDefinition = {
+      ...assignments[0],
+      id: 5,
+      label: "F",
+      name: "Float",
+      focusAreaId: null,
+    };
+    const { container } = render(
+      <PrintScheduleView
+        weekStart={new Date(2024, 0, 7)}
+        config={{ fontSize: 11, selectedFocusAreas: ["North"], spanWeeks: 1 }}
+        employees={employees}
+        allEmployees={employees}
+        focusAreas={focusAreas}
+        assignments={[assignments[0], anywhere]}
+        shiftCategories={shiftCategories}
+        jobs={[]}
+        certifications={[]}
+        orgRoles={[]}
+        shiftForKey={(_, date) => (date.getDay() === 0 ? "F" : "D")}
+        assignmentIdsForKey={(_, date) => (date.getDay() === 0 ? [5] : [1])}
+        getShiftStyle={(label) => (label === "F" ? anywhere : assignments[0])}
+        onClose={() => {}}
+      />,
+    );
+
+    const tally = container.querySelector("[data-print-tally-row]");
+    expect(tally?.querySelector("td")?.textContent).toBe("Day");
+    expect(
+      Array.from(tally?.querySelectorAll("[data-print-tally-count]") ?? []).map(
+        (cell) => cell.textContent,
+      ),
+    ).toEqual(["1", "1", "1", "1", "1", "1", "1"]);
+  });
+
+  it("keys the absences the printout shows, in code mode only", () => {
+    const { container, unmount } = renderPrintView();
+    expect(container.querySelector("[data-print-absence-key]")?.textContent).toContain(
+      "Vacation or Flex",
+    );
+    unmount();
+
+    const named = render(
+      <PrintScheduleView
+        weekStart={new Date(2024, 0, 7)}
+        config={{ fontSize: 12, selectedFocusAreas: ["North"], spanWeeks: 1 }}
+        employees={employees}
+        allEmployees={employees}
+        focusAreas={focusAreas}
+        assignments={assignments}
+        shiftCategories={shiftCategories}
+        jobs={[]}
+        certifications={[]}
+        orgRoles={[]}
+        shiftForKey={() => vacation.label}
+        assignmentIdsForKey={() => []}
+        absenceTypeIdForKey={() => vacation.id}
+        absenceTypeMap={new Map([[vacation.id, vacation]])}
+        getShiftStyle={() => assignments[0]}
+        onClose={() => {}}
+        shiftDisplayMode="name"
+      />,
+    );
+    expect(named.container.querySelector("[data-print-absence-key]")).toBeNull();
   });
 
   it("states the time the schedule was printed as well as the date", () => {
@@ -472,5 +649,15 @@ describe("print document", () => {
     expect(html).toContain("<title>Schedule: &lt;1/7&gt;</title>");
     expect(html).toContain("@font-face { font-family: Inter; }");
     expect(html).toContain('<div class="print-schedule-content">grid</div>');
+  });
+});
+
+describe("gridEquivalentColumnWidth", () => {
+  it("stacks two shifts on paper where a grid that narrow would stack them", () => {
+    // Medium over two weeks leaves each day far too narrow for two pills.
+    expect(stacksShifts(gridEquivalentColumnWidth(11, 14), 2, false)).toBe(true);
+    // Small on one week leaves room for two codes side by side, not two names.
+    expect(stacksShifts(gridEquivalentColumnWidth(9, 7), 2, false)).toBe(false);
+    expect(stacksShifts(gridEquivalentColumnWidth(9, 7), 2, true)).toBe(true);
   });
 });
