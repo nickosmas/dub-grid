@@ -9,6 +9,7 @@ const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
 const routerReplace = vi.fn();
+const routerPush = vi.fn();
 const pushToast = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
@@ -28,6 +29,7 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("expo-router", () => ({
   router: {
+    push: routerPush,
     replace: routerReplace,
   },
   useLocalSearchParams,
@@ -75,6 +77,7 @@ describe("ShiftDetailScreen", () => {
     useLocalSearchParams.mockReset();
     pushToast.mockReset();
     routerReplace.mockReset();
+    routerPush.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
     useLocalSearchParams.mockReturnValue({
@@ -1491,6 +1494,9 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByLabelText("Absence Off Day")).toHaveTextContent("Off Day");
     expect(screen.getByLabelText("Absence Off Day")).not.toHaveTextContent("Absence");
     expect(screen.queryByRole("button", { name: "View previous shift" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("You have an absence this day, so there's no shift to drop or swap."),
+    ).toBeInTheDocument();
   });
 
   it("names the general shift in the detail card pill under a General shift eyebrow", () => {
@@ -1574,6 +1580,9 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByLabelText("General shift Admin")).toBeInTheDocument();
     expect(screen.getByLabelText("General shift Admin")).toHaveTextContent("Admin");
     expect(screen.getByLabelText("General shift Admin")).not.toHaveTextContent("General shift");
+    expect(screen.getByRole("button", { name: "Drop shift" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Swap" })).not.toBeInTheDocument();
+    expect(screen.getByText("A general shift can be dropped but not swapped.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "View previous shift" }));
     expect(screen.getAllByText("Admin").length).toBeGreaterThan(1);
     expect(screen.queryByLabelText("Focus area ICU")).not.toBeInTheDocument();
@@ -1857,6 +1866,9 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByRole("button", { name: "View previous shift" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Drop shift" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Swap" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("This shift was removed, so it can't be dropped or swapped."),
+    ).toBeInTheDocument();
   });
 
   it("hides shift actions for an ongoing shift", () => {
@@ -1956,6 +1968,40 @@ describe("ShiftDetailScreen", () => {
 
     expect(screen.queryByText("Drop shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("This shift has started, so it can't be dropped or swapped."),
+    ).toBeInTheDocument();
+  });
+
+  it("says why the actions are off when the request check fails, and retries it", () => {
+    const refetchRequests = vi.fn().mockResolvedValue(undefined);
+    const defaultQuery = useQuery.getMockImplementation()!;
+    useQuery.mockImplementation((options: { queryKey: unknown[] }) => {
+      if (options.queryKey[1] === "requests") {
+        return {
+          data: undefined,
+          error: new Error("offline"),
+          isFetching: false,
+          isLoading: false,
+          refetch: refetchRequests,
+        };
+      }
+
+      return defaultQuery(options);
+    });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    expect(screen.queryByRole("button", { name: "Drop shift" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "We couldn't check whether you already asked about this shift, so you can't drop or swap it yet.",
+      ),
+    ).toBeInTheDocument();
+    expect(pushToast).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetchRequests).toHaveBeenCalledTimes(1);
   });
 
   it("hides shift actions when an active request already exists for the shift", () => {
@@ -2058,6 +2104,57 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Manager note: Reviewing coverage now.")).toBeInTheDocument();
     expect(screen.queryByText("Drop shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();
+    expect(screen.queryByText(/can't be dropped or swapped/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "View in Requests" }));
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/requests",
+      params: { tab: "mine", requestId: "request-1" },
+    });
+  });
+
+  it("cancels the shift's request in place after a confirmation", () => {
+    const mutate = vi.fn();
+    const defaultQuery = useQuery.getMockImplementation()!;
+    const request = {
+      id: "request-1",
+      requesterEmpId: "emp-1",
+      requesterShiftDate: "2026-04-16",
+      status: "open",
+      type: "pickup",
+      targetEmpId: null,
+      targetName: null,
+      adminNote: null,
+    };
+    useQuery.mockImplementation((options: { queryKey: unknown[] }) => {
+      if (options.queryKey[1] === "requests") {
+        return {
+          data: { requests: [request], openShifts: [] },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return defaultQuery(options);
+    });
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate, reset: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel request" }));
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.getByText("Cancel request?")).toBeInTheDocument();
+    confirmDialog("Cancel request");
+    expect(mutate).toHaveBeenCalledWith(
+      {
+        requestId: "request-1",
+        body: { action: "cancel", empId: "emp-1" },
+        requestType: "pickup",
+      },
+      expect.objectContaining({ onSettled: expect.any(Function) }),
+    );
   });
 
   it("filters swap options to meaningful teammate worked shifts only", () => {
