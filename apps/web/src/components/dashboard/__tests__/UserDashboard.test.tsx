@@ -1860,6 +1860,10 @@ describe("UserDashboard schedule notes", () => {
         "Schedule notes: Training",
         "Schedule notes: Float",
       ]);
+      // A dot in each note's colour, no sticky-note icon.
+      const hero = screen.getByTestId("user-dashboard-hero-notes");
+      expect(hero.querySelectorAll("[data-note-mark]")).toHaveLength(2);
+      expect(hero.querySelector("svg")).toBeNull();
     } finally {
       vi.useRealTimers();
     }

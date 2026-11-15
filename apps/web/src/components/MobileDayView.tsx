@@ -31,6 +31,10 @@ import { MaybeHint } from "@/components/ui/hint";
 import { CalendarOff } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { NoteDots, type ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import { NOTE_LANE_INSET } from "@/components/schedule-grid/badges";
+
+/** A phone-width pill is one short line, too small for the grid's 9px dots. */
+const PHONE_NOTE_DOT_SIZE = 6;
 
 function pillText(label: string, max: number): string {
   if (label.length <= max) return label;
@@ -593,6 +597,10 @@ export default function MobileDayView({
                           pills.map((pill, pillIdx) => {
                             const fs = pills.length > 1 ? 8 : 10;
                             const seams = pillSeams[pillIdx];
+                            // The cell's notes sit in its last pill's bottom-right
+                            // corner, below the label, as on the grid.
+                            const carriesNotes =
+                              pillIdx === pills.length - 1 && noteMarks.length > 0;
                             const pillBorder =
                               getDraftBorderStyle(draftKind) ??
                               (pill.foreignInitials
@@ -624,6 +632,12 @@ export default function MobileDayView({
                                   whiteSpace: "nowrap",
                                   overflow: "hidden",
                                   display: "block",
+                                  ...(carriesNotes
+                                    ? {
+                                        position: "relative",
+                                        paddingBottom: PHONE_NOTE_DOT_SIZE + NOTE_LANE_INSET + 1,
+                                      }
+                                    : null),
                                 }}
                               >
                                 <MaybeHint content={isNameMode ? pill.label : undefined} side="top">
@@ -638,6 +652,16 @@ export default function MobileDayView({
                                     {isNameMode ? pillText(pill.label, 10) : pill.label}
                                   </span>
                                 </MaybeHint>
+                                {carriesNotes ? (
+                                  <NoteDots
+                                    marks={noteMarks}
+                                    indicatorTypes={indicatorTypes}
+                                    placement="overlay"
+                                    rimColor={pill.text}
+                                    isDark={isDarkTheme}
+                                    dotSize={PHONE_NOTE_DOT_SIZE}
+                                  />
+                                ) : null}
                               </span>
                             );
 
@@ -693,12 +717,6 @@ export default function MobileDayView({
                             -
                           </span>
                         )}
-                        <NoteDots
-                          marks={noteMarks}
-                          indicatorTypes={indicatorTypes}
-                          placement="inline"
-                          style={{ flexWrap: "wrap", justifyContent: "center" }}
-                        />
                       </>
                     );
 

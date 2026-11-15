@@ -97,7 +97,10 @@ const indicatorTypes: IndicatorType[] = [
 
 function renderPrintView(indicators?: {
   noteMarksForKey: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
+  /** Fill every day with the first shift instead of the week of Vacation. */
+  worked?: boolean;
 }) {
+  const worked = indicators?.worked ?? false;
   return render(
     <PrintScheduleView
       orgName="Test Org"
@@ -111,9 +114,9 @@ function renderPrintView(indicators?: {
       jobs={[]}
       certifications={[]}
       orgRoles={[]}
-      shiftForKey={() => vacation.label}
-      assignmentIdsForKey={() => []}
-      absenceTypeIdForKey={() => vacation.id}
+      shiftForKey={() => (worked ? assignments[0].label : vacation.label)}
+      assignmentIdsForKey={() => (worked ? [assignments[0].id] : [])}
+      absenceTypeIdForKey={() => (worked ? null : vacation.id)}
       absenceTypeMap={new Map([[vacation.id, vacation]])}
       getShiftStyle={() => assignments[0]}
       onClose={() => {}}
@@ -175,19 +178,52 @@ describe("PrintScheduleView", () => {
 
     it("prints a cell's indicators and keys only the ones that appear", () => {
       const { container } = renderPrintView({
+        worked: true,
         noteMarksForKey: (_, date, focusAreaId) =>
           formatDateKey(date) === firstDay && focusAreaId === 1
             ? [{ indicatorTypeId: 80, state: "published" }]
             : [],
       });
 
-      const dots = container.querySelectorAll("[data-print-indicators] span");
-      expect(Array.from(dots).map((dot) => dot.getAttribute("aria-label"))).toEqual(["Float"]);
+      const marks = container.querySelectorAll<HTMLElement>("[data-print-indicators]");
+      expect(Array.from(marks).map((mark) => mark.getAttribute("aria-label"))).toEqual([
+        "Schedule notes: Float",
+      ]);
+      // In the pill's bottom-right corner, as on the grid.
+      const [mark] = marks;
+      expect(mark.closest("[data-print-pill]")).not.toBeNull();
+      expect(mark.style.position).toBe("absolute");
+      expect(mark.style.bottom).not.toBe("");
+      expect(mark.style.top).toBe("");
+      expect(mark.querySelectorAll("[data-print-note-dot]")).toHaveLength(1);
+
+      // The key names each note beside its own dot, so a colour on paper reads.
       const legend = container.querySelector<HTMLElement>("[data-print-indicator-legend]");
       expect(legend?.textContent).toContain("Float");
       expect(legend?.textContent).not.toContain("Training");
-      expect(legend?.querySelector("[data-note-icon]")?.getAttribute("stroke")).toBe(
-        PRINT_INK.text,
+      const keyDot = legend?.querySelector<HTMLElement>('[data-print-key-note-dot="80"]');
+      expect(keyDot?.style.background).not.toBe("");
+      expect(keyDot?.style.boxShadow).toContain(PRINT_INK.text.toLowerCase().replace("#", ""));
+      expect(legend?.querySelector("svg")).toBeNull();
+    });
+
+    it("prints two dots and counts the rest, as on the grid", () => {
+      const { container } = renderPrintView({
+        worked: true,
+        noteMarksForKey: (_, date) =>
+          formatDateKey(date) === formatDateKey(new Date(2024, 0, 7))
+            ? [80, 81, 99].map((indicatorTypeId) => ({
+                indicatorTypeId,
+                state: "published" as const,
+              }))
+            : [],
+      });
+
+      const [mark] = container.querySelectorAll<HTMLElement>("[data-print-indicators]");
+      expect(mark.querySelectorAll("[data-print-note-dot]")).toHaveLength(2);
+      expect(mark.querySelector("[data-print-note-more]")?.textContent).toBe("+1");
+      expect(mark.getAttribute("aria-label")).toBe(
+        "Schedule notes: Float, Training, Schedule note",
       );
     });
 
@@ -200,6 +236,7 @@ describe("PrintScheduleView", () => {
 
     it("uses literal colours, since the print window has no app CSS variables", () => {
       const { container } = renderPrintView({
+        worked: true,
         noteMarksForKey: () => [{ indicatorTypeId: 99, state: "published" }],
       });
 
@@ -207,7 +244,7 @@ describe("PrintScheduleView", () => {
         .map((element) => element.outerHTML)
         .join("");
       expect(markup).not.toContain("var(--");
-      expect(markup).toContain('aria-label="Schedule note"');
+      expect(markup).toContain('aria-label="Schedule notes: Schedule note"');
     });
   });
 

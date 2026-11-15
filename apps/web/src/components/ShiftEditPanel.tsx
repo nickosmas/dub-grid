@@ -94,7 +94,6 @@ import {
   User,
 } from "lucide-react";
 import { Banner } from "@/components/ui/Banner";
-import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import { ShiftChangeCard } from "@/components/shift-change/ShiftChangeCard";
 import {
   CorrectedDayCard,
@@ -3289,7 +3288,7 @@ export default function ShiftEditPanel({
       <div
         style={{
           position: "absolute",
-          top: 8,
+          bottom: 8,
           ...(side === "left" ? { left: 10 } : { right: 10 }),
           display: "flex",
           gap: 3,
@@ -3796,9 +3795,19 @@ export default function ShiftEditPanel({
             gap: 6,
           }}
         >
-          {active.map(({ id, name }) => (
+          {active.map(({ id, name, color }) => (
             <li key={id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <ScheduleNoteIcon color="var(--dg-color-text-muted)" />
+              <span
+                aria-hidden="true"
+                data-read-only-note-dot={id}
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: color,
+                  flexShrink: 0,
+                }}
+              />
               <span
                 style={{
                   fontSize: "var(--dg-fs-caption)",

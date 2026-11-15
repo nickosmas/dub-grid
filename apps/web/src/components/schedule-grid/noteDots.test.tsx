@@ -1,8 +1,14 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { IndicatorType } from "@/types";
-import { NOTE_DOT_SIZE, NOTE_LANE_HEIGHT, noteMarksWidth } from "./badges";
-import { NoteDots, splitNoteMarks, type ScheduleNoteMark } from "./noteDots";
+import { NOTE_DOT_SIZE, NOTE_LANE_HEIGHT, NOTE_LANE_INSET, noteMarksWidth } from "./badges";
+import {
+  NoteDot,
+  NoteDots,
+  overlayNoteDotsWidth,
+  splitNoteMarks,
+  type ScheduleNoteMark,
+} from "./noteDots";
 
 const indicatorTypes: IndicatorType[] = [
   { id: 1, orgId: "org-1", name: "Float", color: "#ff0000", sortOrder: 1 },
@@ -25,37 +31,39 @@ describe("NoteDots placement", () => {
     expect(dots.style.justifyContent).toBe("flex-end");
     expect(dots.style.paddingRight).toBe("3px");
     expect(container.querySelector("[data-note-mark=published]")).not.toBeNull();
-    expect(container.querySelector("[data-note-icon]")).toBeNull();
   });
-  it("lets inline dots flow with the row where nothing is positioned", () => {
+  it("sets overlay dots in the positioned pill's bottom-right corner, taking no room", () => {
     const { container, getByLabelText } = render(
       <NoteDots
         marks={[{ indicatorTypeId: 1, state: "published" }]}
         indicatorTypes={indicatorTypes}
-        placement="inline"
+        placement="overlay"
+        dotSize={7}
       />,
     );
     const dots = container.querySelector<HTMLElement>("[data-note-dots]")!;
-    expect(dots.style.position).toBe("");
-    expect(dots.dataset.noteDots).toBe("inline");
-    expect(getByLabelText("Float")).toBeInTheDocument();
-    expect(container.querySelector("[data-note-mark]")).toBeNull();
-    expect(container.querySelector("[data-note-icon]")).not.toBeNull();
+    expect(dots.dataset.noteDots).toBe("overlay");
+    expect(dots.style.position).toBe("absolute");
+    expect(dots.style.right).toBe(`${NOTE_LANE_INSET}px`);
+    expect(dots.style.bottom).toBe(`${NOTE_LANE_INSET}px`);
+    expect(getByLabelText("Float")).toBe(dots);
+    const mark = container.querySelector<HTMLElement>("[data-note-mark=published]")!;
+    expect(mark.style.width).toBe("7px");
+    expect(mark).toHaveStyle({ background: "#ff0000" });
   });
 
-  it("draws inline icons in the text colour, a draft addition faded", () => {
+  it("lets a pill move its overlay dots off the default inset", () => {
     const { container } = render(
       <NoteDots
-        marks={[{ indicatorTypeId: 1, state: "draft_added" }]}
+        marks={[{ indicatorTypeId: 1, state: "published" }]}
         indicatorTypes={indicatorTypes}
-        placement="inline"
+        placement="overlay"
+        style={{ right: 4, bottom: 4 }}
       />,
     );
-    const icon = container.querySelector<SVGElement>("[data-note-icon]")!;
-    expect(icon.getAttribute("fill")).toBe("none");
-    expect(icon.getAttribute("stroke")).toBe("currentColor");
-    expect(icon.style.opacity).toBe("0.5");
-    expect(container.innerHTML).not.toContain("#ff0000");
+    const dots = container.querySelector<HTMLElement>("[data-note-dots]")!;
+    expect(dots.style.right).toBe("4px");
+    expect(dots.style.bottom).toBe("4px");
   });
 });
 
@@ -180,12 +188,12 @@ describe("NoteDots corner dots", () => {
     expect(getByLabelText("Readings · Added in the last publish")).toBeInTheDocument();
   });
 
-  it("lists every note inline", () => {
+  it("sizes the count to a smaller dot", () => {
     const { container } = render(
-      <NoteDots marks={published(3)} indicatorTypes={types} placement="inline" />,
+      <NoteDots marks={published(3)} indicatorTypes={types} placement="overlay" dotSize={6} />,
     );
-    expect(container.querySelectorAll("[data-note-icon]")).toHaveLength(3);
-    expect(container.querySelector("[data-note-more]")).toBeNull();
+    expect(dots(container)).toHaveLength(2);
+    expect(container.querySelector<HTMLElement>("[data-note-more]")!.style.fontSize).toBe("6px");
   });
 });
 
@@ -195,5 +203,35 @@ describe("noteMarksWidth", () => {
     expect(noteMarksWidth(1)).toBe(9);
     expect(noteMarksWidth(2)).toBe(21);
     expect(noteMarksWidth(5)).toBe(33);
+  });
+});
+
+describe("overlayNoteDotsWidth", () => {
+  it("claims nothing without notes", () => {
+    expect(overlayNoteDotsWidth(0, 7)).toBe(0);
+  });
+
+  it("claims the dots, their gap and the corner inset on both sides", () => {
+    expect(overlayNoteDotsWidth(1, 7)).toBe(7 + 2 * NOTE_LANE_INSET);
+    expect(overlayNoteDotsWidth(2, 7)).toBe(7 + 2 + 7 + 2 * NOTE_LANE_INSET);
+  });
+
+  it("adds the count's room past two notes", () => {
+    expect(overlayNoteDotsWidth(3, 7)).toBeGreaterThan(overlayNoteDotsWidth(2, 7));
+  });
+});
+
+describe("NoteDot", () => {
+  it("draws one note in its colour, falling back to the muted text colour", () => {
+    const { container } = render(
+      <>
+        <NoteDot color="#123456" size={10} />
+        <NoteDot color={undefined} />
+      </>,
+    );
+    const [named, unknown] = container.querySelectorAll<HTMLElement>("[data-note-mark]");
+    expect(named).toHaveStyle({ background: "#123456" });
+    expect(named.style.width).toBe("10px");
+    expect(unknown.style.background).toBe("var(--dg-color-text-muted)");
   });
 });

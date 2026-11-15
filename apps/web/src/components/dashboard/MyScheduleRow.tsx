@@ -3,19 +3,17 @@ import { layoutEntryAbsence } from "@/lib/absence-pill";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { CalendarDays, Files } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
-import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
-import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
+import { NoteDots, type ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
-import { scheduleNoteMarksBySegment, scheduleNoteMarksLabel } from "./dashboardScheduleNotes";
+import { scheduleNoteMarksBySegment } from "./dashboardScheduleNotes";
 import { noteShiftOf } from "@/app/(app)/schedule/_lib/editor-session";
 import {
   resolveCellChangeBadges,
   type CellChangeBadge,
 } from "@/components/schedule-grid/cellChangeBadges";
-import { MaybeHint } from "@/components/ui/hint";
 import { ScrollCueButton } from "@/components/ui/scroll-cue-button";
 import { formatDateKey } from "@/lib/utils";
 import { DRAFT_BORDER_COLORS, FILLED_PILL_BORDER, resolveShiftPillColors } from "@/lib/colors";
@@ -77,6 +75,7 @@ const MAX_SHIFT_TEXT_LENGTH = 64;
 const NO_FOCUS_AREAS: NonNullable<MyScheduleRowProps["focusAreas"]> = [];
 const NO_NOTES: DashboardContentProps["scheduleNotes"] = [];
 const NO_INDICATOR_TYPES: DashboardContentProps["indicatorTypes"] = [];
+const DASHBOARD_NOTE_DOT_SIZE = 8;
 
 type MyScheduleRowProps = Pick<
   DashboardContentProps,
@@ -674,6 +673,7 @@ function ShiftPill({
   indicatorTypes: DashboardContentProps["indicatorTypes"];
   height: number;
 }) {
+  const { resolvedTheme } = useTheme();
   const draftLabel = resolveDraftLabel(shift);
   const label = capShiftText(shift.label);
   const jobName = shift.jobName ? capShiftText(shift.jobName) : null;
@@ -703,6 +703,8 @@ function ShiftPill({
         // content, and a genuinely long name breaks at a space, never mid-word.
         overflowWrap: "break-word",
         position: "relative",
+        // Room under the time row for the notes in the bottom-right corner.
+        ...(shift.noteMarks.length > 0 ? { paddingBottom: 8 + DASHBOARD_NOTE_DOT_SIZE } : null),
       }}
     >
       <div
@@ -760,8 +762,6 @@ function ShiftPill({
           {shift.sharedFocusArea}
         </div>
       ) : null}
-      {/* The note icon (a stack when there are several) ends the time row,
-          so a pill with notes is no taller. */}
       <div
         style={{
           display: "flex",
@@ -782,37 +782,17 @@ function ShiftPill({
         >
           {shift.timeRange ?? " "}
         </div>
-        {shift.noteMarks.length > 0 ? (
-          <ScheduleNotesMark marks={shift.noteMarks} indicatorTypes={indicatorTypes} />
-        ) : null}
       </div>
+      <NoteDots
+        marks={shift.noteMarks}
+        indicatorTypes={indicatorTypes}
+        placement="overlay"
+        rimColor={shift.textColor}
+        isDark={resolvedTheme === "dark"}
+        dotSize={DASHBOARD_NOTE_DOT_SIZE}
+        style={{ right: 4, bottom: 4 }}
+      />
     </div>
-  );
-}
-
-function ScheduleNotesMark({
-  marks,
-  indicatorTypes,
-}: {
-  marks: ScheduleNoteMark[];
-  indicatorTypes: DashboardContentProps["indicatorTypes"];
-}) {
-  const names = scheduleNoteMarksLabel(marks, indicatorTypes);
-  return (
-    <MaybeHint content={names}>
-      <span
-        role="img"
-        aria-label={`Schedule notes: ${names}`}
-        data-testid="my-schedule-notes"
-        style={{ display: "inline-flex", flexShrink: 0, marginLeft: "auto", lineHeight: 0 }}
-      >
-        {marks.length > 1 ? (
-          <Files aria-hidden="true" size={13} strokeWidth={2} />
-        ) : (
-          <ScheduleNoteIcon state={marks[0].state} size={13} />
-        )}
-      </span>
-    </MaybeHint>
   );
 }
 

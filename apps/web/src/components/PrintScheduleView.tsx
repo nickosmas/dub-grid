@@ -21,7 +21,6 @@ import {
   ShiftDisplayMode,
 } from "@/types";
 import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
-import { ScheduleNoteIcon } from "@/components/schedule-grid/noteIcon";
 import { buildRowAbsenceRuns } from "@/components/schedule-grid/absenceRuns";
 import {
   getCrossFocusBadgePalette,
@@ -53,6 +52,7 @@ import { printFontSizeLabel } from "@/components/print-font-sizes";
 import {
   PrintShiftPill,
   PRINT_PILL_RADIUS,
+  type PrintNoteDot,
   type PrintShiftPillProps,
 } from "@/components/PrintShiftPill";
 import { PRINT_INK } from "@/components/print-palette";
@@ -167,42 +167,16 @@ function printAbsenceFill(absence: AbsenceType) {
   return { background: fill.background, color: fill.text, border: `1px dashed ${fill.border}` };
 }
 
-function printedIndicatorIds(marks: ScheduleNoteMark[]): number[] {
-  return marks.map((mark) => mark.indicatorTypeId);
-}
-
-function PrintIndicatorDots({
-  ids,
-  indicatorTypes,
-}: {
-  ids: number[];
-  indicatorTypes: IndicatorType[];
-}) {
-  if (ids.length === 0) return null;
-  return (
-    <div
-      data-print-indicators="true"
-      style={{ position: "absolute", top: 1, right: 1, display: "flex", gap: 1 }}
-    >
-      {ids.map((id) => {
-        const indicator = indicatorTypes.find((type) => type.id === id);
-        return (
-          <span
-            key={id}
-            aria-label={indicator?.name ?? "Schedule note"}
-            style={{
-              width: "0.55em",
-              height: "0.55em",
-              borderRadius: "50%",
-              background: indicator?.color ?? PRINT_UNKNOWN_INDICATOR,
-              border: "1px solid #FFFFFF",
-              flexShrink: 0,
-            }}
-          />
-        );
-      })}
-    </div>
-  );
+/** A cell's notes as the dots its last pill prints; an archived or unknown note prints grey. */
+function printNoteDots(marks: ScheduleNoteMark[], indicatorTypes: IndicatorType[]): PrintNoteDot[] {
+  return marks.map((mark) => {
+    const indicator = indicatorTypes.find((type) => type.id === mark.indicatorTypeId);
+    return {
+      id: mark.indicatorTypeId,
+      name: indicator?.name ?? "Schedule note",
+      color: indicator?.color ?? PRINT_UNKNOWN_INDICATOR,
+    };
+  });
 }
 
 interface PrintSectionProps {
@@ -752,6 +726,14 @@ function PrintSection({
                             {...pill}
                             variant={pills.length === 1 ? "single" : "multi"}
                             isNameMode={isNameMode}
+                            notes={
+                              pi === pills.length - 1
+                                ? printNoteDots(
+                                    noteMarksForKey?.(emp.id, date, focusAreaId) ?? [],
+                                    indicatorTypes,
+                                  )
+                                : undefined
+                            }
                           />
                         ))}
                         {!runDay && assignment === "OFF" && (
@@ -768,12 +750,6 @@ function PrintSection({
                             OFF
                           </span>
                         )}
-                        <PrintIndicatorDots
-                          ids={printedIndicatorIds(
-                            noteMarksForKey?.(emp.id, date, focusAreaId) ?? [],
-                          )}
-                          indicatorTypes={indicatorTypes}
-                        />
                       </div>
                     </td>
                   );
@@ -1423,7 +1399,19 @@ export default function PrintScheduleView({
                   <KeyItem
                     key={indicator.id}
                     name={indicator.name}
-                    swatch={<ScheduleNoteIcon color={PRINT_INK.text} size="1em" />}
+                    swatch={
+                      <span
+                        data-print-key-note-dot={indicator.id}
+                        style={{
+                          width: "0.75em",
+                          height: "0.75em",
+                          borderRadius: "50%",
+                          background: indicator.color,
+                          boxShadow: `inset 0 0 0 1px ${PRINT_INK.text}`,
+                          flexShrink: 0,
+                        }}
+                      />
+                    }
                   />
                 ))}
               </div>

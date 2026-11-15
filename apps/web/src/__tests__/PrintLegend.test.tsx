@@ -12,9 +12,11 @@ describe("PrintLegend indicators", () => {
     );
 
     expect(container.querySelector("[data-print-legend-indicators]")?.textContent).toBe("Float");
-    expect(
-      container.querySelector("[data-print-legend-indicators] [data-note-icon]"),
-    ).not.toBeNull();
+    const dot = container.querySelector<HTMLElement>(
+      "[data-print-legend-indicators] [data-note-mark]",
+    );
+    expect(dot).toHaveStyle({ background: "#ff0000" });
+    expect(container.querySelector("[data-print-legend-indicators] svg")).toBeNull();
   });
 
   it("shows no indicator key without indicators", () => {
