@@ -984,10 +984,15 @@ export const mobileUpdateShiftRequestResponseSchema = z.object({
 
 export const mobilePersonSchema = z.object({
   id: z.guid(),
-  employeeNumber: z.number().int(),
+  /**
+   * This and `employmentType` are HR facts for staff managers: a colleague's
+   * record leaves both out for anyone else (owner, 2026-11-14), so neither
+   * takes a default the app would show as theirs.
+   */
+  employeeNumber: z.number().int().optional(),
   firstName: z.string(),
   lastName: z.string(),
-  employmentType: z.enum(["full_time", "part_time"]).default("full_time"),
+  employmentType: z.enum(["full_time", "part_time"]).optional(),
   phone: z.string(),
   email: z.string(),
   status: z.enum(["active", "inactive", "removed"]),

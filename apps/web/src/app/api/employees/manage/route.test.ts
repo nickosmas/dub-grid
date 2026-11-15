@@ -452,6 +452,33 @@ describe("POST /api/employees/manage", () => {
       expect(own.employee).toMatchObject(statusDetails);
     });
 
+    it("withholds a coworker's employee number and employment type from a view-only caller, but not their own", async () => {
+      const hrFacts = { employeeNumber: 1042, employmentType: "part_time", seniority: 3 };
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee(hrFacts));
+      const coworker = await (await POST(fetchEmployeeByIdRequest())).json();
+      expect(coworker.employee).not.toHaveProperty("employeeNumber");
+      expect(coworker.employee).not.toHaveProperty("employmentType");
+      // Seniority sets the roster order everyone sees.
+      expect(coworker.employee.seniority).toBe(3);
+
+      mockAuth({});
+      rowToEmployee.mockReturnValue(makeEmployee({ ...hrFacts, userId: VIEWER_USER_ID }));
+      const own = await (await POST(fetchEmployeeByIdRequest())).json();
+      expect(own.employee).toMatchObject(hrFacts);
+    });
+
+    it("gives a staff manager a coworker's employee number and employment type", async () => {
+      mockAuth({ canManageEmployees: true, canViewEmployeeDetails: true });
+      rowToEmployee.mockReturnValue(
+        makeEmployee({ employeeNumber: 1042, employmentType: "part_time" }),
+      );
+
+      const payload = await (await POST(fetchEmployeeByIdRequest())).json();
+
+      expect(payload.employee).toMatchObject({ employeeNumber: 1042, employmentType: "part_time" });
+    });
+
     it("hands contact details to a viewer granted canViewEmployeeDetails", async () => {
       mockAuth({ canViewEmployeeDetails: true });
 
@@ -1050,7 +1077,7 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
     });
   }
 
-  async function listAs(permissions: Record<string, boolean>) {
+  async function employeesAs(permissions: Record<string, boolean>) {
     requireOrgPermissions.mockResolvedValue({
       permissions: {
         isGridmaster: false,
@@ -1066,9 +1093,14 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
     const response = await POST(fetchEmployeesRequest());
     expect(response.status).toBe(200);
     const { employees } = (await response.json()) as {
-      employees: Array<{ id: string; joinedAt: string | null }>;
+      employees: Array<{ id: string; joinedAt: string | null } & Record<string, unknown>>;
     };
-    return new Map(employees.map((employee) => [employee.id, employee.joinedAt]));
+    return new Map(employees.map((employee) => [employee.id, employee]));
+  }
+
+  async function listAs(permissions: Record<string, boolean>) {
+    const employees = await employeesAs(permissions);
+    return new Map([...employees].map(([id, employee]) => [id, employee.joinedAt]));
   }
 
   beforeEach(() => {
@@ -1118,6 +1150,31 @@ describe("POST /api/employees/manage fetchEmployees joined dates", () => {
 
     expect(joined.get("emp-joined")).toBeNull();
     expect(joined.get("emp-self")).toBe("2026-02-01T09:30:00.000Z");
+  });
+
+  it("lists coworkers' employee numbers and employment types for staff managers only", async () => {
+    rowToEmployee.mockImplementation((row: { id: string; user_id: string | null }) =>
+      makeEmployee({
+        id: row.id,
+        userId: row.user_id,
+        employeeNumber: 1042,
+        employmentType: "part_time",
+      }),
+    );
+
+    const forManager = await employeesAs({ canManageEmployees: true });
+    expect(forManager.get("emp-joined")).toMatchObject({
+      employeeNumber: 1042,
+      employmentType: "part_time",
+    });
+
+    const forMember = await employeesAs({});
+    expect(forMember.get("emp-joined")).not.toHaveProperty("employeeNumber");
+    expect(forMember.get("emp-joined")).not.toHaveProperty("employmentType");
+    expect(forMember.get("emp-self")).toMatchObject({
+      employeeNumber: 1042,
+      employmentType: "part_time",
+    });
   });
 });
 
