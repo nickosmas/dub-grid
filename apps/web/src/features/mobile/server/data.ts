@@ -178,7 +178,6 @@ type MobilePeopleRow = Pick<
   | "id"
   | "firstName"
   | "lastName"
-  | "employmentType"
   | "status"
   | "statusChangedAt"
   | "statusNote"
@@ -206,6 +205,7 @@ type MobilePeopleRow = Pick<
   // employeeNumber is optional on Employee (test fixtures may omit it), but DB
   // rows always have one — narrow back to required here.
   employeeNumber: number;
+  employmentType: NonNullable<Employee["employmentType"]>;
   managementDepartmentIds: number[];
   managementDeptAdminIds: number[];
   orgRole: MobilePerson["orgRole"];

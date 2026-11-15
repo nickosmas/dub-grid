@@ -154,6 +154,39 @@ describe("GET /api/organization/directory", () => {
       const directory = await directoryForMember([makeRow("viewer-1")]);
       expect(directory[0]).toMatchObject({ userId: "viewer-1", hasAppAccess: true });
     });
+
+    it("sees no colleague's employee number, but the seniority that orders the roster", async () => {
+      const directory = await directoryForMember([
+        { ...makeRow("colleague-1"), source: "employee", employee_number: 1042, seniority: 3 },
+        { ...makeRow("viewer-1"), source: "employee", employee_number: 7, seniority: 1 },
+      ]);
+
+      expect(directory[0]).toMatchObject({ employeeNumber: null, seniority: 3 });
+      expect(directory[1]).toMatchObject({ employeeNumber: 7, seniority: 1 });
+    });
+  });
+
+  it("gives a staff manager every colleague's employee number", async () => {
+    requireOrgPermissions.mockResolvedValue({
+      orgId: ORG_ID,
+      actor: { id: "manager-1" },
+      serviceClient: { rpc, from: internalProfilesFrom([]) },
+      permissions: {
+        isGridmaster: false,
+        isSuperAdmin: false,
+        canViewStaff: true,
+        canViewEmployeeDetails: true,
+        canManageEmployees: true,
+      },
+    });
+    rpc.mockResolvedValue({
+      data: [{ ...makeRow("colleague-1"), source: "employee", employee_number: 1042 }],
+      error: null,
+    });
+
+    const body = await (await GET(makeRequest({ orgId: ORG_ID }))).json();
+
+    expect(body.directory[0]).toMatchObject({ employeeNumber: 1042 });
   });
 
   it("defaults to a 50-row page and requests it from the RPC", async () => {

@@ -351,6 +351,10 @@ function maskEmployeeForViewer(employee: Employee, callerUserId: string): Employ
     // A joined date says the person has an account, which the nulled userId
     // above exists to withhold.
     joinedAt: isSelf ? employee.joinedAt : null,
+    // HR facts for staff managers only (owner, 2026-11-14). Undefined leaves
+    // them out of the JSON rather than sending a value to mistake for theirs.
+    employeeNumber: isSelf ? employee.employeeNumber : undefined,
+    employmentType: isSelf ? employee.employmentType : undefined,
   };
 }
 

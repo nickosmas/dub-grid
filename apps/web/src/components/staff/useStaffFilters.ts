@@ -13,7 +13,7 @@ export const STAFF_SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "name", label: "Sort: Name" },
   { value: "access", label: "Sort: Access role" },
 ];
-export type EmploymentType = Employee["employmentType"];
+export type EmploymentType = NonNullable<Employee["employmentType"]>;
 export type PhonePresence = "present" | "missing";
 /**
  * A specific certification id, or the two presence cases. "any" is the People
@@ -218,7 +218,7 @@ export function useStaffFilters({
       const matchesEmploymentType =
         regularUserMode ||
         filterEmploymentType.length === 0 ||
-        filterEmploymentType.includes(emp.employmentType);
+        (emp.employmentType != null && filterEmploymentType.includes(emp.employmentType));
       const matchesDepartment =
         regularUserMode ||
         filterDepartment.length === 0 ||

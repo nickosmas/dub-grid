@@ -105,7 +105,10 @@ export async function GET(req: NextRequest) {
         personId: row.person_id as string,
         source: row.source as "employee" | "user_only" | "pending_invite",
         employeeId: (row.employee_id as string | null) ?? null,
-        employeeNumber: (row.employee_number as number | null) ?? null,
+        // An HR fact for staff managers only (owner, 2026-11-14), like the
+        // employees route's view-only mask. Seniority stays below: it sets the
+        // roster order everyone sees.
+        employeeNumber: showsAccount ? ((row.employee_number as number | null) ?? null) : null,
         userId: showsAccount ? ((row.user_id as string | null) ?? null) : null,
         firstName: (row.first_name as string) ?? "",
         lastName: (row.last_name as string) ?? "",

@@ -214,6 +214,38 @@ describe("loadMobilePeoplePayload", () => {
     });
   });
 
+  it("keeps a colleague's employee number and employment type from a regular member", async () => {
+    const coworker = makePerson({
+      id: "employee-coworker",
+      userId: "user-coworker",
+      employeeNumber: 1042,
+      employmentType: "part_time",
+      seniority: 3,
+    });
+
+    const payload = await loadMobilePeoplePayload(
+      {
+        currentOrg: { id: ORG_ID },
+        serviceClient: {},
+        user: { id: USER_ID },
+        permissions: {
+          canManageEmployees: false,
+          canViewStaff: true,
+          canViewEmployeeDetails: false,
+        },
+      } as never,
+      {
+        fetchMobilePeople: vi.fn(async () => [coworker]),
+        mapEmployeeToMobilePerson: vi.fn((person) => person),
+      } as never,
+    );
+
+    expect(payload.people[0]).not.toHaveProperty("employeeNumber");
+    expect(payload.people[0]).not.toHaveProperty("employmentType");
+    // Seniority sets the roster order everyone sees.
+    expect(payload.people[0]).toMatchObject({ seniority: 3 });
+  });
+
   it("gives a regular member a colleague built from named fields, never an Admin's permissions", async () => {
     const admin = makePerson({
       id: "employee-admin",
@@ -302,6 +334,8 @@ describe("loadMobilePeoplePayload", () => {
     expect(payload.people[0]).toMatchObject({
       email: coworker.email,
       phone: coworker.phone,
+      employeeNumber: coworker.employeeNumber,
+      employmentType: coworker.employmentType,
     });
   });
 });
