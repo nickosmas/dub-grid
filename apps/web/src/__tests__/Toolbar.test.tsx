@@ -141,9 +141,44 @@ describe("Toolbar — schedule mode rendering", () => {
     expect(screen.getByRole("button", { name: "South" })).toBeInTheDocument();
   });
 
-  it("renders staff search input with placeholder Search staff", () => {
+  it("opens staff search from its button, over the area tabs", async () => {
+    const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    expect(screen.getByPlaceholderText("Search staff")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search staff")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Search staff" }));
+    const input = screen.getByPlaceholderText("Search staff");
+    expect(input).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "All" })).not.toBeInTheDocument();
+  });
+
+  it("keeps an active search open and closes it with Escape or Close search", async () => {
+    const user = userEvent.setup();
+    const onStaffSearchChange = vi.fn();
+    const { rerender } = render(
+      <Toolbar {...defaultProps} staffSearch="Al" onStaffSearchChange={onStaffSearchChange} />,
+    );
+    const input = screen.getByPlaceholderText("Search staff");
+    await user.click(input);
+    // Escape clears the text first...
+    await user.keyboard("{Escape}");
+    expect(onStaffSearchChange).toHaveBeenLastCalledWith("");
+    rerender(
+      <Toolbar {...defaultProps} staffSearch="" onStaffSearchChange={onStaffSearchChange} />,
+    );
+    // ...then closes the field, handing focus back to its button.
+    await user.keyboard("{Escape}");
+    expect(screen.queryByPlaceholderText("Search staff")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search staff" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Search staff" }));
+    await user.click(screen.getByRole("button", { name: "Close search" }));
+    expect(screen.queryByPlaceholderText("Search staff")).not.toBeInTheDocument();
+  });
+
+  it("shows sort as an icon button with its name", () => {
+    render(<Toolbar {...defaultProps} />);
+    const sort = screen.getByRole("button", { name: "Sort staff" });
+    expect(sort).toHaveTextContent(/^$/);
   });
 });
 
@@ -496,26 +531,17 @@ describe("Toolbar — callbacks", () => {
 });
 
 describe("Toolbar — staff search", () => {
-  it("clear button appears when staffSearch is non-empty", () => {
-    render(<Toolbar {...defaultProps} staffSearch="Alice" />);
-    expect(screen.getByRole("button", { name: "Clear search" })).toBeInTheDocument();
-  });
-
-  it("clear button is absent when staffSearch is empty", () => {
-    render(<Toolbar {...defaultProps} staffSearch="" />);
-    expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
-  });
-
-  it("clicking clear button calls onStaffSearchChange with empty string", async () => {
+  it("Close search clears an active search", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} staffSearch="Alice" />);
-    await user.click(screen.getByRole("button", { name: "Clear search" }));
+    await user.click(screen.getByRole("button", { name: "Close search" }));
     expect(defaultProps.onStaffSearchChange).toHaveBeenCalledWith("");
   });
 
   it("typing in search input calls onStaffSearchChange with typed value", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "Search staff" }));
     const input = screen.getByPlaceholderText("Search staff");
     await user.type(input, "B");
     // The input is controlled (value=staffSearch stays ""), so each keystroke fires

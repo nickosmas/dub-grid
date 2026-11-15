@@ -16,6 +16,7 @@ import {
   Trash2,
   Upload,
   User,
+  X,
 } from "lucide-react";
 import {
   SEARCH_CLEAR_PADDING,
@@ -29,7 +30,7 @@ import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { Switch } from "@/components/ui/switch";
 import { addDays, formatDate } from "@/lib/utils";
 import { FocusArea } from "@/types";
-import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useMediaQuery, MOBILE, TABLET, COMPACT_TOOLBAR } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -124,9 +125,12 @@ function ClearSearchButton({ onClick }: { onClick: () => void }) {
 function SortMenuButton({
   sortBy,
   onSortByChange,
+  iconOnly = false,
 }: {
   sortBy: "seniority" | "name";
   onSortByChange: (sortBy: "seniority" | "name") => void;
+  /** The desktop toolbar shows the icon alone, so it fits one row. */
+  iconOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -139,19 +143,23 @@ function SortMenuButton({
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-haspopup="menu"
+          aria-label={iconOnly ? "Sort staff" : undefined}
+          data-toolbar-sort=""
           className={`dg-btn dg-btn-secondary${open ? " dg-btn-toggled" : ""}`}
           style={{
             height: "var(--dg-toolbar-h)",
-            padding: "0 12px",
+            padding: iconOnly ? 0 : "0 12px",
+            width: iconOnly ? "var(--dg-toolbar-h)" : undefined,
             display: "flex",
             alignItems: "center",
+            justifyContent: "center",
             gap: 6,
             borderRadius: "var(--dg-btn-radius)",
             flexShrink: 0,
           }}
         >
-          <ArrowUpDown size={13} />
-          Sort staff
+          <ArrowUpDown size={13} aria-hidden />
+          {iconOnly ? null : "Sort staff"}
         </Button>
       </Hint>
       {open && (
@@ -204,11 +212,14 @@ function PrintButton({
   onClick,
   disabled,
   fill = false,
+  compact = false,
 }: {
   onClick: () => void;
   disabled: boolean;
   /** Share a phone row equally with Shift requests. */
   fill?: boolean;
+  /** Icon only, on a narrower desktop window. */
+  compact?: boolean;
 }) {
   return (
     <Button
@@ -216,6 +227,7 @@ function PrintButton({
       disabled={disabled}
       onPointerEnter={warmPrintOptions}
       onFocus={warmPrintOptions}
+      aria-label={compact ? "Print" : undefined}
       className="dg-btn dg-btn-ghost"
       style={{
         border: "1px solid var(--dg-color-border)",
@@ -228,7 +240,7 @@ function PrintButton({
       }}
     >
       <Printer aria-hidden size={14} strokeWidth={2.25} />
-      Print
+      {compact ? null : "Print"}
     </Button>
   );
 }
@@ -268,11 +280,14 @@ function ShiftRequestsButton({
   count,
   onClick,
   fill = false,
+  compact = false,
 }: {
   count: number;
   onClick: () => void;
   /** Share a phone row equally with Tools. */
   fill?: boolean;
+  /** Icon and count only, on a narrower desktop window. */
+  compact?: boolean;
 }) {
   return (
     <Hint content={hint("Review pickup, swap and call-off requests")} side="bottom">
@@ -280,6 +295,7 @@ function ShiftRequestsButton({
         onClick={onClick}
         className="dg-btn dg-btn-ghost"
         data-shift-requests-button=""
+        aria-label={compact ? `Shift requests, ${count} waiting` : undefined}
         style={{
           border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-btn-radius)",
@@ -291,7 +307,7 @@ function ShiftRequestsButton({
         }}
       >
         <Repeat aria-hidden size={14} strokeWidth={2.25} />
-        Shift requests
+        {compact ? null : "Shift requests"}
         <NumericBadge count={count} size="sm" tone={count > 0 ? "danger" : "neutral"} showZero />
       </Button>
     </Hint>
@@ -557,6 +573,28 @@ export default function Toolbar({
 }: ToolbarProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
+  const isCompact = useMediaQuery(COMPACT_TOOLBAR);
+
+  // Desktop search opens over the area tabs; an active search keeps it open,
+  // so a filter is never hidden.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchShown = searchOpen || staffSearch !== "";
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef(false);
+  const closeSearch = useCallback(() => {
+    returnFocusRef.current = true;
+    setSearchOpen(false);
+    onStaffSearchChange("");
+  }, [onStaffSearchChange]);
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+  useEffect(() => {
+    if (searchShown || !returnFocusRef.current) return;
+    returnFocusRef.current = false;
+    searchButtonRef.current?.focus();
+  }, [searchShown]);
   const hasGridRows = hasVisibleGridRows ?? hasData;
   const hasScheduleEntries = hasGridRows && (hasVisibleScheduleEntries ?? hasGridRows);
   const hasBulkDeleteEntries = hasRemovableVisibleEntries ?? hasScheduleEntries;
@@ -594,9 +632,14 @@ export default function Toolbar({
     (canApplyRecurringSchedule && onApplyRecurring) ||
     (canImportPrevious && onImportPrevious),
   );
-  const renderPrintButton = (fill: boolean) =>
+  const renderPrintButton = (fill: boolean, compact = false) =>
     hasEditorTools || !onPrintOpen ? null : (
-      <PrintButton onClick={onPrintOpen} disabled={scheduleEntryActionsDisabled} fill={fill} />
+      <PrintButton
+        onClick={onPrintOpen}
+        disabled={scheduleEntryActionsDisabled}
+        fill={fill}
+        compact={compact}
+      />
     );
 
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -917,79 +960,142 @@ export default function Toolbar({
             ...(isTablet ? { order: 3, flexBasis: "100%", width: "100%" } : {}),
           }}
         >
-          {/* Focus area filter */}
-          {focusAreaOptions.length > 1 && (
+          {/* Search opens over the area tabs and sort, so the toolbar stays one row. */}
+          {searchShown ? (
             <div
-              data-tour="schedule-focus-filter"
-              style={{ flex: isTablet ? "1 1 240px" : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
+              data-toolbar-search=""
+              style={{
+                position: "relative",
+                minWidth: 0,
+                maxWidth: isTablet ? undefined : 420,
+                flex: isTablet ? "1 1 160px" : "0 1 420px",
+              }}
             >
-              <ScrollableTabs
-                className="dg-span-tabs dg-span-tabs--light"
-                style={{ flex: isTablet ? 1 : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
-              >
-                {focusAreaOptions.map((w) => {
-                  const isActive = activeFocusArea === w.id;
-                  return (
-                    <Fragment key={w.id ?? "all"}>
-                      <Button
-                        onClick={() => onFocusAreaChange(w.id)}
-                        className={`dg-span-tab${isActive ? " active" : ""}`}
-                      >
-                        {w.name}
-                      </Button>
-                    </Fragment>
-                  );
-                })}
-              </ScrollableTabs>
+              <Search
+                size={13}
+                strokeWidth={2.5}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  left: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--dg-color-text-faint)",
+                  pointerEvents: "none",
+                }}
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search staff"
+                value={staffSearch}
+                onChange={(e) => onStaffSearchChange(e.target.value)}
+                // Escape clears what was typed first, then closes the field.
+                onKeyDown={(event) => {
+                  if (event.key !== "Escape") return;
+                  if (event.currentTarget.value) {
+                    clearSearchOnEscape(() => onStaffSearchChange(""))(event);
+                    return;
+                  }
+                  event.preventDefault();
+                  closeSearch();
+                }}
+                // Open while it has focus, so clearing the text doesn't close it.
+                onFocus={() => setSearchOpen(true)}
+                onBlur={() => {
+                  if (!staffSearch) setSearchOpen(false);
+                }}
+                aria-label="Search staff"
+                className="dg-input"
+                style={{
+                  paddingLeft: 30,
+                  paddingRight: SEARCH_CLEAR_PADDING,
+                  width: "100%",
+                  borderRadius: "var(--dg-btn-radius)",
+                }}
+              />
+              <Hint content={hint("Close search")} side="bottom">
+                <Button
+                  type="button"
+                  aria-label="Close search"
+                  // Keeps the field's focus, so its blur doesn't close it first.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={closeSearch}
+                  className="dg-btn dg-btn-ghost"
+                  style={{
+                    position: "absolute",
+                    right: 4,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: 28,
+                    height: 28,
+                    padding: 0,
+                    justifyContent: "center",
+                    borderRadius: "var(--dg-btn-radius)",
+                  }}
+                >
+                  <X size={14} strokeWidth={2.25} aria-hidden />
+                </Button>
+              </Hint>
             </div>
+          ) : (
+            <>
+              {focusAreaOptions.length > 1 && (
+                <div
+                  data-tour="schedule-focus-filter"
+                  style={{
+                    flex: isTablet ? "1 1 240px" : "0 0 auto",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                  }}
+                >
+                  <ScrollableTabs
+                    // All and four areas, and no wider than long names allow; the
+                    // rest scroll, so the toolbar stays one row.
+                    maxVisibleItems={5}
+                    maxVisibleWidth={420}
+                    className="dg-span-tabs dg-span-tabs--light"
+                    style={{ flex: isTablet ? 1 : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
+                  >
+                    {focusAreaOptions.map((w) => {
+                      const isActive = activeFocusArea === w.id;
+                      return (
+                        <Fragment key={w.id ?? "all"}>
+                          <Button
+                            onClick={() => onFocusAreaChange(w.id)}
+                            className={`dg-span-tab${isActive ? " active" : ""}`}
+                          >
+                            {w.name}
+                          </Button>
+                        </Fragment>
+                      );
+                    })}
+                  </ScrollableTabs>
+                </div>
+              )}
+              <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} iconOnly />
+              <Hint content={hint("Search staff")} side="bottom">
+                <Button
+                  ref={searchButtonRef}
+                  type="button"
+                  aria-label="Search staff"
+                  data-toolbar-search-toggle=""
+                  onClick={() => setSearchOpen(true)}
+                  className="dg-btn dg-btn-secondary"
+                  style={{
+                    height: "var(--dg-toolbar-h)",
+                    width: "var(--dg-toolbar-h)",
+                    padding: 0,
+                    justifyContent: "center",
+                    borderRadius: "var(--dg-btn-radius)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Search size={14} strokeWidth={2.25} aria-hidden />
+                </Button>
+              </Hint>
+            </>
           )}
-
-          {/* Sort order */}
-          <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />
-
-          {/* Staff search */}
-          <div
-            style={{
-              position: "relative",
-              // No hard floor: the flex basis already asks for a comfortable
-              // width, and a floor made the field push itself out of the
-              // toolbar instead of compressing when the row ran out of room
-              // (a zoomed-in desktop is narrow in CSS pixels without being
-              // narrow enough to reach the tablet layout).
-              minWidth: 0,
-              maxWidth: isTablet ? undefined : 320,
-              flex: isTablet ? "1 1 160px" : "1 1 220px",
-            }}
-          >
-            <Search
-              size={13}
-              strokeWidth={2.5}
-              style={{
-                position: "absolute",
-                left: 10,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--dg-color-text-faint)",
-                pointerEvents: "none",
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search staff"
-              value={staffSearch}
-              onChange={(e) => onStaffSearchChange(e.target.value)}
-              onKeyDown={clearSearchOnEscape(() => onStaffSearchChange(""))}
-              aria-label="Search staff"
-              className="dg-input"
-              style={{
-                paddingLeft: 30,
-                paddingRight: staffSearch ? SEARCH_CLEAR_PADDING : 12,
-                width: "100%",
-                borderRadius: "var(--dg-btn-radius)",
-              }}
-            />
-            {staffSearch && <ClearSearchButton onClick={() => onStaffSearchChange("")} />}
-          </div>
         </div>
       )}
 
@@ -1018,6 +1124,7 @@ export default function Toolbar({
             >
               <Button
                 onClick={onCoverageToggle}
+                aria-label={isCompact ? "Schedule Builder" : undefined}
                 className="dg-btn dg-btn-ghost"
                 style={{
                   border: "1px solid var(--dg-color-border)",
@@ -1028,16 +1135,20 @@ export default function Toolbar({
                 }}
               >
                 <CalendarCheck aria-hidden size={14} strokeWidth={2.25} />
-                Schedule Builder
+                {isCompact ? null : "Schedule Builder"}
               </Button>
             </Hint>
           )}
 
           {onRequestsToggle && (
-            <ShiftRequestsButton count={requestsBadgeCount} onClick={onRequestsToggle} />
+            <ShiftRequestsButton
+              count={requestsBadgeCount}
+              onClick={onRequestsToggle}
+              compact={isCompact}
+            />
           )}
 
-          {renderPrintButton(false)}
+          {renderPrintButton(false, isCompact)}
 
           {/* More tools dropdown, for editors; everyone else has Print on the toolbar */}
           {hasEditorTools && (
@@ -1048,6 +1159,7 @@ export default function Toolbar({
                 aria-expanded={toolsOpen}
                 aria-haspopup="menu"
                 className={`dg-btn dg-btn-secondary${toolsOpen ? " dg-btn-toggled" : ""}`}
+                aria-label={isCompact ? "More tools" : undefined}
                 data-tour="toolbar-tools-btn"
                 style={{
                   borderRadius: "var(--dg-btn-radius)",
@@ -1057,7 +1169,7 @@ export default function Toolbar({
                 }}
               >
                 <ToolsIcon />
-                More tools
+                {isCompact ? null : "More tools"}
                 <ChevronDown
                   size={12}
                   strokeWidth={2.5}

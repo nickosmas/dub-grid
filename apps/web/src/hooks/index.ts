@@ -54,6 +54,7 @@ export {
   AUTO_ONE_WEEK,
   DESKTOP,
   HEADER_NARROW,
+  COMPACT_TOOLBAR,
 } from "./useMediaQuery";
 
 export { useShiftRequests } from "./useShiftRequests";

@@ -23,6 +23,9 @@ export const DESKTOP = "(min-width: 1025px)";
 // overflow — most visibly at 125%+ browser zoom on an otherwise ordinary
 // desktop width.
 export const HEADER_NARROW = "(max-width: 1200px)";
+// Below a standard laptop window the schedule toolbar's buttons drop their
+// labels, so the whole toolbar still fits one row.
+export const COMPACT_TOOLBAR = "(max-width: 1439px)";
 
 /**
  * Returns true when the given media query matches.
