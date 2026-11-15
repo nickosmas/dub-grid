@@ -15,7 +15,7 @@ import type {
   MobileScheduleIndicator,
   MobileScheduleRange,
 } from "@dubgrid/contracts";
-import { hasAcceptedCurrentTerms, withoutColleagueStatus } from "@dubgrid/domain";
+import { COLLEAGUE_STATUS_BLANKS, hasAcceptedCurrentTerms } from "@dubgrid/domain";
 import {
   canSeeDraftScheduleNotes,
   scheduleNotesForViewer,
@@ -169,7 +169,7 @@ export function withScheduleIndicators<TEntry extends { employeeId: string; date
  * each shift changed from. The web routes apply the same rule; the publish
  * time stays for everyone, since it says whether the schedule is current.
  */
-function withScheduleVisibility<
+export function withScheduleVisibility<
   TEntry extends {
     publishedByName: string | null;
     change: { kind: string; previousPresentation: unknown; shiftChange?: unknown } | null;
@@ -569,23 +569,45 @@ export async function loadMobilePeoplePayload(
         return mobilePerson;
       }
 
-      // Regular users get a directory payload, not an account or contact
-      // export. Keep the visible scheduling qualifications used by the list
-      // while removing hidden fields and auth-account links.
-      return {
-        ...withoutColleagueStatus(mobilePerson),
-        adminPermissions: null,
-        adminPermissionCount: null,
-        contactNotes: "",
-        deptAdminIds: [],
-        email: "",
-        managementDeptAdminIds: [],
-        pendingInvitation: null,
-        phone: "",
-        statusNote: "",
-        userId: null,
-      };
+      return toColleagueMobilePerson(mobilePerson);
     }),
+  };
+}
+
+/**
+ * A colleague as a regular member sees them, in the People list and on their
+ * profile: the roster facts the web directory shows them, not an account,
+ * contact or status export. Every field is named, so a new one has to be
+ * decided here. Someone Away reads as Active, as `withoutColleagueStatus` says.
+ */
+export function toColleagueMobilePerson(person: MobilePerson): MobilePerson {
+  return {
+    id: person.id,
+    employeeNumber: person.employeeNumber,
+    firstName: person.firstName,
+    lastName: person.lastName,
+    employmentType: person.employmentType,
+    status: person.status === "inactive" ? "active" : person.status,
+    orgRole: person.orgRole,
+    certificationId: person.certificationId,
+    roleIds: person.roleIds,
+    seniority: person.seniority,
+    focusAreaIds: person.focusAreaIds,
+    departmentIds: person.departmentIds,
+    managementDepartmentIds: person.managementDepartmentIds,
+    version: person.version,
+    ...COLLEAGUE_STATUS_BLANKS,
+    phone: "",
+    email: "",
+    contactNotes: "",
+    statusNote: "",
+    deptAdminIds: [],
+    managementDeptAdminIds: [],
+    userId: null,
+    membershipUpdatedAt: null,
+    adminPermissions: null,
+    adminPermissionCount: null,
+    pendingInvitation: null,
   };
 }
 

@@ -9,6 +9,7 @@ import {
   type MobileScheduleEntry,
 } from "@dubgrid/contracts";
 import { withoutHiddenStaff } from "@dubgrid/data-access";
+import { withScheduleVisibility } from "@dubgrid/mobile-api-core";
 import { timesOverlap, type TimeRange } from "@dubgrid/schedule-core";
 import {
   fetchLinkedEmployeeForUser,
@@ -229,7 +230,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(
     mobileShiftSwapOptionsResponseSchema.parse({
       range,
-      entries: options,
+      // Partners' shifts follow the organization's settings on who published
+      // and what changed, as the schedule does (item 46f).
+      entries: withScheduleVisibility(options, auth.permissions, auth.currentOrg),
     }),
   );
 }
