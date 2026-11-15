@@ -8,7 +8,6 @@ import {
   NOTE_LANE_HEIGHT,
   NOTE_LANE_INSET,
 } from "./badges";
-import { ScheduleNoteIcon } from "./noteIcon";
 import { getPublishDiffTone } from "./publishDiffPill";
 
 /**
@@ -55,12 +54,13 @@ function noteDotStyle(
   color: string,
   rim: string,
   isDark: boolean,
+  size: number,
 ): CSSProperties {
   const ring = (width: number, ringColor: string) => `inset 0 0 0 ${width}px ${ringColor}`;
   const base: CSSProperties = {
     display: "block",
-    width: NOTE_DOT_SIZE,
-    height: NOTE_DOT_SIZE,
+    width: size,
+    height: size,
     borderRadius: "50%",
     flexShrink: 0,
   };
@@ -81,6 +81,45 @@ function noteDotStyle(
   return { ...base, background: color, boxShadow: ring(1, rim) };
 }
 
+/**
+ * The room an `overlay` row of dots needs at the end of a pill, so its label
+ * can stop short of them: the dots, their gaps, a "+N" when there is one, and
+ * the corner inset on both sides.
+ */
+export function overlayNoteDotsWidth(count: number, dotSize: number): number {
+  if (count === 0) return 0;
+  const { shown, hidden } = splitNoteMarks(
+    Array.from({ length: count }, () => ({ indicatorTypeId: 0, state: "published" as const })),
+  );
+  const gap = dotSize < NOTE_DOT_SIZE ? 2 : NOTE_DOT_GAP;
+  const dots = shown.length * dotSize + (shown.length - 1) * gap;
+  const more = hidden > 0 ? gap + Math.ceil(dotSize * 0.65 * (1 + String(hidden).length)) : 0;
+  return dots + more + 2 * NOTE_LANE_INSET;
+}
+
+/** A schedule note's dot on its own, for a list that names each note beside it. */
+export function NoteDot({
+  color,
+  state = "published",
+  rimColor = "var(--dg-color-text)",
+  isDark = false,
+  size = NOTE_DOT_SIZE,
+}: {
+  color: string | undefined;
+  state?: ScheduleNoteMarkState;
+  rimColor?: string;
+  isDark?: boolean;
+  size?: number;
+}) {
+  return (
+    <span
+      data-note-mark={state}
+      aria-hidden="true"
+      style={noteDotStyle(state, color ?? "var(--dg-color-text-muted)", rimColor, isDark, size)}
+    />
+  );
+}
+
 const STATE_SUFFIX: Record<ScheduleNoteMarkState, string> = {
   published: "",
   draft_added: " · Added, not published",
@@ -88,9 +127,8 @@ const STATE_SUFFIX: Record<ScheduleNoteMarkState, string> = {
 };
 
 /**
- * The note marks for one shift: a coloured dot per note on a grid pill, up to
- * two and then a count, or a text-coloured icon per note inline where there is
- * room.
+ * The note marks for one shift: a coloured dot per note in the pill's
+ * bottom-right corner, up to two and then a count.
  *
  * One component for every place they appear. The four branches of the grid
  * cell each carried their own copy, which is how two of them ended up with
@@ -103,17 +141,18 @@ export function NoteDots({
   rimColor = "var(--dg-color-text)",
   isDark = false,
   corner = false,
+  dotSize = NOTE_DOT_SIZE,
   style,
 }: {
   marks: ScheduleNoteMark[];
   indicatorTypes: IndicatorType[];
   /**
-   * Where a pill's dots go: `lane` is a row of their own along the bottom of a
-   * flex-column pill, in flow so the words leave room for it, the dots
-   * right-aligned in it; `inline` lists an icon per note beside a name,
-   * outside the grid.
+   * `lane` is a row of its own along the bottom of a flex-column pill, in flow
+   * so the words leave room for it, the dots right-aligned in it; `overlay`
+   * takes no room and sits in the bottom-right corner of the positioned pill
+   * it is drawn in, for a pill too small for a lane (Month, phone width).
    */
-  placement?: "lane" | "inline";
+  placement?: "lane" | "overlay";
   /** The pill's text colour, which rims a published dot and colours the count. */
   rimColor?: string;
   isDark?: boolean;
@@ -123,6 +162,7 @@ export function NoteDots({
    * the mentored M sits in its top-right. The pill must be positioned.
    */
   corner?: boolean;
+  dotSize?: number;
   style?: CSSProperties;
 }) {
   if (marks.length === 0) return null;
@@ -132,87 +172,72 @@ export function NoteDots({
   const labelOf = (mark: ScheduleNoteMark) =>
     `${typeOf(mark)?.name ?? "Note"}${STATE_SUFFIX[mark.state]}`;
 
-  if (placement !== "inline") {
-    const label = marks.map(labelOf).join(", ");
-    const { shown, hidden } = splitNoteMarks(marks);
-    return (
-      <div
-        data-note-dots={placement}
+  const label = marks.map(labelOf).join(", ");
+  const { shown, hidden } = splitNoteMarks(marks);
+  const overlay = placement === "overlay";
+  const dots = (
+    <MaybeHint content={label} side="top">
+      <span
+        role="img"
+        data-note-dots={overlay ? "overlay" : undefined}
+        aria-label={marks.length > 1 ? `${marks.length} notes: ${label}` : label}
         style={{
           display: "flex",
           alignItems: "center",
-          flexShrink: 0,
-          alignSelf: "stretch",
-          height: NOTE_LANE_HEIGHT,
-          justifyContent: "flex-end",
-          ...style,
+          gap: dotSize < NOTE_DOT_SIZE ? 2 : NOTE_DOT_GAP,
+          ...(corner || overlay
+            ? { position: "absolute", right: NOTE_LANE_INSET, bottom: NOTE_LANE_INSET }
+            : null),
+          ...(overlay ? style : null),
         }}
       >
-        <MaybeHint content={label} side="top">
+        {shown.map((mark) => (
+          <NoteDot
+            key={`${mark.indicatorTypeId}_${mark.state}`}
+            color={typeOf(mark)?.color}
+            state={mark.state}
+            rimColor={rimColor}
+            isDark={isDark}
+            size={dotSize}
+          />
+        ))}
+        {hidden > 0 && (
           <span
-            role="img"
-            aria-label={marks.length > 1 ? `${marks.length} notes: ${label}` : label}
+            data-note-more={hidden}
+            aria-hidden="true"
+            className="dg-tabular-nums"
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: NOTE_DOT_GAP,
-              ...(corner
-                ? { position: "absolute", right: NOTE_LANE_INSET, bottom: NOTE_LANE_INSET }
-                : null),
+              color: rimColor,
+              // Sized to the dot row it ends, like the mentored M's label;
+              // the smallest type token (12px) would outgrow a double shift's pill.
+              fontSize: dotSize,
+              fontWeight: 700,
+              lineHeight: `${dotSize}px`,
             }}
           >
-            {shown.map((mark) => (
-              <span
-                key={`${mark.indicatorTypeId}_${mark.state}`}
-                data-note-mark={mark.state}
-                aria-hidden="true"
-                style={noteDotStyle(
-                  mark.state,
-                  typeOf(mark)?.color ?? "var(--dg-color-text-muted)",
-                  rimColor,
-                  isDark,
-                )}
-              />
-            ))}
-            {hidden > 0 && (
-              <span
-                data-note-more={hidden}
-                aria-hidden="true"
-                className="dg-tabular-nums"
-                style={{
-                  color: rimColor,
-                  // Sized to the 9px dot row it ends, like the mentored M's label;
-                  // the smallest type token (12px) would outgrow a double shift's pill.
-                  fontSize: 9,
-                  fontWeight: 700,
-                  lineHeight: `${NOTE_DOT_SIZE}px`,
-                }}
-              >
-                +{hidden}
-              </span>
-            )}
+            +{hidden}
           </span>
-        </MaybeHint>
-      </div>
-    );
-  }
+        )}
+      </span>
+    </MaybeHint>
+  );
+
+  if (overlay) return dots;
 
   return (
-    <div data-note-dots="inline" style={{ flexShrink: 0, display: "flex", gap: 2, ...style }}>
-      {marks.map((mark) => {
-        const label = labelOf(mark);
-        return (
-          <MaybeHint key={`${mark.indicatorTypeId}_${mark.state}`} content={label} side="top">
-            <span
-              aria-label={label}
-              role="img"
-              style={{ display: "inline-flex", color: "var(--dg-color-text-muted)" }}
-            >
-              <ScheduleNoteIcon state={mark.state} />
-            </span>
-          </MaybeHint>
-        );
-      })}
+    <div
+      data-note-dots={placement}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        flexShrink: 0,
+        alignSelf: "stretch",
+        height: NOTE_LANE_HEIGHT,
+        justifyContent: "flex-end",
+        ...style,
+      }}
+    >
+      {dots}
     </div>
   );
 }

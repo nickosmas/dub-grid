@@ -164,8 +164,12 @@ describe("MonthView indicators", () => {
       // Blair's general code lists them under North only; South's note joins
       // that row, and a note filed under both areas shows once.
       const row = within(popover).getByText("Blair T.").parentElement!;
-      expect(within(row).getByLabelText("Training")).toBeInTheDocument();
-      expect(within(popover).getAllByLabelText("Float")).toHaveLength(1);
+      const dots = within(row).getByLabelText("2 notes: Float, Training");
+      // In the shift chip's bottom-right corner, a note filed under both areas once.
+      expect(dots.dataset.noteDots).toBe("overlay");
+      expect(dots.style.position).toBe("absolute");
+      expect(dots.querySelectorAll("[data-note-mark]")).toHaveLength(2);
+      expect(within(popover).getAllByLabelText(/Float/)).toHaveLength(1);
       expect(lookup).toHaveBeenCalledWith("emp-2", day, 2);
     } finally {
       focusAreas.pop();

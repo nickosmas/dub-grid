@@ -1,18 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useTheme } from "next-themes";
-import {
-  CalendarDays,
-  Check,
-  Clock3,
-  Layers,
-  MapPin,
-  StickyNote,
-  UserRound,
-  Users,
-} from "lucide-react";
+import { CalendarDays, Check, Clock3, Layers, MapPin, UserRound, Users } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
-import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import { NoteDot, type ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
 import { scheduleNoteMarksBySegment, scheduleNoteMarksLabel } from "./dashboardScheduleNotes";
 import { noteShiftOf } from "@/app/(app)/schedule/_lib/editor-session";
 import { PublishDiffPill } from "@/components/schedule-grid/publishDiffPill";
@@ -3354,7 +3345,7 @@ function WeekShiftRow({
   );
 }
 
-/** Notes spelled out beside one sticky-note icon; wraps rather than truncates. */
+/** Notes spelled out, each name after its dot; wraps rather than truncates. */
 function ScheduleNotesLine({
   indicatorTypes,
   inverse = false,
@@ -3371,25 +3362,39 @@ function ScheduleNotesLine({
     <div
       data-testid={testId}
       style={{
-        alignItems: "flex-start",
         color: inverse ? "rgba(255,255,255,0.82)" : "var(--dg-color-text-muted)",
         display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        columnGap: inverse ? 14 : 10,
+        rowGap: 4,
         fontSize: inverse ? 15 : 12,
         fontWeight: inverse ? 600 : undefined,
-        gap: inverse ? 8 : 5,
         marginTop: inverse ? 0 : 4,
         minWidth: 0,
       }}
     >
-      <StickyNote
-        aria-hidden="true"
-        size={inverse ? 18 : 14}
-        style={{ flexShrink: 0, marginTop: inverse ? 1 : 0 }}
-      />
-      <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-        <span className="sr-only">Schedule notes: </span>
-        {scheduleNoteMarksLabel(marks, indicatorTypes)}
-      </span>
+      <span className="sr-only">Schedule notes: </span>
+      {marks.map((mark, index) => {
+        const type = indicatorTypes.find((t) => t.id === mark.indicatorTypeId);
+        return (
+          <span
+            key={`${mark.indicatorTypeId}_${mark.state}`}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}
+          >
+            {index > 0 ? <span className="sr-only">, </span> : null}
+            <NoteDot
+              color={type?.color}
+              state={mark.state}
+              rimColor={inverse ? "rgba(255,255,255,0.9)" : "var(--dg-color-text)"}
+              size={inverse ? 10 : 8}
+            />
+            <span style={{ overflowWrap: "anywhere" }}>
+              {scheduleNoteMarksLabel([mark], indicatorTypes)}
+            </span>
+          </span>
+        );
+      })}
     </div>
   );
 }

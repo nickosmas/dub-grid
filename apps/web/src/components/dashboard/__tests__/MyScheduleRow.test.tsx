@@ -1230,44 +1230,46 @@ describe("MyScheduleRow", () => {
       );
     }
 
-    it("ends the time row with one note's icon, named for screen readers", () => {
+    const noteDots = () =>
+      Array.from(document.querySelectorAll<HTMLElement>('[data-note-dots="overlay"]'));
+
+    it("sets one note's dot in the pill's bottom-right corner, named for screen readers", () => {
       renderRow({ notes: [note(1)] });
 
-      const mark = screen.getByTestId("my-schedule-notes");
-      expect(mark).toHaveAccessibleName("Schedule notes: Float");
-      expect(mark.querySelector("[data-note-icon]")).not.toBeNull();
-      // Beside the time, not in a row of its own.
-      expect(mark.parentElement).toHaveTextContent("9:00 AM - 5:00 PM");
+      const [mark] = noteDots();
+      expect(mark).toHaveAccessibleName("Float");
+      expect(mark.style.position).toBe("absolute");
+      expect(mark.style.right).toBe("4px");
+      expect(mark.style.bottom).toBe("4px");
+      expect(mark.closest("[data-my-schedule-pill]")).not.toBeNull();
+      expect(mark.querySelectorAll("[data-note-mark]")).toHaveLength(1);
+      expect(mark.querySelector("svg")).toBeNull();
     });
 
-    it("uses one stacked icon for several notes, naming each", () => {
+    it("draws a dot per note, naming each", () => {
       renderRow({ notes: [note(1), note(2)] });
 
-      const mark = screen.getByTestId("my-schedule-notes");
-      expect(mark).toHaveAccessibleName("Schedule notes: Float, Training");
-      expect(mark.querySelector("[data-note-icon]")).toBeNull();
-      expect(mark.querySelectorAll("svg")).toHaveLength(1);
+      const [mark] = noteDots();
+      expect(mark).toHaveAccessibleName("2 notes: Float, Training");
+      expect(mark.querySelectorAll("[data-note-mark]")).toHaveLength(2);
     });
 
-    it("shows no icon without notes", () => {
+    it("shows no dots without notes", () => {
       renderRow({ notes: [note(1, { date: "2026-05-12" })] });
 
-      expect(screen.queryByTestId("my-schedule-notes")).toBeNull();
+      expect(noteDots()).toHaveLength(0);
     });
 
     it("words an editor's drafts and hides a viewer's", () => {
       const notes = [note(1, { status: "draft" }), note(2)];
 
       const { unmount } = renderRow({ notes, isScheduleEditor: true });
-      expect(screen.getByTestId("my-schedule-notes")).toHaveAccessibleName(
-        "Schedule notes: Float (added, not published), Training",
-      );
+      expect(noteDots()[0]).toHaveAccessibleName("2 notes: Float · Added, not published, Training");
+      expect(noteDots()[0].querySelector("[data-note-mark=draft_added]")).not.toBeNull();
       unmount();
 
       renderRow({ notes });
-      expect(screen.getByTestId("my-schedule-notes")).toHaveAccessibleName(
-        "Schedule notes: Training",
-      );
+      expect(noteDots()[0]).toHaveAccessibleName("Training");
     });
 
     it("gives each half of a double shift its own notes", () => {
@@ -1288,10 +1290,9 @@ describe("MyScheduleRow", () => {
 
       renderRow({ shifts, notes: [note(1, { shiftId: 11, jobId: 8 }), note(2)] });
 
-      const marks = screen.getAllByTestId("my-schedule-notes");
-      expect(marks.map((mark) => mark.getAttribute("aria-label"))).toEqual([
-        "Schedule notes: Training",
-        "Schedule notes: Float",
+      expect(noteDots().map((mark) => mark.getAttribute("aria-label"))).toEqual([
+        "Training",
+        "Float",
       ]);
     });
 
@@ -1311,7 +1312,7 @@ describe("MyScheduleRow", () => {
       renderRow({ shifts, notes: [note(1)] });
 
       expect(screen.getByText("Vacation")).toBeInTheDocument();
-      expect(screen.queryByTestId("my-schedule-notes")).toBeNull();
+      expect(noteDots()).toHaveLength(0);
     });
   });
 });
