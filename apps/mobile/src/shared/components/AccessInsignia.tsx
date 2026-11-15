@@ -8,7 +8,7 @@ import {
 } from "@dubgrid/design-tokens";
 import { ORG_ROLE_LABELS, getHighlightedOrgRole, getOrgRoleInsignia } from "@dubgrid/domain";
 
-import { useMobileColors } from "../providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 
 type InsigniaSize = "sm" | "lg";
 
@@ -30,6 +30,11 @@ const BEVEL_GRADIENT_ID = "access-insignia-bevel";
 // a thin crescent at the very top, so at web's 30% the ring read too bright.
 const BEVEL_LIGHT_OPACITY = 0.15;
 
+// On a dark surface the shaded lower rim blends into the background, so the
+// disc loses its bottom edge and reads as an oval. Dark mode keeps only the
+// top highlight.
+const DARK_BEVEL_SHADE = "rgba(0, 0, 0, 0)";
+
 /**
  * The star marking an elevated member, sitting just after their name: gold for
  * a Super Admin, blue for an Admin. Plain users get nothing, so the mark keeps
@@ -45,6 +50,7 @@ export function AccessInsignia({
   size?: InsigniaSize;
 }) {
   const mobileColors = useMobileColors();
+  const isDarkMode = useIsDarkMode();
   const insignia = getOrgRoleInsignia(orgRole);
   const highlightedRole = getHighlightedOrgRole(orgRole);
   if (!insignia || !highlightedRole) {
@@ -68,7 +74,10 @@ export function AccessInsignia({
             <Stop offset="0" stopColor="#ffffff" stopOpacity={BEVEL_LIGHT_OPACITY} />
             <Stop offset="0.5" stopColor="#ffffff" stopOpacity={0} />
             <Stop offset="0.5" stopColor="#000000" stopOpacity={0} />
-            <Stop offset="1" stopColor={ACCESS_INSIGNIA_BEVEL.shade} />
+            <Stop
+              offset="1"
+              stopColor={isDarkMode ? DARK_BEVEL_SHADE : ACCESS_INSIGNIA_BEVEL.shade}
+            />
           </LinearGradient>
         </Defs>
         <Circle
