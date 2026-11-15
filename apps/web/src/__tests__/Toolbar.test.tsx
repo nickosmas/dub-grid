@@ -83,10 +83,18 @@ describe("Toolbar — Shift requests button", () => {
     expect(badge).toHaveAttribute("data-tone", "neutral");
   });
 
-  it("leaves Tools without a count", () => {
+  it("names the menu More tools and marks it with a chevron, not an icon", () => {
+    render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} />);
+    const button = screen.getByRole("button", { name: "More tools" });
+    expect(button).toHaveTextContent(/^More tools$/);
+    expect(button.querySelector("svg.lucide-chevron-down")).not.toBeNull();
+    expect(button.querySelectorAll("svg")).toHaveLength(1);
+  });
+
+  it("leaves More tools without a count", () => {
     render(<Toolbar {...defaultProps} onRequestsToggle={vi.fn()} requestsBadgeCount={4} />);
     expect(
-      screen.getByRole("button", { name: /Tools/ }).querySelector("[data-numeric-badge]"),
+      screen.getByRole("button", { name: "More tools" }).querySelector("[data-numeric-badge]"),
     ).toBeNull();
   });
 });
@@ -162,7 +170,7 @@ describe("Toolbar — Tools dropdown", () => {
     const onAuditToggle = vi.fn();
     render(<Toolbar {...defaultProps} showAudit onAuditToggle={onAuditToggle} />);
 
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     const authorsItem = screen.getByRole("menuitem", { name: /Authors/i });
     const switchVisual = authorsItem.querySelector('[data-slot="switch"]');
 
@@ -177,7 +185,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("renders Print inside Tools dropdown", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} onPrintOpen={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     expect(screen.getByRole("menuitem", { name: /Print/i })).toBeInTheDocument();
   });
 
@@ -185,7 +193,7 @@ describe("Toolbar — Tools dropdown", () => {
     const user = userEvent.setup();
     const onPrintOpen = vi.fn();
     render(<Toolbar {...defaultProps} onPrintOpen={onPrintOpen} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     await user.click(screen.getByRole("menuitem", { name: /Print/i }));
     expect(onPrintOpen).toHaveBeenCalledOnce();
   });
@@ -193,7 +201,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("uses an upload arrow for Export CSV", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} onExportCSV={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     const exportItem = screen.getByRole("menuitem", { name: /Export CSV/i });
 
     expect(exportItem.querySelector(".lucide-upload")).toBeInTheDocument();
@@ -202,7 +210,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("uses an import arrow for Import Previous Schedule", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} canImportPrevious onImportPrevious={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     const importItem = screen.getByRole("menuitem", {
       name: /Import Previous Schedule/i,
     });
@@ -229,7 +237,7 @@ describe("Toolbar — Tools dropdown", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
 
     expect(screen.queryByRole("menuitem", { name: /Requests/i })).toBeNull();
     expect(screen.getByRole("menuitem", { name: /Print/i })).toHaveAttribute(
@@ -278,7 +286,7 @@ describe("Toolbar — Tools dropdown", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
 
     expect(screen.queryByRole("menuitem", { name: /Requests/i })).toBeNull();
     expect(screen.getByRole("menuitem", { name: /Authors/i })).toHaveAttribute(
@@ -323,7 +331,7 @@ describe("Toolbar — Tools dropdown", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
 
     expect(screen.getByRole("menuitem", { name: /Exit Bulk Delete/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /Exit Bulk Delete/i })).not.toBeDisabled();
@@ -339,7 +347,7 @@ describe("Toolbar — Tools dropdown", () => {
         onImportPrevious={vi.fn()}
       />,
     );
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).toBeInTheDocument();
     expect(
       screen.queryByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
@@ -349,7 +357,7 @@ describe("Toolbar — Tools dropdown", () => {
   it("shows Fill from Recurring Schedules only when recurring apply permission is granted", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} canApplyRecurringSchedule onApplyRecurring={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Tools/i }));
+    await user.click(screen.getByRole("button", { name: "More tools" }));
     expect(
       screen.getByRole("menuitem", { name: /Fill from Recurring Schedules/i }),
     ).toBeInTheDocument();
