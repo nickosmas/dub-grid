@@ -275,28 +275,6 @@ export function computeOutOfWindowDraftGroups(
     }));
 }
 
-/**
- * Whose Away a period's drafts come from, beside its count: "Laura Marshall
- * Away", "includes Laura Marshall and Diane Patterson Away" when other drafts
- * share the period, "3 people Away" for more. Null when none are.
- */
-export function describeStatusDrafts(
-  group: Pick<OutOfWindowDraftGroup, "count" | "statusCount" | "statusEmpIds">,
-  nameOf: (empId: string) => string | null,
-): string | null {
-  const names = group.statusEmpIds
-    .map((empId) => nameOf(empId))
-    .filter((name): name is string => !!name);
-  if (group.statusCount === 0 || names.length === 0) return null;
-  const who =
-    names.length === 1
-      ? names[0]
-      : names.length === 2
-        ? `${names[0]} and ${names[1]}`
-        : `${names.length} people`;
-  return `${group.statusCount < group.count ? "includes " : ""}${who} Away`;
-}
-
 export function draftBreakdownsEqual(left: DraftBreakdown, right: DraftBreakdown): boolean {
   return (
     left.newShifts === right.newShifts &&
