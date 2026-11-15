@@ -1518,7 +1518,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:9a9c4ab0c4e725b5f979179e594bdc112ffe995ac5c8bcf8a09282dc8dc124d0"
+      "evidenceFingerprint": "sha256:48fd55d227fa4ace1e36b341508c08f542a8fbbbdf6d3eb785ea07ca37c0db12"
     },
     {
       "id": "security-sessions",

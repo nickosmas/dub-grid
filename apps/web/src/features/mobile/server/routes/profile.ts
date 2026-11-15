@@ -116,6 +116,7 @@ async function buildMobileProfilePayload(auth: Awaited<ReturnType<typeof require
           contactNotes: auth.permissions.canManageEmployees ? linkedEmployee.contactNotes : "",
           version: linkedEmployee.version,
           employeeNumber: linkedEmployee.employeeNumber,
+          awayUntil: linkedEmployee.awayUntil ?? null,
         }
       : null,
     focusAreas,
