@@ -130,7 +130,7 @@ export function BannerDismissButton({
     <Button
       type="button"
       aria-label="Dismiss"
-      className={`dg-btn dg-btn-ghost dg-btn-icon dg-btn-sm ${className ?? ""}`}
+      className={`dg-btn dg-btn-ghost dg-btn-icon dg-btn-sm dg-banner-dismiss ${className ?? ""}`}
       {...props}
     >
       <X aria-hidden="true" />

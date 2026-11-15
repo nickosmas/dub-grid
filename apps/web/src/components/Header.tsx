@@ -549,7 +549,9 @@ export default function Header({ orgName }: HeaderProps) {
                   className={`dg-nav-tab${active ? " active" : ""}`}
                   style={{ paddingInline: isTablet ? 8 : 14 }}
                 >
-                  <Icon size={16} />
+                  {/* Tablet widths keep the words and drop the icons, so the
+                      bar fits without pushing the account button off the edge. */}
+                  {isTablet ? null : <Icon size={16} />}
                   {item.label}
                 </Link>
               );
