@@ -3504,6 +3504,26 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+/* A period button never grows past the banner: its label truncates instead. */
+.dg-draft-banner-actions > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.dg-draft-banner-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg-draft-banner-title {
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* Draft breakdown chips */
 .dg-draft-chip {
@@ -4077,10 +4097,33 @@ html:has(.dg-own-scroll) .dg-header-gutter {
     padding: 10px 12px;
     margin: 8px 8px;
   }
+  /* A phone banner: title on top with its close in the corner, then the
+     buttons in equal halves, an odd last one across the row. */
+  .dg-draft-banner {
+    position: relative;
+  }
+  .dg-draft-banner:has(.dg-banner-dismiss) > .dg-draft-banner-title {
+    padding-right: 36px;
+  }
   .dg-draft-banner-actions {
     width: 100%;
     margin-left: 0;
-    margin-top: 8px;
+    margin-top: 2px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dg-draft-banner-actions > :not(.dg-banner-dismiss) {
+    width: 100%;
+  }
+  .dg-draft-banner-actions
+    > :nth-child(odd of :not(.dg-banner-dismiss)):nth-last-child(1 of :not(.dg-banner-dismiss)) {
+    grid-column: 1 / -1;
+  }
+  .dg-draft-banner-actions > .dg-banner-dismiss {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: auto;
   }
   /* Mobile nav drawer */
   .dg-mobile-drawer-overlay {

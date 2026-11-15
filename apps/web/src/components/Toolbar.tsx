@@ -126,11 +126,14 @@ function SortMenuButton({
   sortBy,
   onSortByChange,
   iconOnly = false,
+  fill = false,
 }: {
   sortBy: "seniority" | "name";
   onSortByChange: (sortBy: "seniority" | "name") => void;
   /** The desktop toolbar shows the icon alone, so it fits one row. */
   iconOnly?: boolean;
+  /** A row of its own on a phone, across the full width. */
+  fill?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -155,7 +158,7 @@ function SortMenuButton({
             justifyContent: "center",
             gap: 6,
             borderRadius: "var(--dg-btn-radius)",
-            flexShrink: 0,
+            flex: fill ? "1 1 100%" : "0 0 auto",
           }}
         >
           <ArrowUpDown size={13} aria-hidden />
@@ -732,7 +735,10 @@ export default function Toolbar({
             fontWeight="var(--dg-type-control-weight)"
             activeFontWeight="var(--dg-type-control-weight)"
             letterSpacing="normal"
-            style={{ flex: "0 1 auto" }}
+            // The span and Today share their row in equal halves; Sort staff
+            // takes the next row whole (two above, one across, as for any
+            // three peer actions).
+            style={{ flex: "1 1 0", minWidth: 0 }}
           />
           <Button
             onClick={onToday}
@@ -741,12 +747,13 @@ export default function Toolbar({
               height: "var(--dg-toolbar-h)",
               padding: "0 14px",
               borderRadius: "var(--dg-btn-radius)",
-              flexShrink: 0,
+              flex: "1 1 0",
+              minWidth: 0,
             }}
           >
             Today
           </Button>
-          {hasData && <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />}
+          {hasData && <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} fill />}
           {hasData && (
             // Its own row, so the two buttons below share theirs evenly.
             <div style={{ position: "relative", flex: "1 1 100%", minWidth: 0 }}>

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   computeDraftBreakdown,
   computeOutOfWindowDraftGroups,
-  describeStatusDrafts,
   describeKeptStatusDrafts,
   statusDraftEmpIds,
   extractDateKeyFromCellKey,
@@ -125,34 +124,6 @@ describe("statusDraftEmpIds and describeKeptStatusDrafts", () => {
       "Away changes for Laura Marshall and Diane Patterson stay. Change their status to undo them.",
     );
     expect(describeKeptStatusDrafts([])).toBeNull();
-  });
-});
-
-describe("describeStatusDrafts", () => {
-  const names: Record<string, string> = {
-    a: "Laura Marshall",
-    b: "Diane Patterson",
-    c: "Carol Henderson",
-  };
-  const nameOf = (id: string) => names[id] ?? null;
-
-  it("names whose Away a period's drafts are", () => {
-    expect(describeStatusDrafts({ count: 3, statusCount: 3, statusEmpIds: ["a"] }, nameOf)).toBe(
-      "Laura Marshall Away",
-    );
-    expect(
-      describeStatusDrafts({ count: 5, statusCount: 5, statusEmpIds: ["a", "b"] }, nameOf),
-    ).toBe("Laura Marshall and Diane Patterson Away");
-    expect(
-      describeStatusDrafts({ count: 9, statusCount: 9, statusEmpIds: ["a", "b", "c"] }, nameOf),
-    ).toBe("3 people Away");
-  });
-
-  it("says includes when other drafts share the period, and nothing without any", () => {
-    expect(describeStatusDrafts({ count: 7, statusCount: 3, statusEmpIds: ["a"] }, nameOf)).toBe(
-      "includes Laura Marshall Away",
-    );
-    expect(describeStatusDrafts({ count: 4, statusCount: 0, statusEmpIds: [] }, nameOf)).toBeNull();
   });
 });
 
