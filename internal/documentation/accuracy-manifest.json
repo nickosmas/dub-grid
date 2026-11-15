@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8764eae44900c2f0b63d620cc8593713710303916d6fd30b0470bcb623f5d8b6"
+      "evidenceFingerprint": "sha256:fa635416f08052e17c23bfe0b861f7056500dcc1964ec526bc2193d967e23747"
     },
     {
       "id": "introduction",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8d8d94def5f09f2cfbf56a5d8af07650917c95b125ca99e4bdfd7bbf76d8d4bf"
+      "evidenceFingerprint": "sha256:804712cf0e82bf9eb39abea29c4f0b97aaaa60c5edbf87bc18c3a0f83f6862ff"
     },
     {
       "id": "quickstart",
@@ -238,7 +238,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8ab6655e14cb78e25c1b62bf219975ac7c051322e6ba663aa760760caa0ecd92"
+      "evidenceFingerprint": "sha256:ccf5c48c2823f207eae27bc5c5e9f17d6cc51d9385f6171246a7c22d2cc6b415"
     },
     {
       "id": "onboarding",
@@ -386,7 +386,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4091ccf3560d256e99e5b034f3d1d12d2ea13cd6de65dfe2bfc3b3f8f6edb9d2"
+      "evidenceFingerprint": "sha256:35be6d24f942e80e8ee9db38aa2410cc381a7d24327efe8f1c8b32e9cb46afcc"
     },
     {
       "id": "draft-publish",
@@ -499,7 +499,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:753f0fabe15244f2370e2ae7684766a9950dccfb4cc6ed76c08a43d1e336eb28"
+      "evidenceFingerprint": "sha256:a9ed00276c7cb31d878287863129da5c09dbc100d5185477b8a9d91bfba4fb57"
     },
     {
       "id": "realtime",
@@ -1018,7 +1018,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:14c1e78c2876385cb35e2a1a2c9502735e82370329abc27edb05751e94f974ca"
+      "evidenceFingerprint": "sha256:4aa6bd7e862679eb667ef59f5dc8d08344069d3aed5805cb37afef12e9629f0d"
     },
     {
       "id": "terminology",
@@ -1886,7 +1886,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:896f001d3734030a9c2de829f4efb1cdf3fe5e3a8e7c48c5c467fe1e28bcba86"
+      "evidenceFingerprint": "sha256:c3bc2560c12562ccf5bd0ba8bdc5ed210d5d4c4485a18c77fa3c89d6fd794b02"
     },
     {
       "id": "shifts-jobs-absences",
@@ -2160,7 +2160,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:7f22a3aa2995cb0c84674037418163cd2ae0fd014d7bd75e267c1e2d9beecd0a"
+      "evidenceFingerprint": "sha256:414d61e04201614cc403afc32cc5a99f02be9c600517eabc0d9c8a1108f20fee"
     }
   ],
   "surfaceExclusions": [

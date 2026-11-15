@@ -150,6 +150,31 @@ describe("Toolbar — schedule mode rendering", () => {
     expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
   });
 
+  it("collapses the buttons to its right to icons while the field is open", async () => {
+    const user = userEvent.setup();
+    render(
+      <Toolbar
+        {...defaultProps}
+        onCoverageToggle={vi.fn()}
+        onRequestsToggle={vi.fn()}
+        onPublishHistory={vi.fn()}
+      />,
+    );
+    const builder = screen.getByRole("button", { name: "Schedule Builder" });
+    expect(builder).toHaveTextContent("Schedule Builder");
+    await user.click(screen.getByRole("button", { name: "Search staff" }));
+    expect(screen.getByRole("button", { name: "Schedule Builder" })).toHaveTextContent(/^$/);
+    expect(screen.getByRole("button", { name: /Shift requests/ })).not.toHaveTextContent(
+      "Shift requests",
+    );
+    expect(screen.getByRole("button", { name: "More tools" })).toHaveTextContent(/^$/);
+
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Schedule Builder" })).toHaveTextContent(
+      "Schedule Builder",
+    );
+  });
+
   it("clears with Escape, then closes and hands focus back to its button", async () => {
     const user = userEvent.setup();
     const onStaffSearchChange = vi.fn();
