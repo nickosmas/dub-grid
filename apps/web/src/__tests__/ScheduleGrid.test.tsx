@@ -6497,3 +6497,34 @@ describe("ScheduleGrid", () => {
     });
   });
 });
+
+describe("buildScheduleGridModel with no days", () => {
+  it("builds, as Month view passes no days to it", () => {
+    const build = () =>
+      buildScheduleGridModel({
+        filteredEmployees: employees,
+        allEmployees: employees,
+        week1: [],
+        week2: [],
+        spanWeeks: 1,
+        todayKey: formatDateKey(week1[0]),
+        focusAreas,
+        departments,
+        assignments,
+        shiftCategories,
+        jobs: [],
+        indicatorTypes,
+        certifications: [],
+        orgRoles: [],
+        isCellInteractive: true,
+        shiftDisplayMode: "code",
+        accessors: {
+          shiftForKey: () => null,
+          assignmentIdsForKey: () => [],
+          getShiftStyle: getShiftStyleFromCodes(assignments),
+        },
+      });
+    expect(build).not.toThrow();
+    expect(build().columns).toEqual([]);
+  });
+});

@@ -296,7 +296,10 @@ export function buildScheduleGridModel({
   accessors,
 }: BuildScheduleGridModelInput): ScheduleGridModel {
   const allDates = spanWeeks === 2 ? [...week1, ...week2] : week1;
-  const period = { lastDateKey: formatDateKey(allDates[allDates.length - 1]), todayKey };
+  // Month view draws its own calendar and passes no days; today stands in for
+  // the period's end so the model still builds.
+  const lastDate = allDates.at(-1);
+  const period = { lastDateKey: lastDate ? formatDateKey(lastDate) : todayKey, todayKey };
   const onGrid = (employee: Employee) =>
     isOnScheduleGrid(employee, period, awayRanges?.get(employee.id)?.since);
   const filteredEmployees = filteredEmployeesInput.filter(onGrid);
