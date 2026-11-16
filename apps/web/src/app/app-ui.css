@@ -525,6 +525,11 @@
     box-shadow 150ms ease;
   flex: 1 0 auto;
 }
+/* Even segments across whatever width the control is given. */
+.dg-span-tabs--fill > .dg-span-tab {
+  flex: 1 1 0;
+  min-width: 0;
+}
 /* A tab's label truncates rather than pushing the control past its row. */
 .dg-span-tab-label {
   min-width: 0;

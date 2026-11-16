@@ -639,6 +639,25 @@ export default function Toolbar({
     observer?.observe(toolbar);
     return () => observer?.disconnect();
   });
+  // The tabs settle their width after mount, and the fonts load late, so a
+  // first stacked layout gets one more try at one row once things settle.
+  // Any retry is measured before paint, so a row that still doesn't fit never
+  // shows.
+  const settleRetriedRef = useRef(false);
+  useEffect(() => {
+    if (!wrapStacked || settleRetriedRef.current) return;
+    settleRetriedRef.current = true;
+    let cancelled = false;
+    const retry = () => {
+      if (!cancelled) setWrapStacked(false);
+    };
+    const timer = window.setTimeout(retry, 800);
+    void document.fonts?.ready.then(() => window.setTimeout(retry, 0));
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [wrapStacked]);
   useEffect(() => {
     if (searchOpen || !returnFocusRef.current) return;
     returnFocusRef.current = false;

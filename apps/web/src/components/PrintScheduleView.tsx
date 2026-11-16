@@ -51,6 +51,8 @@ import { legendGroupsByFocusArea } from "@/components/PrintLegend";
 import { printFontSizeLabel } from "@/components/print-font-sizes";
 import {
   PrintShiftPill,
+  PRINT_CODE_JOB,
+  PRINT_CODE_SEPARATOR,
   PRINT_PILL_RADIUS,
   type PrintNoteDot,
   type PrintShiftPillProps,
@@ -948,15 +950,10 @@ function KeySwatch({
         <span style={{ fontSize: "1.05em", fontWeight: 600 }}>{label}</span>
         {secondaryLabel ? (
           <>
-            <span
-              aria-hidden="true"
-              style={{ fontSize: "0.76em", fontWeight: 700, margin: "0 0.12em" }}
-            >
+            <span aria-hidden="true" style={PRINT_CODE_SEPARATOR("1.05em")}>
               ·
             </span>
-            <span style={{ fontSize: "0.76em", fontWeight: 700, opacity: 0.78 }}>
-              {secondaryLabel}
-            </span>
+            <span style={PRINT_CODE_JOB("1.05em")}>{secondaryLabel}</span>
           </>
         ) : null}
       </span>
