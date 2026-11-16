@@ -37,7 +37,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { PresetColorPicker, TimeInput12h, inputStyle, labelStyle } from "./shared";
-import { summarizeSelection } from "./job-placement-summary";
+import { summarizePlacement } from "./job-placement-summary";
 import {
   PREDEFINED_COLORS,
   TRANSPARENT_BORDER,
@@ -1356,15 +1356,19 @@ function JobRow({
   const placementSummary =
     section === "shiftless"
       ? "No shift"
-      : [
-          summarizeSelection(activeScheduledDepartments, form.departmentIds, "departments"),
-          summarizeSelection(
-            focusAreasInSelectedDepartments,
-            form.focusAreaIds,
-            pluralLabelNoun(focusAreaLabel),
-          ),
-          summarizeSelection(availableShifts, form.applicableShiftIds, "shifts"),
-        ].join(" · ");
+      : summarizePlacement([
+          {
+            choices: activeScheduledDepartments,
+            selectedIds: form.departmentIds,
+            plural: "departments",
+          },
+          {
+            choices: focusAreasInSelectedDepartments,
+            selectedIds: form.focusAreaIds,
+            plural: pluralLabelNoun(focusAreaLabel),
+          },
+          { choices: availableShifts, selectedIds: form.applicableShiftIds, plural: "shifts" },
+        ]);
 
   const eligibleRoleSummary =
     form.eligibleRoleIds.length === 0
