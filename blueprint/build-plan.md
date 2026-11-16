@@ -1309,3 +1309,15 @@
         its shift. The hover card and panel say who approved it and when,
         with "Was" where a shift the day had changed or was removed. The
         banner counts approved requests apart from publishes.
+- [x] 58. **Preferences in the shift picker** - when a scheduler opens a
+      person's cell, the shift editor shows that person's shift and job
+      preferences (Prefers or Only) in an info banner at the top, tags the
+      preferred or only shift group "Preferred" or "Only", and, once a shift
+      or job outside an Only preference is picked, warns in one banner under
+      the shift, without blocking ("Day Shift is outside Aisha's preference."
+      then "Shift preference: Only Evening Shift"). Absences and shiftless
+      work never warn. Anyone
+      who can edit shifts sees them. Only in the picker: not the grid, the
+      open-shift picker or the Staffing check. Web only. Owner decisions,
+      2026-11-15; design reference: the "Shift preferences in the picker"
+      canvas.

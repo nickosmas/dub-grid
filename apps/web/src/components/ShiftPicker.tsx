@@ -21,6 +21,12 @@ import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatShiftWindow, secondShiftClash, type WorkingShift } from "@/lib/shift-picker-groups";
+import {
+  PreferenceBanner,
+  PreferenceTag,
+  shiftGroupTag,
+  type ShiftEditorPreferences,
+} from "@/components/schedule/shift-preference-notes";
 
 interface ShiftPickerProps {
   assignments?: AssignmentDefinition[];
@@ -52,6 +58,8 @@ interface ShiftPickerProps {
   /** Lists shifts that clash with `workingShift` as unavailable instead of offering them. */
   blockClashes?: boolean;
   absenceScope?: "allDay" | "restOfDay";
+  /** The person's shift and job preferences, shown above the shifts. */
+  preferences?: ShiftEditorPreferences;
 }
 
 export default function ShiftPicker({
@@ -79,6 +87,7 @@ export default function ShiftPicker({
   workingShift = null,
   blockClashes = false,
   absenceScope = "allDay",
+  preferences,
 }: ShiftPickerProps) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
@@ -385,7 +394,7 @@ export default function ShiftPicker({
     gap: 8,
   };
 
-  function renderGroupHeading(label: string, detail: string | null) {
+  function renderGroupHeading(label: string, detail: string | null, tag: string | null = null) {
     return (
       <div
         style={{
@@ -406,6 +415,7 @@ export default function ShiftPicker({
         >
           {label}
         </span>
+        {tag ? <PreferenceTag label={tag} /> : null}
         {detail ? (
           <span
             className="dg-tabular-nums"
@@ -446,7 +456,11 @@ export default function ShiftPicker({
   ) {
     return groupByLabel(options).map(([groupLabel, groupOptions]) => (
       <div key={groupLabel} style={{ marginBottom: 20 }}>
-        {renderGroupHeading(groupLabel, describe(groupOptions))}
+        {renderGroupHeading(
+          groupLabel,
+          describe(groupOptions),
+          shiftGroupTag(preferences, groupOptions[0]?.shiftId ?? null),
+        )}
         <div role="group" aria-label={`${groupLabel} shift options`} style={tileGrid}>
           {[...groupOptions]
             .sort(compareOptionsWithinGroup)
@@ -474,6 +488,7 @@ export default function ShiftPicker({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <PreferenceBanner preferences={preferences} lookups={{ shiftCategories, focusAreas, jobs }} />
       {workingShift && (
         <Banner tone="info" className="dg-tabular-nums">
           <span>
