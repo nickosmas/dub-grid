@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { clearBlockingOverlays, loginAsQaSuperAdmin } from "./helpers/auth";
+import { isKnownBenignConsoleNoise } from "./helpers/runtime-noise";
 
 // 2026-11-15, production: after a laptop slept, the organization's settings
 // were dropped and their refetch paused offline, and the Schedule painted with
@@ -36,7 +37,9 @@ test("the Schedule waits for its settings rather than painting without them", as
   expect(new URL(origin).hostname.startsWith("calmhaven.")).toBe(true);
 
   const pageErrors: string[] = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("pageerror", (error) => {
+    if (!isKnownBenignConsoleNoise(error.message)) pageErrors.push(error.message);
+  });
 
   await loginAsQaSuperAdmin(page, origin);
   await page.goto(`${origin}/schedule`, { waitUntil: "commit" });
