@@ -3441,13 +3441,25 @@ function SchedulerContent({
   const panelCustomEndTime = panelShiftEntry?.customEndTime ?? null;
   const panelDraftKind = panelShiftEntry?.draftKind ?? null;
 
-  const isAbsenceForKey = useCallback(
-    (empId: string, date: Date): boolean => {
+  // Month view's whole-day absence as the schedule shows it, so a draft that
+  // turns a published absence into a shift reads as the shift.
+  const dayOffAbsenceTypeId =
+    resolveDayOffAbsenceType(org?.coverageRuleConfig, absenceTypes)?.absenceType.id ?? null;
+  const monthAbsenceForKey = useCallback(
+    (empId: string, date: Date) => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
-      if (!entry) return false;
-      return entry.absenceTypeId != null || entry.publishedAbsenceTypeId != null;
+      if (!entry || entry.isDelete) return null;
+      const absenceTypeId =
+        entry.absenceTypeId ??
+        (entry.assignmentIds.length === 0 ? (entry.publishedAbsenceTypeId ?? null) : null);
+      if (absenceTypeId == null) return null;
+      const absenceType = absenceTypes.find((type) => type.id === absenceTypeId);
+      return {
+        name: absenceType?.name ?? absenceTypeMap.get(absenceTypeId) ?? "Absence",
+        isDayOff: absenceTypeId === dayOffAbsenceTypeId,
+      };
     },
-    [shifts],
+    [shifts, absenceTypes, absenceTypeMap, dayOffAbsenceTypeId],
   );
 
   const absenceTypeIdForKey = useCallback(
@@ -4281,6 +4293,45 @@ function SchedulerContent({
       };
     });
   }, [editPanel, requestMarks, segmentsForKey, shiftRequests.requests, summarizeRequestMarks]);
+
+  // Month view: a request's first line and its fold color, per person and day.
+  const monthRequestForKey = useCallback(
+    (empId: string, date: Date) => {
+      const summary = activeRequestForKey(empId, date);
+      const first = summary?.requests[0];
+      return summary && first ? { waitingOn: summary.waitingOn, status: first.status } : null;
+    },
+    [activeRequestForKey],
+  );
+
+  // Month view's shortages, from the same coverage the Schedule Builder
+  // measures: the draft for editors, the published days for everyone else.
+  const monthCoverage = useMemo(() => {
+    if (spanWeeks !== "month" || !canViewCoveragePanel || coverageRequirements.length === 0) {
+      return null;
+    }
+    const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+    const monthDates = Array.from(
+      { length: daysInMonth },
+      (_, index) => new Date(monthStart.getFullYear(), monthStart.getMonth(), index + 1),
+    );
+    return computeCoverageCategorySnapshots({
+      ...coverageBase,
+      dates: canEditShifts ? monthDates : filterPublishedDates(monthDates, publishedDateSet),
+      assignmentIdsForKey: coverageAssignmentIdsForKey,
+      coverageCreditForKey,
+    });
+  }, [
+    spanWeeks,
+    canViewCoveragePanel,
+    coverageRequirements.length,
+    monthStart,
+    coverageBase,
+    canEditShifts,
+    publishedDateSet,
+    coverageAssignmentIdsForKey,
+    coverageCreditForKey,
+  ]);
 
   /** Whether the person's own shift that day already has a request they made. */
   const hasActiveRequestForShift = useCallback(
@@ -6860,6 +6911,14 @@ function SchedulerContent({
         );
       }
       setPreferredSpan(next);
+    },
+    [payPeriodStartDate],
+  );
+
+  const handleOpenWeek = useCallback(
+    (date: Date) => {
+      setWeekStart(getScheduleStartForSpan({ date, span: 1, payPeriodStartDate }));
+      setPreferredSpan(1);
     },
     [payPeriodStartDate],
   );
@@ -10007,10 +10066,10 @@ function SchedulerContent({
                 filteredEmployees={filteredEmployees}
                 shiftForKey={shiftForKey}
                 assignmentIdsForKey={assignmentIdsForKey}
-                isAbsenceForKey={isAbsenceForKey}
+                absenceForKey={monthAbsenceForKey}
                 getShiftStyle={getShiftStyle}
                 todayKey={todayKey}
-                focusAreas={focusAreas}
+                focusAreas={orderedFocusAreas}
                 assignments={assignments}
                 shiftCategories={shiftCategories}
                 activeFocusArea={activeFocusArea}
@@ -10020,6 +10079,11 @@ function SchedulerContent({
                 highlightScrollKey={normalizedStaffSearch || undefined}
                 noteMarksForKey={noteMarksForKey}
                 indicatorTypes={indicatorTypes}
+                openShifts={openShifts}
+                coverage={monthCoverage}
+                requestForKey={monthRequestForKey}
+                onOpenWeek={handleOpenWeek}
+                compact={isMobile}
               />
             )}
           </div>
