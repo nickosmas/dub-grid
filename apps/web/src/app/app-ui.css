@@ -4838,11 +4838,15 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   flex-shrink: 0;
   color: var(--dg-color-warning-dark);
 }
+/* The padding is room for a chip's ring, which sits outside the chip; the
+   negative margin keeps the rows where they were. */
 .dg-month-day__rows {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-height: 0;
+  margin: -2px;
+  padding: 2px;
   overflow: hidden;
 }
 .dg-month-row {
@@ -4866,7 +4870,7 @@ html:has(.dg-own-scroll) .dg-header-gutter {
 .dg-month-row__chips {
   display: flex;
   flex-shrink: 0;
-  gap: 3px;
+  gap: 4px;
   margin-left: auto;
 }
 .dg-month-chip {
