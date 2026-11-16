@@ -4801,12 +4801,15 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   font-weight: 700;
   color: var(--dg-color-text-secondary);
 }
+/* Contrast was measured for both themes: past numbers 7.8:1 or better, and
+   today's number is the today wash on the today blue (6.2:1 light, 8.8:1
+   dark) instead of white, which read 1.8:1 on dark mode's light blue. */
 .dg-month-day[data-past] .dg-month-day__num {
-  color: var(--dg-color-text-subtle);
+  color: var(--dg-color-text-muted);
 }
 .dg-month-day[data-today] .dg-month-day__num {
   background: var(--dg-color-today-text);
-  color: var(--dg-color-text-inverse);
+  color: var(--dg-color-today-bg);
 }
 .dg-month-day__marks {
   margin-left: auto;
@@ -4880,7 +4883,7 @@ html:has(.dg-own-scroll) .dg-header-gutter {
 .dg-month-day__off {
   margin-top: auto;
   font-size: var(--dg-fs-footnote);
-  color: var(--dg-color-text-subtle);
+  color: var(--dg-color-text-muted);
 }
 
 .dg-month-panel {
@@ -5004,7 +5007,7 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   text-align: right;
 }
 .dg-month-person__tag[data-tone="draft"] {
-  color: var(--dg-color-warning-dark);
+  color: var(--dg-color-warning-text);
 }
 .dg-month-person__tag[data-tone="manager"] {
   color: var(--dg-color-warning-text);
@@ -5068,7 +5071,7 @@ html:has(.dg-own-scroll) .dg-header-gutter {
 }
 .dg-month-dot[data-kind="open"] {
   border-radius: 2px;
-  background: var(--dg-color-warning);
+  background: var(--dg-color-warning-dark);
 }
 .dg-month-legend {
   display: flex;
@@ -5103,7 +5106,7 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   border-left: 12px solid transparent;
 }
 .dg-month-fold[data-waiting-on="manager"] {
-  border-top-color: var(--dg-color-warning);
+  border-top-color: var(--dg-color-warning-dark);
 }
 .dg-month[data-compact] .dg-month-fold {
   border-top-width: 9px;
