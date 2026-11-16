@@ -34,6 +34,13 @@ interface CustomSelectProps<T extends string | number> {
   activeFontWeight?: React.CSSProperties["fontWeight"];
   /** Letter spacing override */
   letterSpacing?: React.CSSProperties["letterSpacing"];
+  /**
+   * Centre the label and its chevron, for a select that shares a row of equal
+   * buttons with centred labels (the phone toolbar's span beside Today).
+   */
+  centerLabel?: boolean;
+  /** Extra classes on the trigger's wrapper, for layout a parent sets by width. */
+  className?: string;
 }
 
 export default function CustomSelect<T extends string | number>({
@@ -51,6 +58,8 @@ export default function CustomSelect<T extends string | number>({
   fontWeight = 500,
   activeFontWeight = 500,
   letterSpacing,
+  centerLabel = false,
+  className,
 }: CustomSelectProps<T>) {
   const [open, setOpenRaw] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -85,7 +94,7 @@ export default function CustomSelect<T extends string | number>({
     // to an ellipsis instead of pushing it past its neighbours.
     <div
       ref={ref}
-      className="dg-select"
+      className={className ? `dg-select ${className}` : "dg-select"}
       style={{
         display: "inline-block",
         verticalAlign: "middle",
@@ -119,8 +128,13 @@ export default function CustomSelect<T extends string | number>({
         style={{
           display: "inline-flex",
           alignItems: "center",
+          justifyContent: centerLabel ? "center" : undefined,
           gap: 8,
           width: "100%",
+          // Shrinks with its wrapper; the label truncates instead.
+          minWidth: 0,
+          maxWidth: "100%",
+          boxSizing: "border-box",
           height: height ?? "var(--dg-toolbar-h)",
           background: disabled ? "transparent" : "var(--dg-color-field)",
           border: "1px solid var(--dg-color-border)",
@@ -141,7 +155,14 @@ export default function CustomSelect<T extends string | number>({
           ...triggerStyle,
         }}
       >
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+        <span
+          style={{
+            flex: centerLabel ? "0 1 auto" : 1,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
           {displayLabel}
         </span>
         <ChevronDown

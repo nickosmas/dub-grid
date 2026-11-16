@@ -80,7 +80,7 @@ export function CardGridSkeleton({
     <div
       className={cn(
         "grid items-start gap-2.5",
-        singleColumn ? "grid-cols-1" : "grid-cols-[repeat(auto-fill,minmax(340px,1fr))]",
+        singleColumn ? "grid-cols-1" : "grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))]",
       )}
       aria-busy="true"
       aria-label={label}
@@ -341,7 +341,7 @@ export function PeopleDirectorySkeleton({
                   className="flex h-16 items-center gap-6 border-b border-[var(--dg-color-border-light)] px-6 last:border-b-0"
                 >
                   <Skeleton className="h-3.5 w-12 shrink-0" />
-                  <span className="flex w-56 shrink-0 items-center gap-2.5">
+                  <span className="flex w-56 min-w-0 shrink items-center gap-2.5">
                     <Skeleton className="h-8 w-8 shrink-0 dg-skeleton--round" />
                     <Skeleton className={cn("h-3.5", width)} />
                   </span>

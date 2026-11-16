@@ -1700,3 +1700,11 @@
 .landing-home-overtime small {
   font-weight: 400;
 }
+
+/* The narrowest phones: a 0.66 frame is 311px, wider than a 320px screen's
+   content, so the illustrations scale down a step further. */
+@media (max-width: 359px) {
+  .landing-phone-frame {
+    --landing-phone-scale: 0.6;
+  }
+}

@@ -239,13 +239,12 @@ function PrintButton({
       onPointerEnter={warmPrintOptions}
       onFocus={warmPrintOptions}
       aria-label={compact ? "Print" : undefined}
-      className="dg-btn dg-btn-ghost"
+      className="dg-btn dg-btn-secondary"
       style={{
-        border: "1px solid var(--dg-color-border)",
         borderRadius: "var(--dg-btn-radius)",
         height: "var(--dg-toolbar-h)",
         padding: "0 12px",
-        flex: fill ? "1 1 0" : "0 0 auto",
+        flex: fill ? "1 1 calc(50% - 4px)" : "0 0 auto",
         minWidth: 0,
         gap: 8,
       }}
@@ -304,15 +303,14 @@ function ShiftRequestsButton({
     <Hint content={hint("Review pickup, swap and call-off requests")} side="bottom">
       <Button
         onClick={onClick}
-        className="dg-btn dg-btn-ghost"
+        className="dg-btn dg-btn-secondary"
         data-shift-requests-button=""
         aria-label={compact ? `Shift requests, ${count} waiting` : undefined}
         style={{
-          border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-btn-radius)",
           height: "var(--dg-toolbar-h)",
           padding: "0 12px",
-          flex: fill ? "1 1 0" : "0 0 auto",
+          flex: fill ? "1 1 calc(50% - 4px)" : "0 0 auto",
           minWidth: 0,
           gap: 8,
         }}
@@ -783,7 +781,8 @@ export default function Toolbar({
             // The span and Today share their row in equal halves; Sort staff
             // takes the next row whole (two above, one across, as for any
             // three peer actions).
-            style={{ flex: "1 1 0", minWidth: 0 }}
+            style={{ flex: "1 1 calc(50% - 4px)", minWidth: 0 }}
+            centerLabel
           />
           <Button
             onClick={onToday}
@@ -792,7 +791,9 @@ export default function Toolbar({
               height: "var(--dg-toolbar-h)",
               padding: "0 14px",
               borderRadius: "var(--dg-btn-radius)",
-              flex: "1 1 0",
+              // An explicit half, not a zero basis: a zero basis still counts
+              // Today's padding, which left it wider than the span beside it.
+              flex: "1 1 calc(50% - 4px)",
               minWidth: 0,
             }}
           >
@@ -848,7 +849,7 @@ export default function Toolbar({
                 borderRadius: "var(--dg-btn-radius)",
                 height: "var(--dg-toolbar-h)",
                 padding: "0 12px",
-                flex: onRequestsToggle ? "1 1 0" : "0 0 auto",
+                flex: onRequestsToggle ? "1 1 calc(50% - 4px)" : "0 0 auto",
                 minWidth: 0,
                 position: "relative",
               }}
@@ -1234,9 +1235,9 @@ export default function Toolbar({
               <Button
                 onClick={onCoverageToggle}
                 aria-label={actionsCompact ? "Schedule Builder" : undefined}
-                className="dg-btn dg-btn-ghost"
+                // The same face as the toolbar buttons beside it.
+                className="dg-btn dg-btn-secondary"
                 style={{
-                  border: "1px solid var(--dg-color-border)",
                   borderRadius: "var(--dg-btn-radius)",
                   height: "var(--dg-toolbar-h)",
                   padding: "0 12px",
