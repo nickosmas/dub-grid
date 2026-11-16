@@ -12,6 +12,12 @@ interface ScrollableTabsProps {
   maxVisibleItems?: number;
   /** And never wider than this, in pixels, for long item names. */
   maxVisibleWidth?: number;
+  /**
+   * Never wider than every item, and shrink to the cap above, scrolling the
+   * rest, only when the row is short of room.
+   */
+  growToFit?: boolean;
+  "data-tour"?: string;
 }
 
 export default function ScrollableTabs({
@@ -20,11 +26,14 @@ export default function ScrollableTabs({
   style,
   maxVisibleItems,
   maxVisibleWidth,
+  growToFit = false,
+  "data-tour": dataTour,
 }: ScrollableTabsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [capWidth, setCapWidth] = useState<number | null>(null);
+  const [naturalWidth, setNaturalWidth] = useState<number | null>(null);
 
   const frameRef = useRef<number | null>(null);
 
@@ -46,6 +55,7 @@ export default function ScrollableTabs({
   // Measured before paint, so a long list never flashes at full width.
   const measureCap = useCallback(() => {
     const el = scrollRef.current;
+    if (el) setNaturalWidth(el.scrollWidth);
     if (!el || (!maxVisibleItems && !maxVisibleWidth)) {
       setCapWidth(null);
       return;
@@ -99,13 +109,37 @@ export default function ScrollableTabs({
     el.scrollBy({ left: dir === "left" ? -150 : 150, behavior: "smooth" });
   };
 
+  // Growing, the tabs size from their measured width: containment keeps the
+  // long list out of the row's own minimum, so a row shrinks them to the cap
+  // before it wraps, instead of wrapping as soon as every item doesn't fit.
+  // The caller's style still wins, and can read the width as
+  // `--dg-tabs-natural`.
+  const sizing: React.CSSProperties | undefined =
+    growToFit && naturalWidth != null
+      ? ({
+          "--dg-tabs-natural": `${naturalWidth}px`,
+          flex: `0 1 ${naturalWidth}px`,
+          minWidth: capWidth ?? naturalWidth,
+          maxWidth: "100%",
+          contain: "inline-size",
+        } as React.CSSProperties)
+      : capWidth != null
+        ? // A plain length, not min(…, 100%): a percentage limit is ignored when
+          // the row around it sizes itself, which then saves room for every item.
+          { maxWidth: capWidth }
+        : undefined;
+  const rootStyle = sizing
+    ? growToFit
+      ? { ...sizing, ...style }
+      : { ...style, ...sizing }
+    : style;
+
   return (
     <div
       className={`dg-scrollable-tabs${className ? ` ${className}` : ""}`}
-      // A plain length, not min(…, 100%): a percentage limit is ignored when
-      // the row around it sizes itself, which then saves room for every item.
-      style={capWidth != null ? { ...style, maxWidth: capWidth } : style}
+      style={rootStyle}
       data-capped={capWidth != null ? "" : undefined}
+      data-tour={dataTour}
     >
       {/* Left fade + chevron */}
       <div
