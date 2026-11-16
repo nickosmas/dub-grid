@@ -1,35 +1,38 @@
 "use client";
 
-import React, { memo, useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTheme } from "next-themes";
-import { Popover, PopoverContent } from "@/components/ui/popover";
-import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
-import { EmptyState } from "@/components/EmptyState";
-import { DAY_LABELS } from "@/lib/constants";
-import { formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
+import type { CoverageCategorySnapshot } from "@dubgrid/schedule-core";
+import type { ScheduleNoteMark } from "@/components/schedule-grid/noteDots";
+import MonthDayCell, { DraftRing } from "@/components/schedule-month/MonthDayCell";
+import { MonthDayPanel } from "@/components/schedule-month/MonthDayPanel";
 import {
-  Employee,
-  ShiftCategory,
+  buildMonthDay,
+  buildMonthWeeks,
+  type MonthAbsence,
+  type MonthDay,
+  type MonthRequest,
+} from "@/components/schedule-month/monthModel";
+import { DAY_LABELS } from "@/lib/constants";
+import { formatDateKey } from "@/lib/utils";
+import type {
   AssignmentDefinition,
-  FocusArea,
   DraftKind,
+  Employee,
+  FocusArea,
+  GridOpenShift,
   IndicatorType,
+  ShiftCategory,
   ShiftDisplayMode,
 } from "@/types";
-import {
-  NoteDots,
-  overlayNoteDotsWidth,
-  type ScheduleNoteMark,
-} from "@/components/schedule-grid/noteDots";
-import { DRAFT_BORDER_COLORS, FILLED_PILL_BORDER, resolveShiftPillColors } from "@/lib/colors";
-
-/** A day chip is one short line, too small for the grid's 9px dots. */
-const MONTH_NOTE_DOT_SIZE = 7;
-
-function pillText(label: string, max: number): string {
-  if (label.length <= max) return label;
-  return label.slice(0, max - 1).trimEnd() + "\u2026";
-}
 
 interface MonthViewProps {
   monthStart: Date;
@@ -38,7 +41,8 @@ interface MonthViewProps {
   highlightScrollKey?: string;
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
-  isAbsenceForKey?: (empId: string, date: Date) => boolean;
+  /** The day's whole-day absence in the schedule shown (the draft, for editors). */
+  absenceForKey?: (empId: string, date: Date) => MonthAbsence | null;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   todayKey: string;
   focusAreas: FocusArea[];
@@ -47,253 +51,47 @@ interface MonthViewProps {
   activeFocusArea?: number | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   shiftDisplayMode?: ShiftDisplayMode;
-  /** The page's note marks, shown on each person's row in the day popover. */
   noteMarksForKey?: (empId: string, date: Date, focusAreaId?: number) => ScheduleNoteMark[];
   indicatorTypes?: IndicatorType[];
-}
-
-type DayRow = {
-  empId: string;
-  focusAreaId: number;
-  name: string;
-  shift: string;
-  style: AssignmentDefinition;
-  draftKind: DraftKind;
-  isHighlighted: boolean;
-  marks: ScheduleNoteMark[];
-};
-
-type DayCellData = {
-  date: Date;
-  dateKey: string;
-  isToday: boolean;
-  hasHighlightedEmployee: boolean;
-  categoryCounts: Map<number, number>;
-  byFocusArea: Map<string, DayRow[]>;
-  activeCats: ShiftCategory[];
-  focusAreaSections: string[];
-};
-
-function buildMonthCells(monthStart: Date): (Date | null)[] {
-  const year = monthStart.getFullYear();
-  const month = monthStart.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstWeekday = new Date(year, month, 1).getDay();
-  const cells: (Date | null)[] = Array(firstWeekday).fill(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(new Date(year, month, d));
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
-}
-
-const NEUTRAL_FA_STYLE = {
-  bg: "var(--dg-color-bg-secondary)",
-  text: "var(--dg-color-text-muted)",
-} as const;
-
-function shortName(name: string): string {
-  const parts = name.trim().split(" ");
-  return parts[0] + (parts[1] ? " " + parts[1][0] + "." : "");
+  /** Open shifts this viewer may see. */
+  openShifts?: GridOpenShift[];
+  /** The month's coverage, or null when the viewer doesn't see staffing. */
+  coverage?: CoverageCategorySnapshot[] | null;
+  requestForKey?: (empId: string, date: Date) => MonthRequest | null;
+  onOpenWeek?: (date: Date) => void;
+  /** Phone width: a small calendar with the chosen day listed under it. */
+  compact?: boolean;
 }
 
 const EMPTY_INDICATORS: IndicatorType[] = [];
+const EMPTY_OPEN_SHIFTS: GridOpenShift[] = [];
+/** Below this a cell can't hold three areas, so the calendar grows past the window instead. */
+const MIN_ROW_HEIGHT = 112;
+const ROW_GAP = 6;
+const WEEKDAY_ROW = 24;
+const BOTTOM_GUTTER = 16;
 
-/* ── Day Popover (portal-based) ── */
-function DayPopover({
-  anchorEl,
-  data,
-  onClose,
-  isNameMode = false,
-  hasHighlightedSearch = false,
-  indicatorTypes,
-}: {
-  anchorEl: HTMLElement;
-  data: DayCellData;
-  onClose: () => void;
-  isNameMode?: boolean;
-  hasHighlightedSearch?: boolean;
-  indicatorTypes: IndicatorType[];
-}) {
-  const { date, focusAreaSections, byFocusArea } = data;
-  const { resolvedTheme } = useTheme();
-  const isDarkTheme = resolvedTheme === "dark";
-
-  return (
-    <Popover
-      open
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
-    >
-      <PopoverContent
-        anchor={anchorEl}
-        side="bottom"
-        align="start"
-        sideOffset={4}
-        positionMethod="fixed"
-        collisionPadding={8}
-        collisionAvoidance={{
-          side: "flip",
-          align: "shift",
-          fallbackAxisSide: "none",
-        }}
-        initialFocus={false}
-        finalFocus={false}
-        style={{
-          background: "var(--dg-color-surface)",
-          border: "1px solid var(--dg-color-border)",
-          borderRadius: "var(--dg-radius-lg)",
-          boxShadow: "var(--shadow-menu)",
-          overflow: "hidden",
-          position: "relative",
-          display: "flex",
-          flexDirection: "column",
-          width: 300,
-          maxHeight: "min(500px, var(--available-height))",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: "10px 14px",
-            borderBottom: "1px solid var(--dg-color-border-light)",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 700,
-              color: "var(--dg-color-text-primary)",
-            }}
-          >
-            {date.toLocaleDateString("en-US", {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-            })}
-          </span>
-        </div>
-
-        {/* Employee breakdown */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 14px" }}>
-          {focusAreaSections.length === 0 ? (
-            <EmptyState size="inline" title="No shifts scheduled" />
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {focusAreaSections.map((focusArea) => {
-                const workers = byFocusArea.get(focusArea)!;
-                const wc = NEUTRAL_FA_STYLE;
-                return (
-                  <div key={focusArea}>
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        fontWeight: 700,
-                        color: wc.text,
-                        background: wc.bg,
-                        borderRadius: "var(--dg-radius-xs)",
-                        padding: "3px 8px",
-                        marginBottom: 5,
-                      }}
-                    >
-                      {focusArea}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      {workers.map(
-                        ({ name, shift, style: s0, draftKind: dk, isHighlighted, marks }, ni) => {
-                          const s = resolveShiftPillColors(
-                            { color: s0.color, text: s0.text, border: s0.border },
-                            isDarkTheme,
-                          );
-                          return (
-                            <div
-                              key={`${name}-${shift}-${ni}`}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 5,
-                                padding: "2px 4px",
-                                borderRadius: "var(--dg-radius-sm)",
-                                background:
-                                  hasHighlightedSearch && isHighlighted
-                                    ? "var(--dg-color-brand-bg)"
-                                    : "transparent",
-                                boxShadow:
-                                  hasHighlightedSearch && isHighlighted
-                                    ? "inset 3px 0 0 0 var(--dg-color-brand)"
-                                    : undefined,
-                                opacity: hasHighlightedSearch && !isHighlighted ? 0.35 : 1,
-                                transition:
-                                  "opacity 150ms ease, background 150ms ease, box-shadow 150ms ease",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  position: "relative",
-                                  background: s.color,
-                                  border: dk
-                                    ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}`
-                                    : FILLED_PILL_BORDER,
-                                  borderRadius: "var(--dg-radius-xs)",
-                                  padding: isNameMode ? "3px 6px" : dk ? "1px 5px" : "2px 6px",
-                                  ...(marks.length > 0
-                                    ? {
-                                        paddingRight:
-                                          (dk ? 5 : 6) +
-                                          overlayNoteDotsWidth(marks.length, MONTH_NOTE_DOT_SIZE),
-                                      }
-                                    : null),
-                                  fontSize: "var(--dg-fs-footnote)",
-                                  fontWeight: 600,
-                                  color: s.text,
-                                  opacity: dk === "deleted" ? 0.5 : 1,
-                                  textDecoration: dk === "deleted" ? "line-through" : "none",
-                                  maxWidth: 120,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {isNameMode ? pillText(shift, 14) : shift}
-                                <NoteDots
-                                  marks={marks}
-                                  indicatorTypes={indicatorTypes}
-                                  placement="overlay"
-                                  rimColor={s.text}
-                                  isDark={isDarkTheme}
-                                  dotSize={MONTH_NOTE_DOT_SIZE}
-                                />
-                              </div>
-                              <span
-                                style={{
-                                  fontSize: "var(--dg-fs-footnote)",
-                                  color:
-                                    hasHighlightedSearch && isHighlighted
-                                      ? "var(--dg-color-brand)"
-                                      : "var(--dg-color-text-secondary)",
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                              >
-                                {shortName(name)}
-                              </span>
-                            </div>
-                          );
-                        },
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <ScrollOverflowCue />
-      </PopoverContent>
-    </Popover>
-  );
+/** Keeps the calendar exactly as tall as the window leaves it, once it has room for its rows. */
+function useFillHeight(
+  ref: React.RefObject<HTMLDivElement | null>,
+  weeks: number,
+  enabled: boolean,
+) {
+  const [height, setHeight] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!enabled) return;
+    const measure = () => {
+      const el = ref.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const floor = weeks * MIN_ROW_HEIGHT + (weeks - 1) * ROW_GAP + WEEKDAY_ROW;
+      setHeight(Math.max(floor, Math.round(window.innerHeight - top - BOTTOM_GUTTER)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [ref, weeks, enabled]);
+  return enabled ? height : null;
 }
 
 function MonthView({
@@ -303,7 +101,7 @@ function MonthView({
   highlightScrollKey,
   shiftForKey,
   assignmentIdsForKey,
-  isAbsenceForKey,
+  absenceForKey,
   getShiftStyle,
   todayKey,
   focusAreas,
@@ -314,440 +112,201 @@ function MonthView({
   shiftDisplayMode = "code",
   noteMarksForKey,
   indicatorTypes = EMPTY_INDICATORS,
+  openShifts = EMPTY_OPEN_SHIFTS,
+  coverage = null,
+  requestForKey,
+  onOpenWeek,
+  compact = false,
 }: MonthViewProps) {
-  const isNameMode = shiftDisplayMode === "name";
-  const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
-  const focusAreaNames = focusAreas.map((w) => w.name);
-  const hasHighlightedSearch = !!(highlightEmpIds && highlightEmpIds.size > 0);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const rootRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const weeks = useMemo(() => buildMonthWeeks(monthStart), [monthStart]);
+  const hasSearch = !!highlightEmpIds && highlightEmpIds.size > 0;
 
-  // Look up assignments by ID so cross-focus-area shifts render in their own color
-  const assignmentById = useMemo(() => {
-    const map = new Map<number, AssignmentDefinition>();
-    for (const sc of assignments) map.set(sc.id, sc);
-    return map;
-  }, [assignments]);
-
-  // Build a map of categoryId → category for fast lookup
-  const categoryMap = useMemo(() => {
-    const m = new Map<number, ShiftCategory>();
-    for (const cat of shiftCategories) m.set(cat.id, cat);
-    return m;
-  }, [shiftCategories]);
-
-  // Sort-order for a shift style: use its category's sortOrder, fall back to a high number
-  const shiftSortOrder = useCallback(
-    (style: AssignmentDefinition): number => {
-      if (style.categoryId != null) {
-        return categoryMap.get(style.categoryId)?.sortOrder ?? 99;
-      }
-      return 99;
-    },
-    [categoryMap],
+  const assignmentById = useMemo(
+    () => new Map(assignments.map((assignment) => [assignment.id, assignment])),
+    [assignments],
   );
-
-  // Popover state
-  const [popoverDateKey, setPopoverDateKey] = useState<string | null>(null);
-  const popoverAnchorRef = useRef<HTMLElement | null>(null);
-
-  const handleCellClick = useCallback(
-    (dateKey: string, el: HTMLElement) => {
-      if (popoverDateKey === dateKey) {
-        setPopoverDateKey(null);
-        popoverAnchorRef.current = null;
-      } else {
-        setPopoverDateKey(dateKey);
-        popoverAnchorRef.current = el;
-      }
-    },
-    [popoverDateKey],
+  const categoryById = useMemo(
+    () => new Map(shiftCategories.map((category) => [category.id, category])),
+    [shiftCategories],
   );
+  const coverageByDay = useMemo(() => {
+    if (!coverage) return null;
+    const byDay = new Map<string, CoverageCategorySnapshot[]>();
+    for (const snapshot of coverage) {
+      const key = formatDateKey(snapshot.date);
+      byDay.set(key, [...(byDay.get(key) ?? []), snapshot]);
+    }
+    return byDay;
+  }, [coverage]);
 
-  const closePopover = useCallback(() => {
-    setPopoverDateKey(null);
-    popoverAnchorRef.current = null;
-  }, []);
-
-  // Pre-compute all day data so the popover can access it
-  const dayDataMap = useMemo(() => {
-    const map = new Map<string, DayCellData>();
-    const employeeById = new Map(filteredEmployees.map((emp) => [emp.id, emp]));
-    for (const date of cells) {
+  const days = useMemo(() => {
+    const map = new Map<string, MonthDay>();
+    for (const date of weeks.flat()) {
       if (!date) continue;
-      const dateKey = formatDateKey(date);
-      const isToday = dateKey === todayKey;
-
-      const categoryCounts = new Map<number, number>();
-      let hasHighlightedEmployee = false;
-      const byFocusArea = new Map<string, DayRow[]>();
-
-      filteredEmployees.forEach((emp) => {
-        const combinedLabel = shiftForKey(emp.id, date);
-        if (!combinedLabel || combinedLabel === "OFF") return;
-
-        // Skip absence entries (off, sick, vacation, etc.) — they don't count in staffing tallies
-        if (isAbsenceForKey?.(emp.id, date)) return;
-
-        const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
-        const empHomeFas = focusAreas.filter((fa) => emp.focusAreaIds.includes(fa.id));
-        const isHighlighted = highlightEmpIds?.has(emp.id) ?? false;
-        const shiftLabels = combinedLabel.split("/");
-        shiftLabels.forEach((label, li) => {
-          const codeEntry =
-            cellCodeIds[li] != null ? assignmentById.get(cellCodeIds[li]) : undefined;
-          const style = codeEntry ?? getShiftStyle(label, empHomeFas[0]?.name);
-
-          if (style.categoryId != null) {
-            categoryCounts.set(style.categoryId, (categoryCounts.get(style.categoryId) ?? 0) + 1);
-          }
-
-          if (isHighlighted) {
-            hasHighlightedEmployee = true;
-          }
-
-          const dk = draftKindForKey?.(emp.id, date) ?? null;
-
-          if (style.focusAreaId != null) {
-            // Focus-area-specific code: count under that focus area
-            const fa = focusAreas.find((f) => f.id === style.focusAreaId);
-            if (!fa) return;
-            const list = byFocusArea.get(fa.name) ?? [];
-            list.push({
-              empId: emp.id,
-              focusAreaId: fa.id,
-              name: getEmployeeDisplayName(emp),
-              shift: label,
-              style,
-              draftKind: dk,
-              isHighlighted,
-              marks: [],
-            });
-            byFocusArea.set(fa.name, list);
-          } else {
-            // BUG 1.8: General/shared code: count under only the employee's primary focus area
-            // to avoid inflating headcount for employees with multiple focus areas
-            const primaryFa = empHomeFas[0];
-            if (primaryFa) {
-              const list = byFocusArea.get(primaryFa.name) ?? [];
-              list.push({
-                empId: emp.id,
-                focusAreaId: primaryFa.id,
-                name: getEmployeeDisplayName(emp),
-                shift: label,
-                style,
-                draftKind: dk,
-                isHighlighted,
-                marks: [],
-              });
-              byFocusArea.set(primaryFa.name, list);
-            }
-          }
-        });
-      });
-
-      byFocusArea.forEach((list) =>
-        list.sort((a, b) => shiftSortOrder(a.style) - shiftSortOrder(b.style)),
-      );
-      // A person's indicators belong to their day in a focus area, not to each
-      // of their shift codes there, so they show on their first row once sorted.
-      if (noteMarksForKey) {
-        const firstVisibleRowByEmp = new Map<string, DayRow>();
-        const areasWithRowByEmp = new Map<string, Set<number>>();
-        for (const name of focusAreaNames) {
-          const marked = new Set<string>();
-          for (const row of byFocusArea.get(name) ?? []) {
-            if (marked.has(row.empId)) continue;
-            marked.add(row.empId);
-            row.marks = noteMarksForKey(row.empId, date, row.focusAreaId);
-            const visible = activeFocusArea === null || row.focusAreaId === activeFocusArea;
-            if (visible && !firstVisibleRowByEmp.has(row.empId)) {
-              firstVisibleRowByEmp.set(row.empId, row);
-            }
-            const areas = areasWithRowByEmp.get(row.empId) ?? new Set<number>();
-            areas.add(row.focusAreaId);
-            areasWithRowByEmp.set(row.empId, areas);
-          }
-        }
-        // A general code lists the person under their primary focus area only,
-        // so a note filed under another of their areas they have no row in
-        // that day, or under none, joins their first row a filter leaves
-        // visible rather than going unseen. One mark per note type (F-106).
-        firstVisibleRowByEmp.forEach((row, empId) => {
-          const areasWithRow = areasWithRowByEmp.get(empId);
-          const ownAreaIds = employeeById.get(empId)?.focusAreaIds ?? [];
-          const otherAreaIds: (number | undefined)[] = [
-            ...ownAreaIds.filter((id) => !areasWithRow?.has(id)),
-            undefined,
-          ];
-          const seen = new Set(row.marks.map((mark) => mark.indicatorTypeId));
-          for (const areaId of otherAreaIds) {
-            for (const mark of noteMarksForKey(empId, date, areaId)) {
-              if (seen.has(mark.indicatorTypeId)) continue;
-              seen.add(mark.indicatorTypeId);
-              row.marks.push(mark);
-            }
-          }
-        });
-      }
-
-      const activeCats = shiftCategories
-        .filter((cat) => (categoryCounts.get(cat.id) ?? 0) > 0)
-        .sort((a, b) => a.sortOrder - b.sortOrder);
-
-      const focusAreaSections = focusAreaNames.filter(
-        (w) =>
-          byFocusArea.has(w) &&
-          (activeFocusArea === null ||
-            w === focusAreas.find((fa) => fa.id === activeFocusArea)?.name),
-      );
-
-      map.set(dateKey, {
+      const day = buildMonthDay({
         date,
-        dateKey,
-        isToday,
-        hasHighlightedEmployee,
-        categoryCounts,
-        byFocusArea,
-        activeCats,
-        focusAreaSections,
+        todayKey,
+        employees: filteredEmployees,
+        focusAreas,
+        activeFocusArea,
+        categoryById,
+        assignmentById,
+        highlightEmpIds,
+        shiftForKey,
+        assignmentIdsForKey,
+        absenceForKey,
+        getShiftStyle,
+        draftKindForKey,
+        noteMarksForKey,
+        requestForKey,
+        openShifts,
+        coverage: coverageByDay ? (coverageByDay.get(formatDateKey(date)) ?? []) : null,
       });
+      map.set(day.dateKey, day);
     }
     return map;
   }, [
-    cells,
+    weeks,
     todayKey,
     filteredEmployees,
+    focusAreas,
+    activeFocusArea,
+    categoryById,
+    assignmentById,
+    highlightEmpIds,
     shiftForKey,
     assignmentIdsForKey,
-    isAbsenceForKey,
+    absenceForKey,
     getShiftStyle,
-    focusAreas,
-    assignmentById,
-    shiftCategories,
-    focusAreaNames,
-    activeFocusArea,
-    highlightEmpIds,
     draftKindForKey,
-    shiftSortOrder,
     noteMarksForKey,
+    requestForKey,
+    openShifts,
+    coverageByDay,
   ]);
 
-  const popoverData = popoverDateKey ? dayDataMap.get(popoverDateKey) : null;
+  const firstKey = formatDateKey(monthStart);
+  const defaultKey = days.has(todayKey) ? todayKey : firstKey;
+  const [chosenKey, setChosenKey] = useState<string | null>(null);
+  // A choice from another month doesn't carry over; a phone always shows a day.
+  const selectedKey = chosenKey && days.has(chosenKey) ? chosenKey : compact ? defaultKey : null;
+  const selectedDay = selectedKey ? days.get(selectedKey) : undefined;
+  const focusKey = selectedKey ?? defaultKey;
+
+  const select = useCallback(
+    (dateKey: string) =>
+      setChosenKey((current) => (current === dateKey && !compact ? null : dateKey)),
+    [compact],
+  );
+  const close = useCallback(() => setChosenKey(null), []);
+
+  const moveFocus = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const steps: Record<string, number> = {
+        ArrowLeft: -1,
+        ArrowRight: 1,
+        ArrowUp: -7,
+        ArrowDown: 7,
+      };
+      const from = (event.target as HTMLElement).closest<HTMLElement>("[data-date-key]");
+      if (event.key === "Escape" && !compact && selectedKey) {
+        event.preventDefault();
+        close();
+        return;
+      }
+      const step = steps[event.key];
+      if (step == null || !from?.dataset.dateKey) return;
+      const [year, month, day] = from.dataset.dateKey.split("-").map(Number);
+      const next = formatDateKey(new Date(year, month - 1, day + step));
+      const target = gridRef.current?.querySelector<HTMLElement>(`[data-date-key="${next}"]`);
+      if (!target) return;
+      event.preventDefault();
+      target.focus();
+    },
+    [close, compact, selectedKey],
+  );
 
   useEffect(() => {
-    if (!highlightScrollKey || !hasHighlightedSearch) return;
-
+    if (!highlightScrollKey || !hasSearch) return;
     const frame = window.requestAnimationFrame(() => {
-      const firstHighlightedDay = rootRef.current?.querySelector<HTMLElement>(
-        '[data-search-highlight="true"]',
-      );
-      firstHighlightedDay?.scrollIntoView({
-        block: "center",
-        inline: "nearest",
-        behavior: "smooth",
-      });
+      rootRef.current
+        ?.querySelector<HTMLElement>("[data-search-hit]")
+        ?.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
     });
-
     return () => window.cancelAnimationFrame(frame);
-  }, [highlightScrollKey, hasHighlightedSearch]);
+  }, [highlightScrollKey, hasSearch]);
+
+  const fillHeight = useFillHeight(rootRef, weeks.length, !compact);
+  const monthLabel = monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const legend = compact && (
+    <div className="dg-month-legend" aria-hidden="true">
+      {coverage && (
+        <span className="dg-month-legend__item">
+          <span className="dg-month-dot" data-kind="short" />
+          Short of a staffing target
+        </span>
+      )}
+      <span className="dg-month-legend__item">
+        <span className="dg-month-dot" data-kind="open" />
+        Open shift
+      </span>
+      <span className="dg-month-legend__item">
+        <DraftRing size={9} />
+        Unpublished changes
+      </span>
+    </div>
+  );
 
   return (
-    <div ref={rootRef}>
-      {/* Day-of-week column headers */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-          gap: 6,
-          marginBottom: 4,
-        }}
-      >
-        {DAY_LABELS.map((d) => (
-          <div
-            key={d}
-            style={{
-              textAlign: "center",
-              fontSize: "var(--dg-fs-footnote)",
-              fontWeight: 700,
-              letterSpacing: "0.07em",
-              color: "var(--dg-color-text-subtle)",
-              padding: "4px 0",
-            }}
-          >
-            {d.toUpperCase()}
-          </div>
-        ))}
-      </div>
-
-      {/* Calendar grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-          gap: 6,
-          alignItems: "start",
-        }}
-      >
-        {cells.map((date, i) => {
-          if (!date) {
+    <div
+      ref={rootRef}
+      className="dg-month"
+      data-compact={compact || undefined}
+      style={fillHeight ? { height: fillHeight } : undefined}
+      onKeyDown={moveFocus}
+    >
+      <div className="dg-month__calendar">
+        <div className="dg-month__weekdays" aria-hidden="true">
+          {DAY_LABELS.map((label) => (
+            <div key={label} className="dg-month__weekday">
+              {compact ? label.slice(0, 1) : label}
+            </div>
+          ))}
+        </div>
+        <div ref={gridRef} className="dg-month__grid" role="group" aria-label={monthLabel}>
+          {weeks.flat().map((date, index) => {
+            if (!date) return <div key={`blank-${index}`} className="dg-month__blank" />;
+            const day = days.get(formatDateKey(date))!;
             return (
-              <div
-                key={`empty-${i}`}
-                style={{
-                  background: "transparent",
-                  borderRadius: "var(--dg-radius-lg)",
-                  minHeight: 64,
-                }}
+              <MonthDayCell
+                key={day.dateKey}
+                day={day}
+                isSelected={day.dateKey === selectedKey}
+                isFocusTarget={day.dateKey === focusKey}
+                singleArea={activeFocusArea !== null}
+                hasSearch={hasSearch}
+                compact={compact}
+                isDark={isDark}
+                onSelect={select}
               />
             );
-          }
-
-          const dateKey = formatDateKey(date);
-          const data = dayDataMap.get(dateKey)!;
-          const { isToday, focusAreaSections, byFocusArea, hasHighlightedEmployee } = data;
-          const isOpen = popoverDateKey === dateKey;
-          const isSearchHighlightedDay = hasHighlightedSearch && hasHighlightedEmployee;
-
-          return (
-            <div
-              key={dateKey}
-              className="dg-month-cell"
-              role="button"
-              tabIndex={0}
-              data-search-highlight={isSearchHighlightedDay ? "true" : undefined}
-              aria-label={date.toLocaleDateString("en-US", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-              onClick={(e) => handleCellClick(dateKey, e.currentTarget)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleCellClick(dateKey, e.currentTarget);
-                }
-              }}
-              style={{
-                background: isSearchHighlightedDay
-                  ? isToday
-                    ? "linear-gradient(180deg, var(--dg-color-brand-bg) 0%, var(--dg-color-today-bg) 100%)"
-                    : "var(--dg-color-brand-bg)"
-                  : isToday
-                    ? "var(--dg-color-today-bg)"
-                    : "var(--dg-color-surface)",
-                border: isOpen
-                  ? "2px solid var(--dg-color-brand-border)"
-                  : isSearchHighlightedDay
-                    ? "2px solid var(--dg-color-brand-border)"
-                    : isToday
-                      ? "2px solid var(--dg-color-today-text)"
-                      : "1px solid var(--dg-color-border)",
-                borderRadius: "var(--dg-radius-lg)",
-                padding: isOpen || isToday ? "8px 9px 7px" : "9px 10px 8px",
-                minHeight: 64,
-                minWidth: 0,
-                boxShadow: isOpen
-                  ? "0 0 0 2px rgba(37, 99, 235, 0.12)"
-                  : isSearchHighlightedDay
-                    ? "0 0 0 2px rgba(37, 99, 235, 0.12)"
-                    : "0 1px 3px rgba(0,0,0,0.04)",
-                cursor: "pointer",
-                opacity: hasHighlightedSearch && !hasHighlightedEmployee ? 0.35 : 1,
-                transition:
-                  "border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease, background 150ms ease",
-              }}
-            >
-              {/* Date number */}
-              <div
-                style={{
-                  marginBottom: focusAreaSections.length > 0 ? 5 : 0,
-                }}
-              >
-                <div
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: "50%",
-                    background: isToday ? "var(--dg-color-today-text)" : "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 700,
-                    color: isToday
-                      ? "var(--dg-color-text-inverse)"
-                      : "var(--dg-color-text-secondary)",
-                  }}
-                >
-                  {date.getDate()}
-                </div>
-              </div>
-
-              {/* Focus areas + total shift count */}
-              {focusAreaSections.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  {focusAreaSections.map((focusArea) => {
-                    const workers = byFocusArea.get(focusArea)!;
-                    const wc = NEUTRAL_FA_STYLE;
-                    return (
-                      <div
-                        key={focusArea}
-                        className="dg-month-area-row"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 4,
-                          minWidth: 0,
-                        }}
-                      >
-                        <span
-                          className="dg-month-area-name"
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            fontWeight: 600,
-                            color: wc.text,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            minWidth: 0,
-                          }}
-                        >
-                          {focusArea}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            fontWeight: 700,
-                            background: wc.bg,
-                            color: wc.text,
-                            borderRadius: "var(--dg-radius-xs)",
-                            padding: "1px 5px",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {workers.length}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+          })}
+        </div>
+        {legend}
       </div>
-
-      {/* Day popover */}
-      {popoverData && popoverAnchorRef.current && (
-        <DayPopover
-          anchorEl={popoverAnchorRef.current}
-          data={popoverData}
-          onClose={closePopover}
-          isNameMode={isNameMode}
-          hasHighlightedSearch={hasHighlightedSearch}
+      {selectedDay && (
+        <MonthDayPanel
+          day={selectedDay}
+          isNameMode={shiftDisplayMode === "name"}
+          hasSearch={hasSearch}
+          isDark={isDark}
           indicatorTypes={indicatorTypes}
+          onClose={compact ? undefined : close}
+          onOpenWeek={onOpenWeek}
         />
       )}
     </div>

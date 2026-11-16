@@ -93,13 +93,17 @@ function renderMonth(
   );
 }
 
+function dayPanel() {
+  return screen.getByRole("region", { name: /details$/ });
+}
+
 function openDay() {
   const cell = document.querySelector<HTMLElement>(`[data-date-key="${dayKey}"]`);
   fireEvent.click(cell ?? screen.getAllByText("15")[0]);
 }
 
 describe("MonthView indicators", () => {
-  it("shows each person's indicators by name in the day popover", () => {
+  it("shows each person's indicators by name in the day panel", () => {
     const lookup = vi.fn((empId: string, date: Date, focusAreaId?: number): ScheduleNoteMark[] => {
       if (formatDateKey(date) !== dayKey || focusAreaId !== 1) return [];
       return empId === "emp-1"
@@ -109,10 +113,10 @@ describe("MonthView indicators", () => {
     renderMonth(lookup);
     openDay();
 
-    const popover = screen.getByRole("dialog");
-    expect(within(popover).getByLabelText("Float")).toBeInTheDocument();
+    const panel = dayPanel();
+    expect(within(panel).getByLabelText("Float")).toBeInTheDocument();
     // A general code sits under the person's primary focus area, and is keyed by it.
-    expect(within(popover).getByLabelText("Training · Added, not published")).toBeInTheDocument();
+    expect(within(panel).getByLabelText("Training · Added, not published")).toBeInTheDocument();
     expect(lookup).toHaveBeenCalledWith("emp-2", day, 1);
   });
 
@@ -126,10 +130,10 @@ describe("MonthView indicators", () => {
     );
     openDay();
 
-    const popover = screen.getByRole("dialog");
-    expect(within(popover).getAllByLabelText("Float")).toHaveLength(1);
-    // On the person's first row as the popover orders them, not the first built.
-    const firstRow = within(popover).getAllByText("Alex T.")[0].parentElement!;
+    const panel = dayPanel();
+    expect(within(panel).getAllByLabelText("Float")).toHaveLength(1);
+    // On the person's first row as the panel orders them, not the first built.
+    const firstRow = within(panel).getAllByText("Alex Taylor")[0].parentElement!;
     expect(within(firstRow).getByLabelText("Float")).toBeInTheDocument();
     codes["emp-1"] = [northDay];
   });
@@ -160,16 +164,16 @@ describe("MonthView indicators", () => {
       renderMonth(lookup);
       openDay();
 
-      const popover = screen.getByRole("dialog");
+      const panel = dayPanel();
       // Blair's general code lists them under North only; South's note joins
       // that row, and a note filed under both areas shows once.
-      const row = within(popover).getByText("Blair T.").parentElement!;
+      const row = within(panel).getByText("Blair Taylor").parentElement!;
       const dots = within(row).getByLabelText("2 notes: Float, Training");
       // In the shift chip's bottom-right corner, a note filed under both areas once.
       expect(dots.dataset.noteDots).toBe("overlay");
       expect(dots.style.position).toBe("absolute");
       expect(dots.querySelectorAll("[data-note-mark]")).toHaveLength(2);
-      expect(within(popover).getAllByLabelText(/Float/)).toHaveLength(1);
+      expect(within(panel).getAllByLabelText(/Float/)).toHaveLength(1);
       expect(lookup).toHaveBeenCalledWith("emp-2", day, 2);
     } finally {
       focusAreas.pop();
@@ -207,7 +211,7 @@ describe("MonthView indicators", () => {
       );
       openDay();
 
-      const row = within(screen.getByRole("dialog")).getByText("Blair T.").parentElement!;
+      const row = within(dayPanel()).getByText("Blair Taylor").parentElement!;
       expect(within(row).getByLabelText("Training")).toBeInTheDocument();
     });
 
@@ -236,9 +240,9 @@ describe("MonthView indicators", () => {
         );
         openDay();
 
-        const popover = screen.getByRole("dialog");
-        expect(within(popover).queryByText("North")).not.toBeInTheDocument();
-        const row = within(popover).getByText("Alex T.").parentElement!;
+        const panel = dayPanel();
+        expect(within(panel).queryByText("North")).not.toBeInTheDocument();
+        const row = within(panel).getByText("Alex Taylor").parentElement!;
         expect(within(row).getByLabelText("Training")).toBeInTheDocument();
       });
     });
@@ -254,8 +258,8 @@ describe("MonthView indicators", () => {
         });
         openDay();
 
-        const popover = screen.getByRole("dialog");
-        expect(within(popover).getAllByLabelText(/^Float/)).toHaveLength(1);
+        const panel = dayPanel();
+        expect(within(panel).getAllByLabelText(/^Float/)).toHaveLength(1);
       });
     });
   });
