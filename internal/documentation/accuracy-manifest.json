@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:e3b01f9cf16b3c044cf1da55d7d89bf6086fcac199ab773d1dde461b7fbca0db"
+      "evidenceFingerprint": "sha256:5a8ce8a9a5036f0058b23b48fa81cb86c462135e0e996c11b557dcd8db188c5b"
     },
     {
       "id": "introduction",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:0a6f4eec2762ba68611390689cd27d5530fb5f869c8e67946bb4cc42b4a6e178"
+      "evidenceFingerprint": "sha256:a4c9541a7455ef62151c23a598567483f3dc915023d8c806029612cdae31ffe1"
     },
     {
       "id": "quickstart",
@@ -238,7 +238,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:20f9a0baa40f3f5da64a53feaf1e64dde033f6f1afad18d8ee8ee32e5158dc06"
+      "evidenceFingerprint": "sha256:cc57c5628b4787ba3e89ee855d5c6dbe0e747aaf246256ba5c2e4954039c3cb6"
     },
     {
       "id": "onboarding",
@@ -386,7 +386,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:48115b40aaa60ef54d5c567413e9f68def1ccede17b465989cc60af0219f457d"
+      "evidenceFingerprint": "sha256:783b3943873f36c773450420d5b7fd0b383fc797b46b31c59682aac327addf03"
     },
     {
       "id": "draft-publish",
@@ -499,7 +499,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:1a1a13948e5251a583b8dcd4b56f5b55f49fc4d794c5e0e80176e021855ab34f"
+      "evidenceFingerprint": "sha256:71ed27d51b7f470a59f5444a2e47f8b0004f7de9d6bdef784c4ed6f39f917361"
     },
     {
       "id": "realtime",
@@ -690,7 +690,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:875f0058092188b2a359a0f8b72061eda782ce2dd3721fb8c7f1aa858c4d3778"
+      "evidenceFingerprint": "sha256:303c99ae7ab26040fb0d887200c3fff9e3fa5cb5fe9ba53b11d1e17b69b199a1"
     },
     {
       "id": "roster",
@@ -1018,7 +1018,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:004454af716618458d6cd2de81a6c2f831388ab686d946c49cb89b763cfdbaea"
+      "evidenceFingerprint": "sha256:a45a231c687ab7318ca0a680dfb3825967eaa891e31e8053371043f9e198456d"
     },
     {
       "id": "terminology",
@@ -1886,7 +1886,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f70afd7e2472c3eccede30a154f8ebddf383a7d97739fa055cbf88fbb791b8c8"
+      "evidenceFingerprint": "sha256:d7ff9741ac71b5ffa093b03c0955fd465dac772e36bd62ba817063aaff5a1d62"
     },
     {
       "id": "shifts-jobs-absences",
@@ -1996,7 +1996,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:ed5a2d736bcd5fe7536ae4126578fcde15edc2a2e8700df4cc488c4e58cd9434"
+      "evidenceFingerprint": "sha256:59a4a0a73f73b32173f40998ae80130d1a9265a5d5470f6706dc4e1ec8889ae4"
     },
     {
       "id": "coverage-open-shifts",
@@ -2160,7 +2160,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:80a73164ff3db625662978d917e30119a57c351e914de53a3ef5b56b1d8c4076"
+      "evidenceFingerprint": "sha256:52f2b387d6d88c267a0d4050270345eb97fe7a7039db263f1ca5d60a81326b73"
     }
   ],
   "surfaceExclusions": [

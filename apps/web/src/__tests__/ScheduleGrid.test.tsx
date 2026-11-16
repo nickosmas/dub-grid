@@ -548,8 +548,8 @@ describe("ScheduleGrid", () => {
     expect(badge?.style.width).toBe("16px");
     expect(badge?.style.height).toBe("16px");
     expect(badge?.style.borderRadius).toBe("999px");
-    expect(badge?.style.top).toBe("0.5px");
-    expect(badge?.style.right).toBe("0.5px");
+    expect(badge?.style.top).toBe("2px");
+    expect(badge?.style.right).toBe("2px");
     expect(pill?.style.paddingLeft).toBe(pill?.style.paddingRight);
   });
 
@@ -598,8 +598,8 @@ describe("ScheduleGrid", () => {
     expect((badges[0] as HTMLElement).style.width).toBe("16px");
     expect((badges[0] as HTMLElement).style.height).toBe("16px");
     expect((badges[0] as HTMLElement).style.borderRadius).toBe("999px");
-    expect((badges[0] as HTMLElement).style.top).toBe("0.5px");
-    expect((badges[0] as HTMLElement).style.right).toBe("0.5px");
+    expect((badges[0] as HTMLElement).style.top).toBe("2px");
+    expect((badges[0] as HTMLElement).style.right).toBe("2px");
     expect(pills[1].style.paddingLeft).toBe(pills[1].style.paddingRight);
     // The first line keeps the M's room on both sides, so it stays centred and clear of it.
     const firstLine = pills[1].querySelector<HTMLElement>(":scope > div");
@@ -3866,7 +3866,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const mentored = firstCell.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
 
-    expect(mentored?.style.right).toBe("0.5px");
+    expect(mentored?.style.right).toBe("2px");
   });
 
   it("keeps the mentored circle at the top while a draft chip marks the pill", () => {
@@ -3887,7 +3887,7 @@ describe("ScheduleGrid", () => {
     const mentored = pill.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
 
     expect(pill.querySelector("[data-draft-badge]")).not.toBeNull();
-    expect(mentored?.style.top).toBe("0.5px");
+    expect(mentored?.style.top).toBe("2px");
   });
 
   it("keeps the mentored circle at the top while a publish chip marks the pill", () => {
@@ -3938,7 +3938,7 @@ describe("ScheduleGrid", () => {
     const mentored = pill.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
 
     expect(firstCell.querySelector("[data-publish-badge]")).not.toBeNull();
-    expect(mentored?.style.top).toBe("0.5px");
+    expect(mentored?.style.top).toBe("2px");
   });
 
   it("keeps a double shift's mentored circle at the top while a draft chip marks its pill", () => {
@@ -3962,7 +3962,7 @@ describe("ScheduleGrid", () => {
     const mentoredPill = mentored?.closest('[data-shift-pill="multi"]') as HTMLElement | null;
 
     expect(mentoredPill?.querySelector("[data-draft-badge]")).not.toBeNull();
-    expect(mentored?.style.top).toBe("0.5px");
+    expect(mentored?.style.top).toBe("2px");
   });
 
   it("keeps mentored and cross-focus context on a draft-deleted shift", () => {
@@ -3991,7 +3991,7 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement | null;
     expect(mentored).not.toBeNull();
     // The "Deleted" chip straddles the top-left edge, so the circle keeps its corner.
-    expect(mentored?.style.top).toBe("0.5px");
+    expect(mentored?.style.top).toBe("2px");
     const wing = within(deletedPill).getByText("SW") as HTMLElement;
     expect(wing).toHaveStyle({
       top: "0px",

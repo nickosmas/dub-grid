@@ -1,6 +1,14 @@
 "use client";
 
-import { useMemo, useState, useRef, useCallback, useEffect, Fragment } from "react";
+import {
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  Fragment,
+} from "react";
 import {
   ArrowUpDown,
   CalendarCheck,
@@ -594,6 +602,62 @@ export default function Toolbar({
   // An open search field takes the room the buttons' labels would.
   const searchingInline = searchOpen && !roomyToolbar;
   const actionsCompact = isCompact || searchingInline;
+
+  // Two rows whenever the zones don't fit on one: the dates and actions on top,
+  // the focus areas with sort and search below. Without it a width between the
+  // tablet layout and one full row left the actions alone on a second row.
+  // Measured before paint, and re-tried only once the toolbar is wider than
+  // where it last stacked, so it never flips back and forth.
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const navZoneRef = useRef<HTMLDivElement>(null);
+  const filterZoneRef = useRef<HTMLDivElement>(null);
+  const actionsZoneRef = useRef<HTMLDivElement>(null);
+  const [wrapStacked, setWrapStacked] = useState(false);
+  const stackedAtWidthRef = useRef(0);
+  const stackedLayout = isTablet || wrapStacked;
+  useLayoutEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar || isTablet) return;
+    const check = () => {
+      const nav = navZoneRef.current;
+      if (!nav) return;
+      const width = toolbar.clientWidth;
+      if (wrapStacked) {
+        if (width > stackedAtWidthRef.current + 8) setWrapStacked(false);
+        return;
+      }
+      const wrapped = [filterZoneRef.current, actionsZoneRef.current].some(
+        (zone) => zone != null && zone.offsetTop > nav.offsetTop + 4,
+      );
+      if (wrapped) {
+        stackedAtWidthRef.current = width;
+        setWrapStacked(true);
+      }
+    };
+    check();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(check);
+    observer?.observe(toolbar);
+    return () => observer?.disconnect();
+  });
+  // The tabs settle their width after mount, and the fonts load late, so a
+  // first stacked layout gets one more try at one row once things settle.
+  // Any retry is measured before paint, so a row that still doesn't fit never
+  // shows.
+  const settleRetriedRef = useRef(false);
+  useEffect(() => {
+    if (!wrapStacked || settleRetriedRef.current) return;
+    settleRetriedRef.current = true;
+    let cancelled = false;
+    const retry = () => {
+      if (!cancelled) setWrapStacked(false);
+    };
+    const timer = window.setTimeout(retry, 800);
+    void document.fonts?.ready.then(() => window.setTimeout(retry, 0));
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [wrapStacked]);
   useEffect(() => {
     if (searchOpen || !returnFocusRef.current) return;
     returnFocusRef.current = false;
@@ -854,6 +918,7 @@ export default function Toolbar({
   return (
     <div
       key="desktop"
+      ref={toolbarRef}
       className="dg-toolbar-type dg-field-raised"
       style={{
         display: "flex",
@@ -866,6 +931,7 @@ export default function Toolbar({
     >
       {/* ── NAV ZONE: Time navigation + span (stays as one unit) ── */}
       <div
+        ref={navZoneRef}
         style={{
           display: "flex",
           alignItems: "center",
@@ -955,6 +1021,7 @@ export default function Toolbar({
       {/* ── FILTER ZONE: Focus areas + search (wraps to row 2 on tablet) ── */}
       {hasData && (
         <div
+          ref={filterZoneRef}
           style={{
             display: "flex",
             alignItems: "center",
@@ -965,20 +1032,20 @@ export default function Toolbar({
             // controls off the side of the screen.
             // While the field is open it shares this row with the tabs, which
             // give up width (they scroll), rather than wrapping below them.
-            flexWrap: searchingInline && !isTablet ? "nowrap" : "wrap",
+            flexWrap: searchingInline && !stackedLayout ? "nowrap" : "wrap",
             rowGap: 8,
-            flex: isTablet ? undefined : searchingInline ? "1 1 0" : "1 1 auto",
+            flex: stackedLayout ? undefined : searchingInline ? "1 1 0" : "1 1 auto",
             minWidth: 0,
             maxWidth: "100%",
-            ...(isTablet ? { order: 3, flexBasis: "100%", width: "100%" } : {}),
+            ...(stackedLayout ? { order: 3, flexBasis: "100%", width: "100%" } : {}),
           }}
         >
           {focusAreaOptions.length > 1 && (
             <div
               data-tour="schedule-focus-filter"
               style={{
-                flex: isTablet ? "1 1 240px" : searchingInline ? "0 1 auto" : "0 0 auto",
-                minWidth: searchingInline && !isTablet ? 96 : 0,
+                flex: stackedLayout ? "1 1 240px" : searchingInline ? "0 1 auto" : "0 0 auto",
+                minWidth: searchingInline && !stackedLayout ? 96 : 0,
                 maxWidth: "100%",
               }}
             >
@@ -988,7 +1055,7 @@ export default function Toolbar({
                 maxVisibleItems={5}
                 maxVisibleWidth={420}
                 className="dg-span-tabs dg-span-tabs--light"
-                style={{ flex: isTablet ? 1 : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
+                style={{ flex: stackedLayout ? 1 : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
               >
                 {focusAreaOptions.map((w) => {
                   const isActive = activeFocusArea === w.id;
@@ -1160,13 +1227,15 @@ export default function Toolbar({
       {/* ── RIGHT ZONE: Presence + Coverage + Tools ── */}
       {hasData && (
         <div
+          ref={actionsZoneRef}
           data-toolbar-actions=""
           data-compact={actionsCompact ? "" : undefined}
           style={{
             marginLeft: "auto",
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            // The same spacing as the controls in the other zones.
+            gap: 8,
             flexWrap: "wrap",
             minWidth: 0,
             maxWidth: "100%",
