@@ -129,7 +129,7 @@ export function BillingBanner({
 }
 
 /** Tabs that fill the row in equal parts on a phone and size to their labels beside a title. */
-export const EVEN_TABS = "w-full sm:w-auto [&>button]:flex-1 sm:[&>button]:flex-none";
+export const EVEN_TABS = "dg-span-tabs--even";
 
 export function BillingCard({
   icon,

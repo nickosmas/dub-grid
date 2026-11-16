@@ -525,6 +525,12 @@
     box-shadow 150ms ease;
   flex: 1 0 auto;
 }
+/* A tab's label truncates rather than pushing the control past its row. */
+.dg-span-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* Hover darkens an unselected label a step short of the chosen one. */
 .dg-span-tab:hover:not(.active) {
   color: var(--dg-color-text-secondary);
@@ -2589,6 +2595,11 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   border-collapse: separate;
   border-spacing: 0;
 }
+/* A long unbroken value (an email) may break, so the table fits its box on a
+   phone instead of pushing the row's arrow out of view. */
+.dg-activity-table td {
+  overflow-wrap: anywhere;
+}
 .dg-activity-head--when {
   width: 88px;
 }
@@ -3507,6 +3518,9 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   min-width: 0;
   max-width: 100%;
 }
+.dg-settings-table-scroll {
+  overflow-x: auto;
+}
 /* A period button never grows past the banner: its label truncates instead. */
 .dg-draft-banner-actions > * {
   min-width: 0;
@@ -3569,6 +3583,9 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* A narrow card puts its action under the title rather than past its edge. */
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 /* The title every card shares, in a header bar or at the top of its body. */
 .dg-card-title {
@@ -4096,6 +4113,30 @@ html:has(.dg-own-scroll) .dg-header-gutter {
     flex-wrap: wrap;
     padding: 10px 12px;
     margin: 8px 8px;
+  }
+  .dg-settings-table-scroll > [data-settings-table-layout="adaptive"] {
+    min-width: var(--dg-settings-table-min, 0px);
+  }
+  /* Alerts' paired filters and actions share their rows in equal halves. */
+  .dg-alerts-half {
+    /* A half, not a zero basis, so a pair starts its own line after a
+       full-width neighbour instead of squeezing beside it. */
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+  /* Select takes its own line, so the two buttons below share theirs. */
+  .dg-alerts-select {
+    order: -1;
+    flex: 1 1 100%;
+  }
+  /* Even tabs fill their row on a phone, every segment the same width. */
+  .dg-span-tabs.dg-span-tabs--even {
+    width: 100%;
+  }
+  .dg-span-tabs--even > .dg-span-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 8px;
   }
   /* A phone banner: title on top with its close in the corner, then the
      buttons in equal halves, an odd last one across the row. */
