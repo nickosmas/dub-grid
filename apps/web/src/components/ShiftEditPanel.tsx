@@ -45,6 +45,11 @@ import { describeCancelRequestConfirmation } from "@/components/shift-requests/c
 import { formatShiftWindow, type WorkingShift } from "@/lib/shift-picker-groups";
 import ShiftPicker from "./ShiftPicker";
 import {
+  PreferenceWarnings,
+  preferenceWarnings,
+  type ShiftEditorPreferences,
+} from "@/components/schedule/shift-preference-notes";
+import {
   fmt12h,
   subtractOneHour,
   addOneHour,
@@ -252,6 +257,8 @@ interface ShiftEditPanelProps {
   certifications?: NamedItem[];
   /** Organization roles — used to restrict job eligibility to schedule roles. */
   orgRoles?: NamedItem[];
+  /** The person's shift and job preferences: shown in the picker, warned about under a shift. */
+  preferences?: ShiftEditorPreferences;
   /** Audit metadata — only populated for admin+ users. */
   auditInfo?: {
     createdByName: string | null;
@@ -527,6 +534,7 @@ export default function ShiftEditPanel({
   focusAreas = [],
   certifications = [],
   orgRoles = [],
+  preferences,
   auditInfo,
   isOwnShift = false,
   hasActiveRequest = false,
@@ -3373,6 +3381,24 @@ export default function ShiftEditPanel({
     );
   }
 
+  function renderCurrentShiftWithPreferences() {
+    const warnings = isAbsence
+      ? []
+      : currentSegments.flatMap((segment) =>
+          preferenceWarnings(
+            preferences,
+            { shiftId: segment.shiftId ?? null, jobId: segment.jobId ?? null },
+            { shiftCategories, focusAreas, jobs },
+          ),
+        );
+    return (
+      <>
+        {renderCurrentShiftPill()}
+        <PreferenceWarnings warnings={warnings} />
+      </>
+    );
+  }
+
   function renderCurrentShiftPill() {
     if (!hasActiveShift || currentLabels.length === 0) return null;
     const noteTypes = getActiveIndicatorIds
@@ -4845,7 +4871,7 @@ export default function ShiftEditPanel({
             />
           ) : inViewMode ? (
             <ShiftPanelView
-              header={renderCurrentShiftPill()}
+              header={renderCurrentShiftWithPreferences()}
               details={buildViewDetails()}
               status={buildViewStatus()}
               series={
@@ -4869,7 +4895,7 @@ export default function ShiftEditPanel({
               {/* An arrived-late absence comes before the shifts (item 50c) */}
               {absenceSession?.side === "arrived-late" && renderRestOfDayAbsenceCard()}
               {/* Current shift displayed prominently */}
-              {renderCurrentShiftPill()}
+              {renderCurrentShiftWithPreferences()}
 
               {allowShiftEdits &&
                 hasActiveShift &&
@@ -5314,6 +5340,7 @@ export default function ShiftEditPanel({
                     initialTab={modal.activeFocusAreaId}
                     multiSelect={true}
                     closeOnSelect={false}
+                    preferences={preferences}
                   />
                 </div>
               )}
