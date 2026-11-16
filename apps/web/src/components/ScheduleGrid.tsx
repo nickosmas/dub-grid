@@ -3017,6 +3017,19 @@ const SectionBlock = memo(function SectionBlock({
                             })
                           : null;
                         const showDiffCellTint = !awayRunDay && (!!draftKind || showsPublishDiff);
+                        // Change chips straddle the cell's top edge, so a cell that
+                        // carries them lifts its content over every grid line, as a
+                        // tinted cell does; an Away bar's chips ride on its first day.
+                        const awayRunChanges =
+                          awayRunDay?.position === "start"
+                            ? rowAwayRunChanges.get(awayRunDay.runIndex)
+                            : undefined;
+                        const liftsChips =
+                          showDiffCellTint ||
+                          !!(
+                            awayRunChanges &&
+                            (awayRunChanges.draft.length > 0 || awayRunChanges.published.length > 0)
+                          );
                         // The row above paints its own bottom stroke inside its
                         // own box — the header cells and the open-shifts row both
                         // do it with a background-image at their bottom edge. Row
@@ -3133,7 +3146,7 @@ const SectionBlock = memo(function SectionBlock({
                                     : undefined,
                               // A run's bar crosses into the next cells, so none of
                               // them may stack its own background above it.
-                              zIndex: showDiffCellTint
+                              zIndex: liftsChips
                                 ? 8
                                 : ri === 0 && !absenceRunDay && !awayRunDay
                                   ? 5
@@ -3203,7 +3216,7 @@ const SectionBlock = memo(function SectionBlock({
                             <div
                               className="dg-grid-cell__content"
                               style={{
-                                zIndex: showDiffCellTint ? 4 : undefined,
+                                zIndex: liftsChips ? 4 : undefined,
                                 overflow: "visible",
                                 // In a row grown for one cell's content, every
                                 // other cell keeps the normal height, centred.
@@ -3238,7 +3251,7 @@ const SectionBlock = memo(function SectionBlock({
                               {awayRunDay?.position === "start" && (
                                 <AwayRunBar
                                   runIndex={awayRunDay.runIndex}
-                                  changes={rowAwayRunChanges.get(awayRunDay.runIndex) ?? null}
+                                  changes={awayRunChanges ?? null}
                                   personName={getEmployeeDisplayName(emp)}
                                   label={
                                     awayRunBeforeFirstDay && rowAwayRange?.firstDay
