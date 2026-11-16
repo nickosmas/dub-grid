@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:61948e3a021ccb32edc33ea0508a74f94b1ec340ff0b12dc8028a010db08eee6",
+  "sourceDigest": "sha256:db2aedd3c3d58a841f53c1e37c0db58d6c6a5e6fe1caf620943d2f8e90682b30",
   "webRoutes": [
     {
       "id": "web:/",
@@ -7535,8 +7535,40 @@
       "exampleFiles": []
     },
     {
+      "id": "env:VERCEL_DEPLOYMENT_ID",
+      "name": "VERCEL_DEPLOYMENT_ID",
+      "scopes": [
+        "web-server"
+      ],
+      "declaration": "usage-only",
+      "exposure": "provider-injected",
+      "declarations": [
+        {
+          "path": "apps/web/src/lib/env.server.ts"
+        }
+      ],
+      "usages": [],
+      "exampleFiles": []
+    },
+    {
       "id": "env:VERCEL_ENV",
       "name": "VERCEL_ENV",
+      "scopes": [
+        "web-server"
+      ],
+      "declaration": "usage-only",
+      "exposure": "provider-injected",
+      "declarations": [
+        {
+          "path": "apps/web/src/lib/env.server.ts"
+        }
+      ],
+      "usages": [],
+      "exampleFiles": []
+    },
+    {
+      "id": "env:VERCEL_GIT_COMMIT_SHA",
+      "name": "VERCEL_GIT_COMMIT_SHA",
       "scopes": [
         "web-server"
       ],

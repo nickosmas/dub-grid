@@ -55,7 +55,7 @@ describe("cache module", () => {
       expect(CacheKey.orgRoles("org-1")).toBe("dg:org:org-1:orgRoles");
       expect(CacheKey.coverageReqs("org-1")).toBe("dg:org:org-1:coverageRequirements");
       expect(CacheKey.organization("org-1")).toBe("dg:org:org-1:organization");
-      expect(CacheKey.bootstrapConfig("org-1")).toBe("dg:org:org-1:bootstrapConfig");
+      expect(CacheKey.bootstrapConfig("org-1")).toBe("dg:org:org-1:bootstrapConfig:local");
     });
 
     it("builds employee-scoped keys correctly", () => {
@@ -190,6 +190,20 @@ describe("cache module", () => {
       // cacheSet is fire-and-forget, wait for it
       await vi.waitFor(() => {
         expect(mockSet).toHaveBeenCalledWith("key", [{ id: 3 }], { ex: 300 });
+      });
+    });
+
+    it("replaces a cached value that fails validation instead of returning it", async () => {
+      mockGet.mockResolvedValueOnce({ shape: "someone else's" });
+      mockSet.mockResolvedValueOnce("OK");
+      const fetcher = vi.fn().mockResolvedValue([1, 2]);
+
+      const result = await cacheThrough("key", 30, fetcher, Array.isArray);
+
+      expect(result).toEqual([1, 2]);
+      expect(fetcher).toHaveBeenCalledOnce();
+      await vi.waitFor(() => {
+        expect(mockSet).toHaveBeenCalledWith("key", [1, 2], { ex: 30 });
       });
     });
 

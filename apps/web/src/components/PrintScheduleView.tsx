@@ -1,6 +1,7 @@
 "use client";
 
 import type { AbsencePillLayout } from "@/lib/absence-pill";
+import { MentoredGlyph } from "@/components/schedule-grid/MentoredGlyph";
 import {
   Fragment,
   useLayoutEffect,
@@ -1414,7 +1415,7 @@ export default function PrintScheduleView({
                           flexShrink: 0,
                         }}
                       >
-                        M
+                        <MentoredGlyph size="1.1em" />
                       </span>
                     }
                   />

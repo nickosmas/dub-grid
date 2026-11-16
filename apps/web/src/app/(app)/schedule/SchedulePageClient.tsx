@@ -400,6 +400,7 @@ import {
 import { UNATTRIBUTED_EDITOR_ID, computeEditorDraftBreakdowns } from "@/lib/publish-attribution";
 import { useQueryClient } from "@tanstack/react-query";
 import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
+import { useOrganizationConfigGuard } from "@/hooks/useOrganizationConfigGuard";
 import { queryKeys } from "@/lib/query-keys";
 import {
   buildScheduleNoteMap,
@@ -626,6 +627,7 @@ function SchedulerContent({
     absenceTypeMap,
     coverageRequirements,
     departments,
+    activeEmployeeCount,
     loading: orgLoading,
     loadError,
     bootstrapRetryable,
@@ -8948,6 +8950,36 @@ function SchedulerContent({
   // ── Loading / error states ───────────────────────────────────────────────────
 
   const isLoading = orgLoading || empLoading || scheduleLoading;
+  // Settings that disagree with the staff and shifts loaded beside them reload
+  // once, then show the recovery screen rather than an empty or "?" grid.
+  const referencedAssignmentIds = useMemo(
+    () => Object.values(shifts).flatMap((entry) => entry?.assignmentIds ?? []),
+    [shifts],
+  );
+  const configGuardInput = useMemo(
+    () =>
+      isLoading || !org
+        ? null
+        : {
+            employees,
+            focusAreas,
+            departments,
+            assignments: allAssignmentDefinitions,
+            referencedAssignmentIds,
+            serverActiveStaffCount: activeEmployeeCount,
+          },
+    [
+      isLoading,
+      org,
+      employees,
+      focusAreas,
+      departments,
+      allAssignmentDefinitions,
+      referencedAssignmentIds,
+      activeEmployeeCount,
+    ],
+  );
+  const configGuard = useOrganizationConfigGuard(configGuardInput);
   // The snapshot only carries shifts and notes, so it can only stand in for the
   // loading screen once the roster is here too — otherwise the grid would paint
   // with no rows and read as broken.
@@ -9005,6 +9037,9 @@ function SchedulerContent({
         onRetry={retryOrganizationBootstrap}
       />
     );
+  }
+  if (configGuard.failed) {
+    return <OrganizationBootstrapRecovery automaticallyRetry={false} onRetry={configGuard.retry} />;
   }
 
   return (

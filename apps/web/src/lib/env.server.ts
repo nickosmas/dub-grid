@@ -52,6 +52,8 @@ const serverSchema = z
     VERCEL_PROJECT_ID: z.string().optional(),
     VERCEL_TEAM_ID: z.string().optional(),
     VERCEL_ENV: z.string().optional(),
+    VERCEL_DEPLOYMENT_ID: z.string().optional(),
+    VERCEL_GIT_COMMIT_SHA: z.string().optional(),
     RESEND_FROM_EMAIL: z.string().optional(),
     DEMO_RECIPIENT_EMAIL: z.string().optional(),
     LOG_LEVEL: z.string().optional(),
