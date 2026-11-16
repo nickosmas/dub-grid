@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash c62e54522c9911fd850aeeaa55978c7f47b57ab0af634027b607b8a3ef409932 -->
+<!-- blueprint:source-hash a6ef405649c757d6f13e1775aab05adbfa8405b0cd5a839ac21238911f350cbd -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -90,6 +90,7 @@ in progress, and 57, which is in progress (57a shipped).
 - **55** - One staff page holds everything stored about a person, in tabs that follow one chosen period.
 - **56** - The app feels built for each phone: native navigation, sheets and alerts, one DubGrid design, and a My schedule | Team switch.
 - **57** (in progress) - Every day a shift request touches is marked on the web grid while it waits and after approval; approvals count as changes in Highlight changes.
+- **58** - The shift picker shows a person's shift and job preferences and warns, without blocking, when a choice goes outside an Only preference.
 
 Each item's parts, what each part shipped and its migration live in
 `blueprint/build-plan.md` (the checklist) and `blueprint/history/` (the
@@ -159,7 +160,7 @@ one it names.
   or publishes always sees both. A schedule-change alert never names the
   publisher.
 
-### Staffing and Auto-build (items 47, 48, 49)
+### Staffing and Auto-build (items 47, 48, 49, 58)
 
 - Every staffing insight is measured on the schedule and must be exact. An
   approval publishes at once and replaces any earlier draft of the cells it
@@ -179,6 +180,14 @@ one it names.
   schedule, Apply and Discard. The day off absence is a Schedule Rules setting
   pre-detected by name. The Tools item is Fill from Recurring Schedules
   (2026-10-22).
+- Scheduling by hand, a person's shift and job preferences show only in their
+  shift editor: an info banner at the top of the picker, a "Preferred" or
+  "Only" tag on the shift group, and, once a pick goes outside an Only
+  preference, one warning banner under the shift, never a block ("Day Shift is
+  outside Aisha's preference." then "Shift preference: Only Evening Shift").
+  Absences and shiftless work never warn. Anyone who can edit shifts sees
+  them. Not on the grid, the open-shift picker or the Staffing check
+  (2026-11-15). Design: "Shift preferences in the picker" canvas.
 
 ### Staff status (item 51)
 

@@ -398,7 +398,7 @@ import {
   type PublishEditorRow,
 } from "./_components/PublishChangeSummary";
 import { UNATTRIBUTED_EDITOR_ID, computeEditorDraftBreakdowns } from "@/lib/publish-attribution";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import OrganizationBootstrapRecovery from "@/components/onboarding/OrganizationBootstrapRecovery";
 import { useOrganizationConfigGuard } from "@/hooks/useOrganizationConfigGuard";
 import { queryKeys } from "@/lib/query-keys";
@@ -7515,37 +7515,39 @@ function SchedulerContent({
 
   // Editors only, while the panel is open: every suggestion is measured on a
   // copy of the schedule by the engine, so this reruns as the draft changes.
-  // Shift and job preferences shape the Schedule Builder's choices; read when it opens.
-  const [shiftPreferences, setShiftPreferences] = useState<
-    ReadonlyMap<string, CoverageShiftPreference>
-  >(() => new Map());
-  const [jobPreferences, setJobPreferences] = useState<ReadonlyMap<string, CoverageJobPreference>>(
-    () => new Map(),
+  // Shift and job preferences shape Auto-build's choices and show in the shift
+  // editor. A failed read leaves both working without them.
+  const preferencesEnabled = Boolean(org?.id && canEditShifts);
+  const shiftPreferencesQuery = useQuery({
+    queryKey: queryKeys.recurringShifts.preferences(org?.id ?? "none"),
+    queryFn: () => fetchShiftPreferences(org!.id),
+    enabled: preferencesEnabled,
+  });
+  const jobPreferencesQuery = useQuery({
+    queryKey: queryKeys.recurringShifts.jobPreferences(org?.id ?? "none"),
+    queryFn: () => fetchJobPreferences(org!.id),
+    enabled: preferencesEnabled,
+  });
+  const shiftPreferences = useMemo<ReadonlyMap<string, CoverageShiftPreference>>(
+    () =>
+      new Map(
+        (shiftPreferencesQuery.data ?? []).map(({ employeeId, mode, shiftIds }) => [
+          employeeId,
+          { mode, shiftIds },
+        ]),
+      ),
+    [shiftPreferencesQuery.data],
   );
-  useEffect(() => {
-    if (!showCoveragePanel || !org?.id || !canEditShifts) return;
-    let cancelled = false;
-    fetchShiftPreferences(org.id)
-      .then((list) => {
-        if (cancelled) return;
-        setShiftPreferences(
-          new Map(list.map(({ employeeId, mode, shiftIds }) => [employeeId, { mode, shiftIds }])),
-        );
-      })
-      // Someone who cannot read recurring schedules builds without preferences.
-      .catch(() => undefined);
-    fetchJobPreferences(org.id)
-      .then((list) => {
-        if (cancelled) return;
-        setJobPreferences(
-          new Map(list.map(({ employeeId, mode, jobIds }) => [employeeId, { mode, jobIds }])),
-        );
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [showCoveragePanel, org?.id, canEditShifts]);
+  const jobPreferences = useMemo<ReadonlyMap<string, CoverageJobPreference>>(
+    () =>
+      new Map(
+        (jobPreferencesQuery.data ?? []).map(({ employeeId, mode, jobIds }) => [
+          employeeId,
+          { mode, jobIds },
+        ]),
+      ),
+    [jobPreferencesQuery.data],
+  );
   const coverageSuggestions = useMemo(() => {
     if (!coverageMatrix || !canEditShifts) return null;
     const adapterInput = {
@@ -10090,6 +10092,17 @@ function SchedulerContent({
                   : undefined
               }
               isCreatingRepeatSeries={isCreatingRepeatSeries}
+              preferences={
+                editPanel.empId
+                  ? {
+                      shift: shiftPreferences.get(editPanel.empId),
+                      job: jobPreferences.get(editPanel.empId),
+                      firstName:
+                        employees.find((employee) => employee.id === editPanel.empId)?.firstName ||
+                        editPanel.empName,
+                    }
+                  : undefined
+              }
               empId={editPanel.empId}
               customStartTime={panelCustomStartTime}
               customEndTime={panelCustomEndTime}

@@ -191,6 +191,13 @@ function canManageRecurring(
   );
 }
 
+/** Schedulers see preferences in the shift editor even without the recurring permissions. */
+function canReadPreferences(
+  permissions: ReturnType<typeof import("@dubgrid/authz").buildPermissionContext>,
+) {
+  return canReadRecurring(permissions) || permissions.canEditShifts;
+}
+
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
@@ -519,7 +526,7 @@ export async function POST(req: NextRequest) {
 
       case "fetchShiftPreferences":
       case "fetchJobPreferences": {
-        const auth = await requireOrgPermissions(req, data.orgId, canReadRecurring, { actor });
+        const auth = await requireOrgPermissions(req, data.orgId, canReadPreferences, { actor });
         if ("response" in auth) {
           return auth.response;
         }
