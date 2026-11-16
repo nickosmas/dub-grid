@@ -1429,7 +1429,19 @@ function JobRow({
             {isDefaultShiftJob ? DEFAULT_SHIFT_JOB_LABEL : form.name || "Untitled job"}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3 }}>
-            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
+            {/* One line that truncates: the header is a button, and its
+                placement can name many areas and shifts. */}
+            <span
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--dg-color-text-muted)",
+                minWidth: 0,
+                maxWidth: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {placementSummary}
             </span>
             {isLockedIdentityJob && !isDefaultShiftJob ? (

@@ -128,7 +128,12 @@ export function EmptyState({
           </p>
         )}
       </div>
-      {action && <div style={{ marginTop: size === "default" ? 8 : 4 }}>{action}</div>}
+      {action && (
+        // Never wider than the empty state, so a long action label truncates.
+        <div style={{ marginTop: size === "default" ? 8 : 4, maxWidth: "100%", minWidth: 0 }}>
+          {action}
+        </div>
+      )}
     </div>
   );
 }

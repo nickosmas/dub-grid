@@ -45,7 +45,7 @@ export function SpanTabs<T extends string>({
             onClick={() => onChange(item.value)}
             className={`dg-span-tab${isActive ? " active" : ""}`}
           >
-            {item.label}
+            <span className="dg-span-tab-label">{item.label}</span>
             {item.count ? (
               <NumericBadge
                 count={item.count}
