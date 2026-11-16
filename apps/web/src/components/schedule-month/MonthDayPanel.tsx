@@ -204,8 +204,10 @@ export function MonthDayPanel({
             {area.groups.map((group) => (
               <div key={group.key} className="dg-month-group">
                 <div className="dg-month-group__head">
-                  <span className="dg-month-group__name">{group.name}</span>
-                  {group.hours && <span className="dg-month-group__hours">{group.hours}</span>}
+                  <span className="dg-month-group__title">
+                    <span className="dg-month-group__name">{group.name}</span>
+                    {group.hours && <span className="dg-month-group__hours">{group.hours}</span>}
+                  </span>
                   <span
                     className="dg-month-group__status dg-tabular-nums"
                     data-short={group.short > 0 || undefined}
