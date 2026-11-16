@@ -30,10 +30,14 @@ const BEVEL_GRADIENT_ID = "access-insignia-bevel";
 // a thin crescent at the very top, so at web's 30% the ring read too bright.
 const BEVEL_LIGHT_OPACITY = 0.15;
 
+// react-native-svg drops the alpha of a stop's color and takes opacity only
+// from stopOpacity, so the shade's rgba token would draw solid black.
+const BEVEL_SHADE_OPACITY = 0.16;
+
 // On a dark surface the shaded lower rim blends into the background, so the
 // disc loses its bottom edge and reads as an oval. Dark mode keeps only the
 // top highlight.
-const DARK_BEVEL_SHADE = "rgba(0, 0, 0, 0)";
+const DARK_BEVEL_SHADE_OPACITY = 0;
 
 /**
  * The star marking an elevated member, sitting just after their name: gold for
@@ -76,7 +80,8 @@ export function AccessInsignia({
             <Stop offset="0.5" stopColor="#000000" stopOpacity={0} />
             <Stop
               offset="1"
-              stopColor={isDarkMode ? DARK_BEVEL_SHADE : ACCESS_INSIGNIA_BEVEL.shade}
+              stopColor="#000000"
+              stopOpacity={isDarkMode ? DARK_BEVEL_SHADE_OPACITY : BEVEL_SHADE_OPACITY}
             />
           </LinearGradient>
         </Defs>
