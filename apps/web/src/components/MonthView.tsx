@@ -21,6 +21,7 @@ import {
   type MonthDay,
   type MonthRequest,
 } from "@/components/schedule-month/monthModel";
+import { SLIDEOVER_CLOSE_MS } from "@/hooks/useSlideoverClose";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import type {
@@ -192,17 +193,37 @@ function MonthView({
   const firstKey = formatDateKey(monthStart);
   const defaultKey = days.has(todayKey) ? todayKey : firstKey;
   const [chosenKey, setChosenKey] = useState<string | null>(null);
+  // The day whose panel is sliding away, kept on screen until the slide ends.
+  const [leavingKey, setLeavingKey] = useState<string | null>(null);
+  const leaveTimer = useRef<number | undefined>(undefined);
   // A choice from another month doesn't carry over; a phone always shows a day.
   const selectedKey = chosenKey && days.has(chosenKey) ? chosenKey : compact ? defaultKey : null;
-  const selectedDay = selectedKey ? days.get(selectedKey) : undefined;
+  const panelKey = selectedKey ?? (leavingKey && days.has(leavingKey) ? leavingKey : null);
+  const panelDay = panelKey ? days.get(panelKey) : undefined;
   const focusKey = selectedKey ?? defaultKey;
 
+  useEffect(() => () => window.clearTimeout(leaveTimer.current), []);
+
+  const close = useCallback(() => {
+    if (!chosenKey) return;
+    setLeavingKey(chosenKey);
+    setChosenKey(null);
+    window.clearTimeout(leaveTimer.current);
+    leaveTimer.current = window.setTimeout(() => setLeavingKey(null), SLIDEOVER_CLOSE_MS);
+  }, [chosenKey]);
+
   const select = useCallback(
-    (dateKey: string) =>
-      setChosenKey((current) => (current === dateKey && !compact ? null : dateKey)),
-    [compact],
+    (dateKey: string) => {
+      if (dateKey === chosenKey && !compact) {
+        close();
+        return;
+      }
+      window.clearTimeout(leaveTimer.current);
+      setLeavingKey(null);
+      setChosenKey(dateKey);
+    },
+    [chosenKey, close, compact],
   );
-  const close = useCallback(() => setChosenKey(null), []);
 
   const moveFocus = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -298,16 +319,18 @@ function MonthView({
         </div>
         {legend}
       </div>
-      {selectedDay && (
-        <MonthDayPanel
-          day={selectedDay}
-          isNameMode={shiftDisplayMode === "name"}
-          hasSearch={hasSearch}
-          isDark={isDark}
-          indicatorTypes={indicatorTypes}
-          onClose={compact ? undefined : close}
-          onOpenWeek={onOpenWeek}
-        />
+      {panelDay && (
+        <div className="dg-month__side" data-closing={!selectedKey || undefined}>
+          <MonthDayPanel
+            day={panelDay}
+            isNameMode={shiftDisplayMode === "name"}
+            hasSearch={hasSearch}
+            isDark={isDark}
+            indicatorTypes={indicatorTypes}
+            onClose={compact ? undefined : close}
+            onOpenWeek={onOpenWeek}
+          />
+        </div>
       )}
     </div>
   );
