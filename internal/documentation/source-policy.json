@@ -140,7 +140,9 @@
     "UPSTASH_REDIS_REST_TOKEN": { "declaration": "conditional", "exposure": "secret" },
     "UPSTASH_REDIS_REST_URL": { "declaration": "conditional", "exposure": "server-config" },
     "VERCEL_API_TOKEN": { "declaration": "optional", "exposure": "secret" },
+    "VERCEL_DEPLOYMENT_ID": { "declaration": "usage-only", "exposure": "provider-injected" },
     "VERCEL_ENV": { "declaration": "usage-only", "exposure": "provider-injected" },
+    "VERCEL_GIT_COMMIT_SHA": { "declaration": "usage-only", "exposure": "provider-injected" },
     "VERCEL_PROJECT_ID": { "declaration": "optional", "exposure": "server-config" },
     "VERCEL_TEAM_ID": { "declaration": "optional", "exposure": "server-config" }
   },

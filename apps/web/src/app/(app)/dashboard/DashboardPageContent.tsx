@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo } from "react";
+import { useOrganizationConfigGuard } from "@/hooks/useOrganizationConfigGuard";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -56,6 +57,7 @@ function DashboardContent() {
     loading: refLoading,
     loadError,
     bootstrapRetryable,
+    activeEmployeeCount,
   } = useOrganizationData();
   const queryClient = useQueryClient();
   const retryOrganizationBootstrap = useCallback(async () => {
@@ -64,6 +66,30 @@ function DashboardContent() {
   const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
 
   const isLoading = refLoading || empLoading || perms.isLoading;
+  // Settings that leave staff with no section reload once, then show the
+  // recovery screen rather than a dashboard of unnamed shifts.
+  const configGuardInput = useMemo(
+    () =>
+      isLoading || !org
+        ? null
+        : {
+            employees,
+            focusAreas,
+            departments,
+            assignments: allAssignmentDefinitions,
+            serverActiveStaffCount: activeEmployeeCount,
+          },
+    [
+      isLoading,
+      org,
+      employees,
+      focusAreas,
+      departments,
+      allAssignmentDefinitions,
+      activeEmployeeCount,
+    ],
+  );
+  const configGuard = useOrganizationConfigGuard(configGuardInput);
 
   const assignmentById = useMemo(() => {
     const map = new Map<number, (typeof assignments)[number]>();
@@ -82,6 +108,9 @@ function DashboardContent() {
         onRetry={retryOrganizationBootstrap}
       />
     );
+  }
+  if (configGuard.failed) {
+    return <OrganizationBootstrapRecovery automaticallyRetry={false} onRetry={configGuard.retry} />;
   }
 
   return (

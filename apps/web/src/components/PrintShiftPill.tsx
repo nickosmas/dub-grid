@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import { PRINT_FIT_LINE } from "@/components/print-fit";
+import { MentoredGlyph } from "@/components/schedule-grid/MentoredGlyph";
 import { PRINT_INK } from "@/components/print-palette";
 import { seamBorders, seamRadius, type PillSeam } from "@/lib/attached-pill";
 import { fmt12hShort } from "@/lib/utils";
@@ -162,7 +163,7 @@ export function PrintShiftPill({
             lineHeight: 1,
           }}
         >
-          M
+          <MentoredGlyph size="1.1em" />
         </span>
       )}
       {notes.length > 0 && (

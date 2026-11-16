@@ -50,6 +50,14 @@ function redisKey(key: string): string {
   return `${serverEnv?.CACHE_KEY_PREFIX ?? ""}${key}`;
 }
 
+// The bootstrap aggregate is a positional array of query results whose order
+// is code, not data. Preview and production deployments, and the old and new
+// release during a rollout, share one Redis, so an entry is read only by the
+// deployment that wrote it.
+function deploymentScope(): string {
+  return serverEnv?.VERCEL_DEPLOYMENT_ID || serverEnv?.VERCEL_GIT_COMMIT_SHA || "local";
+}
+
 // ── Key Builders ───────────��────────────────────────────���───────────────
 export const CacheKey = {
   // Stable org config
@@ -69,7 +77,7 @@ export const CacheKey = {
    * Never contains memberships, permissions, session state, employee records,
    * or Test Sandbox context.
    */
-  bootstrapConfig: (orgId: string) => `dg:org:${orgId}:bootstrapConfig`,
+  bootstrapConfig: (orgId: string) => `dg:org:${orgId}:bootstrapConfig:${deploymentScope()}`,
   allOrganizations: () => `dg:gm:allOrganizations`,
 
   // Moderate
@@ -236,9 +244,11 @@ export async function cacheThrough<T>(
   key: string,
   ttlSeconds: number,
   fetcher: () => Promise<T>,
+  /** An entry that fails this is ignored and replaced, never returned. */
+  isValid?: (value: unknown) => boolean,
 ): Promise<T> {
   const cached = await cacheGet<T>(key);
-  if (cached !== null) {
+  if (cached !== null && (!isValid || isValid(cached))) {
     if (_debugMode) console.debug(`[cache] HIT ${key}`);
     return cached;
   }
