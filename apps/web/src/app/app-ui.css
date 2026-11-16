@@ -2628,6 +2628,12 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   align-items: baseline;
   gap: 2px 6px;
 }
+.dg-activity-day-meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
 .dg-activity-day-label {
   font-size: var(--dg-type-content-group-heading-size);
   font-weight: var(--dg-type-content-group-heading-weight);
@@ -3514,6 +3520,19 @@ html:has(.dg-own-scroll) .dg-header-gutter {
 .dg-draft-banner--info {
   background: var(--dg-color-banner-info-bg);
   border-color: var(--dg-color-banner-info-border);
+}
+/* A long message stacks its title over the text and shares the row with the
+   buttons, rather than spanning the banner and leaving them a row of their
+   own pushed to the right. */
+.dg-draft-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.dg-draft-banner:has(> .dg-draft-banner-body) > :first-child {
+  align-self: flex-start;
 }
 .dg-draft-banner-actions {
   margin-left: auto;
@@ -4944,13 +4963,22 @@ html:has(.dg-own-scroll) .dg-header-gutter {
 .dg-month-group {
   margin-bottom: 10px;
 }
+/* The hours wrap under the name, so the status keeps its place at the end
+   of the first line instead of dropping to a line of its own. */
 .dg-month-group__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: var(--dg-fs-caption);
+}
+.dg-month-group__title {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px 8px;
-  margin-bottom: 4px;
-  font-size: var(--dg-fs-caption);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .dg-month-group__name {
   font-weight: 600;
@@ -4961,6 +4989,8 @@ html:has(.dg-own-scroll) .dg-header-gutter {
 }
 .dg-month-group__status {
   margin-left: auto;
+  flex: none;
+  white-space: nowrap;
   font-weight: 600;
   color: var(--dg-color-text-muted);
 }

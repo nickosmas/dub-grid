@@ -1435,7 +1435,14 @@
 .landing-phones-trio .landing-phones {
   gap: 40px;
 }
+/* Three phones at 0.72 need 1100px, so a narrower desktop shrinks them
+   rather than dropping the third onto a row of its own. */
 @media (min-width: 1024px) {
+  .landing-phones-trio .landing-phone-frame {
+    --landing-phone-scale: 0.62;
+  }
+}
+@media (min-width: 1200px) {
   .landing-phones-trio .landing-phone-frame {
     --landing-phone-scale: 0.72;
   }

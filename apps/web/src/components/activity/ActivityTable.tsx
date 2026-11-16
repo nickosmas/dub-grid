@@ -95,12 +95,16 @@ export function ActivityTable<T extends ActivityTableEntry>({
                 <th scope="colgroup" colSpan={columnCount} className="dg-activity-day-heading">
                   <div className="dg-activity-day-heading-inner">
                     <span className="dg-activity-day-label">{group.label}</span>
-                    {group.label === "Today" || group.label === "Yesterday" ? (
-                      <span className="dg-activity-day-date">
-                        {formatActivityDayDate(group.dateKey)}
-                      </span>
-                    ) : null}
-                    <DayCount count={dayCounts?.[group.dateKey] ?? group.entries.length} />
+                    {/* The date and count wrap as one piece, so a narrow
+                        heading never ends a line on the separator. */}
+                    <span className="dg-activity-day-meta">
+                      {group.label === "Today" || group.label === "Yesterday" ? (
+                        <span className="dg-activity-day-date">
+                          {formatActivityDayDate(group.dateKey)}
+                        </span>
+                      ) : null}
+                      <DayCount count={dayCounts?.[group.dateKey] ?? group.entries.length} />
+                    </span>
                   </div>
                 </th>
               </tr>
