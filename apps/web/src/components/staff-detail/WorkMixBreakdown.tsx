@@ -85,7 +85,7 @@ export function WorkMixBreakdown({
         </div>
       ) : null}
 
-      <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-x-6 gap-y-1 p-0">
+      <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))] gap-x-6 gap-y-1 p-0">
         {mix.map((item) => (
           <li
             key={item.key}

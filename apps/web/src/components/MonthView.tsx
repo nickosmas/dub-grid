@@ -557,7 +557,7 @@ function MonthView({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
+          gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
           gap: 6,
           marginBottom: 4,
         }}
@@ -583,7 +583,7 @@ function MonthView({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
+          gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
           gap: 6,
           alignItems: "start",
         }}
@@ -611,6 +611,7 @@ function MonthView({
           return (
             <div
               key={dateKey}
+              className="dg-month-cell"
               role="button"
               tabIndex={0}
               data-search-highlight={isSearchHighlightedDay ? "true" : undefined}
@@ -645,6 +646,7 @@ function MonthView({
                 borderRadius: "var(--dg-radius-lg)",
                 padding: isOpen || isToday ? "8px 9px 7px" : "9px 10px 8px",
                 minHeight: 64,
+                minWidth: 0,
                 boxShadow: isOpen
                   ? "0 0 0 2px rgba(37, 99, 235, 0.12)"
                   : isSearchHighlightedDay
@@ -691,14 +693,17 @@ function MonthView({
                     return (
                       <div
                         key={focusArea}
+                        className="dg-month-area-row"
                         style={{
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
                           gap: 4,
+                          minWidth: 0,
                         }}
                       >
                         <span
+                          className="dg-month-area-name"
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
@@ -706,6 +711,7 @@ function MonthView({
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
+                            minWidth: 0,
                           }}
                         >
                           {focusArea}
