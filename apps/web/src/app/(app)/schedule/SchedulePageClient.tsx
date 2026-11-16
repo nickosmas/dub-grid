@@ -222,6 +222,7 @@ import {
 import type { TimeRange } from "@/lib/schedule-logic";
 import {
   buildShiftDisplayParts,
+  compareJobsByQualificationSeniority,
   formatAssignableShiftOptionLabel,
   formatShiftAssignmentDisqualificationMessage,
   getAssignmentDefinitionDisqualificationReasons as getAssignmentDisqualificationReasons,
@@ -4302,6 +4303,18 @@ function SchedulerContent({
       return summary && first ? { waitingOn: summary.waitingOn, status: first.status } : null;
     },
     [activeRequestForKey],
+  );
+
+  const monthJobSeniority = useMemo(
+    () =>
+      new Map(
+        [...jobs]
+          .sort((left, right) =>
+            compareJobsByQualificationSeniority(left, right, orgRoles, certifications),
+          )
+          .map((job, index) => [job.id, index]),
+      ),
+    [jobs, orgRoles, certifications],
   );
 
   // Month view's shortages, from the same coverage the Schedule Builder
@@ -10082,6 +10095,7 @@ function SchedulerContent({
                 openShifts={openShifts}
                 coverage={monthCoverage}
                 requestForKey={monthRequestForKey}
+                jobSeniority={monthJobSeniority}
                 onOpenWeek={handleOpenWeek}
                 compact={isMobile}
               />

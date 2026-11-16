@@ -304,6 +304,41 @@ export function getQualificationSeniorityRank(input: {
   );
 }
 
+/**
+ * Most senior job first: jobs limited to roles or certifications, by the most
+ * senior one they allow, then jobs anyone can work.
+ */
+export function compareJobsByQualificationSeniority(
+  left: JobDefinition,
+  right: JobDefinition,
+  orgRoles: NamedItem[],
+  certifications: NamedItem[],
+): number {
+  const leftRank = getQualificationSeniorityRank({
+    job: left,
+    orgRoles,
+    certifications,
+  });
+  const rightRank = getQualificationSeniorityRank({
+    job: right,
+    orgRoles,
+    certifications,
+  });
+  const leftRanked = leftRank != null;
+  const rightRanked = rightRank != null;
+
+  if (leftRanked !== rightRanked) {
+    return leftRanked ? -1 : 1;
+  }
+  if (leftRank != null && rightRank != null && leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+  if (left.sortOrder !== right.sortOrder) {
+    return left.sortOrder - right.sortOrder;
+  }
+  return left.name.localeCompare(right.name);
+}
+
 function formatRequirementList(requirements: string[]): string {
   if (requirements.length === 0) {
     return "qualification requirements";
