@@ -4721,9 +4721,35 @@ html:has(.dg-own-scroll) .dg-header-gutter {
    opens a panel beside the calendar, or under it at phone width. */
 .dg-month {
   display: flex;
-  gap: 16px;
   align-items: stretch;
   min-height: 0;
+}
+/* The panel slides in from the right like a slideover while the calendar
+   narrows to make room. The panel keeps its width and sits at the slot's
+   right edge, so growing the slot is what moves it. */
+.dg-month__side {
+  display: flex;
+  justify-content: flex-end;
+  width: 396px;
+  padding-left: 16px;
+  flex-shrink: 0;
+  overflow: hidden;
+  animation: month-side-in var(--dg-duration-standard) ease-out;
+}
+.dg-month__side[data-closing] {
+  animation: month-side-out var(--dg-duration-standard) ease forwards;
+}
+@keyframes month-side-in {
+  from {
+    width: 0;
+    padding-left: 0;
+  }
+}
+@keyframes month-side-out {
+  to {
+    width: 0;
+    padding-left: 0;
+  }
 }
 .dg-month__calendar {
   flex: 1;
@@ -5119,6 +5145,13 @@ html:has(.dg-own-scroll) .dg-header-gutter {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+.dg-month[data-compact] .dg-month__side {
+  display: block;
+  width: auto;
+  padding-left: 0;
+  overflow: visible;
+  animation: none;
 }
 .dg-month[data-compact] .dg-month-panel {
   width: auto;
