@@ -35,6 +35,7 @@ export * from "./coverage-matrix";
 export * from "./coverage-change-text";
 export * from "./coverage-suggestions";
 export * from "./coverage-suggestion-text";
+export * from "./preference-fit";
 export * from "./requests-assembly";
 export * from "./hours-assembly";
 export * from "./pay-period";

@@ -190,6 +190,32 @@ describe("POST /api/schedule/recurring", () => {
       });
     });
 
+    it("lets anyone who edits shifts read preferences, but not save them", async () => {
+      requireOrgPermissions.mockResolvedValue({
+        actor: { id: ACTOR_ID, email: null },
+        serviceClient: client({}),
+      });
+
+      await post({ action: "fetchShiftPreferences" });
+      await post({ action: "fetchJobPreferences" });
+      await post({
+        action: "saveShiftPreference",
+        employeeId: EMPLOYEE_ID,
+        preference: null,
+      });
+
+      type Allowed = (p: Record<string, boolean>) => boolean;
+      const [readShifts, readJobs, save] = requireOrgPermissions.mock.calls.map(
+        (call) => call[2] as Allowed,
+      );
+      for (const read of [readShifts, readJobs]) {
+        expect(read({ canEditShifts: true })).toBeTruthy();
+        expect(read({ canViewRecurringShifts: true })).toBeTruthy();
+        expect(read({})).toBeFalsy();
+      }
+      expect(save({ canEditShifts: true })).toBeFalsy();
+    });
+
     it("saves a preference for the organization's own person and shifts", async () => {
       const db = client({
         employees: { data: { id: EMPLOYEE_ID }, error: null },
