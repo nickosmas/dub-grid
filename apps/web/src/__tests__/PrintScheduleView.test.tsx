@@ -135,7 +135,9 @@ describe("PrintScheduleView", () => {
     expect(bars[0].dataset.printAbsenceRun).toBe("7");
     expect(bars[0].textContent).toBe("Vacation or Flex ×7");
     expect(bars[0].style.background).toContain("repeating-linear-gradient(135deg");
-    expect(bars[0].style.borderStyle).toBe("dashed");
+    // The grid's edge for a filled pill: dashed means a draft there.
+    expect(bars[0].style.borderStyle).toBe("solid");
+    expect(bars[0].style.borderColor).toBe("transparent");
     expect(container.querySelectorAll("[data-print-pill]")).toHaveLength(0);
   });
 
@@ -246,6 +248,15 @@ describe("PrintScheduleView", () => {
       expect(markup).not.toContain("var(--");
       expect(markup).toContain('aria-label="Schedule notes: Schedule note"');
     });
+  });
+
+  it("draws a code in the key as its printed pill draws it", () => {
+    const { container } = renderPrintView({ worked: true, noteMarksForKey: () => [] });
+    const pill = container.querySelector<HTMLElement>("[data-print-pill]")!;
+    const swatch = container.querySelector<HTMLElement>("[data-print-key-swatch]")!;
+    expect(swatch.textContent).toBe(pill.textContent);
+    expect(swatch.style.borderRadius).toBe(PRINT_PILL_RADIUS.single);
+    expect(swatch.style.background).toBe(pill.style.background);
   });
 
   it("keys shift codes but prints no shift key for full shift names", () => {
