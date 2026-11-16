@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { decodeJwt } from "jose";
-import { setSentryUser } from "@/lib/sentry";
+import { addBreadcrumb, setSentryUser } from "@/lib/sentry";
+import { resolveAuthEventUser } from "@/lib/auth-event-user";
 import { AuthContext } from "@/lib/auth-context";
 export { useAuth } from "@/lib/auth-context";
 import {
@@ -92,6 +93,7 @@ export default function AuthProvider({
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const authGenerationRef = useRef(0);
+  const userRef = useRef<User | null>(null);
   // Only the first mount's answer applies: it describes the hard load that
   // rendered this provider, not any later navigation.
   const initialServerVerifiedUserId = useRef(serverVerifiedUserId);
@@ -115,6 +117,7 @@ export default function AuthProvider({
 
       setSession(nextUser ? nextSession : null);
       setUser(nextUser);
+      userRef.current = nextUser;
       setIsLoading(false);
       setSentryUser(
         nextUser ? { id: nextUser.id, orgId: tokenOrgId(nextSession?.access_token) } : null,
@@ -215,21 +218,21 @@ export default function AuthProvider({
       }
 
       void (async () => {
-        // On these events the session's user already came from the auth server
-        // in that same exchange: signInWithPassword and refreshSession return
-        // it, and setSession re-reads it before emitting. Calling getUser()
-        // again here was a second network round trip for an answer we were
-        // just handed — and it landed right after sign-in, back-to-back with
-        // setSession's own, on the slowest screen in the app.
-        //
-        // Anything else (INITIAL_SESSION, a session rehydrated from storage)
-        // is not vouched for by the auth server, so it still gets verified.
-        const trustsSessionUser =
-          event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED";
-        const verifiedUser =
-          trustsSessionUser && nextSession.user
-            ? nextSession.user
-            : await getVerifiedBrowserAuthUser().catch(() => null);
+        // SIGNED_IN, TOKEN_REFRESHED and USER_UPDATED carry a user the auth
+        // server just returned; anything else (INITIAL_SESSION, a session
+        // rehydrated from storage) is verified, and an unreachable auth server
+        // keeps the person signed in rather than signing them out.
+        const resolved = await resolveAuthEventUser({
+          event,
+          session: nextSession,
+          currentUser: userRef.current,
+          verify: () => getVerifiedBrowserAuthUser(),
+        });
+        if (resolved.kind === "keep") {
+          addBreadcrumb("auth", `${event}: auth server unreachable, kept the current state`);
+          return;
+        }
+        const verifiedUser = resolved.user;
         if (!commitAuthState(generation, nextSession, verifiedUser)) return;
 
         // No redirect on SIGNED_OUT — signOutLocal() handles the apex redirect,

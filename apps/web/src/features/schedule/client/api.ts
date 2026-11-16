@@ -572,11 +572,19 @@ export function getScheduleLastViewed(orgId: string): Promise<string | null> {
   }).then((data) => data.lastViewed);
 }
 
+/**
+ * Records when this person last looked at the schedule. Every caller fires and
+ * forgets it, so a failure (offline after sleep) settles quietly rather than
+ * surfacing as an unhandled error; the next visit records it again.
+ */
 export function updateScheduleLastViewed(orgId: string): Promise<void> {
   return requestScheduleManage<{ success: true }>({
     action: "updateScheduleLastViewed",
     orgId,
-  }).then(() => undefined);
+  }).then(
+    () => undefined,
+    () => undefined,
+  );
 }
 
 async function requestManageWithLockTyped<T extends Record<string, unknown>>(

@@ -543,7 +543,7 @@ describe("ScheduleGrid", () => {
     expect(pill).not.toBeNull();
     expect(within(firstCell).getByText("D")).toBeInTheDocument();
     expect(badge).not.toBeNull();
-    expect(badge).toHaveTextContent("M");
+    expect(badge?.querySelector("[data-mentored-glyph]")).not.toBeNull();
     expect(badge?.getAttribute("aria-label")).toBe("Mentored assignment");
     expect(badge?.style.width).toBe("16px");
     expect(badge?.style.height).toBe("16px");

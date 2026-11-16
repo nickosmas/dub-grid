@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { UserPen } from "lucide-react";
+import { MentoredGlyph } from "./MentoredGlyph";
 import { MaybeHint } from "@/components/ui/hint";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import type { RequestWaitingOn } from "@/types";
@@ -237,7 +238,7 @@ export function MentoredShiftBadge({
         zIndex: 5,
       }}
     >
-      M
+      <MentoredGlyph size={compact ? 9 : 10} />
     </span>
   );
 

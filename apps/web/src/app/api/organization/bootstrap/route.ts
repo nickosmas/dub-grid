@@ -46,6 +46,7 @@ import {
 } from "@/lib/db/shared";
 import logger from "@/lib/logger";
 import { CacheKey, cacheThrough, TTL } from "@/lib/cache";
+import { isBootstrapConfigBundle } from "@/lib/server/bootstrap-config-bundle";
 import { withTimeoutOrThrow } from "@/lib/with-timeout";
 import { BILLING_ACCESS_SELECT, evaluateOrganizationAccess } from "@/lib/billing-policy";
 
@@ -167,62 +168,66 @@ function loadBootstrapData(timer: Timer, deadlineAt: number, targetOrgId: string
       // permissions, session, impersonation, sandbox selection, and staff
       // count remain request-scoped.
       timeBootstrapStage(timer, deadlineAt, "config", () =>
-        cacheThrough(CacheKey.bootstrapConfig(targetOrgId), TTL.MIDDLEWARE, () =>
-          Promise.all([
-            serviceClient
-              .from("organizations")
-              .select(`${ORGANIZATION_COLS}, ${BILLING_ACCESS_SELECT}`)
-              .eq("id", targetOrgId)
-              .single(),
-            serviceClient
-              .from("focus_areas")
-              .select(FOCUS_AREA_COLS)
-              .eq("org_id", targetOrgId)
-              .order("sort_order", { ascending: true }),
-            serviceClient
-              .from("shift_categories")
-              .select(SHIFT_CATEGORY_COLS)
-              .eq("org_id", targetOrgId)
-              .order("sort_order", { ascending: true }),
-            serviceClient
-              .from("jobs")
-              .select(JOB_COLS)
-              .eq("org_id", targetOrgId)
-              .order("sort_order", { ascending: true }),
-            serviceClient
-              .from("indicator_types")
-              .select(INDICATOR_TYPE_COLS)
-              .eq("org_id", targetOrgId)
-              .is("archived_at", null)
-              .order("sort_order", { ascending: true }),
-            serviceClient
-              .from("certifications")
-              .select(NAMED_ITEM_COLS)
-              .eq("org_id", targetOrgId)
-              .is("archived_at", null)
-              .order("sort_order", { ascending: true }),
-            serviceClient
-              .from("organization_roles")
-              .select(ORG_ROLE_COLS)
-              .eq("org_id", targetOrgId)
-              .is("archived_at", null)
-              .order("sort_order", { ascending: true }),
-            serviceClient
-              .from("departments")
-              .select(DEPARTMENT_COLS)
-              .eq("org_id", targetOrgId)
-              .is("archived_at", null)
-              .order("sort_order", { ascending: true }),
-            serviceClient
-              .from("coverage_requirements")
-              .select(COVERAGE_REQ_COLS)
-              .eq("org_id", targetOrgId),
-            serviceClient
-              .from("absence_types")
-              .select(ABSENCE_TYPE_COLS)
-              .eq("org_id", targetOrgId)
-              .order("sort_order", { ascending: true }),
-          ]),
+        cacheThrough(
+          CacheKey.bootstrapConfig(targetOrgId),
+          TTL.MIDDLEWARE,
+          () =>
+            Promise.all([
+              serviceClient
+                .from("organizations")
+                .select(`${ORGANIZATION_COLS}, ${BILLING_ACCESS_SELECT}`)
+                .eq("id", targetOrgId)
+                .single(),
+              serviceClient
+                .from("focus_areas")
+                .select(FOCUS_AREA_COLS)
+                .eq("org_id", targetOrgId)
+                .order("sort_order", { ascending: true }),
+              serviceClient
+                .from("shift_categories")
+                .select(SHIFT_CATEGORY_COLS)
+                .eq("org_id", targetOrgId)
+                .order("sort_order", { ascending: true }),
+              serviceClient
+                .from("jobs")
+                .select(JOB_COLS)
+                .eq("org_id", targetOrgId)
+                .order("sort_order", { ascending: true }),
+              serviceClient
+                .from("indicator_types")
+                .select(INDICATOR_TYPE_COLS)
+                .eq("org_id", targetOrgId)
+                .is("archived_at", null)
+                .order("sort_order", { ascending: true }),
+              serviceClient
+                .from("certifications")
+                .select(NAMED_ITEM_COLS)
+                .eq("org_id", targetOrgId)
+                .is("archived_at", null)
+                .order("sort_order", { ascending: true }),
+              serviceClient
+                .from("organization_roles")
+                .select(ORG_ROLE_COLS)
+                .eq("org_id", targetOrgId)
+                .is("archived_at", null)
+                .order("sort_order", { ascending: true }),
+              serviceClient
+                .from("departments")
+                .select(DEPARTMENT_COLS)
+                .eq("org_id", targetOrgId)
+                .is("archived_at", null)
+                .order("sort_order", { ascending: true }),
+              serviceClient
+                .from("coverage_requirements")
+                .select(COVERAGE_REQ_COLS)
+                .eq("org_id", targetOrgId),
+              serviceClient
+                .from("absence_types")
+                .select(ABSENCE_TYPE_COLS)
+                .eq("org_id", targetOrgId)
+                .order("sort_order", { ascending: true }),
+            ]),
+          isBootstrapConfigBundle,
         ),
       ),
       // Count only: SetupGuard needs to know an org has staff before it
