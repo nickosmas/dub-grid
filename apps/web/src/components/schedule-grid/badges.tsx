@@ -203,7 +203,7 @@ function ChangeHoverCard({
 
 export function MentoredShiftBadge({
   compact = false,
-  rightInset = 0.5,
+  rightInset = NOTE_LANE_INSET,
 }: {
   compact?: boolean;
   /** Pushed inward when something outranks it in the corner — see LOCK_CORNER_CLEARANCE. */
@@ -217,7 +217,8 @@ export function MentoredShiftBadge({
       style={{
         position: "absolute",
         // Change chips straddle the top-left edge, so no chip shares this corner.
-        top: 0.5,
+        // The same inset as the note dots in the opposite corner.
+        top: NOTE_LANE_INSET,
         right: rightInset,
         width: size,
         height: size,

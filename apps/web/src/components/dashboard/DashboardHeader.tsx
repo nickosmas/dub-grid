@@ -147,22 +147,23 @@ export default function DashboardHeader({
             gap: 8,
           }}
         >
+          {/* The row is filled: the tabs take what the button leaves, in even
+              segments, as the Activity log's period row does. */}
           {showViewModeTabs ? (
             <ViewModeTabs
               modes={VIEW_MODES}
               viewMode={viewMode}
               onViewModeChange={onViewModeChange}
+              even
               style={{
-                alignSelf: "flex-start",
+                flex: "1 1 auto",
                 maxWidth: "100%",
                 minWidth: 0,
                 overflowX: "auto",
                 overflowY: "hidden",
               }}
             />
-          ) : (
-            <div />
-          )}
+          ) : null}
           <Button
             onClick={onToday}
             className="dg-btn dg-btn-secondary"
@@ -170,7 +171,7 @@ export default function DashboardHeader({
               height: "var(--dg-toolbar-h)",
               padding: "0 14px",
               borderRadius: "var(--dg-btn-radius)",
-              flexShrink: 0,
+              flex: showViewModeTabs ? "0 0 auto" : "1 1 100%",
             }}
           >
             {todayLabel}
@@ -295,14 +296,21 @@ function ViewModeTabs({
   viewMode,
   onViewModeChange,
   style,
+  even = false,
 }: {
   modes: { value: ViewMode; label: string }[];
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   style?: CSSProperties;
+  /** Equal segments across the width it's given. */
+  even?: boolean;
 }) {
   return (
-    <div data-tour="dashboard-view-mode" className="dg-span-tabs dg-span-tabs--light" style={style}>
+    <div
+      data-tour="dashboard-view-mode"
+      className={`dg-span-tabs dg-span-tabs--light${even ? " dg-span-tabs--fill" : ""}`}
+      style={style}
+    >
       {modes.map((m) => {
         const isActive = viewMode === m.value;
         return (
