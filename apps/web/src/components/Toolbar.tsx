@@ -615,6 +615,7 @@ export default function Toolbar({
   const [wrapStacked, setWrapStacked] = useState(false);
   const stackedAtWidthRef = useRef(0);
   const stackedLayout = isTablet || wrapStacked;
+  const tabsGrow = !stackedLayout && !searchingInline;
   useLayoutEffect(() => {
     const toolbar = toolbarRef.current;
     if (!toolbar || isTablet) return;
@@ -1032,46 +1033,50 @@ export default function Toolbar({
             // controls off the side of the screen.
             // While the field is open it shares this row with the tabs, which
             // give up width (they scroll), rather than wrapping below them.
-            flexWrap: searchingInline && !stackedLayout ? "nowrap" : "wrap",
+            // Growing tabs share one row with sort and search, and the zone's
+            // minimum is the tabs at their cap, so the toolbar stacks only
+            // once even that doesn't fit.
+            flexWrap: (searchingInline && !stackedLayout) || tabsGrow ? "nowrap" : "wrap",
             rowGap: 8,
-            flex: stackedLayout ? undefined : searchingInline ? "1 1 0" : "1 1 auto",
-            minWidth: 0,
+            flex: stackedLayout ? undefined : searchingInline || tabsGrow ? "1 1 0" : "1 1 auto",
+            minWidth: tabsGrow ? "auto" : 0,
             maxWidth: "100%",
             ...(stackedLayout ? { order: 3, flexBasis: "100%", width: "100%" } : {}),
           }}
         >
           {focusAreaOptions.length > 1 && (
-            <div
+            <ScrollableTabs
               data-tour="schedule-focus-filter"
-              style={{
-                flex: stackedLayout ? "1 1 240px" : searchingInline ? "0 1 auto" : "0 0 auto",
-                minWidth: searchingInline && !stackedLayout ? 96 : 0,
-                maxWidth: "100%",
-              }}
+              // On one row every area shows when there's room; short of it the
+              // tabs shrink to All and four areas (no wider than long names
+              // allow) and the rest scroll, so the toolbar stays one row.
+              maxVisibleItems={5}
+              maxVisibleWidth={420}
+              growToFit={stackedLayout || tabsGrow}
+              className="dg-span-tabs dg-span-tabs--light"
+              style={
+                stackedLayout
+                  ? // A row of their own: as wide as every area, or the row.
+                    { flex: "1 1 240px", minWidth: 0, maxWidth: "var(--dg-tabs-natural, 100%)" }
+                  : tabsGrow
+                    ? undefined
+                    : { flex: "0 1 auto", minWidth: 96, maxWidth: "100%" }
+              }
             >
-              <ScrollableTabs
-                // All and four areas, and no wider than long names allow; the
-                // rest scroll, so the toolbar stays one row.
-                maxVisibleItems={5}
-                maxVisibleWidth={420}
-                className="dg-span-tabs dg-span-tabs--light"
-                style={{ flex: stackedLayout ? 1 : "0 0 auto", minWidth: 0, maxWidth: "100%" }}
-              >
-                {focusAreaOptions.map((w) => {
-                  const isActive = activeFocusArea === w.id;
-                  return (
-                    <Fragment key={w.id ?? "all"}>
-                      <Button
-                        onClick={() => onFocusAreaChange(w.id)}
-                        className={`dg-span-tab${isActive ? " active" : ""}`}
-                      >
-                        {w.name}
-                      </Button>
-                    </Fragment>
-                  );
-                })}
-              </ScrollableTabs>
-            </div>
+              {focusAreaOptions.map((w) => {
+                const isActive = activeFocusArea === w.id;
+                return (
+                  <Fragment key={w.id ?? "all"}>
+                    <Button
+                      onClick={() => onFocusAreaChange(w.id)}
+                      className={`dg-span-tab${isActive ? " active" : ""}`}
+                    >
+                      {w.name}
+                    </Button>
+                  </Fragment>
+                );
+              })}
+            </ScrollableTabs>
           )}
           {roomyToolbar ? (
             <>
