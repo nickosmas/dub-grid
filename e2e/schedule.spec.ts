@@ -32,4 +32,11 @@ test("the schedule opens in Month view", async ({ page }) => {
 
   await expect(page.getByText(/^[A-Z][a-z]+ \d{4}$/).first()).toBeVisible();
   await expect(page.getByText("This page didn't load")).toHaveCount(0);
+
+  // A day opens its panel, and the panel leads to the week where it's edited.
+  await page.getByRole("button", { name: /, today,/ }).click();
+  const panel = page.getByRole("region", { name: /details$/ });
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "Open this week" }).click();
+  await expect(page.getByRole("button", { name: "1 Week", exact: true })).toBeVisible();
 });

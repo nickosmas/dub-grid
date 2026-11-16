@@ -99,7 +99,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:375682f07c30939f8354728c86aed7ab0cae45583067fd39db008c72ba116d2f"
+      "evidenceFingerprint": "sha256:56a449d4b5598e52e2f1be7ff7046020077805084e22ce503852af172d46f16a"
     },
     {
       "id": "introduction",
@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4b4b1c0446d1e579af917dcc1f97424d750a95b56051af0912d108aba937e124"
+      "evidenceFingerprint": "sha256:85f9521e9d59c63709d9fba244dd225757ac778635a42fbb8198715c4d54624e"
     },
     {
       "id": "quickstart",
@@ -238,7 +238,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:b2da250f73eb2ed49a67336705c00e9a5b2bd0ab97f9641f5672076f5adde979"
+      "evidenceFingerprint": "sha256:d611f394a342f542dfe54e61fc3b7ca07a4eac87aa86d8b30874458c7fa5a440"
     },
     {
       "id": "onboarding",
@@ -356,6 +356,9 @@
             "apps/web/src/components/PrintOptionsModal.tsx",
             "apps/web/src/components/PrintScheduleView.tsx",
             "apps/web/src/components/MonthView.tsx",
+            "apps/web/src/components/schedule-month/monthModel.ts",
+            "apps/web/src/components/schedule-month/MonthDayCell.tsx",
+            "apps/web/src/components/schedule-month/MonthDayPanel.tsx",
             "apps/web/src/components/MobileDayView.tsx",
             "apps/web/src/components/schedule-grid/noteDots.tsx",
             "apps/web/src/components/schedule/OpenShiftStaffingModal.tsx",
@@ -377,6 +380,7 @@
             "apps/web/src/__tests__/PrintOptionsModal.test.tsx",
             "apps/web/src/__tests__/PrintScheduleView.test.tsx",
             "apps/web/src/__tests__/MonthView.test.tsx",
+            "apps/web/src/components/schedule-month/monthModel.test.ts",
             "apps/web/src/__tests__/MobileDayView.test.tsx",
             "apps/web/src/components/schedule/OpenShiftStaffingModal.test.tsx",
             "apps/web/src/app/(app)/schedule/_components/BulkDeleteReviewContent.test.tsx",
@@ -386,7 +390,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:334efb3eb1fa9a5399a2ea8a291aacdc25a8a63f8f0bb767ebf333b43d1397ce"
+      "evidenceFingerprint": "sha256:805ec263197471ecc8123c2584184920fd9951e37752b32f578680c7a23c1da6"
     },
     {
       "id": "draft-publish",
@@ -444,7 +448,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:67471f583073bc1dbabbca8b4d505dbcaa6ec38150e3bc29f8916e590f8dce21"
+      "evidenceFingerprint": "sha256:6b19f144cb9e39e3678ac907ba523bb9ddee9c39ef53d172c927ab8f551cc4ea"
     },
     {
       "id": "recurring-shifts",
@@ -499,7 +503,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:50ddbad8d06e34299dc3067a21d776c022f2e53aa1dfddc51069c39ad1908643"
+      "evidenceFingerprint": "sha256:98d6b9c0619a0ffa9840e231bd264280e82ee305fc732ce7e25bc3e4586261c5"
     },
     {
       "id": "realtime",
@@ -546,7 +550,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fdc2bac39860ef27b0ae3a9d6b6a30736c4fc22e003f3dbccb85443ba16ce3a0"
+      "evidenceFingerprint": "sha256:4ffe1317125c2ab922ebabe970dd2f9791ce689d2e6432e5bf968526e9066541"
     },
     {
       "id": "shift-requests",
@@ -1996,7 +2000,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:4be516b6baa1fb1fdba95da9e14e9339f6435a395a1bf5f5f78eddd74f27cef9"
+      "evidenceFingerprint": "sha256:a2d4bda93868b55c3473145299c9e5df6271cfb0b8370a50ee70e9ce524c06d6"
     },
     {
       "id": "coverage-open-shifts",
@@ -2047,7 +2051,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:2a67682f34224775d0f0773648512dbbbefc365428e6b2285adf2a741aea809b"
+      "evidenceFingerprint": "sha256:839bffa746856c936a928cbe3dbecbb0731c04f1871b46c76ed4e6c63e6cd57d"
     },
     {
       "id": "mobile-schedule",
@@ -2160,7 +2164,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:fa0b501f55630fa1596bc86fdeb48fe923b3bf05ed5282059dbcd84275a41877"
+      "evidenceFingerprint": "sha256:54fa43a303bb5da30da9fc7143855075e7fdf7115c7b6d4047b4606de5a6f6c5"
     }
   ],
   "surfaceExclusions": [
