@@ -23,11 +23,13 @@ export function ScheduleSessionWarning({
   return (
     <div className="dg-draft-banner dg-draft-banner--danger no-print" role="alert">
       <BannerIcon tone="danger" icon={Monitor} />
-      <strong>Schedule open elsewhere</strong>
-      <span>
-        Your account has this schedule open in {sessionLabel}. Close it there before you edit here,
-        so your changes don't clash. Those devices stay signed in.
-      </span>
+      <div className="dg-draft-banner-body">
+        <strong>Schedule open elsewhere</strong>
+        <span>
+          Your account has this schedule open in {sessionLabel}. Close it there before you edit
+          here, so your changes don&apos;t clash. Those devices stay signed in.
+        </span>
+      </div>
       <div className="dg-draft-banner-actions">
         <Button
           type="button"

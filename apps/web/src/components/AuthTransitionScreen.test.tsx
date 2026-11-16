@@ -77,4 +77,24 @@ describe("AuthTransitionScreen", () => {
       vi.useRealTimers();
     }
   });
+
+  it("offers trying again only when the screen can retry", async () => {
+    vi.useFakeTimers();
+    try {
+      markAuthTransition();
+      render(<AuthTransitionScreen phase="workspace" />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(
+        screen.getByText("This is taking longer than usual. You can keep waiting."),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
+    } finally {
+      consumeAuthTransition();
+      vi.useRealTimers();
+    }
+  });
 });
