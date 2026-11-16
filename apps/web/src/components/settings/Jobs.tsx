@@ -1355,7 +1355,7 @@ function JobRow({
 
   const placementSummary =
     section === "shiftless"
-      ? "Worked without a shift"
+      ? "No shift"
       : [
           summarizeSelection(activeScheduledDepartments, form.departmentIds, "departments"),
           summarizeSelection(
