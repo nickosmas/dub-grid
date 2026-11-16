@@ -228,6 +228,14 @@ export const captureMessage: (message: string, level?: SeverityLevel) => void = 
   dispatch(() => _sdk!.captureMessage(redactSecurityText(args[0]), args[1]));
 };
 
+/** Leaves a trail entry that rides along with the next reported error. */
+export const addBreadcrumb: (category: string, message: string) => void = (category, message) => {
+  if (!sentryKillSwitchEnabled()) return;
+  dispatch(() =>
+    _sdk!.addBreadcrumb?.({ category, message: redactSecurityText(message), level: "info" }),
+  );
+};
+
 // setUser
 export const setUser: (user: SentryUser) => void = (...args) => {
   dispatch(() => _sdk!.setUser(...args));

@@ -18,6 +18,7 @@ import {
 } from "@/features/account/client/session-identity";
 import { reloadForWebAuthOrganizationChange } from "@/lib/auth-boundary-navigation";
 import { isAuthTransitionPending } from "@/lib/auth-transition";
+import { addBreadcrumb } from "@/lib/sentry";
 
 // The screens that establish a session. Changing identity is what they are for,
 // and they show no organization data, so they stay mounted across the change:
@@ -83,6 +84,12 @@ export default function AuthenticatedCacheBoundary({ children }: { children: Rea
       return;
     }
 
+    addBreadcrumb(
+      "auth",
+      `Cleared cached data: ${settledIdentity.kind} to ${identity.kind}${
+        changesWebAuthOrganization(settledIdentity, identity) ? " (organization changed)" : ""
+      }`,
+    );
     void clearAuthenticatedBrowserState(queryClient).then(() => {
       if (
         transitionGenerationRef.current !== generation ||

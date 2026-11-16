@@ -50,7 +50,7 @@ describe("cache key prefix", () => {
 
     expect(mockDel).toHaveBeenCalledWith(
       "e2e-7-1-3:dg:org:org-1:jobs",
-      "e2e-7-1-3:dg:org:org-1:bootstrapConfig",
+      `e2e-7-1-3:${CacheKey.bootstrapConfig("org-1")}`,
     );
   });
 });

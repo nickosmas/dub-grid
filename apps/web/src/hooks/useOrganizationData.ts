@@ -434,7 +434,11 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     [allAbsenceTypes, org?.shiftDisplayMode],
   );
 
-  const loading = !ctx.resolved || bootstrapQuery.isLoading;
+  // No settings yet is loading however the fetch stands. `isLoading` is only
+  // true while a request is in flight, so a fetch paused offline (a laptop
+  // waking from sleep) or waiting to retry read as loaded with no departments
+  // and no shift codes: an empty Schedule and "?" shifts (2026-11-15).
+  const loading = !ctx.resolved || (enabled && bootstrapQuery.isPending);
   const loadError = bootstrapQuery.isError
     ? formatClientErrorMessage(
         bootstrapQuery.error,

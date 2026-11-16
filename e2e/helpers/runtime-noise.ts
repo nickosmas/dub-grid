@@ -35,6 +35,10 @@ const KNOWN_BENIGN_CONSOLE_PATTERNS: readonly RegExp[] = [
   // same walk on Chromium and Firefox still reports a real network failure, and
   // a server failure is still caught by a spec's response listener.
   /^TypeError: Load failed$/,
+  // The browser's own notice that a ResizeObserver callback changed layout and
+  // its next round waits a frame. The grid's sticky chrome measures itself
+  // this way; WebKit raises it as a page error when the page re-lays out.
+  /^ResizeObserver loop (completed with undelivered notifications|limit exceeded)\.?$/,
 ];
 
 export function isKnownBenignConsoleNoise(messageText: string): boolean {
