@@ -130,8 +130,9 @@ export function PrintShiftPill({
           aria-label="Mentored assignment"
           style={{
             position: "absolute",
-            top: "0.12em",
-            right: "0.12em",
+            // The same inset as the note dots in the bottom-right corner.
+            top: "0.15em",
+            right: "0.15em",
             width: "1.75em",
             height: "1.75em",
             borderRadius: 999,
