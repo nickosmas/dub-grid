@@ -26,7 +26,7 @@ blocked) when a choice goes outside an Only preference.
   pick), however many items it holds. Each item names what was picked, then
   the preference on its own line (owner, mid-build): "Day Shift is outside
   Aisha's preference." / "Shift preference: **Only Evening Shift**", and for
-  a job "Med Aide is outside Aisha's preference." / "Job preference:
+  a job "Med Aide job is outside Aisha's preference." / "Job preference:
   **Only CNA**". A Prefers preference never warns. Absences and shiftless
   work (Orientation, Training) never warn.
 - **Anyone who can edit shifts sees them**, as well as those who can view

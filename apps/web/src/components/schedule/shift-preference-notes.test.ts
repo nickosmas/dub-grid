@@ -72,7 +72,7 @@ describe("preferenceWarnings", () => {
         value: "Only Evening Shift",
       },
       {
-        lead: "Med Aide is outside Aisha's preference.",
+        lead: "Med Aide job is outside Aisha's preference.",
         label: "Job preference",
         value: "Only CNA",
       },

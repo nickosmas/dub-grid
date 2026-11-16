@@ -109,7 +109,8 @@ export function preferenceWarnings(
   }
   if (breaks.job && preferences.job) {
     const job = lookups.jobs.find((item) => item.id === work.jobId);
-    const named = job && !isDefaultShiftSystemJob(job) ? job.name : null;
+    // "Supervisor job", so a job name never reads as a shift.
+    const named = job && !isDefaultShiftSystemJob(job) ? `${job.name} job` : null;
     const value = describeKnown("only", preferences.job.jobIds, jobName);
     warnings.push(warning(named, "Job preference", value));
   }
