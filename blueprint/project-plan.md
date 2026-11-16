@@ -186,6 +186,10 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   (what happened, who approved it and when), and an approved request counts
   as a change in Highlight changes like a publish. Web only (owner,
   2026-11-14).
+- Preferences in the shift picker: when a scheduler fills a cell by hand,
+  the shift editor shows that person's shift and job preferences and warns,
+  without blocking, when a choice goes outside an Only preference. Anyone
+  who can edit shifts sees them. Web only (owner, 2026-11-15).
 - Platform and access rules (owner, 2026-11-08 and 2026-11-13): the mobile
   app stays signed in until the person signs out, while web sessions end
   after 35 minutes idle; suspending or offboarding someone ends only their

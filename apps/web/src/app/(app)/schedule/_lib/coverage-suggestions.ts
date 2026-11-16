@@ -5,6 +5,7 @@ import {
   MAX_DAYS_IN_A_WEEK,
   computeShiftSegmentHours,
   getScheduleWeekStartDate,
+  onlyPreferenceBreaks,
   parseLocalDateKey,
   type CoverageAvailability,
   type CoverageDayOverride,
@@ -398,16 +399,14 @@ export function availabilityFromShifts(
   }
 
   const assignment = input.assignments.find((candidate) => candidate.id === assignmentId);
-  const preference = input.preferences?.get(employeeId);
-  if (preference?.mode === "only") {
-    const shiftId = shiftOfAssignment(assignment);
-    if (shiftId == null || !preference.shiftIds.includes(shiftId)) return { kind: "onlyShifts" };
-  }
-  const jobPreference = input.jobPreferences?.get(employeeId);
-  if (jobPreference?.mode === "only") {
-    const jobId = assignment?.jobId ?? null;
-    if (jobId == null || !jobPreference.jobIds.includes(jobId)) return { kind: "onlyJobs" };
-  }
+  const breaks = onlyPreferenceBreaks(
+    shiftOfAssignment(assignment),
+    assignment?.jobId ?? null,
+    input.preferences?.get(employeeId),
+    input.jobPreferences?.get(employeeId),
+  );
+  if (breaks.shift) return { kind: "onlyShifts" };
+  if (breaks.job) return { kind: "onlyJobs" };
   const range = assignment ? assignmentTimeRange(assignment, input.shiftCategories) : null;
   const sameDay = getStaffingStateAlignedTimeRanges(state, context);
   for (const [index, existing] of sameDay.entries()) {
