@@ -59,6 +59,8 @@ interface MonthViewProps {
   /** The month's coverage, or null when the viewer doesn't see staffing. */
   coverage?: CoverageCategorySnapshot[] | null;
   requestForKey?: (empId: string, date: Date) => MonthRequest | null;
+  /** Each job's place from most senior down. */
+  jobSeniority?: Map<number, number>;
   onOpenWeek?: (date: Date) => void;
   /** Phone width: a small calendar with the chosen day listed under it. */
   compact?: boolean;
@@ -116,6 +118,7 @@ function MonthView({
   openShifts = EMPTY_OPEN_SHIFTS,
   coverage = null,
   requestForKey,
+  jobSeniority,
   onOpenWeek,
   compact = false,
 }: MonthViewProps) {
@@ -166,6 +169,7 @@ function MonthView({
         requestForKey,
         openShifts,
         coverage: coverageByDay ? (coverageByDay.get(formatDateKey(date)) ?? []) : null,
+        jobSeniority,
       });
       map.set(day.dateKey, day);
     }
@@ -188,6 +192,7 @@ function MonthView({
     requestForKey,
     openShifts,
     coverageByDay,
+    jobSeniority,
   ]);
 
   const firstKey = formatDateKey(monthStart);

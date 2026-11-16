@@ -46,7 +46,7 @@ import {
   toDarkPillColors,
 } from "@/lib/colors";
 import { calcTimeDuration, fmt12h } from "@/lib/utils";
-import { getQualificationSeniorityRank } from "@/lib/assignable-shifts";
+import { compareJobsByQualificationSeniority } from "@/lib/assignable-shifts";
 import {
   getJobShiftColorOverride,
   getJobShiftTimeOverride,
@@ -128,37 +128,6 @@ function isScheduledLikeSection(section: JobSection): boolean {
 
 function sortByOrder<T extends { sortOrder: number; id: number }>(items: T[]): T[] {
   return [...items].sort((left, right) => left.sortOrder - right.sortOrder || left.id - right.id);
-}
-
-function compareJobsByQualificationSeniority(
-  left: JobDefinition,
-  right: JobDefinition,
-  orgRoles: NamedItem[],
-  certifications: NamedItem[],
-): number {
-  const leftRank = getQualificationSeniorityRank({
-    job: left,
-    orgRoles,
-    certifications,
-  });
-  const rightRank = getQualificationSeniorityRank({
-    job: right,
-    orgRoles,
-    certifications,
-  });
-  const leftRanked = leftRank != null;
-  const rightRanked = rightRank != null;
-
-  if (leftRanked !== rightRanked) {
-    return leftRanked ? -1 : 1;
-  }
-  if (leftRank != null && rightRank != null && leftRank !== rightRank) {
-    return leftRank - rightRank;
-  }
-  if (left.sortOrder !== right.sortOrder) {
-    return left.sortOrder - right.sortOrder;
-  }
-  return left.name.localeCompare(right.name);
 }
 
 function formatCount(count: number, singular: string, plural = `${singular}s`): string {

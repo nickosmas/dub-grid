@@ -157,6 +157,20 @@ export interface MonthDayInput {
   openShifts: GridOpenShift[];
   /** This day's coverage, or null when the viewer doesn't see staffing. */
   coverage: CoverageCategorySnapshot[] | null;
+  /** Each job's place from most senior down; people on a more senior job list first. */
+  jobSeniority?: Map<number, number>;
+}
+
+/** Stable, so people on the same job keep the staff order they arrived in. */
+function sortPeopleByJob(
+  people: MonthPersonRow[],
+  jobSeniority: Map<number, number> | undefined,
+): MonthPersonRow[] {
+  if (!jobSeniority) return people;
+  const placeOf = (row: MonthPersonRow) =>
+    (row.style.jobId != null ? jobSeniority.get(row.style.jobId) : undefined) ??
+    Number.MAX_SAFE_INTEGER;
+  return [...people].sort((a, b) => placeOf(a) - placeOf(b));
 }
 
 const shiftKeyOf = (style: AssignmentDefinition): number | null =>
@@ -294,7 +308,10 @@ export function buildMonthDay(input: MonthDayInput): MonthDay {
     if (!groups) return [];
     const sorted = [...groups.values()]
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
-      .map(({ sortOrder: _sortOrder, ...group }) => group);
+      .map(({ sortOrder: _sortOrder, ...group }) => ({
+        ...group,
+        people: sortPeopleByJob(group.people, input.jobSeniority),
+      }));
     return [{ focusAreaId: area.id, name: area.name, groups: sorted }];
   });
 

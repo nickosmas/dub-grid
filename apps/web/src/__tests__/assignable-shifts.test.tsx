@@ -5,6 +5,7 @@ import {
   buildAssignableShiftOptions,
   buildAssignableShiftDisplayMap,
   buildScheduleAssignmentOptions,
+  compareJobsByQualificationSeniority,
   formatShiftAssignmentDisqualificationMessage,
   getQualificationSeniorityRank,
   getAssignmentDefinitionDisqualificationReasons,
@@ -226,6 +227,20 @@ describe("assignable shift resolution", () => {
         orgRoles,
       ),
     ).toBe(true);
+  });
+
+  it("puts jobs limited to senior roles before jobs anyone can work", () => {
+    const open = {
+      ...jobs[1]!,
+      id: 90,
+      name: "Default",
+      eligibleRoleIds: [],
+      requiredCertificationIds: [],
+    };
+    const sorted = [open, jobs[1]!].sort((left, right) =>
+      compareJobsByQualificationSeniority(left, right, orgRoles, certifications),
+    );
+    expect(sorted.map((job) => job.id)).toEqual([jobs[1]!.id, 90]);
   });
 
   it("derives qualification seniority from roles first, then certifications", () => {

@@ -279,4 +279,22 @@ describe("buildMonthDay", () => {
     expect(dayShift.people[0].marks.map((m) => m.indicatorTypeId)).toEqual([7]);
     expect(evening.people[0].marks).toEqual([]);
   });
+
+  it("lists people on a more senior job first, in staff order within a job", () => {
+    const supervising = { ...DAY, id: 102, label: "D", jobId: 7 } as AssignmentDefinition;
+    const shiftJob = { ...DAY, jobId: 8 } as AssignmentDefinition;
+    const day = buildMonthDay(
+      input(
+        { a: { ids: [100] }, b: { ids: [102] }, c: { ids: [100] } },
+        {
+          assignmentById: new Map([shiftJob, supervising, EVE].map((a) => [a.id, a])),
+          jobSeniority: new Map([
+            [7, 0],
+            [8, 1],
+          ]),
+        },
+      ),
+    );
+    expect(day.areas[0].groups[0].people.map((row) => row.empId)).toEqual(["b", "a", "c"]);
+  });
 });
