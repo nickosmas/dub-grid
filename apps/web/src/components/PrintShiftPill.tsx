@@ -48,6 +48,20 @@ const PRINT_VISIBLE_NOTE_DOTS = 2;
 // its 14px names.
 export const PRINT_PILL_RADIUS = { single: "0.55em", multi: "0.4em" } as const;
 
+// The grid's code line: the job at three quarters of the code's size (12px
+// beside 16px), after a half-faded dot with 2px either side, at 78% ink.
+export const PRINT_CODE_SEPARATOR = (codeSize: string): CSSProperties => ({
+  fontSize: `calc(${codeSize} * 0.75)`,
+  fontWeight: 700,
+  opacity: 0.5,
+  margin: "0 0.167em",
+});
+export const PRINT_CODE_JOB = (codeSize: string): CSSProperties => ({
+  fontSize: `calc(${codeSize} * 0.75)`,
+  fontWeight: 700,
+  opacity: 0.78,
+});
+
 // A line that shrinks to fit rather than being cut off (see print-fit.ts).
 const FIT_LINE: CSSProperties = { ...PRINT_FIT_LINE, textAlign: "center" };
 
@@ -130,8 +144,10 @@ export function PrintShiftPill({
           aria-label="Mentored assignment"
           style={{
             position: "absolute",
-            top: "0.12em",
-            right: "0.12em",
+            // The note dots' inset (0.15em of the pill's type) in this badge's
+            // own smaller em, so both corners sit the same distance in.
+            top: "0.25em",
+            right: "0.25em",
             width: "1.75em",
             height: "1.75em",
             borderRadius: 999,
@@ -222,15 +238,10 @@ export function PrintShiftPill({
             <span style={{ fontSize: primarySize, fontWeight: 600 }}>{primaryLabel}</span>
             {hasSecondary && (
               <>
-                <span
-                  aria-hidden="true"
-                  style={{ fontSize: detailSize, fontWeight: 700, margin: "0 0.12em" }}
-                >
+                <span aria-hidden="true" style={PRINT_CODE_SEPARATOR(primarySize)}>
                   ·
                 </span>
-                <span style={{ fontSize: detailSize, fontWeight: 700, opacity: 0.78 }}>
-                  {secondaryLabel}
-                </span>
+                <span style={PRINT_CODE_JOB(primarySize)}>{secondaryLabel}</span>
               </>
             )}
           </span>

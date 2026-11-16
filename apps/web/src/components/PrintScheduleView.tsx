@@ -51,6 +51,8 @@ import { legendGroupsByFocusArea } from "@/components/PrintLegend";
 import { printFontSizeLabel } from "@/components/print-font-sizes";
 import {
   PrintShiftPill,
+  PRINT_CODE_JOB,
+  PRINT_CODE_SEPARATOR,
   PRINT_PILL_RADIUS,
   type PrintNoteDot,
   type PrintShiftPillProps,
@@ -159,12 +161,12 @@ export function gridEquivalentColumnWidth(fontSize: number, dayCount: number): n
 }
 
 /**
- * An absence prints in its light stripes with a dashed edge, so it still reads
- * as an absence when the browser drops background graphics.
+ * An absence prints in its light stripes with the grid's filled-pill edge.
+ * A dashed edge on the grid means a draft, so the printout never uses one.
  */
 function printAbsenceFill(absence: AbsenceType) {
   const fill = absenceStripeFill(absence.color, false);
-  return { background: fill.background, color: fill.text, border: `1px dashed ${fill.border}` };
+  return { background: fill.background, color: fill.text, border: FILLED_PILL_BORDER };
 }
 
 /** A cell's notes as the dots its last pill prints; an archived or unknown note prints grey. */
@@ -914,21 +916,47 @@ function KeyItem({ swatch, name }: { swatch: ReactNode; name: string }) {
   );
 }
 
-function KeySwatch({ label, style }: { label: string; style: CSSProperties }) {
+/**
+ * A code in the key, drawn as the printed pill draws it: the shift code, then
+ * a smaller, lighter job after a dot ("D·s"), in a pill's own corners.
+ */
+function KeySwatch({
+  label,
+  secondaryLabel = null,
+  style,
+}: {
+  label: string;
+  secondaryLabel?: string | null;
+  style: CSSProperties;
+}) {
   return (
     <span
+      data-print-key-swatch=""
       style={{
-        borderRadius: PRINT_PILL_RADIUS.multi,
-        padding: "0.15em 0.5em",
-        fontSize: "0.9em",
-        fontWeight: 600,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: PRINT_PILL_RADIUS.single,
+        padding: "0.3em 0.6em",
         flexShrink: 0,
-        minWidth: "2.5em",
-        textAlign: "center",
+        minWidth: "3em",
+        lineHeight: 1.15,
+        whiteSpace: "nowrap",
         ...style,
       }}
     >
-      {label}
+      {/* One inline label, so its parts share a baseline and the line centres. */}
+      <span>
+        <span style={{ fontSize: "1.05em", fontWeight: 600 }}>{label}</span>
+        {secondaryLabel ? (
+          <>
+            <span aria-hidden="true" style={PRINT_CODE_SEPARATOR("1.05em")}>
+              ·
+            </span>
+            <span style={PRINT_CODE_JOB("1.05em")}>{secondaryLabel}</span>
+          </>
+        ) : null}
+      </span>
     </span>
   );
 }
@@ -1099,6 +1127,17 @@ export default function PrintScheduleView({
       printWindow.addEventListener("afterprint", () => printWindow.close());
     });
   }
+
+  // The key names each code the way its pills print it ("D·s", not "DS").
+  const keyLabelParts = (code: AssignmentDefinition) => {
+    const shiftId = code.shiftId ?? code.categoryId ?? null;
+    const shift =
+      shiftId != null
+        ? (shiftCategories.find((category) => category.id === shiftId) ?? null)
+        : null;
+    const job = code.jobId != null ? (jobs.find((entry) => entry.id === code.jobId) ?? null) : null;
+    return buildShiftDisplayParts({ shift, job, assignment: code, shiftDisplayMode });
+  };
 
   // Full shift names already say what each pill is, so only codes need a key.
   const legendGroups = isNameMode
@@ -1324,7 +1363,8 @@ export default function PrintScheduleView({
                         name={s.name}
                         swatch={
                           <KeySwatch
-                            label={s.label}
+                            label={keyLabelParts(s).primaryLabel}
+                            secondaryLabel={keyLabelParts(s).secondaryLabel}
                             style={{
                               background: s.color,
                               color: s.text,
