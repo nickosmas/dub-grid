@@ -12,7 +12,7 @@ vi.mock("@/lib/published-shifts", async (importOriginal) => ({
 import { renderPublishedEmployeeCalendar } from "./calendar-feed";
 
 function makeClient(
-  absenceTypes: Array<{ id: number; label: string }> = [],
+  absenceTypes: Array<{ id: number; name: string; label: string }> = [],
   tables: Record<string, Array<Record<string, unknown>>> = {},
 ) {
   const builderFor = (rows: Array<Record<string, unknown>>) => {
@@ -124,7 +124,7 @@ describe("renderPublishedEmployeeCalendar", () => {
       },
     ]);
     const result = await renderPublishedEmployeeCalendar(
-      makeClient([{ id: 4, label: "Vacation" }]) as never,
+      makeClient([{ id: 4, name: "Vacation", label: "V" }]) as never,
       {
         id: "employee-1",
         orgId: "org-1",
@@ -137,6 +137,7 @@ describe("renderPublishedEmployeeCalendar", () => {
       new Date("2026-09-01T12:00:00.000Z"),
     );
 
+    expect(result).toContain("SUMMARY:Vacation (DubGrid)");
     expect(result).toContain("DTSTART;VALUE=DATE:20260903");
     expect(result).toContain("DTEND;VALUE=DATE:20260904");
     expect(result).toContain("DTSTART;TZID=America/Los_Angeles:20260904T200000");
@@ -160,7 +161,7 @@ describe("renderPublishedEmployeeCalendar", () => {
     ]);
 
     const result = await renderPublishedEmployeeCalendar(
-      makeClient([{ id: 4, label: "Sick" }]) as never,
+      makeClient([{ id: 4, name: "Sick", label: "S" }]) as never,
       {
         id: "employee-1",
         orgId: "org-1",
@@ -213,5 +214,42 @@ describe("renderPublishedEmployeeCalendar", () => {
 
     expect(result).toContain("SUMMARY:Day Shift · East Wing (DubGrid)");
     expect(result).toContain("LOCATION:East Wing");
+  });
+
+  it("spells out absence names, archived ones included, rather than grid codes", async () => {
+    fetchPublishedShiftRows.mockResolvedValue([
+      {
+        emp_id: "employee-1",
+        date: "2026-09-03",
+        resolvedAssignmentIds: [],
+        resolvedSegments: [],
+        published_absence_type_id: 7,
+        published_custom_start_time: null,
+        published_custom_end_time: null,
+      },
+    ]);
+
+    const client = makeClient([{ id: 7, name: "Day Off", label: "X" }]);
+    const result = await renderPublishedEmployeeCalendar(
+      client as never,
+      {
+        id: "employee-1",
+        orgId: "org-1",
+        userId: "user-1",
+        firstName: "Avery",
+        lastName: "Stone",
+        timeZone: "America/Los_Angeles",
+      },
+      12,
+      new Date("2026-09-01T12:00:00.000Z"),
+    );
+
+    expect(result).toContain("SUMMARY:Day Off (DubGrid)");
+    expect(result).toContain("DESCRIPTION:Avery Stone: Day Off");
+    expect(result).not.toContain("SUMMARY:X ");
+    const absenceQuery = client.from.mock.results.find(
+      (_, index) => client.from.mock.calls[index]?.[0] === "absence_types",
+    )?.value as { is: ReturnType<typeof vi.fn> };
+    expect(absenceQuery.is).not.toHaveBeenCalled();
   });
 });

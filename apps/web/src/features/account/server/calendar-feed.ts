@@ -39,11 +39,8 @@ export async function renderPublishedEmployeeCalendar(
       employeeId: employee.id,
       ...range,
     }),
-    client
-      .from("absence_types")
-      .select("id, label")
-      .eq("org_id", employee.orgId)
-      .is("archived_at", null),
+    // Archived types stay: a published day that holds one still names it.
+    client.from("absence_types").select("id, name, label").eq("org_id", employee.orgId),
     client.from("shift_categories").select("id, focus_area_id").eq("org_id", employee.orgId),
     client.from("focus_areas").select("id, name").eq("org_id", employee.orgId),
   ]);
@@ -79,10 +76,12 @@ export async function renderPublishedEmployeeCalendar(
       .filter((name): name is string => Boolean(name))
       .join(", ");
 
+  // A calendar is read away from the grid's legend, so it spells out the
+  // absence ("Vacation") rather than its grid code ("X").
   const absenceTypeById = new Map(
     (absenceTypesResult.data ?? []).map((row: Record<string, unknown>) => [
       row.id as number,
-      row.label as string,
+      ((row.name as string | null)?.trim() || row.label) as string,
     ]),
   );
   const events = (shifts as PublishedShiftRow[])
