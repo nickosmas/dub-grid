@@ -343,10 +343,7 @@ export function SeatHistoryChart({ history }: { history: SeatHistoryMonth[] }) {
       footer={
         history.length > 0 ? (
           <>
-            <FooterNote>
-              Seat history starts in {starts}, when your subscription began. Hover over or tap a
-              month to see its details.
-            </FooterNote>
+            <FooterNote>Seat history starts in {starts}.</FooterNote>
             <FooterActions>
               <Button
                 type="button"
@@ -376,8 +373,7 @@ export function SeatHistoryChart({ history }: { history: SeatHistoryMonth[] }) {
                 lineHeight: 1.5,
               }}
             >
-              Seat history begins when your subscription starts. Each month will show how many seats
-              were in use and how many were paid for.
+              Seat history begins when your subscription starts.
             </span>
           </div>
         ) : (

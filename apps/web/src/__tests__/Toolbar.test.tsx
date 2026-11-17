@@ -368,7 +368,7 @@ describe("Toolbar — Tools dropdown", () => {
       "aria-disabled",
       "true",
     );
-    expect(screen.getByRole("menuitem", { name: /Bulk Delete Entries/i })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: /^Bulk Delete$/i })).toHaveAttribute(
       "aria-disabled",
       "true",
     );
@@ -421,7 +421,7 @@ describe("Toolbar — Tools dropdown", () => {
       "aria-disabled",
       "true",
     );
-    expect(screen.getByRole("menuitem", { name: /Bulk Delete Entries/i })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: /^Bulk Delete$/i })).toHaveAttribute(
       "aria-disabled",
       "true",
     );

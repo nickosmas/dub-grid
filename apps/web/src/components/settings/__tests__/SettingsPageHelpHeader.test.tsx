@@ -2,7 +2,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-let currentSection = "schedule-jobs";
+let currentSection = "schedule-absence-types";
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => ({
@@ -175,7 +175,7 @@ const baseProps = {
 
 describe("SettingsPage title help", () => {
   beforeEach(() => {
-    currentSection = "schedule-jobs";
+    currentSection = "schedule-absence-types";
     localStorage.clear();
   });
 
@@ -183,9 +183,7 @@ describe("SettingsPage title help", () => {
     render(<SettingsPage {...baseProps} />);
 
     expect(
-      screen.getByText(
-        "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility.",
-      ),
+      screen.getByText("Sick, vacation, and the other reasons someone isn't working a shift."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
   });
@@ -196,9 +194,7 @@ describe("SettingsPage title help", () => {
     render(<SettingsPage {...baseProps} />);
 
     expect(
-      screen.queryByText(
-        "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility.",
-      ),
+      screen.queryByText("Sick, vacation, and the other reasons someone isn't working a shift."),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
   });

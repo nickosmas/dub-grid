@@ -256,11 +256,7 @@ describe("AddEmployeeModal", () => {
       await userEvent.click(screen.getByRole("button", { name: "Access role" }));
       await userEvent.click(screen.getByRole("option", { name: "Admin" }));
 
-      expect(
-        screen.getByText(
-          "Ready to add 3 staff members. We email the person you invite a link to join.",
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByText("We'll email 1 invite.")).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "Add 3 & invite 1" }));
 
       expect(onAdd.mock.calls[0][0]).toHaveLength(3);

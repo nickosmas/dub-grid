@@ -715,9 +715,6 @@ function OrganizationSwitchOverlay({ name }: { name: string }) {
     >
       <AnimatedDubGridLogo animation="climb" surfaceColor={mobileColors.background} />
       <AppText align="center" variant="cardTitle">{`Switching to ${name}`}</AppText>
-      <AppText align="center" tone="muted" variant="body">
-        We're loading everything for this organization.
-      </AppText>
     </Animated.View>
   );
 }

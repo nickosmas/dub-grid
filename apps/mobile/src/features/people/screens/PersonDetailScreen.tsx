@@ -2633,9 +2633,6 @@ function AccountLinkChallengeModal({
     "this staff profile";
   const isMismatch = displayed.kind === "name_mismatch";
   const title = isMismatch ? "Name mismatch found" : "Account found";
-  const subtitle = isMismatch
-    ? "Review the existing account before linking it."
-    : "Confirm that this is the right app account.";
 
   return (
     <BottomSheetModal
@@ -2657,18 +2654,15 @@ function AccountLinkChallengeModal({
           </SheetActions>
         </>
       }
-      header={<SheetHeader subtitle={subtitle} title={title} />}
+      header={<SheetHeader title={title} />}
       onDismiss={onCancel}
       visible={challenge != null}
     >
       <View style={styles.modalInfoPanel}>
-        <Text style={styles.modalInfoTitle}>
-          {isMismatch ? "The account name is different" : "Existing app account found"}
-        </Text>
         <Text style={styles.modalInfoText}>
           {isMismatch
-            ? "The existing account is under a different name. Linking it updates the staff profile to match the account name."
-            : "An existing app account matches this staff profile. You can link it instead of sending a new invitation."}
+            ? "Linking updates the staff profile to the account name."
+            : "Link it instead of sending a new invitation."}
         </Text>
       </View>
 
@@ -3003,10 +2997,6 @@ const createStyles = (mobileColors: MobileColors) =>
           gap: 8,
           padding: 16,
         },
-    modalInfoTitle: {
-      ...mobileTextWeighted("rowTitle", "medium"),
-      color: mobileColors.textPrimary,
-    },
     modalInfoText: {
       ...mobileText.body,
       color: mobileColors.textSecondary,

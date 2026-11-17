@@ -12,7 +12,7 @@ import { EVEN_TABS, BillingCard, FooterNote, IconTile } from "./billing-ui";
 type Filter = "all" | BillingEventCategory;
 
 const FILTER_EMPTY: Record<Filter, string> = {
-  all: "There's no billing activity yet. Changes to your trial, subscription, and payments will appear here.",
+  all: "No billing activity yet.",
   payments: "There are no payments here yet.",
   subscription: "There are no subscription changes here yet.",
   trial: "There are no trial changes here yet.",

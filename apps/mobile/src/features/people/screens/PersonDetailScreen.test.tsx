@@ -1219,9 +1219,7 @@ describe("PersonDetailScreen", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Send" }).at(-1)!);
 
     expect(await screen.findByText("Account found")).toBeInTheDocument();
-    expect(
-      screen.getByText(/^An existing app account matches this staff profile\./),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Link it instead of sending a new invitation.")).toBeInTheDocument();
     expect(screen.queryByText("Name mismatch found")).not.toBeInTheDocument();
     expect(screen.queryByText("Invite to the app")).not.toBeInTheDocument();
 
@@ -1238,9 +1236,7 @@ describe("PersonDetailScreen", () => {
       expect(screen.getByText("Name mismatch found")).toBeInTheDocument();
     });
     expect(
-      screen.getByText(
-        "The existing account is under a different name. Linking it updates the staff profile to match the account name.",
-      ),
+      screen.getByText("Linking updates the staff profile to the account name."),
     ).toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();
@@ -1325,11 +1321,7 @@ describe("PersonDetailScreen", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Send" }).at(-1)!);
 
     expect(await screen.findByText("Account found")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /matches this staff profile\. You can link it instead of sending a new invitation\./,
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Link it instead of sending a new invitation.")).toBeInTheDocument();
     expect(screen.queryByText("Invite to the app")).not.toBeInTheDocument();
 
     for (const call of mutationCalls) call.mutate.mockClear();

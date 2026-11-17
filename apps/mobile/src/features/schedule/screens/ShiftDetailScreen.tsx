@@ -1117,11 +1117,10 @@ export default function ShiftDetailScreen() {
       ) : null}
       {requestMode === "coverage" ? (
         <View style={styles.subsection}>
-          <Text style={styles.subsectionBody}>Choose how you want to drop this shift.</Text>
           <View style={styles.coverageOptionList}>
             <CoverageOptionCard
               active={coverageRequestType === "pickup"}
-              body="Teammates can claim it. It stays yours until a claim is approved."
+              body="Stays yours until a claim is approved."
               disabled={createRequestMutation.isPending}
               onPress={() => {
                 setCoverageRequestType("pickup");
@@ -1132,7 +1131,7 @@ export default function ShiftDetailScreen() {
             />
             <CoverageOptionCard
               active={coverageRequestType === "calloff"}
-              body="For a shift you can't work. Once it's approved, you're marked absent and the shift opens for others to pick up."
+              body="You're marked absent once approved, and the shift opens for pickup."
               disabled={createRequestMutation.isPending || activeAbsenceTypes.length === 0}
               onPress={() => {
                 setCoverageRequestType("calloff");
@@ -1158,11 +1157,11 @@ export default function ShiftDetailScreen() {
                 />
               )}
               <Text style={styles.subsectionLabel}>Request specific person</Text>
-              <Text style={styles.subsectionBody}>
-                {selectedTargetedPickupEntry
-                  ? "Review your request below, then submit."
-                  : "Only teammates with an absence on this date are shown."}
-              </Text>
+              {selectedTargetedPickupEntry ? null : (
+                <Text style={styles.subsectionBody}>
+                  Only teammates with an absence on this date are shown.
+                </Text>
+              )}
               <View style={styles.swapDateFilteredList}>
                 {targetedPickupOptions.length === 0 ? (
                   <EmptyStateCard
@@ -1219,9 +1218,6 @@ export default function ShiftDetailScreen() {
                   />
                 ))}
               </SelectionSection>
-              {selectedCalloffAbsenceType ? (
-                <Text style={styles.subsectionBody}>Review your call-off below, then submit.</Text>
-              ) : null}
             </View>
           ) : null}
         </View>
@@ -1229,11 +1225,11 @@ export default function ShiftDetailScreen() {
 
       {requestMode === "swap" ? (
         <View style={styles.subsection}>
-          <Text style={styles.subsectionBody}>
-            {selectedTargetEntry
-              ? "Review the trade below, then submit your swap request."
-              : "Pick a teammate's published shift to trade for. The same shift on a different day works too."}
-          </Text>
+          {selectedTargetEntry ? null : (
+            <Text style={styles.subsectionBody}>
+              Pick a teammate's shift to trade for. The same shift on another day works too.
+            </Text>
+          )}
           {shiftEntry ? (
             <>
               <View style={styles.swapSummaryList}>
@@ -1279,14 +1275,7 @@ export default function ShiftDetailScreen() {
                     title="No shifts to swap with"
                     body="Teammates' shifts you could swap with show here once published."
                   />
-                ) : selectedTargetEntry ? (
-                  <View style={styles.swapSelectedPanel}>
-                    <Text style={styles.subsectionBody}>
-                      {selectedTargetEntry.employeeName} is selected for{" "}
-                      {formatShiftDate(selectedTargetEntry.date)}.
-                    </Text>
-                  </View>
-                ) : (
+                ) : selectedTargetEntry ? null : (
                   <View style={styles.swapDateFilteredList}>
                     <View style={styles.swapWeekNav}>
                       <Button
@@ -1615,7 +1604,7 @@ export default function ShiftDetailScreen() {
           {activeShiftRequest ? (
             <Card
               title="You already asked about this shift"
-              body={`Your ${formatShiftRequestType(activeShiftRequest.type).toLowerCase()} request is ${formatShiftRequestStatus(activeShiftRequest.status).toLowerCase()} for this shift.`}
+              body={`Your ${formatShiftRequestType(activeShiftRequest.type).toLowerCase()} request is ${formatShiftRequestStatus(activeShiftRequest.status).toLowerCase()}.`}
               detail={
                 <View style={styles.activeRequestDetail}>
                   {formatShiftRequestNote(activeShiftRequest.adminNote) ? (

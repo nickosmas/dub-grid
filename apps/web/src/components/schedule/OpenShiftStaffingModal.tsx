@@ -199,11 +199,7 @@ export function OpenShiftStaffingModal({
         </div>
       ) : visibleCandidates.length === 0 ? (
         <div role="status">
-          <EmptyState
-            size="compact"
-            title="No matching staff"
-            description="Try a different name."
-          />
+          <EmptyState size="compact" title="No matching staff" />
         </div>
       ) : (
         <div className="dg-open-shift-staffing-list" role="radiogroup" aria-label="Eligible staff">

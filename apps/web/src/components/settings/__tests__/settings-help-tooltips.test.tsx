@@ -119,11 +119,7 @@ describe("settings help cleanup", () => {
     );
 
     expect(screen.queryByText("Department structure")).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Scheduled Departments appear on the grid. Each one has one or more units that define how staff are grouped on the schedule.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Appear on the grid, split into units.")).toBeInTheDocument();
     expect(
       screen.getByText(
         "For people who use the app but don't appear on the schedule (e.g. HR, Reception, Finance).",
@@ -226,9 +222,6 @@ describe("settings help cleanup", () => {
         "Pick any schedule-eligible roles and certifications that can qualify staff. Selections inside each list are alternatives. Leave either list empty to keep that gate open.",
       ).length,
     ).toBeGreaterThan(0);
-    expect(
-      screen.getByText("Decide whether staff must match both lists, or just one."),
-    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
   });
 

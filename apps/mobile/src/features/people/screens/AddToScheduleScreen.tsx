@@ -210,7 +210,7 @@ export default function AddToScheduleScreen() {
         />
       ) : (
         <>
-          <ProfileSection description="Assignments put them on the schedule. Their administrative teams don't change.">
+          <ProfileSection description="Their administrative teams don't change.">
             <ProfileChoiceGroup
               error={focusAreaError}
               items={focusAreas.map((item) => ({ id: item.id, name: item.name }))}

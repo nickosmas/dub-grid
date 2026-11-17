@@ -121,8 +121,7 @@ export default function OnboardingPage() {
             marginBottom: "40px",
           }}
         >
-          Your account is ready, but you aren&apos;t in an organization yet. Ask your administrator
-          to invite you, then check again.
+          Ask your administrator to invite you, then check again.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -147,7 +146,7 @@ export default function OnboardingPage() {
 
           {pollTimedOut && (
             <p style={{ fontSize: "14px", color: "var(--dg-color-warning-text)", margin: 0 }}>
-              You're not in an organization yet. Ask your administrator to add you.
+              Still not added.
             </p>
           )}
 

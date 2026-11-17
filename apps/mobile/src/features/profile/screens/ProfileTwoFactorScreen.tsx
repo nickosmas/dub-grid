@@ -393,7 +393,7 @@ export default function ProfileTwoFactorScreen() {
       ) : isEnrolling ? (
         <ProfileSection
           title="Set up"
-          description="Add a new entry in your authenticator app (Google Authenticator, Authy, 1Password, etc.) using this key, then enter the 6-digit code it generates."
+          description="Add this key to your authenticator app, then enter the 6-digit code it shows."
         >
           <ProfilePanel>
             {mfaSecret ? (

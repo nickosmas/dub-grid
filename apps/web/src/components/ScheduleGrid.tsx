@@ -5837,7 +5837,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                 ? "No matching staff"
                 : isCellInteractive && !canOpenCell
                   ? "Nobody assigned here yet"
-                  : "No shifts found for this period"
+                  : "No published shifts for this period"
           }
           description={
             allEmployees.length === 0
@@ -5846,7 +5846,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                 ? "Clear the search or filters to see everyone."
                 : isCellInteractive && !canOpenCell
                   ? "Assign people here from the People page."
-                  : "No shifts have been published for this period yet."
+                  : undefined
           }
           style={{ marginTop: 34 }}
         />
