@@ -46,6 +46,12 @@ export interface ShiftRequestsOptions {
    * one request instead of two for the same period.
    */
   includeAllStatuses?: boolean;
+  /**
+   * Called once an action publishes a change: an approval, or a create,
+   * claim, volunteer or accept the server approved at once. The schedule
+   * grid holds its own copy of the published days and reloads it here.
+   */
+  onScheduleChanged?: () => void;
 }
 
 export interface ShiftRequestsData {
@@ -133,6 +139,11 @@ export function useShiftRequests(
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => Date.now());
   const includeAllStatuses = options?.includeAllStatuses === true;
+  const onScheduleChangedRef = useRef(options?.onScheduleChanged);
+  onScheduleChangedRef.current = options?.onScheduleChanged;
+  const scheduleChanged = useCallback((published: boolean) => {
+    if (published) onScheduleChangedRef.current?.();
+  }, []);
 
   // Stabilize the Map reference: serialize to a string key so the query key
   // doesn't change identity every render (Map is compared by reference).
@@ -331,13 +342,14 @@ export function useShiftRequests(
         // dispatchNotificationEvent; queuing it again here double-sent every
         // request's notification.
         await refetchAfterMutation();
+        scheduleChanged(autoApproved);
         return requestId;
       } catch (err: unknown) {
         toast.error(errMsg(err, "We couldn't send your request. Try again."));
         return null;
       }
     },
-    [orgId, refetchAfterMutation, showSubmitted],
+    [orgId, refetchAfterMutation, scheduleChanged, showSubmitted],
   );
 
   const claim = useCallback(
@@ -348,13 +360,14 @@ export function useShiftRequests(
         showSubmitted({ action: "claimed" }, autoApproved);
         // Server route already dispatches shift_request_claimed.
         await refetchAfterMutation();
+        scheduleChanged(autoApproved);
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "We couldn't claim that shift. Try again."));
         return false;
       }
     },
-    [orgId, refetchAfterMutation, showSubmitted],
+    [orgId, refetchAfterMutation, scheduleChanged, showSubmitted],
   );
 
   const volunteer = useCallback(
@@ -376,13 +389,14 @@ export function useShiftRequests(
         showSubmitted({ action: "claimed" }, autoApproved);
         // Server route already dispatches shift_request_created.
         await refetchAfterMutation();
+        scheduleChanged(autoApproved);
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "We couldn't volunteer you for that shift. Try again."));
         return false;
       }
     },
-    [orgId, refetchAfterMutation, showSubmitted],
+    [orgId, refetchAfterMutation, scheduleChanged, showSubmitted],
   );
 
   const respond = useCallback(
@@ -400,13 +414,14 @@ export function useShiftRequests(
           toast.success(copy.title, { description: copy.message });
         }
         await refetchAfterMutation();
+        scheduleChanged(accept && autoApproved);
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "We couldn't send your answer. Try again."));
         return false;
       }
     },
-    [orgId, refetchAfterMutation, requests, showSubmitted],
+    [orgId, refetchAfterMutation, requests, scheduleChanged, showSubmitted],
   );
 
   const resolve = useCallback(
@@ -417,13 +432,14 @@ export function useShiftRequests(
         toast.success(approved ? "Request approved" : "Request rejected");
         // Server route already dispatches shift_request_resolved.
         await refetchAfterMutation();
+        scheduleChanged(approved);
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "We couldn't update that request. Try again."));
         return false;
       }
     },
-    [orgId, refetchAfterMutation],
+    [orgId, refetchAfterMutation, scheduleChanged],
   );
 
   const cancel = useCallback(

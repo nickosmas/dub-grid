@@ -24,6 +24,7 @@ import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { getLineTextError, normalizeLineText } from "@/lib/form-validation";
 import { labelStyle } from "./shared";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { checkDependenciesOrSay } from "./checkDependenciesOrSay";
 
 type LocalIndicator = IndicatorType & { isNew?: boolean; clientKey: string };
 
@@ -171,7 +172,10 @@ function IndicatorRow({
       onDeleted(indicator.id);
       return;
     }
-    const deps = await checkIndicatorTypeDependencies(indicator.id, orgId);
+    const deps = await checkDependenciesOrSay(() =>
+      checkIndicatorTypeDependencies(indicator.id, orgId),
+    );
+    if (!deps) return;
     setDependencyInfo(deps);
     setShowDeleteConfirm(true);
   }, [indicator.id, indicator.isNew, onDeleted, orgId]);

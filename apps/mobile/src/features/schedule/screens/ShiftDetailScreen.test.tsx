@@ -1494,9 +1494,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByLabelText("Absence Off Day")).toHaveTextContent("Off Day");
     expect(screen.getByLabelText("Absence Off Day")).not.toHaveTextContent("Absence");
     expect(screen.queryByRole("button", { name: "View previous shift" })).not.toBeInTheDocument();
-    expect(
-      screen.getByText("You have an absence this day, so there's no shift to drop or swap."),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/drop or swap/i)).not.toBeInTheDocument();
   });
 
   it("names the general shift in the detail card pill under a General shift eyebrow", () => {
@@ -1582,7 +1580,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByLabelText("General shift Admin")).not.toHaveTextContent("General shift");
     expect(screen.getByRole("button", { name: "Drop shift" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Swap" })).not.toBeInTheDocument();
-    expect(screen.getByText("A general shift can be dropped but not swapped.")).toBeInTheDocument();
+    expect(screen.queryByText(/can be dropped/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "View previous shift" }));
     expect(screen.getAllByText("Admin").length).toBeGreaterThan(1);
     expect(screen.queryByLabelText("Focus area ICU")).not.toBeInTheDocument();
@@ -1866,9 +1864,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByRole("button", { name: "View previous shift" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Drop shift" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Swap" })).not.toBeInTheDocument();
-    expect(
-      screen.getByText("This shift was removed, so it can't be dropped or swapped."),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/dropped or swapped/i)).not.toBeInTheDocument();
   });
 
   it("hides shift actions for an ongoing shift", () => {
@@ -1968,12 +1964,10 @@ describe("ShiftDetailScreen", () => {
 
     expect(screen.queryByText("Drop shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();
-    expect(
-      screen.getByText("This shift has started, so it can't be dropped or swapped."),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/dropped or swapped/i)).not.toBeInTheDocument();
   });
 
-  it("says why the actions are off when the request check fails, and retries it", () => {
+  it("offers a retry when the request check fails", () => {
     const refetchRequests = vi.fn().mockResolvedValue(undefined);
     const defaultQuery = useQuery.getMockImplementation()!;
     useQuery.mockImplementation((options: { queryKey: unknown[] }) => {
@@ -1994,11 +1988,7 @@ describe("ShiftDetailScreen", () => {
     render(<ShiftDetailScreen />);
 
     expect(screen.queryByRole("button", { name: "Drop shift" })).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "We couldn't check whether you already asked about this shift, so you can't drop or swap it yet.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("We couldn't check your requests for this shift.")).toBeInTheDocument();
     expect(pushToast).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetchRequests).toHaveBeenCalledTimes(1);

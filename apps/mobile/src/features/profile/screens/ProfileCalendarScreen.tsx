@@ -97,7 +97,7 @@ export default function ProfileCalendarScreen() {
     onSuccess: async ({ action, result }) => {
       setIssued(result);
       await statusQuery.refetch();
-      await openCalendarAction(action, result.feedUrl);
+      await openIssuedLink(action, result.feedUrl);
     },
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
@@ -128,6 +128,24 @@ export default function ProfileCalendarScreen() {
     },
   });
 
+  // The link already exists by now, so a failed open must not read as a
+  // failed create.
+  async function openIssuedLink(action: CalendarAction, feedUrl: string) {
+    try {
+      await openCalendarAction(action, feedUrl);
+    } catch {
+      pushToast(
+        action === "share"
+          ? { tone: "error", title: "Couldn't share the link", message: "Try again." }
+          : {
+              tone: "error",
+              title: "Couldn't open the calendar",
+              message: "Use Share link and open it in your calendar app.",
+            },
+      );
+    }
+  }
+
   const manualRefresh = useManualRefresh(() => statusQuery.refetch());
   const contentState = useMobileContentState({
     hasData: Boolean(statusQuery.data),
@@ -141,7 +159,7 @@ export default function ProfileCalendarScreen() {
   function handleAction(action: CalendarAction) {
     if (isBusy) return;
     if (issued) {
-      void openCalendarAction(action, issued.feedUrl);
+      void openIssuedLink(action, issued.feedUrl);
       return;
     }
     if (isActive) {

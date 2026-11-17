@@ -245,6 +245,44 @@ describe("loadMobileShiftRequestsPayload", () => {
     },
   );
 
+  it("lists a request however far ahead its day is, but bounds open pickups to the range", async () => {
+    const { auth } = makeContext({ data: [], error: null });
+    const OTHER_ID = "66666666-6666-4666-8666-666666666666";
+    const mine = {
+      id: PENDING_ID,
+      status: "pending_approval",
+      requesterEmpId: EMP_ID,
+      targetEmpId: null,
+      requesterShiftDate: "2026-12-20",
+    };
+    const farPickup = {
+      id: APPROVED_ID,
+      status: "open",
+      type: "pickup",
+      requesterEmpId: OTHER_ID,
+      targetEmpId: null,
+      requesterShiftDate: "2026-12-20",
+    };
+    const fetchMobileShiftRequests = vi.fn(async () => [mine, farPickup] as never);
+
+    const { requests } = await loadMobileShiftRequestsPayload(
+      auth,
+      { startDate: "2026-11-17", endDate: "2026-11-30" },
+      {
+        fetchLinkedEmployeeForUser: vi.fn(async () => ({ id: EMP_ID }) as never),
+        fetchMobileOpenShifts: vi.fn(async () => []),
+        fetchMobileScheduleEntries: vi.fn(async () => []),
+        fetchMobileShiftRequests,
+      },
+    );
+
+    expect(fetchMobileShiftRequests).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ endDate: expect.anything() }),
+    );
+    expect(requests.map((request) => request.id)).toEqual([PENDING_ID]);
+  });
+
   it("does not check for a viewer who cannot approve", async () => {
     const { load, rpc } = payloadFor({ canEditShifts: true }, { data: [], error: null });
 

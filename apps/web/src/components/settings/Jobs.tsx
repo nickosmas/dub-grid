@@ -84,6 +84,7 @@ import {
   sharedShiftFocusArea,
   DEFAULT_ORGANIZATION_LABELS,
 } from "@dubgrid/domain";
+import { checkDependenciesOrSay } from "./checkDependenciesOrSay";
 
 type JobSection = "defaultShift" | "scheduled" | "shiftless";
 
@@ -1280,7 +1281,8 @@ function JobRow({
       onDeleted(job.id);
       return;
     }
-    const deps = await checkJobDependencies(job.id, orgId);
+    const deps = await checkDependenciesOrSay(() => checkJobDependencies(job.id, orgId));
+    if (!deps) return;
     setDependencyInfo(deps);
     setShowDeleteConfirm(true);
   }, [job.id, job.isNew, onDeleted, orgId]);

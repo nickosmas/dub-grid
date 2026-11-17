@@ -187,7 +187,6 @@ describe("mobile shift-requests route", () => {
         employeeId: "emp-1",
         includeOpenPickupRequests: true,
         startDate: "2026-04-18",
-        endDate: "2026-05-01",
         hiddenUserIds: [],
       },
     );
@@ -253,7 +252,6 @@ describe("mobile shift-requests route", () => {
         employeeId: "emp-1",
         includeOpenPickupRequests: true,
         startDate: "2026-04-19",
-        endDate: "2026-04-25",
         hiddenUserIds: [],
       },
     );
@@ -677,7 +675,6 @@ describe("mobile shift-requests route", () => {
         employeeId: undefined,
         includeOpenPickupRequests: false,
         startDate: "2026-04-18",
-        endDate: "2026-05-01",
         hiddenUserIds: [],
       },
     );
