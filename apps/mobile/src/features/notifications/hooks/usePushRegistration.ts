@@ -4,8 +4,10 @@ import { AppState, Platform } from "react-native";
 import { getUserIdFromAccessToken } from "../../../shared/lib/access-token";
 import { registerPushToken } from "../../../shared/lib/api";
 import {
+  loadPushOptedOut,
   loadStoredPushDevice,
   loadStoredPushRegistration,
+  savePushOptedOut,
   saveStoredPushDevice,
   saveStoredPushRegistration,
   type StoredPushDevice,
@@ -89,7 +91,23 @@ export function usePushRegistration(
   );
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<unknown | null>(null);
+  // The OS permission alone can't say push is off: someone can turn it off in
+  // the app while the OS still allows it, and that choice must hold through
+  // every foreground and launch.
+  const [optedOut, setOptedOut] = useState(false);
   const attemptedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadPushOptedOut()
+      .then((value) => {
+        if (!cancelled) setOptedOut(value);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /**
    * Resolves true only when the device row was actually written for the current
@@ -101,6 +119,8 @@ export function usePushRegistration(
   async function refreshPushRegistration(options?: {
     requestPermission?: boolean;
     disable?: boolean;
+    /** The switch's own calls, so a failure reaches its error toast. */
+    throwOnError?: boolean;
   }): Promise<boolean> {
     if (pushUnsupported || !accessToken || !currentOrgId) {
       setPermissionState("unsupported");
@@ -130,14 +150,21 @@ export function usePushRegistration(
       if (options?.disable) {
         await forgetPushRegistration();
         const storedDevice = await loadStoredPushDevice();
-        if (!storedDevice) {
-          return true;
+        if (storedDevice) {
+          await registerPushToken(accessToken, {
+            ...storedDevice,
+            disabled: true,
+          });
         }
+        await savePushOptedOut(true);
+        setOptedOut(true);
+        return true;
+      }
 
-        await registerPushToken(accessToken, {
-          ...storedDevice,
-          disabled: true,
-        });
+      if (options?.requestPermission) {
+        await savePushOptedOut(false);
+        setOptedOut(false);
+      } else if (await loadPushOptedOut().catch(() => false)) {
         return true;
       }
 
@@ -168,6 +195,7 @@ export function usePushRegistration(
       return true;
     } catch (registrationError) {
       setError(registrationError);
+      if (options?.throwOnError) throw registrationError;
       return false;
     } finally {
       setIsRegistering(false);
@@ -227,10 +255,12 @@ export function usePushRegistration(
       isRegistering,
       error,
       isSupported: !pushUnsupported,
-      enablePush: () => refreshPushRegistration({ requestPermission: true }),
-      disablePush: () => refreshPushRegistration({ disable: true }),
+      /** Whether this device gets push: the OS allows it and the app wasn't told no. */
+      isEnabled: permissionState === "granted" && !optedOut,
+      enablePush: () => refreshPushRegistration({ requestPermission: true, throwOnError: true }),
+      disablePush: () => refreshPushRegistration({ disable: true, throwOnError: true }),
       refreshPushRegistration: () => refreshPushRegistration(),
     }),
-    [error, isRegistering, permissionState],
+    [error, isRegistering, optedOut, permissionState],
   );
 }

@@ -433,15 +433,20 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       ? requestedDateParam
       : null;
   const [selectedTeamFocusAreaKey, setSelectedTeamFocusAreaKey] = useState<string | null>(null);
+  // Each link param is cleared once applied: the tab stays mounted, so the
+  // same link opened again has to change the param to take effect again.
   useEffect(() => {
     if (scope === "team" && requestedFocusAreaId) {
       setSelectedTeamFocusAreaKey(`focus-area:${requestedFocusAreaId}`);
+      router.setParams({ focusAreaId: undefined });
     }
   }, [requestedFocusAreaId, scope]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(requestedDate);
   useEffect(() => {
-    if (requestedDate) setSelectedDateOverride(requestedDate);
+    if (!requestedDate) return;
+    setSelectedDateOverride(requestedDate);
+    router.setParams({ date: undefined });
   }, [requestedDate]);
   const [weekStripWidth, setWeekStripWidth] = useState(0);
   const [weekStripRowHeight, setWeekStripRowHeight] = useState(WEEK_STRIP_ROW_HEIGHT);

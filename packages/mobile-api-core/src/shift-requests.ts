@@ -347,13 +347,16 @@ export async function loadMobileShiftRequestsPayload<TEmployee extends MobileShi
   const employeeId = canViewAllRequests ? undefined : linkedEmployee?.id;
   const requestRange = resolveMobileShiftRequestRange(input.startDate, input.endDate);
 
-  const [requests, openShifts, availabilityEntries] = await Promise.all([
+  // No end date: a request awaiting someone stays listed however far ahead
+  // its day is, or it could be neither answered nor cancelled on the phone.
+  // Only open pickups keep the range, below, which their availability check
+  // covers.
+  const [fetchedRequests, openShifts, availabilityEntries] = await Promise.all([
     deps.fetchMobileShiftRequests(auth.serviceClient, {
       orgId: auth.currentOrg.id,
       employeeId,
       includeOpenPickupRequests: !canViewAllRequests,
       ...(input.startDate ? { startDate: input.startDate } : {}),
-      ...(input.endDate ? { endDate: input.endDate } : {}),
     }),
     linkedEmployee || canViewAllRequests
       ? deps.fetchMobileOpenShifts(auth.serviceClient, {
@@ -377,6 +380,15 @@ export async function loadMobileShiftRequestsPayload<TEmployee extends MobileShi
         })
       : Promise.resolve([]),
   ]);
+
+  const requests = employeeId
+    ? fetchedRequests.filter(
+        (request) =>
+          request.requesterEmpId === employeeId ||
+          request.targetEmpId === employeeId ||
+          request.requesterShiftDate <= requestRange.endDate,
+      )
+    : fetchedRequests;
 
   return {
     requests:

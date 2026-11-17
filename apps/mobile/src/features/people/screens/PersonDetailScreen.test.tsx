@@ -2242,6 +2242,22 @@ describe("PersonDetailScreen", () => {
       expect(screen.queryByRole("button", { name: "Change status" })).not.toBeInTheDocument();
     });
 
+    it("dials the number's digits, and says so when the phone can't call", async () => {
+      const { linkingOpenURLMock } = await import("../../../test/native");
+      linkingOpenURLMock.mockReset().mockRejectedValueOnce(new Error("no dialer"));
+      renderAsManager({ phone: "+1 (415) 425-3334" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Call" }));
+
+      expect(linkingOpenURLMock).toHaveBeenCalledWith("tel:+14154253334");
+      await vi.waitFor(() => {
+        expect(pushToast).toHaveBeenCalledWith(
+          expect.objectContaining({ tone: "error", title: "Couldn't start a call" }),
+        );
+      });
+      linkingOpenURLMock.mockReset().mockResolvedValue(undefined);
+    });
+
     // Under the hero: Call and Email, always both, the one without a number or
     // address dimmed rather than dropped. At the foot: everything that manages
     // the person, in web's staff-panel order, access first and status last.

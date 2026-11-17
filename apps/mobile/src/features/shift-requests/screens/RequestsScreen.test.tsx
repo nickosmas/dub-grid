@@ -43,7 +43,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("expo-router", () => ({
-  router: { push: routerPush },
+  router: { push: routerPush, setParams: vi.fn() },
   useLocalSearchParams,
 }));
 

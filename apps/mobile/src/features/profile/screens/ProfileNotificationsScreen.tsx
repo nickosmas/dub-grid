@@ -133,7 +133,7 @@ export default function ProfileNotificationsScreen() {
 
   const togglePush = async () => {
     try {
-      if (push.permissionState === "granted") {
+      if (push.isEnabled) {
         await push.disablePush();
       } else {
         await push.enablePush();
@@ -196,7 +196,7 @@ export default function ProfileNotificationsScreen() {
                 disabled={!pushSwitchEnabled || push.permissionState === "denied"}
                 isLast={!(push.isSupported && push.permissionState === "denied")}
                 label="Push to this device"
-                value={push.permissionState === "granted"}
+                value={push.isEnabled}
                 onValueChange={() => {
                   void togglePush();
                 }}

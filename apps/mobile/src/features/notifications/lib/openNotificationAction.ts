@@ -11,6 +11,18 @@ export type NativeRoute = { pathname: string; params?: Record<string, string> };
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const REQUEST_TABS = new Set(["available", "all", "mine", "approval", "history"]);
+
+/** The Requests tab, opened on the section the alert is about. */
+function requestsRoute(tab: string | null, requestId: string | null): NativeRoute {
+  const params: Record<string, string> = {};
+  if (tab && REQUEST_TABS.has(tab)) params.tab = tab;
+  if (requestId) params.requestId = requestId;
+  return Object.keys(params).length > 0
+    ? { pathname: "/(tabs)/requests", params }
+    : { pathname: "/(tabs)/requests" };
+}
+
 function isExternalUrl(href: string): boolean {
   return /^https?:\/\//i.test(href);
 }
@@ -35,14 +47,14 @@ export function resolveNativeRoute(href: string): NativeRoute | null {
 
   switch (head) {
     case "schedule": {
-      if (query.has("requests")) return { pathname: "/(tabs)/requests" };
+      if (query.has("requests")) return requestsRoute(query.get("requests"), null);
       const date = query.get("date");
       return date && DATE_KEY.test(date)
         ? { pathname: "/(tabs)/team", params: { date } }
         : { pathname: "/(tabs)/team" };
     }
     case "requests":
-      return { pathname: "/(tabs)/requests" };
+      return requestsRoute(query.get("tab"), query.get("id"));
     case "people":
       return second && UUID.test(second)
         ? { pathname: "/(tabs)/people/[id]", params: { id: second } }

@@ -52,7 +52,13 @@ vi.mock("../../../shared/lib/api", () => ({
   registerPushToken: (...a: unknown[]) => registerPushToken(...a),
 }));
 
+let pushOptedOut = false;
+
 vi.mock("../../../shared/lib/session", () => ({
+  loadPushOptedOut: async () => pushOptedOut,
+  savePushOptedOut: async (value: boolean) => {
+    pushOptedOut = value;
+  },
   loadStoredPushDevice: (...a: unknown[]) => loadStoredPushDevice(...a),
   saveStoredPushDevice: (...a: unknown[]) => saveStoredPushDevice(...a),
   loadStoredPushRegistration: async () => storedRegistration,
@@ -78,6 +84,7 @@ describe("usePushRegistration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     storedRegistration = null;
+    pushOptedOut = false;
     addEventListener.mockReturnValue({ remove: vi.fn() });
     getPermissionsAsync.mockResolvedValue(GRANTED);
     requestPermissionsAsync.mockResolvedValue(GRANTED);
@@ -269,6 +276,63 @@ describe("usePushRegistration", () => {
     });
 
     expect(storedRegistration).toBeNull();
+  });
+
+  it("keeps push off through the next foreground once it is turned off in the app", async () => {
+    loadStoredPushDevice.mockResolvedValue({
+      expoPushToken: "ExponentPushToken[stored]",
+      platform: "ios",
+    });
+    const { result } = renderHook(() => usePushRegistration("token-123", "org-1"));
+    await waitFor(() => expect(registerPushToken).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.isEnabled).toBe(true));
+
+    await act(async () => {
+      await result.current.disablePush();
+    });
+    expect(result.current.isEnabled).toBe(false);
+    expect(result.current.permissionState).toBe("granted");
+
+    const handler = addEventListener.mock.calls.at(-1)?.[1] as (s: string) => void;
+    await act(async () => {
+      handler("active");
+    });
+
+    await waitFor(() => expect(getPermissionsAsync).toHaveBeenCalledTimes(3));
+    expect(registerPushToken).toHaveBeenCalledTimes(2);
+    expect(registerPushToken).toHaveBeenLastCalledWith(
+      "token-123",
+      expect.objectContaining({ disabled: true }),
+    );
+  });
+
+  it("does not register on launch after push was turned off, until it is turned on", async () => {
+    pushOptedOut = true;
+    const { result } = renderHook(() => usePushRegistration("token-123", "org-1"));
+
+    await waitFor(() => expect(getPermissionsAsync).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.isRegistering).toBe(false));
+    expect(registerPushToken).not.toHaveBeenCalled();
+    expect(result.current.isEnabled).toBe(false);
+
+    await act(async () => {
+      await result.current.enablePush();
+    });
+
+    expect(registerPushToken).toHaveBeenCalledTimes(1);
+    expect(result.current.isEnabled).toBe(true);
+    expect(pushOptedOut).toBe(false);
+  });
+
+  it("lets the switch's own calls throw so the screen can say so", async () => {
+    registerPushToken.mockRejectedValue(new Error("network down"));
+    const { result } = renderHook(() =>
+      usePushRegistration("token-123", "org-1", { autoRegister: false }),
+    );
+
+    await act(async () => {
+      await expect(result.current.enablePush()).rejects.toThrow("network down");
+    });
   });
 
   it("surfaces a registration failure instead of throwing", async () => {

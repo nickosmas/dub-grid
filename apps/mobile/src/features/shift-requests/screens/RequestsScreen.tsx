@@ -851,9 +851,12 @@ export default function RequestsScreen() {
   }, [contentState.kind, defaultTab, selectedTab]);
   // A deep link that names a tab (an alert, a home card) still wins over the
   // latched choice, as it did before the latch.
+  // Cleared once applied: the tab stays mounted, so the same link opened
+  // again has to change the param to take effect again.
   useEffect(() => {
     if (routeTab) {
       setSelectedTab(routeTab);
+      router.setParams({ tab: undefined });
     }
   }, [routeTab]);
 

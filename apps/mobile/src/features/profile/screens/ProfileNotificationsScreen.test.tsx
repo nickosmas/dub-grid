@@ -64,6 +64,7 @@ const setQueryData = vi.fn();
 function defaultPush(overrides?: Partial<ReturnType<typeof usePushRegistration>>) {
   return {
     permissionState: "granted",
+    isEnabled: true,
     isRegistering: false,
     isSupported: true,
     enablePush: vi.fn().mockResolvedValue(undefined),
@@ -187,7 +188,9 @@ describe("ProfileNotificationsScreen", () => {
   });
 
   it("shows permission-denied copy and disables the push switch when permission was denied", () => {
-    usePushRegistration.mockReturnValue(defaultPush({ permissionState: "denied" }));
+    usePushRegistration.mockReturnValue(
+      defaultPush({ permissionState: "denied", isEnabled: false }),
+    );
     useQuery.mockReturnValue({
       data: { prefs: {} },
       isLoading: false,
@@ -208,7 +211,9 @@ describe("ProfileNotificationsScreen", () => {
   it("offers the device settings when permission was denied", async () => {
     const { linkingOpenSettingsMock } = await import("../../../test/native");
     linkingOpenSettingsMock.mockClear();
-    usePushRegistration.mockReturnValue(defaultPush({ permissionState: "denied" }));
+    usePushRegistration.mockReturnValue(
+      defaultPush({ permissionState: "denied", isEnabled: false }),
+    );
     useQuery.mockReturnValue({
       data: { prefs: {} },
       isLoading: false,
@@ -242,6 +247,26 @@ describe("ProfileNotificationsScreen", () => {
         rows[index - 1]!.compareDocumentPosition(rows[index]!) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
+  });
+
+  it("turns push on again when it was turned off in the app, though the OS allows it", async () => {
+    const enablePush = vi.fn().mockResolvedValue(undefined);
+    usePushRegistration.mockReturnValue(
+      defaultPush({ permissionState: "granted", isEnabled: false, enablePush }),
+    );
+    useQuery.mockReturnValue({
+      data: { prefs: {} },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<ProfileNotificationsScreen />);
+
+    expect(screen.getByLabelText("Push notifications")).not.toBeChecked();
+    fireEvent.click(screen.getByLabelText("Push notifications"));
+
+    expect(enablePush).toHaveBeenCalled();
   });
 
   it("disables push when the switch is toggled off while granted", async () => {
