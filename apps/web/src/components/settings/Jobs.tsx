@@ -37,7 +37,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { PresetColorPicker, TimeInput12h, inputStyle, labelStyle } from "./shared";
-import { summarizePlacement } from "./job-placement-summary";
+import { summarizeGeneralJobTiming, summarizePlacement } from "./job-placement-summary";
 import {
   PREDEFINED_COLORS,
   TRANSPARENT_BORDER,
@@ -1324,7 +1324,7 @@ function JobRow({
 
   const placementSummary =
     section === "shiftless"
-      ? "No shift"
+      ? summarizeGeneralJobTiming(normalizedShiftlessTiming)
       : summarizePlacement([
           {
             choices: activeScheduledDepartments,

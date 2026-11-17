@@ -1,3 +1,5 @@
+import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
+
 interface Choice {
   id: number;
   name: string;
@@ -43,4 +45,30 @@ export function summarizePlacement(levels: readonly PlacementLevel[]): string {
     if (isEmpty(level)) break;
   }
   return parts.join(" · ");
+}
+
+/** A general job's default timing, as the settings form holds it. */
+export interface GeneralJobTiming {
+  defaultStartTime: string | null;
+  defaultEndTime: string | null;
+  defaultDurationHours: number | null;
+  defaultDurationMinutes: number | null;
+}
+
+function formatDuration(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const hourPart = hours > 0 ? `${hours} ${hours === 1 ? "hour" : "hours"}` : null;
+  const minutePart = minutes > 0 ? `${minutes} min` : null;
+  return [hourPart, minutePart].filter(Boolean).join(" ");
+}
+
+/** "9:00 AM - 5:00 PM", "8 hours", "3 hours 30 min", or "No set time". */
+export function summarizeGeneralJobTiming(timing: GeneralJobTiming): string {
+  const range = formatScheduleTimeRange(timing.defaultStartTime, timing.defaultEndTime);
+  if (range) return range;
+  const totalMinutes =
+    (timing.defaultDurationHours ?? 0) * 60 + (timing.defaultDurationMinutes ?? 0);
+  if (totalMinutes > 0) return formatDuration(totalMinutes);
+  return "No set time";
 }
