@@ -24,12 +24,20 @@ import {
 const PERSON = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
 
 describe("resolveNativeRoute", () => {
-  it("sends request hrefs to the Requests tab, whichever path the web uses", () => {
+  it("sends request hrefs to the Requests tab on their section, whichever path the web uses", () => {
     expect(resolveNativeRoute("/schedule?requests=approval")).toEqual({
       pathname: "/(tabs)/requests",
+      params: { tab: "approval" },
     });
-    expect(resolveNativeRoute("/schedule?requests=mine")).toEqual({ pathname: "/(tabs)/requests" });
+    expect(resolveNativeRoute("/schedule?requests=mine")).toEqual({
+      pathname: "/(tabs)/requests",
+      params: { tab: "mine" },
+    });
     expect(resolveNativeRoute("/requests?id=req-1&tab=approval")).toEqual({
+      pathname: "/(tabs)/requests",
+      params: { tab: "approval", requestId: "req-1" },
+    });
+    expect(resolveNativeRoute("/schedule?requests=bogus")).toEqual({
       pathname: "/(tabs)/requests",
     });
   });

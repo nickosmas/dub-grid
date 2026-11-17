@@ -31,6 +31,7 @@ import { toast } from "sonner";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 import { Banner } from "@/components/ui/Banner";
+import { checkDependenciesOrSay } from "./checkDependenciesOrSay";
 
 export default function StringListSettings({
   label,
@@ -337,7 +338,8 @@ export default function StringListSettings({
     }
     // Existing items — check dependencies
     if (onCheckDependencies) {
-      const deps = await onCheckDependencies(item.id);
+      const deps = await checkDependenciesOrSay(() => onCheckDependencies(item.id));
+      if (!deps) return;
       setDeleteConfirm({ idx: i, item, deps });
     } else {
       // No dependency checker provided — fall back to archive on save

@@ -58,7 +58,7 @@ describe("CalendarSubscriptionCard", () => {
     const encoded = encodeURIComponent(PRIVATE_URL);
     expect(screen.getByRole("link", { name: "Apple Calendar" })).toHaveAttribute(
       "href",
-      PRIVATE_URL.replace("https:", "webcals:"),
+      PRIVATE_URL.replace("https:", "webcal:"),
     );
     const google = screen.getByRole("link", { name: "Google Calendar" });
     expect(google).toHaveAttribute("href", `https://calendar.google.com/calendar/r?cid=${encoded}`);

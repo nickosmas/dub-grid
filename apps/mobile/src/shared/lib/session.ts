@@ -3,6 +3,7 @@ import { getStoredValue, removeStoredValue, setStoredValue } from "./local-stora
 const LAST_ORG_KEY = "dubgrid-mobile-last-org";
 const PUSH_DEVICE_KEY = "dubgrid-mobile-push-device";
 const PUSH_REGISTRATION_KEY = "dubgrid-mobile-push-registration";
+const PUSH_OPTED_OUT_KEY = "dubgrid-mobile-push-opted-out";
 const HAS_SEEN_ONBOARDING_KEY = "dubgrid-mobile-has-seen-onboarding";
 
 export type StoredPushDevice = {
@@ -114,6 +115,20 @@ export async function saveStoredPushRegistration(
 
 export async function loadStoredPushRegistration(): Promise<StoredPushRegistration | null> {
   return loadJsonValue<StoredPushRegistration>(PUSH_REGISTRATION_KEY);
+}
+
+/** Push turned off for this device in the app, while the OS still allows it. */
+export async function loadPushOptedOut(): Promise<boolean> {
+  return (await getStoredValue(PUSH_OPTED_OUT_KEY)) === "true";
+}
+
+export async function savePushOptedOut(optedOut: boolean): Promise<void> {
+  if (!optedOut) {
+    await removeStoredValue(PUSH_OPTED_OUT_KEY);
+    return;
+  }
+
+  await setStoredValue(PUSH_OPTED_OUT_KEY, "true");
 }
 
 export async function loadHasSeenOnboarding(): Promise<boolean> {

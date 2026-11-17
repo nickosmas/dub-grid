@@ -178,7 +178,10 @@ describe("NotificationDetailScreen", () => {
     await waitFor(() => {
       expect(markNotificationRead).toHaveBeenCalledWith("token-123", NOTIFICATION_ID);
     });
-    expect(openNativeRoute).toHaveBeenCalledWith({ pathname: "/(tabs)/requests" }, "replace");
+    expect(openNativeRoute).toHaveBeenCalledWith(
+      { pathname: "/(tabs)/requests", params: { requestId: "req-1" } },
+      "replace",
+    );
     expect(screen.queryByText("Pickup available")).toBeNull();
 
     rerender(<NotificationDetailScreen />);
@@ -199,7 +202,10 @@ describe("NotificationDetailScreen", () => {
     render(<NotificationDetailScreen />);
 
     await waitFor(() => {
-      expect(openNativeRoute).toHaveBeenCalledWith({ pathname: "/(tabs)/requests" }, "replace");
+      expect(openNativeRoute).toHaveBeenCalledWith(
+        { pathname: "/(tabs)/requests", params: { requestId: "req-1" } },
+        "replace",
+      );
     });
     expect(markNotificationRead).not.toHaveBeenCalled();
   });

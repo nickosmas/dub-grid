@@ -38,6 +38,7 @@ import type { DependencyInfo } from "@/features/settings/client";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 import { Banner } from "@/components/ui/Banner";
+import { checkDependenciesOrSay } from "./checkDependenciesOrSay";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -807,7 +808,8 @@ function DepartmentSection({
       }
       return;
     }
-    const deps = await checkDepartmentDependencies(dept.id, orgId);
+    const deps = await checkDependenciesOrSay(() => checkDepartmentDependencies(dept.id, orgId));
+    if (!deps) return;
     setDeleteConfirm({ idx: i, dept, deps });
   };
 
@@ -851,7 +853,8 @@ function DepartmentSection({
       setLocalFAs((prev) => prev.filter((f) => f.id !== fa.id));
       return;
     }
-    const deps = await checkFocusAreaDependencies(fa.id, orgId);
+    const deps = await checkDependenciesOrSay(() => checkFocusAreaDependencies(fa.id, orgId));
+    if (!deps) return;
     setFaDeleteConfirm({ faId: fa.id, fa, deps });
   };
 

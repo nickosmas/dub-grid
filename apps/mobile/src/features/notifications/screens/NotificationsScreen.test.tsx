@@ -280,7 +280,7 @@ describe("NotificationsScreen", () => {
 
     // The alert is about a request, so the tap lands on the Requests tab, and
     // it does so synchronously: no network wait sits in front of it.
-    expect(push).toHaveBeenCalledWith("/(tabs)/requests");
+    expect(push).toHaveBeenCalledWith({ pathname: "/(tabs)/requests", params: { tab: "mine" } });
     // The row is marked read in the cached pages before the write resolves.
     expect(setQueryData).toHaveBeenCalled();
     await waitFor(() => {
@@ -392,7 +392,7 @@ describe("NotificationsScreen", () => {
 
     fireEvent.click(screen.getByText("Pickup available"));
 
-    expect(push).toHaveBeenCalledWith("/(tabs)/requests");
+    expect(push).toHaveBeenCalledWith({ pathname: "/(tabs)/requests", params: { tab: "mine" } });
     await waitFor(() => {
       expect(pushToast).toHaveBeenCalledWith(
         expect.objectContaining({ title: "Couldn't update alerts" }),

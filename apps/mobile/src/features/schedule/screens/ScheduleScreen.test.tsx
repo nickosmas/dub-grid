@@ -48,6 +48,7 @@ const useLocalSearchParams = vi.fn(() => ({}));
 vi.mock("expo-router", () => ({
   router: {
     push: routerPush,
+    setParams: vi.fn(),
   },
   useLocalSearchParams: () => useLocalSearchParams(),
 }));

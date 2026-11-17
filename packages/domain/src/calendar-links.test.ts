@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { buildCalendarSubscribeLinks } from "./calendar-links";
 
 describe("buildCalendarSubscribeLinks", () => {
-  it("maps an https feed to webcals and encodes it for Google and Outlook", () => {
+  it("maps an https feed to webcal and encodes it for Google and Outlook", () => {
     const links = buildCalendarSubscribeLinks(
       "https://calmhaven.dubgrid.app/api/calendar/feed/abc123",
     );
-    expect(links.apple).toBe("webcals://calmhaven.dubgrid.app/api/calendar/feed/abc123");
+    expect(links.apple).toBe("webcal://calmhaven.dubgrid.app/api/calendar/feed/abc123");
     expect(links.google).toBe(
       "https://calendar.google.com/calendar/r?cid=https%3A%2F%2Fcalmhaven.dubgrid.app%2Fapi%2Fcalendar%2Ffeed%2Fabc123",
     );
@@ -15,7 +15,7 @@ describe("buildCalendarSubscribeLinks", () => {
     );
   });
 
-  it("maps a plain http feed to webcal for local development", () => {
+  it("maps a plain http feed to webcal too", () => {
     const links = buildCalendarSubscribeLinks(
       "http://calmhaven.localhost:3000/api/calendar/feed/abc123",
     );

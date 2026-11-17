@@ -52,12 +52,18 @@ export function CoverageSectionRow({ section }: { section: CoverageSection }) {
     <View style={styles.row}>
       <PressableRow
         accessibilityLabel={`${section.focusAreaName}, ${section.pct} percent covered`}
-        onPress={() =>
+        onPress={() => {
+          // Opens on the row's first short day, so the schedule shows the
+          // week stepped to here rather than wherever the tab was left.
+          const firstGap = daily.find((day) => day.filledCount < day.requiredCount)?.dateKey;
           router.push({
             pathname: "/(tabs)/team",
-            params: { focusAreaId: String(section.focusAreaId) },
-          })
-        }
+            params: {
+              focusAreaId: String(section.focusAreaId),
+              ...(firstGap ? { date: firstGap } : {}),
+            },
+          });
+        }}
         style={styles.pressable}
       >
         <View style={styles.rowBody}>

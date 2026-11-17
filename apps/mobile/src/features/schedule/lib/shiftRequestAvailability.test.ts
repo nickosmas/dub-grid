@@ -1,6 +1,9 @@
 import type { MobileScheduleEntry } from "@dubgrid/contracts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getShiftRequestAvailability, SHIFT_REQUEST_NOTICES } from "./shiftRequestAvailability";
+import {
+  getShiftRequestAvailability,
+  SHIFT_REQUEST_CHECK_FAILED_NOTICE,
+} from "./shiftRequestAvailability";
 
 const TIME_ZONE = "America/Los_Angeles";
 
@@ -86,6 +89,8 @@ function availability(
 }
 
 describe("getShiftRequestAvailability", () => {
+  const NONE = { canDrop: false, canSwap: false, notice: null, canRetry: false };
+
   beforeEach(() => {
     vi.useFakeTimers();
     // 12:00 PM on Apr 15 in Los Angeles.
@@ -106,43 +111,20 @@ describe("getShiftRequestAvailability", () => {
   });
 
   it("says nothing on a teammate's shift or without a linked person", () => {
-    expect(availability(buildEntry({ employeeId: "emp-2" }))).toMatchObject({
-      canDrop: false,
-      notice: null,
-    });
-    expect(availability(buildEntry(), { linkedEmployeeId: null }).notice).toBeNull();
-    expect(availability(null).notice).toBeNull();
+    expect(availability(buildEntry({ employeeId: "emp-2" }))).toEqual(NONE);
+    expect(availability(buildEntry(), { linkedEmployeeId: null })).toEqual(NONE);
+    expect(availability(null)).toEqual(NONE);
   });
 
-  it("explains a shift that has started", () => {
-    expect(availability(buildEntry({ date: "2026-04-15" }))).toEqual({
-      canDrop: false,
-      canSwap: false,
-      notice: SHIFT_REQUEST_NOTICES.started,
-      canRetry: false,
-    });
-  });
-
-  it("explains a shift that is over, earlier today or on a past day", () => {
+  it("hides the actions without explaining on a shift that has started or is over", () => {
     const morning = buildEntry({
       date: "2026-04-15",
       ...worked([segment(1, "Early", "05:00:00", "09:00:00")]),
     });
 
-    expect(availability(morning).notice).toBe(SHIFT_REQUEST_NOTICES.over);
-    expect(availability(buildEntry({ date: "2026-04-14" })).notice).toBe(
-      SHIFT_REQUEST_NOTICES.over,
-    );
-  });
-
-  it("treats last night's shift that runs into today as started, not over", () => {
-    vi.setSystemTime(new Date("2026-04-15T13:00:00.000Z")); // 6:00 AM in Los Angeles
-    const overnight = buildEntry({
-      date: "2026-04-14",
-      ...worked([segment(3, "Night Shift", "23:00:00", "07:00:00")]),
-    });
-
-    expect(availability(overnight).notice).toBe(SHIFT_REQUEST_NOTICES.started);
+    expect(availability(buildEntry({ date: "2026-04-15" }))).toEqual(NONE);
+    expect(availability(morning)).toEqual(NONE);
+    expect(availability(buildEntry({ date: "2026-04-14" }))).toEqual(NONE);
   });
 
   it("keeps the actions while a later shift in the cell has not started", () => {
@@ -157,26 +139,24 @@ describe("getShiftRequestAvailability", () => {
     expect(availability(double)).toMatchObject({ canDrop: true, canSwap: true, notice: null });
   });
 
-  it("explains a removed shift, past or upcoming", () => {
+  it("hides the actions without explaining on a removed shift", () => {
     const removedChange = {
       kind: "deleted",
       previousPresentation: worked([DAY_SHIFT]).presentation,
     } as MobileScheduleEntry["change"];
 
-    expect(availability(buildEntry({ change: removedChange })).notice).toBe(
-      SHIFT_REQUEST_NOTICES.removed,
-    );
+    expect(availability(buildEntry({ change: removedChange }))).toEqual(NONE);
     expect(
       availability(
         buildEntry({
           date: "2026-04-14",
           state: { ...buildEntry().state, kind: "deleted", segments: [] },
         }),
-      ).notice,
-    ).toBe(SHIFT_REQUEST_NOTICES.removed);
+      ),
+    ).toEqual(NONE);
   });
 
-  it("explains a whole-day absence without naming it", () => {
+  it("hides the actions without explaining on a whole-day absence", () => {
     const result = availability(
       buildEntry({
         state: { ...buildEntry().state, kind: "absence", segments: [], absenceTypeId: 3 },
@@ -184,9 +164,7 @@ describe("getShiftRequestAvailability", () => {
       }),
     );
 
-    expect(result).toMatchObject({ canDrop: false, canSwap: false });
-    expect(result.notice).toBe(SHIFT_REQUEST_NOTICES.absence);
-    expect(result.notice).not.toContain("Sick");
+    expect(result).toEqual(NONE);
   });
 
   it("keeps drop and swap on a shift with an absence beside it", () => {
@@ -209,38 +187,32 @@ describe("getShiftRequestAvailability", () => {
   });
 
   it("stays quiet while the request check runs or a request is under way", () => {
-    expect(availability(buildEntry(), { isCheckingExistingRequests: true })).toMatchObject({
-      canDrop: false,
-      notice: null,
-    });
-    expect(availability(buildEntry(), { hasActiveRequest: true })).toMatchObject({
-      canDrop: false,
-      notice: null,
-    });
+    expect(availability(buildEntry(), { isCheckingExistingRequests: true })).toEqual(NONE);
+    expect(availability(buildEntry(), { hasActiveRequest: true })).toEqual(NONE);
   });
 
   it("offers a retry when the request check failed", () => {
     expect(availability(buildEntry(), { hasExistingRequestCheckError: true })).toEqual({
       canDrop: false,
       canSwap: false,
-      notice: SHIFT_REQUEST_NOTICES.checkFailed,
+      notice: SHIFT_REQUEST_CHECK_FAILED_NOTICE,
       canRetry: true,
     });
   });
 
-  it("says a shift that has started first, even when the check failed", () => {
+  it("offers no retry on a shift that has started, even when the check failed", () => {
     expect(
       availability(buildEntry({ date: "2026-04-15" }), { hasExistingRequestCheckError: true }),
-    ).toMatchObject({ notice: SHIFT_REQUEST_NOTICES.started, canRetry: false });
+    ).toEqual(NONE);
   });
 
-  it("offers only a drop on a general shift and says why", () => {
+  it("offers only a drop on a general shift, without explaining the missing swap", () => {
     const entry = buildEntry(worked([segment(null, "Training", "07:00:00", "15:00:00")]));
 
     expect(availability(entry)).toEqual({
       canDrop: true,
       canSwap: false,
-      notice: SHIFT_REQUEST_NOTICES.generalShift,
+      notice: null,
       canRetry: false,
     });
   });

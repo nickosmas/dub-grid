@@ -280,6 +280,20 @@ export default function PersonDetailScreen() {
   const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
   const isSelfRoute = Boolean(personId && currentEmployeeId && personId === currentEmployeeId);
   const { pushToast } = useToast();
+  // A phone with no dialer or mail app rejects the link; say so rather than
+  // leave a button that does nothing.
+  const openContact = (url: string, kind: "call" | "email") => {
+    Linking.openURL(url).catch(() => {
+      pushToast({
+        tone: "error",
+        title: kind === "call" ? "Couldn't start a call" : "Couldn't open email",
+        message:
+          kind === "call"
+            ? "This device can't make calls from the app."
+            : "Set up an email app on this device to send email.",
+      });
+    });
+  };
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [editFocusField, setEditFocusField] = useState<ContactField | null>(null);
@@ -1745,7 +1759,7 @@ export default function PersonDetailScreen() {
             iconTone="green"
             label="Call"
             onPress={() => {
-              void Linking.openURL(`tel:${person.phone}`);
+              openContact(`tel:${person.phone?.replace(/[^\d+]/g, "")}`, "call");
             }}
           />
           <ProfileQuickAction
@@ -1754,7 +1768,7 @@ export default function PersonDetailScreen() {
             iconTone="blue"
             label="Email"
             onPress={() => {
-              void Linking.openURL(`mailto:${person.email}`);
+              openContact(`mailto:${person.email}`, "email");
             }}
           />
         </ProfileQuickActions>

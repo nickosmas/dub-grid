@@ -100,6 +100,34 @@ describe("dashboard row drill-ins", () => {
     });
   });
 
+  it("opens a coverage section on its first short day, in the week the card shows", () => {
+    render(
+      <CoverageSectionRow
+        section={
+          {
+            focusAreaId: 3,
+            focusAreaName: "Memory Care",
+            filledTotal: 6,
+            requiredTotal: 8,
+            openSlots: 2,
+            pct: 75,
+            daily: [
+              { dateKey: "2026-11-22", filledCount: 2, requiredCount: 2 },
+              { dateKey: "2026-11-23", filledCount: 1, requiredCount: 2 },
+            ],
+          } as never
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Memory Care, 75 percent covered" }));
+
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/team",
+      params: { focusAreaId: "3", date: "2026-11-23" },
+    });
+  });
+
   it("opens an overtime entry on that person", () => {
     render(
       <StaffHoursRow

@@ -5,6 +5,7 @@ type ReactModule = typeof ReactType;
 
 export const screenScrollToMock = vi.fn();
 export const linkingOpenSettingsMock = vi.fn(() => Promise.resolve());
+export const linkingOpenURLMock = vi.fn((_url: string) => Promise.resolve());
 export const alertMock = vi.fn();
 export const keyboardDismissMock = vi.fn();
 export const announceForAccessibilityMock = vi.fn();
@@ -505,7 +506,7 @@ export function createReactNativeModule(
       out: (easing: (value: number) => number) => easing,
     },
     Linking: {
-      openURL: () => Promise.resolve(),
+      openURL: (url: string) => linkingOpenURLMock(url),
       openSettings: linkingOpenSettingsMock,
     },
     Modal,

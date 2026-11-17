@@ -930,12 +930,17 @@ function SchedulerContent({
         .sort((a, b) => a.name.localeCompare(b.name)),
     [employeeDirectory],
   );
+  // An approval publishes on the server, and the grid keeps its own copy of
+  // the published days, so it reloads them (set once the loader exists).
+  const reloadScheduleAfterRequestRef = useRef<() => void>(() => undefined);
   const shiftRequests = useShiftRequests(
     orgId ?? org?.id ?? null,
     assignmentLabelMap,
     currentEmpId,
     canApproveShiftRequests,
     org?.timezone ?? null,
+    null,
+    { onScheduleChanged: () => reloadScheduleAfterRequestRef.current() },
   );
 
   // ── Open shifts (calloff-spawned pickups) ──
@@ -2404,6 +2409,9 @@ function SchedulerContent({
   removeRemoteSessionRef.current = removeRemoteSession;
   const refetchScheduleDataRef = useRef(refetchScheduleData);
   refetchScheduleDataRef.current = refetchScheduleData;
+  reloadScheduleAfterRequestRef.current = () => {
+    refetchScheduleData().catch((err: unknown) => Sentry.captureException(err));
+  };
   const refetchPublishedRangesRef = useRef<() => Promise<void>>(async () => {});
   // Tracks when data was last fetched — used to throttle tab-visibility refetches
   const lastRefetchAtRef = useRef(0);
@@ -8486,8 +8494,14 @@ function SchedulerContent({
     });
     const day = runs.days[week.findIndex((date) => formatDateKey(date) === dateKey)];
     if (!day) return null;
+    // Past days are finished: only Correct this day changes them, so a run
+    // that started before today removes only the days from today on.
+    if (isPastDateKey(dateKey, todayKey)) return null;
     return {
-      dateKeys: week.slice(day.start, day.start + day.length).map((date) => formatDateKey(date)),
+      dateKeys: week
+        .slice(day.start, day.start + day.length)
+        .map((date) => formatDateKey(date))
+        .filter((key) => !isPastDateKey(key, todayKey)),
     };
   }, [
     absenceTypeIdForKey,
@@ -8502,6 +8516,7 @@ function SchedulerContent({
     shiftForKey,
     showPublishDiff,
     spanWeeks,
+    todayKey,
     week1,
     week2,
   ]);
@@ -8509,7 +8524,8 @@ function SchedulerContent({
   // Removes a whole run as one batch, with one Undo that puts back the days
   // nobody has changed since.
   const removeAbsenceRun = useCallback(
-    async (empId: string, dateKeys: string[], absenceName: string) => {
+    async (empId: string, runDateKeys: string[], absenceName: string) => {
+      const dateKeys = runDateKeys.filter((key) => !isPastDateKey(key, todayKeyRef.current));
       const applied = planAbsenceRunRemoval(empId, dateKeys, shiftsRef.current);
       const updates = dateKeys
         .map((dateKey) => buildShiftDeleteUpdate(empId, dateKey))
