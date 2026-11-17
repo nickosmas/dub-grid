@@ -8,6 +8,7 @@ import type { ShiftRequest } from "@/types";
 const mockFetchShiftRequests = vi.fn();
 const mockClaimShiftRequest = vi.fn();
 const mockRespondToShiftRequest = vi.fn();
+const mockResolveShiftRequest = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 const mockCaptureException = vi.fn();
@@ -17,7 +18,7 @@ vi.mock("@/features/schedule/client", () => ({
   claimShiftRequest: (...args: unknown[]) => mockClaimShiftRequest(...args),
   createShiftRequest: vi.fn(),
   fetchShiftRequests: (...args: unknown[]) => mockFetchShiftRequests(...args),
-  resolveShiftRequest: vi.fn(),
+  resolveShiftRequest: (...args: unknown[]) => mockResolveShiftRequest(...args),
   respondToShiftRequest: (...args: unknown[]) => mockRespondToShiftRequest(...args),
   volunteerForOpenShift: vi.fn(),
 }));
@@ -235,6 +236,41 @@ describe("useShiftRequests", () => {
     expect(mockToastSuccess).toHaveBeenCalledWith("Shift is yours", {
       description: "The claim was approved and is on the schedule.",
     });
+  });
+
+  it("tells the schedule to reload once an action publishes, and not otherwise", async () => {
+    mockFetchShiftRequests.mockResolvedValue([]);
+    mockResolveShiftRequest.mockResolvedValue(undefined);
+    mockClaimShiftRequest.mockResolvedValueOnce({ autoApproved: false });
+    mockClaimShiftRequest.mockResolvedValueOnce({ autoApproved: true });
+    const onScheduleChanged = vi.fn();
+
+    const { result } = renderHook(
+      () =>
+        useShiftRequests("org-1", new Map(), "claimer-1", true, "America/Los_Angeles", null, {
+          onScheduleChanged,
+        }),
+      { wrapper },
+    );
+    await flush();
+
+    await act(async () => {
+      await result.current.resolve("request-1", false);
+    });
+    await act(async () => {
+      await result.current.claim("request-2", "claimer-1");
+    });
+    expect(onScheduleChanged).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.resolve("request-1", true);
+    });
+    expect(onScheduleChanged).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.claim("request-3", "claimer-1");
+    });
+    expect(onScheduleChanged).toHaveBeenCalledTimes(2);
   });
 
   it("names a targeted pickup, not a swap, when the recipient answers", async () => {

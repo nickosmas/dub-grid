@@ -23,6 +23,7 @@ import {
 } from "@/components/shift-requests/approval-draft-warning";
 import { describeCancelRequestConfirmation } from "@/components/shift-requests/cancel-request-copy";
 import ProgressBar from "@/components/ProgressBar";
+import { formatDateKey } from "@/lib/utils";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { joinAssignmentNames } from "@/lib/assignable-shifts";
 import { absenceStripeFill } from "@/lib/absence-stripes";
@@ -97,7 +98,8 @@ const HISTORY_DEFAULT_DAYS = 30;
 function isoDateDaysAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  // The viewer's own day: toISOString gave UTC's, a day ahead every US evening.
+  return formatDateKey(d);
 }
 
 function formatResolvedAt(value: string): string {

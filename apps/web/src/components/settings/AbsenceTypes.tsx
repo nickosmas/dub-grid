@@ -31,6 +31,7 @@ import { PresetColorPicker, labelStyle } from "./shared";
 import { FILLED_PILL_BORDER, PREDEFINED_COLORS, TRANSPARENT_BORDER } from "@/lib/colors";
 import { absenceStripeFill } from "@/lib/absence-stripes";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { checkDependenciesOrSay } from "./checkDependenciesOrSay";
 
 type AbsenceTypeFormState = {
   label: string;
@@ -227,7 +228,10 @@ function AbsenceTypeRow({
       onDeleted(absenceType.id);
       return;
     }
-    const deps = await checkAbsenceTypeDependencies(absenceType.id, orgId);
+    const deps = await checkDependenciesOrSay(() =>
+      checkAbsenceTypeDependencies(absenceType.id, orgId),
+    );
+    if (!deps) return;
     setDependencyInfo(deps);
     setShowDeleteConfirm(true);
   }, [absenceType.id, absenceType.isNew, onDeleted, orgId]);

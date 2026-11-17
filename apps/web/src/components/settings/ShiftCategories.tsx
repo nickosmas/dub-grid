@@ -38,6 +38,7 @@ import {
   toDarkPillColors,
 } from "@/lib/colors";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { checkDependenciesOrSay } from "./checkDependenciesOrSay";
 
 // ── Shift Categories Settings ──────────────────────────────────────────────────
 const SHIFT_ABBR_MAX_LENGTH = 8;
@@ -102,7 +103,8 @@ function ShiftCategoriesSettings({
       handleDelete(cat, false);
       return;
     }
-    const deps = await checkShiftCategoryDependencies(catId, orgId);
+    const deps = await checkDependenciesOrSay(() => checkShiftCategoryDependencies(catId, orgId));
+    if (!deps) return;
     setCatDepInfo(deps);
     setConfirmDeleteId(catId);
   };
