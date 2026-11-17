@@ -129,7 +129,23 @@ describe("ProfileCalendarScreen", () => {
     expect(api.createCalendarSubscription).toHaveBeenCalledWith("token-123");
     expect(api.rotateCalendarSubscription).not.toHaveBeenCalled();
     expect(openURL).toHaveBeenCalledWith(
-      "webcals://calmhaven.dubgrid.app/api/calendar/feed/tok_abc",
+      "webcal://calmhaven.dubgrid.app/api/calendar/feed/tok_abc",
+    );
+  });
+
+  it("says the calendar didn't open, not that the link failed, when the phone can't open it", async () => {
+    mockStatus(false);
+    openURL.mockRejectedValueOnce(new Error("Unable to open URL"));
+    const api = await renderScreen();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Google Calendar" }));
+    });
+
+    expect(api.createCalendarSubscription).toHaveBeenCalledTimes(1);
+    expect(pushToast).toHaveBeenCalledTimes(1);
+    expect(pushToast).toHaveBeenCalledWith(
+      expect.objectContaining({ tone: "error", title: "Couldn't open the calendar" }),
     );
   });
 

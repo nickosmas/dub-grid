@@ -162,7 +162,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:4796aa2be088eabb171487cb69b99a738b15236669079f1db61a93e6c439be73"
+      "evidenceFingerprint": "sha256:b3492a5d08a79a0efeefdb9d3f374819edd4c20ce840a9a6be05659ecf76d61c"
     },
     {
       "id": "quickstart",
@@ -390,7 +390,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:bbf8deba3ced2ba1000fbd0290e1962d21f1ab018c42873321fbd2c167e3074b"
+      "evidenceFingerprint": "sha256:5e3c01ae01d268f4d53f72782e6b825fd8eb935c4f16b1459acb571feee569e4"
     },
     {
       "id": "draft-publish",
@@ -1522,7 +1522,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:aae97056713199fa0759a18216a3fd83b16ad08a3c95f3b20b2e7594be24d49a"
+      "evidenceFingerprint": "sha256:5d1e5f28076c8d00ab2d60326ecfd25d2fd78dea5c42ddb8730157c20de012ab"
     },
     {
       "id": "security-sessions",
@@ -2106,7 +2106,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:e1a4dc5ce349ad7a784a19f44196e4f6d0a205e967b013b710be789b8608edc1"
+      "evidenceFingerprint": "sha256:ec002ee3aa6a2e8113b817b01c96ab9a20f2df9cec6c2fb222be31b2b8c5c8dc"
     },
     {
       "id": "integrations-exports",
@@ -2164,7 +2164,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:304f8bac75954b0b58b1b9a9294a127bf5bee145e7f073e9f6277bcd14d119ee"
+      "evidenceFingerprint": "sha256:a9e33b2172432b53c77e48e5f7b0318468d442f56a11b4fe733ec7f80e641dec"
     }
   ],
   "surfaceExclusions": [
