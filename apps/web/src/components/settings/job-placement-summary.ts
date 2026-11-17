@@ -63,12 +63,23 @@ function formatDuration(totalMinutes: number): string {
   return [hourPart, minutePart].filter(Boolean).join(" ");
 }
 
+function durationMinutes(timing: GeneralJobTiming): number {
+  return (timing.defaultDurationHours ?? 0) * 60 + (timing.defaultDurationMinutes ?? 0);
+}
+
+/**
+ * A general job has no shift to take its hours from, so without a full start
+ * and end time or a duration above zero it would count 0 hours.
+ */
+export function hasGeneralJobTiming(timing: GeneralJobTiming): boolean {
+  return Boolean(timing.defaultStartTime && timing.defaultEndTime) || durationMinutes(timing) > 0;
+}
+
 /** "9:00 AM - 5:00 PM", "8 hours", "3 hours 30 min", or "No set time". */
 export function summarizeGeneralJobTiming(timing: GeneralJobTiming): string {
   const range = formatScheduleTimeRange(timing.defaultStartTime, timing.defaultEndTime);
   if (range) return range;
-  const totalMinutes =
-    (timing.defaultDurationHours ?? 0) * 60 + (timing.defaultDurationMinutes ?? 0);
+  const totalMinutes = durationMinutes(timing);
   if (totalMinutes > 0) return formatDuration(totalMinutes);
   return "No set time";
 }

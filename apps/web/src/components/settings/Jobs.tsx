@@ -37,7 +37,11 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { PresetColorPicker, TimeInput12h, inputStyle, labelStyle } from "./shared";
-import { summarizeGeneralJobTiming, summarizePlacement } from "./job-placement-summary";
+import {
+  hasGeneralJobTiming,
+  summarizeGeneralJobTiming,
+  summarizePlacement,
+} from "./job-placement-summary";
 import {
   PREDEFINED_COLORS,
   TRANSPARENT_BORDER,
@@ -1048,6 +1052,10 @@ function JobRow({
     section === "shiftless" &&
     (normalizedShiftlessTiming.defaultStartTime == null) !==
       (normalizedShiftlessTiming.defaultEndTime == null);
+  const missingGeneralJobTiming =
+    section === "shiftless" &&
+    !incompleteGeneralJobTime &&
+    !hasGeneralJobTiming(normalizedShiftlessTiming);
   const incompleteShiftOverride = useMemo(
     () =>
       selectedShifts.some((shift) => {
@@ -1113,6 +1121,7 @@ function JobRow({
     !duplicateName &&
     !duplicateAbbr &&
     !incompleteGeneralJobTime &&
+    !missingGeneralJobTiming &&
     !incompleteShiftOverride &&
     hasRequiredPlacement;
 
@@ -2544,6 +2553,20 @@ function JobRow({
               }}
             >
               Enter both a start and end time, or switch this general job to duration mode.
+            </p>
+          ) : null}
+
+          {missingGeneralJobTiming ? (
+            <p
+              style={{
+                color: "var(--dg-color-danger)",
+                fontSize: "var(--dg-fs-caption)",
+                margin: 0,
+              }}
+            >
+              {hasGeneralJobDuration
+                ? "Enter a duration of at least 1 minute."
+                : "Set a default time or duration."}
             </p>
           ) : null}
 

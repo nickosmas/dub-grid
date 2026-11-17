@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  hasGeneralJobTiming,
   summarizeGeneralJobTiming,
   summarizePlacement,
   summarizeSelection,
@@ -131,5 +132,33 @@ describe("summarizeGeneralJobTiming", () => {
     expect(summarizeGeneralJobTiming(none)).toBe("No set time");
     expect(summarizeGeneralJobTiming({ ...none, defaultStartTime: "09:00" })).toBe("No set time");
     expect(summarizeGeneralJobTiming({ ...none, defaultDurationHours: 0 })).toBe("No set time");
+  });
+});
+
+describe("hasGeneralJobTiming", () => {
+  const none = {
+    defaultStartTime: null,
+    defaultEndTime: null,
+    defaultDurationHours: null,
+    defaultDurationMinutes: null,
+  };
+
+  it("accepts a full start and end time", () => {
+    expect(
+      hasGeneralJobTiming({ ...none, defaultStartTime: "09:00", defaultEndTime: "17:00" }),
+    ).toBe(true);
+  });
+
+  it("accepts a duration above zero", () => {
+    expect(hasGeneralJobTiming({ ...none, defaultDurationHours: 8 })).toBe(true);
+    expect(hasGeneralJobTiming({ ...none, defaultDurationMinutes: 30 })).toBe(true);
+  });
+
+  it("rejects no timing, a half-entered time and a zero duration", () => {
+    expect(hasGeneralJobTiming(none)).toBe(false);
+    expect(hasGeneralJobTiming({ ...none, defaultEndTime: "17:00" })).toBe(false);
+    expect(
+      hasGeneralJobTiming({ ...none, defaultDurationHours: 0, defaultDurationMinutes: 0 }),
+    ).toBe(false);
   });
 });
