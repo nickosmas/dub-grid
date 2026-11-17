@@ -37,7 +37,11 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { PresetColorPicker, TimeInput12h, inputStyle, labelStyle } from "./shared";
-import { summarizePlacement } from "./job-placement-summary";
+import {
+  hasGeneralJobTiming,
+  summarizeGeneralJobTiming,
+  summarizePlacement,
+} from "./job-placement-summary";
 import {
   PREDEFINED_COLORS,
   TRANSPARENT_BORDER,
@@ -46,7 +50,7 @@ import {
   toDarkPillColors,
 } from "@/lib/colors";
 import { calcTimeDuration, fmt12h } from "@/lib/utils";
-import { getQualificationSeniorityRank } from "@/lib/assignable-shifts";
+import { compareJobsByQualificationSeniority } from "@/lib/assignable-shifts";
 import {
   getJobShiftColorOverride,
   getJobShiftTimeOverride,
@@ -128,37 +132,6 @@ function isScheduledLikeSection(section: JobSection): boolean {
 
 function sortByOrder<T extends { sortOrder: number; id: number }>(items: T[]): T[] {
   return [...items].sort((left, right) => left.sortOrder - right.sortOrder || left.id - right.id);
-}
-
-function compareJobsByQualificationSeniority(
-  left: JobDefinition,
-  right: JobDefinition,
-  orgRoles: NamedItem[],
-  certifications: NamedItem[],
-): number {
-  const leftRank = getQualificationSeniorityRank({
-    job: left,
-    orgRoles,
-    certifications,
-  });
-  const rightRank = getQualificationSeniorityRank({
-    job: right,
-    orgRoles,
-    certifications,
-  });
-  const leftRanked = leftRank != null;
-  const rightRanked = rightRank != null;
-
-  if (leftRanked !== rightRanked) {
-    return leftRanked ? -1 : 1;
-  }
-  if (leftRank != null && rightRank != null && leftRank !== rightRank) {
-    return leftRank - rightRank;
-  }
-  if (left.sortOrder !== right.sortOrder) {
-    return left.sortOrder - right.sortOrder;
-  }
-  return left.name.localeCompare(right.name);
 }
 
 function formatCount(count: number, singular: string, plural = `${singular}s`): string {
@@ -1079,6 +1052,10 @@ function JobRow({
     section === "shiftless" &&
     (normalizedShiftlessTiming.defaultStartTime == null) !==
       (normalizedShiftlessTiming.defaultEndTime == null);
+  const missingGeneralJobTiming =
+    section === "shiftless" &&
+    !incompleteGeneralJobTime &&
+    !hasGeneralJobTiming(normalizedShiftlessTiming);
   const incompleteShiftOverride = useMemo(
     () =>
       selectedShifts.some((shift) => {
@@ -1144,6 +1121,7 @@ function JobRow({
     !duplicateName &&
     !duplicateAbbr &&
     !incompleteGeneralJobTime &&
+    !missingGeneralJobTiming &&
     !incompleteShiftOverride &&
     hasRequiredPlacement;
 
@@ -1355,7 +1333,7 @@ function JobRow({
 
   const placementSummary =
     section === "shiftless"
-      ? "No shift"
+      ? summarizeGeneralJobTiming(normalizedShiftlessTiming)
       : summarizePlacement([
           {
             choices: activeScheduledDepartments,
@@ -2575,6 +2553,20 @@ function JobRow({
               }}
             >
               Enter both a start and end time, or switch this general job to duration mode.
+            </p>
+          ) : null}
+
+          {missingGeneralJobTiming ? (
+            <p
+              style={{
+                color: "var(--dg-color-danger)",
+                fontSize: "var(--dg-fs-caption)",
+                margin: 0,
+              }}
+            >
+              {hasGeneralJobDuration
+                ? "Enter a duration of at least 1 minute."
+                : "Set a default time or duration."}
             </p>
           ) : null}
 

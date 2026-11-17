@@ -157,6 +157,41 @@ export interface MonthDayInput {
   openShifts: GridOpenShift[];
   /** This day's coverage, or null when the viewer doesn't see staffing. */
   coverage: CoverageCategorySnapshot[] | null;
+  /** Each job's place from most senior down; people on a more senior job list first. */
+  jobSeniority?: Map<number, number>;
+}
+
+/** Stable, so people on the same job keep the staff order they arrived in. */
+function sortPeopleByJob(
+  people: MonthPersonRow[],
+  jobSeniority: Map<number, number> | undefined,
+): MonthPersonRow[] {
+  if (!jobSeniority) return people;
+  const placeOf = (row: MonthPersonRow) =>
+    (row.style.jobId != null ? jobSeniority.get(row.style.jobId) : undefined) ??
+    Number.MAX_SAFE_INTEGER;
+  return [...people].sort((a, b) => placeOf(a) - placeOf(b));
+}
+
+/** A requirement's job from its `focusArea:job:shift` row key; legacy and any-job rows have none. */
+function jobIdOfRowKey(rowKey: string): number | null {
+  const parts = rowKey.split(":");
+  const jobId = parts.length === 3 ? Number(parts[1]) : NaN;
+  return Number.isInteger(jobId) && jobId > 0 ? jobId : null;
+}
+
+/** Stable, so lines on the same job keep the Schedule Builder's order. */
+function sortCoverageByJob(
+  lines: MonthCoverageLine[],
+  jobOf: Map<MonthCoverageLine, number | null>,
+  jobSeniority: Map<number, number> | undefined,
+): MonthCoverageLine[] {
+  if (!jobSeniority) return lines;
+  const placeOf = (line: MonthCoverageLine) => {
+    const jobId = jobOf.get(line);
+    return (jobId != null ? jobSeniority.get(jobId) : undefined) ?? Number.MAX_SAFE_INTEGER;
+  };
+  return [...lines].sort((a, b) => placeOf(a) - placeOf(b));
 }
 
 const shiftKeyOf = (style: AssignmentDefinition): number | null =>
@@ -268,6 +303,7 @@ export function buildMonthDay(input: MonthDayInput): MonthDay {
   }
 
   const isPast = dateKey < input.todayKey;
+  const coverageJob = new Map<MonthCoverageLine, number | null>();
   // Past days are finished; a shortage there is history, not something to fix.
   if (input.coverage && !isPast) {
     for (const snapshot of input.coverage) {
@@ -284,7 +320,9 @@ export function buildMonthDay(input: MonthDayInput): MonthDay {
       }));
       const { actual, required } = snapshot.status;
       const short = actual < required - EPSILON ? required - actual : 0;
-      group.coverage.push({ label: snapshot.rowLabel, actual, required, short });
+      const line = { label: snapshot.rowLabel, actual, required, short };
+      coverageJob.set(line, jobIdOfRowKey(snapshot.rowKey));
+      group.coverage.push(line);
       group.short += short;
     }
   }
@@ -294,7 +332,11 @@ export function buildMonthDay(input: MonthDayInput): MonthDay {
     if (!groups) return [];
     const sorted = [...groups.values()]
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
-      .map(({ sortOrder: _sortOrder, ...group }) => group);
+      .map(({ sortOrder: _sortOrder, ...group }) => ({
+        ...group,
+        people: sortPeopleByJob(group.people, input.jobSeniority),
+        coverage: sortCoverageByJob(group.coverage, coverageJob, input.jobSeniority),
+      }));
     return [{ focusAreaId: area.id, name: area.name, groups: sorted }];
   });
 

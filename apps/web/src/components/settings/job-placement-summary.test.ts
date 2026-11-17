@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { summarizePlacement, summarizeSelection } from "./job-placement-summary";
+import {
+  hasGeneralJobTiming,
+  summarizeGeneralJobTiming,
+  summarizePlacement,
+  summarizeSelection,
+} from "./job-placement-summary";
 
 const wings = [
   { id: 1, name: "East" },
@@ -97,5 +102,63 @@ describe("summarizePlacement", () => {
         { ...shifts, selectedIds: [] },
       ]),
     ).toBe("Not placed yet");
+  });
+});
+
+describe("summarizeGeneralJobTiming", () => {
+  const none = {
+    defaultStartTime: null,
+    defaultEndTime: null,
+    defaultDurationHours: null,
+    defaultDurationMinutes: null,
+  };
+
+  it("shows a fixed time in 12-hour form", () => {
+    expect(
+      summarizeGeneralJobTiming({ ...none, defaultStartTime: "09:00", defaultEndTime: "17:00" }),
+    ).toBe("9:00 AM - 5:00 PM");
+  });
+
+  it("shows a duration in hours and minutes", () => {
+    expect(summarizeGeneralJobTiming({ ...none, defaultDurationHours: 8 })).toBe("8 hours");
+    expect(summarizeGeneralJobTiming({ ...none, defaultDurationHours: 1 })).toBe("1 hour");
+    expect(
+      summarizeGeneralJobTiming({ ...none, defaultDurationHours: 3, defaultDurationMinutes: 30 }),
+    ).toBe("3 hours 30 min");
+    expect(summarizeGeneralJobTiming({ ...none, defaultDurationMinutes: 45 })).toBe("45 min");
+  });
+
+  it("says no set time when neither is set, or a time is half entered", () => {
+    expect(summarizeGeneralJobTiming(none)).toBe("No set time");
+    expect(summarizeGeneralJobTiming({ ...none, defaultStartTime: "09:00" })).toBe("No set time");
+    expect(summarizeGeneralJobTiming({ ...none, defaultDurationHours: 0 })).toBe("No set time");
+  });
+});
+
+describe("hasGeneralJobTiming", () => {
+  const none = {
+    defaultStartTime: null,
+    defaultEndTime: null,
+    defaultDurationHours: null,
+    defaultDurationMinutes: null,
+  };
+
+  it("accepts a full start and end time", () => {
+    expect(
+      hasGeneralJobTiming({ ...none, defaultStartTime: "09:00", defaultEndTime: "17:00" }),
+    ).toBe(true);
+  });
+
+  it("accepts a duration above zero", () => {
+    expect(hasGeneralJobTiming({ ...none, defaultDurationHours: 8 })).toBe(true);
+    expect(hasGeneralJobTiming({ ...none, defaultDurationMinutes: 30 })).toBe(true);
+  });
+
+  it("rejects no timing, a half-entered time and a zero duration", () => {
+    expect(hasGeneralJobTiming(none)).toBe(false);
+    expect(hasGeneralJobTiming({ ...none, defaultEndTime: "17:00" })).toBe(false);
+    expect(
+      hasGeneralJobTiming({ ...none, defaultDurationHours: 0, defaultDurationMinutes: 0 }),
+    ).toBe(false);
   });
 });

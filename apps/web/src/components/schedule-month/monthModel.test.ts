@@ -279,4 +279,48 @@ describe("buildMonthDay", () => {
     expect(dayShift.people[0].marks.map((m) => m.indicatorTypeId)).toEqual([7]);
     expect(evening.people[0].marks).toEqual([]);
   });
+
+  it("lists people on a more senior job first, in staff order within a job", () => {
+    const supervising = { ...DAY, id: 102, label: "D", jobId: 7 } as AssignmentDefinition;
+    const shiftJob = { ...DAY, jobId: 8 } as AssignmentDefinition;
+    const day = buildMonthDay(
+      input(
+        { a: { ids: [100] }, b: { ids: [102] }, c: { ids: [100] } },
+        {
+          assignmentById: new Map([shiftJob, supervising, EVE].map((a) => [a.id, a])),
+          jobSeniority: new Map([
+            [7, 0],
+            [8, 1],
+          ]),
+        },
+      ),
+    );
+    expect(day.areas[0].groups[0].people.map((row) => row.empId)).toEqual(["b", "a", "c"]);
+  });
+
+  it("lists a shift's staffing lines on a more senior job first", () => {
+    const line = (rowKey: string, rowLabel: string) =>
+      ({ ...snapshot(11, 1, 1), rowKey, rowLabel }) as CoverageCategorySnapshot;
+    const day = buildMonthDay(
+      input(
+        {},
+        {
+          coverage: [
+            line("1:0:11", "Evening Shift"),
+            line("1:8:11", "Evening Shift · Med Aide"),
+            line("1:7:11", "Evening Shift · Charge Nurse"),
+          ],
+          jobSeniority: new Map([
+            [7, 0],
+            [8, 1],
+          ]),
+        },
+      ),
+    );
+    expect(day.areas[0].groups[0].coverage.map((l) => l.label)).toEqual([
+      "Evening Shift · Charge Nurse",
+      "Evening Shift · Med Aide",
+      "Evening Shift",
+    ]);
+  });
 });
