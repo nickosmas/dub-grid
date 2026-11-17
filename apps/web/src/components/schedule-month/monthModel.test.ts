@@ -297,4 +297,30 @@ describe("buildMonthDay", () => {
     );
     expect(day.areas[0].groups[0].people.map((row) => row.empId)).toEqual(["b", "a", "c"]);
   });
+
+  it("lists a shift's staffing lines on a more senior job first", () => {
+    const line = (rowKey: string, rowLabel: string) =>
+      ({ ...snapshot(11, 1, 1), rowKey, rowLabel }) as CoverageCategorySnapshot;
+    const day = buildMonthDay(
+      input(
+        {},
+        {
+          coverage: [
+            line("1:0:11", "Evening Shift"),
+            line("1:8:11", "Evening Shift · Med Aide"),
+            line("1:7:11", "Evening Shift · Charge Nurse"),
+          ],
+          jobSeniority: new Map([
+            [7, 0],
+            [8, 1],
+          ]),
+        },
+      ),
+    );
+    expect(day.areas[0].groups[0].coverage.map((l) => l.label)).toEqual([
+      "Evening Shift · Charge Nurse",
+      "Evening Shift · Med Aide",
+      "Evening Shift",
+    ]);
+  });
 });
