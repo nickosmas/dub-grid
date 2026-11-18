@@ -1339,7 +1339,7 @@
   - [x] 59b. **Requests** - the list keeps its full cards with Approve and
         Reject; the right pane shows the whole request, "If approved" or
         "If you accept", and that day's roster. Staff open on Mine.
-  - [ ] 59c. **Schedule** - the right pane is the day's overview: coverage
+  - [x] 59c. **Schedule** - the right pane is the day's overview: coverage
         by area, open shifts and that day's requests; staff get their own
         day, claimable shifts and their requests, with no coverage numbers.
         Tapping a person shows their shift.
