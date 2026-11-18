@@ -805,16 +805,16 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
               </Button>
             ))}
           </div>
-          <div
-            style={{
-              fontSize: "var(--dg-fs-footnote)",
-              color: "var(--dg-color-text-muted)",
-            }}
-          >
-            {resetOccurrences
-              ? `Every day goes back to the repeating ${isAbsence ? "absence" : "shift"}, undoing changes made to a single day.`
-              : "A day changed on its own keeps that change."}
-          </div>
+          {resetOccurrences && (
+            <div
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--dg-color-text-muted)",
+              }}
+            >
+              {`Every day goes back to the repeating ${isAbsence ? "absence" : "shift"}, undoing changes made to a single day.`}
+            </div>
+          )}
         </fieldset>
       )}
 
@@ -837,12 +837,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
               {MAX_SERIES_OCCURRENCES} shifts.
             </div>
           )}
-          {preview.overwrites > 0 && (
-            <div>
-              {overwriteCountText(preview.overwrites)} You can replace or keep{" "}
-              {preview.overwrites === 1 ? "it" : "them"}.
-            </div>
-          )}
+          {preview.overwrites > 0 && <div>{overwriteCountText(preview.overwrites)}</div>}
         </Banner>
       )}
 

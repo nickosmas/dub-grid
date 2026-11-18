@@ -462,7 +462,6 @@ function LeftOut({ preview, words }: { preview: CoverageBuildPreview; words?: Sk
 
 /** What a build does, one point each, shown under the title. */
 export const BUILD_POINTS = [
-  "Fills open shifts with qualified staff who are free.",
   "Starts from recurring schedules and works around absences and waiting requests.",
   "Nothing changes until you apply it.",
 ];
@@ -709,7 +708,6 @@ export function ScheduleBuildSection({
                 <p className="dg-cc-detail-line dg-cc-build-warning" role="note">
                   Some people may work {MAX_DAYS_IN_A_WEEK_STRETCHED} days in a week or{" "}
                   {MAX_DAYS_IN_A_ROW_STRETCHED} in a row, never {MAX_DAYS_IN_A_WEEK_STRETCHED + 1}.
-                  The result names everyone who does.
                 </p>
               )}
             </div>

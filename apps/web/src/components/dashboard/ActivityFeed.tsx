@@ -7,14 +7,7 @@ import ExpandButton from "./ExpandButton";
 import { EmptyState } from "@/components/EmptyState";
 
 function EmptyActivityState() {
-  return (
-    <EmptyState
-      size="compact"
-      style={{ minHeight: 134 }}
-      title="No recent activity"
-      description="Published updates, shift changes, requests, and new user sign-ups will appear here."
-    />
-  );
+  return <EmptyState size="compact" style={{ minHeight: 134 }} title="No recent activity" />;
 }
 
 interface ActivityFeedProps {
@@ -71,7 +64,6 @@ export default function ActivityFeed({
               />
             )}
           </div>
-          {!collapsed && <div className="dg-card-subtitle">Latest events</div>}
         </div>
         {!collapsed && onExpand && items.length > 0 && (
           <div onClick={(e) => e.stopPropagation()}>

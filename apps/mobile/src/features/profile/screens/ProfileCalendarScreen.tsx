@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { MobileCalendarSubscriptionIssued } from "@dubgrid/contracts";
 import {
   CALENDAR_SUBSCRIBE_LABELS,
@@ -6,8 +6,7 @@ import {
   type CalendarSubscribeTarget,
 } from "@dubgrid/domain";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Linking, StyleSheet } from "react-native";
-import { Text } from "../../../shared/components/Text";
+import { Linking } from "react-native";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -21,9 +20,7 @@ import {
   rotateCalendarSubscription,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import {
   ProfileList,
@@ -73,8 +70,6 @@ async function openCalendarAction(action: CalendarAction, feedUrl: string) {
  * the rest of this visit so a second row reuses it instead of rotating again.
  */
 export default function ProfileCalendarScreen() {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [issued, setIssued] = useState<MobileCalendarSubscriptionIssued | null>(null);
@@ -208,7 +203,7 @@ export default function ProfileCalendarScreen() {
         <>
           <ProfileSection
             title="Add to calendar"
-            description="Your shifts stay up to date in the calendar app you pick. The link is private to you."
+            description="Updates automatically. The link is private to you."
           >
             <ProfileList>
               {visibleActions.map((entry, index) => (
@@ -221,12 +216,6 @@ export default function ProfileCalendarScreen() {
                 />
               ))}
             </ProfileList>
-            {isActive ? (
-              <Text style={styles.note}>
-                A calendar link is already active. Adding another calendar replaces it, and any
-                calendar using the old link stops updating.
-              </Text>
-            ) : null}
           </ProfileSection>
 
           {isActive ? (
@@ -270,12 +259,3 @@ export default function ProfileCalendarScreen() {
     </Screen>
   );
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    note: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-      marginTop: 12,
-    },
-  });

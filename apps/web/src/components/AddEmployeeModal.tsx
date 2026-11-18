@@ -1,7 +1,7 @@
 "use client";
 import { X } from "lucide-react";
 
-import { useState, useCallback, useRef, useMemo, useId } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import {
   getOptionalStaffEmailError,
   getStaffNameError,
@@ -94,7 +94,6 @@ export default function AddEmployeeModal({
 }: AddEmployeeModalProps) {
   const roleOptions = inviteRoleOptions(canGrantElevatedRoles);
   const isMobile = useMediaQuery(MOBILE);
-  const descriptionId = useId();
   const defaultCertId: number | null = null;
   const defaultFocusAreaIds = useMemo(
     () => (focusAreas.length > 0 ? [focusAreas[0].id] : []),
@@ -280,7 +279,6 @@ export default function AddEmployeeModal({
         title="Add staff members"
         onClose={onClose}
         onRequestClose={requestClose}
-        aria-describedby={descriptionId}
         style={{
           maxWidth: 1080,
           width: isMobile ? "calc(100vw - 32px)" : "min(1080px, calc(100vw - 48px))",
@@ -299,13 +297,11 @@ export default function AddEmployeeModal({
             <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
               {validRows.length === 0
                 ? "Complete the fields marked with * to create a profile."
-                : `Ready to add ${validRows.length} staff member${validRows.length === 1 ? "" : "s"}.${
-                    invitedRows.length === 0
-                      ? ""
-                      : invitedRows.length === 1
-                        ? " We email the person you invite a link to join."
-                        : ` We email each of the ${invitedRows.length} people you invite a link to join.`
-                  }`}
+                : invitedRows.length === 0
+                  ? ""
+                  : invitedRows.length === 1
+                    ? "We'll email 1 invite."
+                    : `We'll email ${invitedRows.length} invites.`}
             </div>
             <div
               style={{
@@ -353,20 +349,6 @@ export default function AddEmployeeModal({
         }
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
-          <p
-            id={descriptionId}
-            style={{
-              margin: "-8px 0 0",
-              fontSize: "var(--dg-fs-label)",
-              lineHeight: 1.5,
-              color: "var(--dg-color-text-muted)",
-              maxWidth: 760,
-            }}
-          >
-            Add several people at once, choose their {certificationLabel.toLowerCase()}, and assign
-            one or more {focusAreaLabel.toLowerCase()} before saving.
-          </p>
-
           <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
             <div
               style={{

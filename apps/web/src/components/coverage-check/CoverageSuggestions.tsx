@@ -138,8 +138,7 @@ interface CoverageDayDetailProps {
 }
 
 /** What Apply all does, said wherever it is offered. */
-export const APPLY_ALL_NOTE =
-  "Applies each draft fix in turn, so no spot is filled twice. Pickup approvals aren't included.";
+export const APPLY_ALL_NOTE = "Pickup approvals aren't included.";
 
 export function hasDraftFix(items: CoverageSuggestionView[]): boolean {
   return items.some(

@@ -185,7 +185,6 @@ export function PersonMembershipActions({
       {editingPermissions && (
         <PermissionsEditor
           title={`Admin permissions: ${name}`}
-          subtitle="Choose what this admin can view and manage."
           initialPermissions={membership.adminPermissions}
           showPermissionCounter
           buildReview={(permissions, initial) => {

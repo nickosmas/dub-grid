@@ -333,28 +333,16 @@ export const DISPLAY_MODES: {
   id: ShiftDisplayMode;
   title: string;
   description: string;
-  details: string[];
 }[] = [
   {
     id: "code",
     title: "Short Codes",
-    description:
-      "Display abbreviations like D, EVE, N on the grid. Best when your team scans the schedule by compact shift labels.",
-    details: [
-      "The schedule grid, monthly calendar, and recurring-pattern editor show short codes in each cell",
-      "Shift previews in Settings follow this choice too",
-      "Compact display fits well in all views including 2-week",
-    ],
+    description: "Abbreviations like D, EVE, N.",
   },
   {
     id: "name",
     title: "Full Names",
-    description:
-      "Display descriptive names like Day Shift, Evening, Night on the grid. Best for organizations that don't use codes.",
-    details: [
-      "The schedule grid, monthly calendar, and recurring-pattern editor show the full shift name in each cell",
-      "Shift cells take up more room to fit the longer text",
-    ],
+    description: "Names like Day Shift, Evening, Night.",
   },
 ];
 
@@ -484,10 +472,6 @@ export default function DisplayMode({
           }}
         >
           <div className="dg-card-title">Choose a display mode</div>
-          <div className="dg-card-description">
-            Select how shifts appear in the schedule grid, monthly calendar, recurring-pattern
-            editor, and shift previews in Settings.
-          </div>
         </div>
 
         <div style={{ padding: 18 }}>
@@ -614,8 +598,7 @@ export default function DisplayMode({
                 lineHeight: 1.5,
               }}
             >
-              Show the complete shift, time, assignment, and cell status when someone hovers a shift
-              pill on the schedule.
+              Show shift details when hovering a shift on the schedule.
             </div>
           </div>
           <Switch

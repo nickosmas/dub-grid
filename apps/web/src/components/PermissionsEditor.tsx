@@ -214,7 +214,7 @@ function ModuleRow({
 
 interface PermissionsEditorProps {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   initialPermissions: AdminPermissions | null | undefined;
   showPermissionCounter?: boolean;
   labels?: Partial<PermissionEditorLabels>;

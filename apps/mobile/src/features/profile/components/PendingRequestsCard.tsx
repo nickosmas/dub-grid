@@ -57,10 +57,7 @@ export function PendingRequestsCard({
     // it is with Cancel request under it in red, as Settings lists a pending
     // change with its own way out.
     return (
-      <ProfileSection
-        description="Waiting on admin review. You can cancel a request anytime."
-        title={countLabel}
-      >
+      <ProfileSection title={countLabel}>
         <ProfileList>
           {requests.map((request, index) => (
             <View key={request.id}>
@@ -90,9 +87,6 @@ export function PendingRequestsCard({
         <Ionicons color={mobileColors.warningText} name="time" size={24} style={styles.icon} />
         <View style={styles.headerCopy}>
           <Text style={styles.title}>{countLabel}</Text>
-          <Text style={styles.subtitle}>
-            Waiting on admin review. You can cancel a request anytime.
-          </Text>
         </View>
       </View>
 
@@ -149,10 +143,6 @@ const createStyles = (mobileColors: MobileColors) =>
     title: {
       ...mobileText.cardTitle,
       color: mobileColors.warningText,
-    },
-    subtitle: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
     },
     list: {
       gap: mobileSpace.md,

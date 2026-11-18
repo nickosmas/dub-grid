@@ -1670,7 +1670,7 @@ describe("ShiftEditPanel", () => {
       expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
+      await user.click(screen.getByRole("button", { name: "Make Repeating" }));
 
       const createRepeatingShiftButton = screen.getByRole("button", {
         name: "Create repeating shift",
@@ -1690,9 +1690,7 @@ describe("ShiftEditPanel", () => {
 
       expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Make this a repeating shift" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Make Repeating" })).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Create repeating shift" }),
       ).not.toBeInTheDocument();
@@ -1702,7 +1700,7 @@ describe("ShiftEditPanel", () => {
       const user = userEvent.setup();
       const { container } = render(<RepeatFlowPanel />);
 
-      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
+      await user.click(screen.getByRole("button", { name: "Make Repeating" }));
 
       expect(container.querySelector('input[type="date"]')).toBeNull();
       expect(screen.getByText("January 2024")).toBeInTheDocument();
@@ -1720,7 +1718,7 @@ describe("ShiftEditPanel", () => {
 
       render(<RepeatFlowPanel />);
 
-      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
+      await user.click(screen.getByRole("button", { name: "Make Repeating" }));
       await user.click(screen.getByLabelText("On date"));
       await user.click(screen.getByRole("button", { name: "Create repeating shift" }));
 
@@ -1732,7 +1730,7 @@ describe("ShiftEditPanel", () => {
 
       render(<RepeatAbsenceFlowPanel />);
 
-      await user.click(screen.getByRole("button", { name: "Make this repeating" }));
+      await user.click(screen.getByRole("button", { name: "Make Repeating" }));
 
       expect(screen.getByText("Repeating Absence")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Create Repeating Absence" })).toBeInTheDocument();
@@ -1743,7 +1741,7 @@ describe("ShiftEditPanel", () => {
 
       render(<RepeatNameFlowPanel />);
 
-      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
+      await user.click(screen.getByRole("button", { name: "Make Repeating" }));
 
       const preview = document.querySelector(
         '[data-repeat-shift-preview="true"]',
@@ -1758,7 +1756,7 @@ describe("ShiftEditPanel", () => {
     async function submitRepeat(onRepeatConfirm: MockFn) {
       const user = userEvent.setup();
       render(<RepeatFlowPanel onRepeatConfirm={onRepeatConfirm} />);
-      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
+      await user.click(screen.getByRole("button", { name: "Make Repeating" }));
       await user.click(screen.getByRole("button", { name: "Create repeating shift" }));
       return user;
     }
@@ -1937,7 +1935,7 @@ describe("ShiftEditPanel", () => {
       await user.click(within(dialog).getByRole("button", { name: "Continue" }));
 
       expect(screen.getByText("Editing this and later days")).toBeInTheDocument();
-      expect(screen.getByText(/Times and notes change one day at a time/)).toBeInTheDocument();
+      expect(screen.getByText(/To change times or notes, edit this day only/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Custom time/ })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
@@ -2890,7 +2888,7 @@ describe("ShiftEditPanel", () => {
     it("makes Repeat unavailable on a shift with an absence, and says why", () => {
       renderDay({ currentRestOfDayAbsenceTypeId: 8, onRepeatConfirm: vi.fn() });
 
-      expect(screen.getByRole("button", { name: "Make this a repeating shift" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Make Repeating" })).toBeDisabled();
       expect(
         screen.getByText(/A shift with an absence beside it can.t repeat/),
       ).toBeInTheDocument();

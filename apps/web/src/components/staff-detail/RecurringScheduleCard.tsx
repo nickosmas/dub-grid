@@ -187,7 +187,6 @@ export function RecurringScheduleCard({
               {recurringShifts.length}
             </Badge>
           </div>
-          <div className="dg-card-subtitle">Weekly pattern for repeating assignments.</div>
         </div>
       </div>
       <div className="dg-card-body">

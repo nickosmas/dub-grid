@@ -146,10 +146,7 @@ export function CalendarSubscriptionCard() {
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">Calendar subscription</div>
-          <div className="dg-card-subtitle">
-            Add your shifts to Apple Calendar, Google Calendar, or Outlook in one click, or copy the
-            link for any other app.
-          </div>
+          <div className="dg-card-subtitle">Add your shifts to any calendar app.</div>
         </div>
       </div>
       <div className="dg-card-body flex flex-col gap-3">
@@ -161,9 +158,7 @@ export function CalendarSubscriptionCard() {
           <p className="m-0 text-[14px] text-[var(--dg-color-danger)]">{error}</p>
         ) : !status?.active ? (
           <p className="m-0 text-[14px] text-[var(--dg-color-text-muted)]">
-            Create a private link, then add it to Apple Calendar, Google Calendar, or Outlook in one
-            click, or copy it for any other app. Calendar apps poll the link without a DubGrid
-            login.
+            Anyone with the link can see your shifts.
           </p>
         ) : (
           <div className="flex flex-col gap-3">
@@ -197,9 +192,6 @@ export function CalendarSubscriptionCard() {
                 created or replaced.
               </p>
             )}
-            <p className="m-0 text-[12px] text-[var(--dg-color-text-subtle)]">
-              Replacing the link immediately disables the previous URL.
-            </p>
           </div>
         )}
       </div>

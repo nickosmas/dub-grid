@@ -96,7 +96,6 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
   return (
     <StepLayout
       title="Structure"
-      description={`Set up your ${deptLabel.toLowerCase()}, the ${roleLabel.toLowerCase()} people carry, and the ${certLabel.toLowerCase()} that gate scheduling decisions.`}
       onNext={handleNext}
       onBack={onBack}
       nextDisabled={saving}

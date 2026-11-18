@@ -787,12 +787,6 @@ function ShiftCategoriesSettings({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <p
-        style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)", margin: 0 }}
-      >
-        {`The main shifts in each ${focusAreaTerm}, such as Day, Evening and Night.`}
-      </p>
-
       {focusAreas.length === 0 && (
         <EmptyState
           size="compact"

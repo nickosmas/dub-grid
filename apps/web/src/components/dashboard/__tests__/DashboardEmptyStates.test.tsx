@@ -45,11 +45,6 @@ describe("dashboard empty states", () => {
     const { container } = render(<ActivityFeed items={[]} />);
 
     expect(screen.getByText("No recent activity")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Published updates, shift changes, requests, and new user sign-ups will appear here.",
-      ),
-    ).toBeInTheDocument();
     expect(container.querySelector("svg")).toBeNull();
   });
 

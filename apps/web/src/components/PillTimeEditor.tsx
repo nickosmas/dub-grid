@@ -3,8 +3,6 @@ import { useState, useEffect } from "react";
 import { calcTimeDuration } from "@/lib/utils";
 import { Button } from "@/components/Button";
 import CustomSelect from "./CustomSelect";
-import { Hint } from "@/components/ui/hint";
-import { hint } from "@/components/ui/hint.types";
 import {
   parseTo12h,
   to24h,
@@ -198,21 +196,19 @@ export function PillTimeEditor({
             </div>
           )}
         </div>
-        <Hint content={hint("Override this shift's start and end times")} side="left">
-          <Button
-            data-tour="edit-panel-custom-time"
-            onClick={() => startEditing()}
-            className="dg-btn dg-btn-secondary"
-            style={{
-              flexShrink: 0,
-              fontSize: "var(--dg-fs-footnote)",
-              padding: "6px 10px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Set custom time
-          </Button>
-        </Hint>
+        <Button
+          data-tour="edit-panel-custom-time"
+          onClick={() => startEditing()}
+          className="dg-btn dg-btn-secondary"
+          style={{
+            flexShrink: 0,
+            fontSize: "var(--dg-fs-footnote)",
+            padding: "6px 10px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Set custom time
+        </Button>
       </div>
     );
   }

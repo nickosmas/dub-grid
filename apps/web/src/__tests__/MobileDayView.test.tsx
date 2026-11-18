@@ -239,7 +239,7 @@ describe("MobileDayView for a viewer who can't edit", () => {
   it("doesn't tell them to assign people when nobody shows", () => {
     renderFor({ canOpenCell: () => false, filteredEmployees: [] });
 
-    expect(screen.getByText("No shifts found for this period")).toBeInTheDocument();
+    expect(screen.getByText("No published shifts for this period")).toBeInTheDocument();
     expect(screen.queryByText("Assign people here from the People page.")).toBeNull();
   });
 

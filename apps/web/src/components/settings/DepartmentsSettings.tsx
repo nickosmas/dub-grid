@@ -1367,7 +1367,7 @@ export default function DepartmentsSettings({
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <DepartmentSection
         title={scheduledDepartmentLabel}
-        description={`${scheduledDepartmentLabel} appear on the grid. Each one has one or more ${focusAreaLabel.toLowerCase()} that define how staff are grouped on the schedule.`}
+        description={`Appear on the grid, split into ${focusAreaLabel.toLowerCase()}.`}
         depts={scheduledDepts}
         allDepartments={departments}
         focusAreas={focusAreas}

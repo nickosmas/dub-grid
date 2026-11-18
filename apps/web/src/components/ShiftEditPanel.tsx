@@ -2245,15 +2245,6 @@ export default function ShiftEditPanel({
         }}
       >
         {!standalone && <div style={sectionLabel}>Drop shift</div>}
-        <div
-          style={{
-            fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--dg-color-text-secondary)",
-            lineHeight: 1.5,
-          }}
-        >
-          Choose how you want to drop this shift.
-        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <Button
             type="button"
@@ -2307,9 +2298,7 @@ export default function ShiftEditPanel({
               }}
             >
               <div style={choiceTitleStyle}>Offer for pickup</div>
-              <div style={choiceBodyStyle}>
-                Teammates can claim it. It stays yours until a claim is approved.
-              </div>
+              <div style={choiceBodyStyle}>Stays yours until a claim is approved.</div>
             </div>
           </Button>
 
@@ -4526,7 +4515,7 @@ export default function ShiftEditPanel({
         </div>
         {editingRange ? (
           <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
-            Times and notes change one day at a time. To change them, edit this day only.
+            To change times or notes, edit this day only.
           </div>
         ) : null}
         {seriesScope === "all" && canEditSeriesPattern ? (
@@ -5004,47 +4993,40 @@ export default function ShiftEditPanel({
               {allowShiftEdits && hasActiveShift && !seriesId && onRepeatConfirm && (
                 <div style={{ marginBottom: 16 }}>
                   <div style={sectionLabel}>Repeating</div>
-                  <Hint
-                    content={hint(
-                      repeatBlockedReason ?? "Repeat it daily, weekly or every 2 weeks",
-                    )}
-                    side="top"
+                  <Button
+                    data-tour="edit-panel-repeat-btn"
+                    disabled={repeatBlockedReason != null}
+                    onClick={() => {
+                      setShowRepeatForm(true);
+                    }}
+                    className="dg-btn dg-btn-secondary"
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      fontSize: "var(--dg-fs-caption)",
+                      padding: "9px 12px",
+                    }}
                   >
-                    <Button
-                      data-tour="edit-panel-repeat-btn"
-                      disabled={repeatBlockedReason != null}
-                      onClick={() => {
-                        setShowRepeatForm(true);
-                      }}
-                      className="dg-btn dg-btn-secondary"
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "9px 12px",
-                      }}
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="17 1 21 5 17 9" />
-                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                        <polyline points="7 23 3 19 7 15" />
-                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                      </svg>
-                      {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
-                    </Button>
-                  </Hint>
+                      <polyline points="17 1 21 5 17 9" />
+                      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                      <polyline points="7 23 3 19 7 15" />
+                      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                    </svg>
+                    Make Repeating
+                  </Button>
                   {repeatBlockedReason && (
                     <div
                       style={{
@@ -5602,8 +5584,8 @@ export default function ShiftEditPanel({
           message={
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <span>
-                Choose the days to remove. Published days are removed in the draft and leave the
-                schedule when you publish.{pastSeriesDaysNote ? ` ${pastSeriesDaysNote}` : ""}
+                Published days are removed in the draft and leave the schedule when you publish.
+                {pastSeriesDaysNote ? ` ${pastSeriesDaysNote}` : ""}
               </span>
               <SeriesScopeChoices
                 label="Days to remove"
@@ -5634,10 +5616,7 @@ export default function ShiftEditPanel({
           title={`Edit ${repeatingNoun}`}
           message={
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <span>
-                Choose which days this change applies to.
-                {pastSeriesDaysNote ? ` ${pastSeriesDaysNote}` : ""}
-              </span>
+              {pastSeriesDaysNote ? <span>{pastSeriesDaysNote}</span> : null}
               <SeriesScopeChoices
                 label="Days to edit"
                 options={scopeOptions}

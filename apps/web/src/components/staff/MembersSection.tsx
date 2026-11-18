@@ -1090,11 +1090,6 @@ export function MembersSection({
             <h1 className="text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
               Directory
             </h1>
-            <p className="mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
-              {regularUserMode
-                ? "Your colleagues and where they work."
-                : "View and manage your organization's staff roster."}
-            </p>
           </div>
 
           {directoryHasMore && (
@@ -2090,11 +2085,6 @@ export function MembersSection({
                   searchQuery || managementHasActiveFilters
                     ? "No one matches your search or filters"
                     : "Nobody on an administrative team yet"
-                }
-                description={
-                  searchQuery || managementHasActiveFilters
-                    ? undefined
-                    : "People on an administrative team will show here."
                 }
                 action={
                   managementActiveFilterCount > 0 ? (

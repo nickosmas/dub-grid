@@ -44,7 +44,7 @@ export function InvitePermissionsField({
       {open && (
         <PermissionsEditor
           title="Set permissions"
-          subtitle="Choose what this admin can view and manage. They apply when the invite is accepted."
+          subtitle="Applies when the invite is accepted."
           initialPermissions={value}
           showPermissionCounter
           labels={{

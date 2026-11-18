@@ -187,7 +187,6 @@ export function MemberAccessControls({
           {showPermissions && (
             <PermissionsEditor
               title="Edit permissions"
-              subtitle="Choose what this admin can view and manage."
               initialPermissions={adminPermissions}
               showPermissionCounter
               labels={labels}

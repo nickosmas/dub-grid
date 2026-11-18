@@ -687,13 +687,6 @@ function ReportsContent() {
         </div>
 
         <section data-testid="reports-settings" style={reportsSettingsStyle}>
-          <div style={reportsSettingsHeaderStyle}>
-            <div>
-              <p style={reportsSettingsDescriptionStyle}>
-                Choose the report, period, and optional filters before generating a preview.
-              </p>
-            </div>
-          </div>
           <div
             data-testid="reports-filter-controls"
             className="dg-field-raised"
@@ -1071,17 +1064,6 @@ const reportsRunActionsStyle: CSSProperties = {
 
 const reportsSettingsStyle: CSSProperties = {
   marginBottom: 18,
-};
-
-const reportsSettingsHeaderStyle: CSSProperties = {
-  marginBottom: 16,
-};
-
-const reportsSettingsDescriptionStyle: CSSProperties = {
-  color: "var(--dg-color-text-muted)",
-  fontSize: "var(--dg-fs-body)",
-  lineHeight: 1.45,
-  margin: "4px 0 0",
 };
 
 // A wrapping row where each field is at least as wide as its own value, so

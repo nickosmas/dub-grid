@@ -212,7 +212,7 @@ export default function ProfileNotificationsScreen() {
                   push.isSupported
                     ? push.permissionState === "denied"
                       ? "Notifications are off for DubGrid in your device settings."
-                      : "Get alerts on this device when the app is closed."
+                      : undefined
                     : "Push notifications are not supported on this device."
                 }
                 disabled={!pushSwitchEnabled || push.permissionState === "denied"}
@@ -237,10 +237,7 @@ export default function ProfileNotificationsScreen() {
             </ProfileList>
           </ProfileSection>
 
-          <ProfileSection
-            title="Categories"
-            description="Choose how each kind of update reaches you."
-          >
+          <ProfileSection title="Categories">
             <ProfileList>
               {CATEGORIES.map((cat, index) => (
                 <ProfileNavRow

@@ -20,6 +20,7 @@ import {
   formatShiftRequestNote,
 } from "@dubgrid/domain";
 import { getAvatarTone } from "@dubgrid/design-tokens";
+import { formatScheduleDayLabel } from "@dubgrid/schedule-core";
 import {
   BottomSheetModal,
   SheetActions,
@@ -35,6 +36,9 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { InlineError } from "../../../shared/components/InlineError";
 import { Card, Screen } from "../../../shared/components/Screen";
+import { AppText } from "../../../shared/components/AppText";
+import { PUSHED_BY_FOLD_PARAM, shouldReturnToSplit } from "../../../shared/layout/fold-rule";
+import { useSplitLayout } from "../../../shared/layout/SplitView";
 import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton/CardRowListSkeleton";
@@ -249,17 +253,45 @@ function MentoredPill() {
   );
 }
 
-export default function ShiftDetailScreen() {
+export type ShiftDetailTarget = {
+  employeeId: string;
+  date: string;
+  rangeStart: string;
+  rangeEnd: string;
+  source: "team" | "mine";
+};
+
+/**
+ * A shift's page. On its own route it reads the shift from the URL;
+ * `embedded` in a split view's detail pane (iPhone Duo open) it takes the
+ * shift from the list and draws its own heading, since the native bar
+ * belongs to the list's page.
+ */
+export default function ShiftDetailScreen({
+  shift,
+  embedded = false,
+}: { shift?: ShiftDetailTarget; embedded?: boolean } = {}) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const params = useLocalSearchParams<{
+  const routeParams = useLocalSearchParams<{
     employeeId?: string;
     date?: string;
     rangeStart?: string;
     rangeEnd?: string;
     source?: string;
+    [PUSHED_BY_FOLD_PARAM]?: string;
   }>();
+  const params = shift ?? routeParams;
+  // Pushed when an open iPhone Duo was folded closed: opening it again goes
+  // back to Schedule, which still has this shift picked beside the list.
+  const split = useSplitLayout();
+  const pushedByFold = !embedded && routeParams[PUSHED_BY_FOLD_PARAM] === "1";
+  useEffect(() => {
+    if (shouldReturnToSplit({ isSplit: split !== null, pushedByFold }) && router.canGoBack()) {
+      router.back();
+    }
+  }, [split, pushedByFold]);
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
   const focusAreaFieldLabel = capitalizeFirst(
@@ -1117,11 +1149,10 @@ export default function ShiftDetailScreen() {
       ) : null}
       {requestMode === "coverage" ? (
         <View style={styles.subsection}>
-          <Text style={styles.subsectionBody}>Choose how you want to drop this shift.</Text>
           <View style={styles.coverageOptionList}>
             <CoverageOptionCard
               active={coverageRequestType === "pickup"}
-              body="Teammates can claim it. It stays yours until a claim is approved."
+              body="Stays yours until a claim is approved."
               disabled={createRequestMutation.isPending}
               onPress={() => {
                 setCoverageRequestType("pickup");
@@ -1132,7 +1163,7 @@ export default function ShiftDetailScreen() {
             />
             <CoverageOptionCard
               active={coverageRequestType === "calloff"}
-              body="For a shift you can't work. Once it's approved, you're marked absent and the shift opens for others to pick up."
+              body="You're marked absent once approved, and the shift opens for pickup."
               disabled={createRequestMutation.isPending || activeAbsenceTypes.length === 0}
               onPress={() => {
                 setCoverageRequestType("calloff");
@@ -1158,11 +1189,11 @@ export default function ShiftDetailScreen() {
                 />
               )}
               <Text style={styles.subsectionLabel}>Request specific person</Text>
-              <Text style={styles.subsectionBody}>
-                {selectedTargetedPickupEntry
-                  ? "Review your request below, then submit."
-                  : "Only teammates with an absence on this date are shown."}
-              </Text>
+              {selectedTargetedPickupEntry ? null : (
+                <Text style={styles.subsectionBody}>
+                  Only teammates with an absence on this date are shown.
+                </Text>
+              )}
               <View style={styles.swapDateFilteredList}>
                 {targetedPickupOptions.length === 0 ? (
                   <EmptyStateCard
@@ -1219,9 +1250,6 @@ export default function ShiftDetailScreen() {
                   />
                 ))}
               </SelectionSection>
-              {selectedCalloffAbsenceType ? (
-                <Text style={styles.subsectionBody}>Review your call-off below, then submit.</Text>
-              ) : null}
             </View>
           ) : null}
         </View>
@@ -1229,11 +1257,11 @@ export default function ShiftDetailScreen() {
 
       {requestMode === "swap" ? (
         <View style={styles.subsection}>
-          <Text style={styles.subsectionBody}>
-            {selectedTargetEntry
-              ? "Review the trade below, then submit your swap request."
-              : "Pick a teammate's published shift to trade for. The same shift on a different day works too."}
-          </Text>
+          {selectedTargetEntry ? null : (
+            <Text style={styles.subsectionBody}>
+              Pick a teammate's shift to trade for. The same shift on another day works too.
+            </Text>
+          )}
           {shiftEntry ? (
             <>
               <View style={styles.swapSummaryList}>
@@ -1279,14 +1307,7 @@ export default function ShiftDetailScreen() {
                     title="No shifts to swap with"
                     body="Teammates' shifts you could swap with show here once published."
                   />
-                ) : selectedTargetEntry ? (
-                  <View style={styles.swapSelectedPanel}>
-                    <Text style={styles.subsectionBody}>
-                      {selectedTargetEntry.employeeName} is selected for{" "}
-                      {formatShiftDate(selectedTargetEntry.date)}.
-                    </Text>
-                  </View>
-                ) : (
+                ) : selectedTargetEntry ? null : (
                   <View style={styles.swapDateFilteredList}>
                     <View style={styles.swapWeekNav}>
                       <Button
@@ -1394,6 +1415,16 @@ export default function ShiftDetailScreen() {
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
     >
+      {embedded && shiftDate ? (
+        <View style={styles.paneHeading}>
+          <AppText tone="secondary" variant="meta">
+            {formatScheduleDayLabel(shiftDate, new Date(), timeZone)}
+          </AppText>
+          <AppText accessibilityRole="header" variant="screenTitle">
+            {employeeId === linkedEmployeeId ? "Your shift" : "Shift detail"}
+          </AppText>
+        </View>
+      ) : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           // Drop and Swap belong to the viewer's own shift, and "Working
@@ -1615,7 +1646,7 @@ export default function ShiftDetailScreen() {
           {activeShiftRequest ? (
             <Card
               title="You already asked about this shift"
-              body={`Your ${formatShiftRequestType(activeShiftRequest.type).toLowerCase()} request is ${formatShiftRequestStatus(activeShiftRequest.status).toLowerCase()} for this shift.`}
+              body={`Your ${formatShiftRequestType(activeShiftRequest.type).toLowerCase()} request is ${formatShiftRequestStatus(activeShiftRequest.status).toLowerCase()}.`}
               detail={
                 <View style={styles.activeRequestDetail}>
                   {formatShiftRequestNote(activeShiftRequest.adminNote) ? (
