@@ -39,12 +39,20 @@ const TOP_ROW_CENTRE = 30;
  * on a screen with a top inset. `rowCentre` is where the row centres
  * without help, for a row that isn't the usual 44.
  */
+/**
+ * Whether the status bar stands in a side column (iPhone Duo closed or
+ * open): no top inset, a side one. The navigation bar's trailing items move
+ * into that narrow column too, where only symbols fit.
+ */
+export function hasSideColumn(insets: { top: number; left: number; right: number }): boolean {
+  return insets.top <= 0 && (insets.left > 0 || insets.right > 0);
+}
+
 export function getSideColumnTopOffset(
   insets: { top: number; left: number; right: number },
   rowCentre = TOP_ROW_CENTRE,
 ): number {
-  const sideColumn = insets.top <= 0 && (insets.left > 0 || insets.right > 0);
-  return sideColumn ? Math.max(SIDE_COLUMN_CAMERA_CENTRE - rowCentre, 0) : 0;
+  return hasSideColumn(insets) ? Math.max(SIDE_COLUMN_CAMERA_CENTRE - rowCentre, 0) : 0;
 }
 
 /**

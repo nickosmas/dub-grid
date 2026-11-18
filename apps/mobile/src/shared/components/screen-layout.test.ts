@@ -5,6 +5,7 @@ import {
   getScreenGutter,
   getScreenSidePadding,
   getSideColumnTopOffset,
+  hasSideColumn,
 } from "./screen-layout";
 
 // Read at call time by `getScreenBottomPadding`, so flipping this between tests
@@ -152,5 +153,16 @@ describe("getSideColumnTopOffset", () => {
 
   it("adds nothing with no inset on any side", () => {
     expect(getSideColumnTopOffset({ top: 0, left: 0, right: 0 })).toBe(0);
+  });
+});
+
+describe("hasSideColumn", () => {
+  it("is true when the status bar stands beside the screen (iPhone Duo)", () => {
+    expect(hasSideColumn({ top: 0, left: 0, right: 62 })).toBe(true);
+  });
+
+  it("is false with a top inset, the status bar above the screen", () => {
+    expect(hasSideColumn({ top: 59, left: 0, right: 0 })).toBe(false);
+    expect(hasSideColumn({ top: 0, left: 0, right: 0 })).toBe(false);
   });
 });

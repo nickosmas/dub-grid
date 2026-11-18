@@ -1,12 +1,14 @@
 import { Stack } from "expo-router";
 import { Platform } from "react-native";
+import { useHasSideColumn } from "./useHasSideColumn";
 import { useToolbarIcon, type MaterialIconName, type SFSymbol } from "./useToolbarIcon";
 
 /**
  * One button in the native navigation bar. iOS shows its words (or the SF
- * Symbol when `iconOnly`), Android always the Material icon, which it draws
- * to an image first, so the button waits for that image rather than render
- * empty.
+ * Symbol when `iconOnly`, or when the bar stands in an iPhone Duo's side
+ * column, where words don't fit), Android always the Material icon, which it
+ * draws to an image first, so the button waits for that image rather than
+ * render empty.
  */
 export function HeaderBarAction({
   label,
@@ -26,7 +28,8 @@ export function HeaderBarAction({
   onPress: () => void;
 }) {
   const icon = useToolbarIcon(sfSymbol, materialIcon);
-  const showsWords = Platform.OS === "ios" && !iconOnly;
+  const sideColumn = useHasSideColumn();
+  const showsWords = Platform.OS === "ios" && !iconOnly && !sideColumn;
 
   if (!showsWords && !icon) return null;
 
