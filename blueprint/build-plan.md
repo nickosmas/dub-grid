@@ -1347,7 +1347,7 @@
         off's roster and claimable shifts, or an open shift's Claim or why
         not. Team: today's roster and coverage; a day or approval tapped
         replaces it.
-  - [ ] 59e. **Alerts and Profile** - the page an alert points to; the
+  - [x] 59e. **Alerts and Profile** - the page an alert points to; the
         chosen setting beside Profile.
   - [ ] 59f. **This week on a person's page** - a person's page shows This
         week (their shift each day); staff see "Working with you this week"

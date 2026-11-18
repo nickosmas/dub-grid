@@ -30,6 +30,9 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
 
 import ProfilePrivacyScreen from "./ProfilePrivacyScreen";
 
+// The page goes back into an open iPhone Duo's split; nothing to fold here.
+vi.mock("../../../shared/layout/useReturnToSplit", () => ({ useReturnToSplit: () => undefined }));
+
 describe("ProfilePrivacyScreen", () => {
   beforeEach(() => {
     getStoredConsent.mockReset();

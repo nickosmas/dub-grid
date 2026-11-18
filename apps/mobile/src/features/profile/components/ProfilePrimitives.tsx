@@ -354,12 +354,18 @@ export function ProfileNavRow({
   label,
   value,
   isLast = false,
+  selected,
   onPress,
 }: {
   iconName: IconName;
   label: string;
   value?: string;
   isLast?: boolean;
+  /**
+   * Set only in a split view, true for the setting shown beside the list. A
+   * split row picks rather than opens, so it has no chevron.
+   */
+  selected?: boolean;
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
@@ -374,6 +380,7 @@ export function ProfileNavRow({
         styles.navRow,
         IS_NATIVE_LIST && styles.rowNative,
         !isLast && !IS_NATIVE_LIST && styles.rowDivider,
+        selected === true && { backgroundColor: mobileColors.brandSoft },
       ]}
     >
       <ProfileIcon name={iconName} />
@@ -385,7 +392,9 @@ export function ProfileNavRow({
           </Text>
         ) : null}
       </View>
-      <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+      {selected === undefined ? (
+        <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+      ) : null}
       {!isLast && IS_NATIVE_LIST ? (
         <View style={[styles.insetDivider, styles.insetDividerIcon]} />
       ) : null}

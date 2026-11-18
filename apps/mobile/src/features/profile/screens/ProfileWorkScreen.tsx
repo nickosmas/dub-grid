@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { PaneTitle } from "../../../shared/layout/PaneTitle";
+import { useReturnToSplit } from "../../../shared/layout/useReturnToSplit";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
@@ -148,7 +150,18 @@ function getProfileEditFieldErrors(
   };
 }
 
-export default function ProfileWorkScreen() {
+export default function ProfileWorkScreen({
+  embedded = false,
+  onUnsavedChange,
+}: {
+  embedded?: boolean;
+  /**
+   * Embedded, Profile swaps settings without navigating, so the route's
+   * discard guard never runs; this tells Profile to ask instead.
+   */
+  onUnsavedChange?: (unsaved: boolean) => void;
+} = {}) {
+  useReturnToSplit(!embedded);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
@@ -519,8 +532,12 @@ export default function ProfileWorkScreen() {
     return saveMutation.mutateAsync(null);
   }
 
+  useEffect(() => {
+    onUnsavedChange?.(hasChanges);
+  }, [hasChanges, onUnsavedChange]);
+  // Embedded there is nothing to leave, so the actions appear with an edit.
   const footer =
-    draft && profile ? (
+    draft && profile && (!embedded || hasChanges) ? (
       <View style={styles.actionsRow}>
         <View style={styles.actionButton}>
           <Button
@@ -556,8 +573,11 @@ export default function ProfileWorkScreen() {
   // and the tests keep them along the bottom. They join the bar once the push
   // has finished: during it, iOS morphed Profile's Edit into a long pill on
   // the way to this checkmark.
+  // Embedded beside Profile on an open iPhone Duo, the bar is the list's, so
+  // the actions stay along the bottom of the pane.
+  const actionsInBar = IS_NATIVE_LIST && !embedded;
   const barActions =
-    IS_NATIVE_LIST && pushSettled ? (
+    actionsInBar && pushSettled ? (
       <EditBarActions
         save={{
           label: isNameRequest ? "Send" : "Save",
@@ -584,7 +604,7 @@ export default function ProfileWorkScreen() {
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      footer={IS_NATIVE_LIST ? null : footer}
+      footer={actionsInBar ? null : footer}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there
@@ -593,6 +613,7 @@ export default function ProfileWorkScreen() {
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
     >
+      {embedded ? <PaneTitle eyebrow="Profile" title="Profile details" /> : null}
       {barActions}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (

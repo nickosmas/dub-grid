@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from "react";
+import { PaneTitle } from "../../../shared/layout/PaneTitle";
+import { useReturnToSplit } from "../../../shared/layout/useReturnToSplit";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Linking, StyleSheet, View } from "react-native";
 import { Screen } from "../../../shared/components/Screen";
@@ -69,7 +71,10 @@ function normalizePrefs(input: unknown): PrefsShape {
   return next;
 }
 
-export default function ProfileNotificationsScreen() {
+export default function ProfileNotificationsScreen({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
+  useReturnToSplit(!embedded);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
@@ -187,6 +192,7 @@ export default function ProfileNotificationsScreen() {
       onRefresh={manualRefresh.refresh}
       scrollEnabled={contentState.kind !== "loading"}
     >
+      {embedded ? <PaneTitle eyebrow="Profile" title="Notifications" /> : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowVariant="toggle" rowsPerSection={3} sections={2} showHero={false} />
