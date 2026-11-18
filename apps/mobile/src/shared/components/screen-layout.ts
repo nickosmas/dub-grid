@@ -26,6 +26,28 @@ export function getScreenGutter(): number {
 const IOS_LARGE_TITLE_INSET = 20;
 
 /**
+ * Where the camera's centre sits when the status bar stands in a side column
+ * (iPhone Duo closed or open), and where a top row (8 above a 44-point row)
+ * centres without help. Measured on the simulator: camera 47.7, wordmark 30.5.
+ */
+const SIDE_COLUMN_CAMERA_CENTRE = 48;
+const TOP_ROW_CENTRE = 30;
+
+/**
+ * Extra room above a screen's top row so it lines up with the camera when
+ * the status bar has moved to a side column and the top inset is 0. Nothing
+ * on a screen with a top inset. `rowCentre` is where the row centres
+ * without help, for a row that isn't the usual 44.
+ */
+export function getSideColumnTopOffset(
+  insets: { top: number; left: number; right: number },
+  rowCentre = TOP_ROW_CENTRE,
+): number {
+  const sideColumn = insets.top <= 0 && (insets.left > 0 || insets.right > 0);
+  return sideColumn ? Math.max(SIDE_COLUMN_CAMERA_CENTRE - rowCentre, 0) : 0;
+}
+
+/**
  * Leading and trailing padding that keeps content clear of the side safe
  * area. On iPhone Duo the status bar, camera and tab bar stand in a column on
  * the trailing edge, and UIKit doesn't inset a scroll view's content for it.
