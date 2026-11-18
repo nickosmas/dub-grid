@@ -28,6 +28,10 @@ export const ACTION_SEGMENT_OPTION_RADIUS = Math.min(
  */
 export const createStyles = (mobileColors: MobileColors, isDark = false) =>
   StyleSheet.create({
+    paneHeading: {
+      gap: mobileSpace.xs,
+      paddingTop: mobileSpace.lg,
+    },
     shiftDetailCard: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,

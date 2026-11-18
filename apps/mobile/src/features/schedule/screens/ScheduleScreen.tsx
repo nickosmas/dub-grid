@@ -6,7 +6,7 @@ import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Reanimated, {
@@ -47,6 +47,10 @@ import {
   WeekNavigatorHeader,
 } from "../components/WeekNavigatorHeader";
 import { SplitShiftBadge } from "../components/SplitShift";
+import { DayOverview } from "../components/DayOverview";
+import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
+import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
+import ShiftDetailScreen from "./ShiftDetailScreen";
 import { getMySchedule, getOrgSchedule, getShiftRequests } from "../../../shared/lib/api";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import { hapticSelection } from "../../../shared/lib/haptics";
@@ -124,6 +128,8 @@ import {
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
+/** Narrower than this, a split's list rows put the role pill under the name. */
+const NARROW_LIST_MAX_WIDTH = 340;
 const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_EXPAND_TIMING = {
   duration: 240,
@@ -474,6 +480,13 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     : false;
   const isTeamScope = scope === "team";
   const isBlockedTeamView = isTeamScope && !canViewTeamSchedule && Boolean(bootstrapQuery.data);
+  // Open on the iPhone Duo, the team schedule sits beside the chosen day's
+  // overview, or the shift of a person tapped in the list.
+  const splitLayout = useSplitLayout();
+  const split = isTeamScope && !isBlockedTeamView ? splitLayout : null;
+  const [pickedShift, setPickedShift] = useState<{ employeeId: string; date: string } | null>(null);
+  const shownShift = pickedShift?.date === selectedDate ? pickedShift : null;
+  const narrowList = split !== null && split.listWidth < NARROW_LIST_MAX_WIDTH;
   // The week is keyed by "today" in the organization's time zone, which
   // bootstrap supplies. Fetching before it arrived keyed the first request
   // by the UTC date, which near the day boundary is the wrong week: a wasted
@@ -841,6 +854,49 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   useScrollToTopOnChange(scrollViewRef, `${range.startDate}:${selectedDate}`);
 
+  // The split's list has the height for the whole month, so it stays open
+  // there; folding closed brings back the week strip.
+  const isSplit = split !== null;
+  useEffect(() => {
+    if (isSplit) {
+      setCalendarMonthAnchor(getScheduleMonthStartDate(selectedDateRef.current ?? selectedDate));
+      calendarExpandProgress.value = withTiming(1, MONTH_EXPAND_TIMING);
+      setIsCalendarOpen(true);
+    } else {
+      closeCalendarExpansion();
+    }
+    // Only the split's arrival and departure open or close the month.
+  }, [isSplit]);
+  // Folding closed turns a picked shift into its pushed page, marked so it
+  // goes back into the split when the Duo opens again; the day overview, a
+  // default, gives way to the list. Only on screen: a hidden tab never pushes.
+  const isFocused = useIsFocused();
+  const wasSplitRef = useRef(isSplit);
+  useEffect(() => {
+    const wasSplit = wasSplitRef.current;
+    wasSplitRef.current = isSplit;
+    if (!isFocused || !shownShift) return;
+    if (
+      shouldPushPickOnClose({
+        wasSplit,
+        isSplit,
+        pickedId: `${shownShift.employeeId}:${shownShift.date}`,
+      })
+    ) {
+      router.push({
+        pathname: "/shift/[employeeId]/[date]",
+        params: {
+          employeeId: shownShift.employeeId,
+          date: shownShift.date,
+          rangeStart: range.startDate,
+          rangeEnd: range.endDate,
+          source: scope,
+          [PUSHED_BY_FOLD_PARAM]: "1",
+        },
+      });
+    }
+  }, [isSplit, isFocused, shownShift, range.startDate, range.endDate, scope]);
+
   function closeCalendarExpansion() {
     if (!isCalendarOpen) {
       return;
@@ -864,6 +920,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     const resolvedNextDate = nextDate ?? todayDate;
     if (selectedDateRef.current !== resolvedNextDate) {
       hapticSelection();
+      // Another day opens on its overview, not a shift left from the last one.
+      setPickedShift(null);
     }
     selectedDateRef.current = resolvedNextDate;
     setSelectedDateOverride(nextDate);
@@ -874,10 +932,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     // Cleared here too: closeCalendarExpansion returns early while collapsed,
     // and a month pinned by a tap would outlive the swipes that leave it.
     setCalendarMonthAnchor(null);
-    closeCalendarExpansion();
+    if (!split) closeCalendarExpansion();
   }
 
   function handleOpenShiftDetail(entry: MobileScheduleEntry) {
+    if (split) {
+      setPickedShift({ employeeId: entry.employeeId, date: entry.date });
+      return;
+    }
     router.push({
       pathname: "/shift/[employeeId]/[date]",
       params: {
@@ -1157,7 +1219,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   function handleSelectFocusArea(nextFocusAreaKey: string) {
     setSelectedTeamFocusAreaKey(nextFocusAreaKey);
-    closeCalendarExpansion();
+    if (!split) closeCalendarExpansion();
   }
 
   const weekStripRenderWidth = weekStripWidth || WEEK_SWIPE_FALLBACK_WIDTH;
@@ -1372,23 +1434,27 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           </Reanimated.View>
         </Reanimated.View>
 
-        <GestureDetector gesture={calendarHandleGesture}>
-          <View
-            accessibilityLabel={isCalendarOpen ? "Collapse month calendar" : "Open month calendar"}
-            accessibilityActions={[{ name: "activate" }]}
-            accessibilityRole="adjustable"
-            hitSlop={{ top: 8, bottom: 16, left: 40, right: 40 }}
-            onAccessibilityAction={() => {
-              const shouldOpen = !isCalendarOpen;
-              if (shouldOpen) handleCalendarDragStart();
-              calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
-              handleCalendarDragEnd(shouldOpen);
-            }}
-            style={styles.calendarDragHandleRow}
-          >
-            <View style={styles.calendarDragHandleBar} />
-          </View>
-        </GestureDetector>
+        {isSplit ? null : (
+          <GestureDetector gesture={calendarHandleGesture}>
+            <View
+              accessibilityLabel={
+                isCalendarOpen ? "Collapse month calendar" : "Open month calendar"
+              }
+              accessibilityActions={[{ name: "activate" }]}
+              accessibilityRole="adjustable"
+              hitSlop={{ top: 8, bottom: 16, left: 40, right: 40 }}
+              onAccessibilityAction={() => {
+                const shouldOpen = !isCalendarOpen;
+                if (shouldOpen) handleCalendarDragStart();
+                calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
+                handleCalendarDragEnd(shouldOpen);
+              }}
+              style={styles.calendarDragHandleRow}
+            >
+              <View style={styles.calendarDragHandleBar} />
+            </View>
+          </GestureDetector>
+        )}
       </View>
     </View>
   ) : (
@@ -1401,7 +1467,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />
   );
 
-  return (
+  const listScreen = (
     <Screen
       bottomPaddingMode="tabbed"
       pageBackground={homeWash}
@@ -1578,7 +1644,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                   <View
                     style={[
                       styles.shiftGroupHeader,
-                      stackGroupTime && styles.shiftGroupHeaderStacked,
+                      (stackGroupTime || narrowList) && styles.shiftGroupHeaderStacked,
                     ]}
                   >
                     {group.focusArea ? (
@@ -1593,7 +1659,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                       <Text
                         style={[
                           styles.shiftGroupTime,
-                          stackGroupTime && styles.shiftGroupTimeStacked,
+                          (stackGroupTime || narrowList) && styles.shiftGroupTimeStacked,
                         ]}
                       >
                         {groupTimeRange}
@@ -1614,6 +1680,13 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                               : undefined
                           }
                           row={row}
+                          narrow={narrowList}
+                          selected={
+                            split
+                              ? shownShift?.employeeId === row.entry.employeeId &&
+                                shownShift.date === row.entry.date
+                              : undefined
+                          }
                           onPress={() => handleOpenShiftDetail(row.entry)}
                         />
                       ))}
@@ -1627,6 +1700,32 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         {confirmationModal}
       </View>
     </Screen>
+  );
+
+  if (!split) return listScreen;
+
+  return (
+    <SplitView
+      layout={split}
+      list={listScreen}
+      detail={
+        shownShift ? (
+          <ShiftDetailScreen
+            key={`${shownShift.employeeId}:${shownShift.date}`}
+            embedded
+            shift={{
+              employeeId: shownShift.employeeId,
+              date: shownShift.date,
+              rangeStart: range.startDate,
+              rangeEnd: range.endDate,
+              source: "team",
+            }}
+          />
+        ) : (
+          <DayOverview date={selectedDate} entries={scheduleEntries} now={now} range={range} />
+        )
+      }
+    />
   );
 }
 
@@ -1732,6 +1831,8 @@ function TeamShiftMemberRow({
   linkedEmployeeId,
   tabFocusAreaId,
   row,
+  selected,
+  narrow = false,
   onPress,
 }: {
   groupTimeRange: string | null;
@@ -1740,6 +1841,10 @@ function TeamShiftMemberRow({
   /** The selected focus-area tab's area, when it names one. */
   tabFocusAreaId?: number;
   row: TeamScheduleShiftRow;
+  /** Set only in a split view, true for the shift shown beside the list. */
+  selected?: boolean;
+  /** A narrow list (the iPhone Duo held tall) puts the role pill under the name. */
+  narrow?: boolean;
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
@@ -1759,7 +1864,7 @@ function TeamShiftMemberRow({
     : hasMentoredSegments(getScheduleEntrySegments(entry));
   // Once the reader raises the text size the role pill moves under the name:
   // the two no longer share a row's width, so neither has to give.
-  const stackRolePill = useWindowDimensions().fontScale > 1;
+  const stackRolePill = useWindowDimensions().fontScale > 1 || narrow;
   // A double shift gives each note to one half; a single shift in a focus-area
   // tab lists that area's notes, and the all tab every note.
   const isSplitEntry = getScheduleEntrySegments(entry).length > 1;
@@ -1783,7 +1888,14 @@ function TeamShiftMemberRow({
   return (
     <View>
       {isFirst ? null : <View style={styles.teamMemberSeparator} />}
-      <PressableRow onPress={onPress} style={styles.teamMemberRow}>
+      <PressableRow
+        onPress={onPress}
+        selected={selected}
+        style={[
+          styles.teamMemberRow,
+          selected === true && { backgroundColor: mobileColors.brandSoft },
+        ]}
+      >
         <View
           style={[
             styles.teamMemberAvatar,

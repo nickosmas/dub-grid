@@ -50,8 +50,13 @@ vi.mock("expo-router", () => ({
     push: routerPush,
     setParams: vi.fn(),
   },
+  useIsFocused: () => true,
   useLocalSearchParams: () => useLocalSearchParams(),
 }));
+
+// The shift page and day overview only render in an iPhone Duo split view.
+vi.mock("./ShiftDetailScreen", () => ({ default: () => null }));
+vi.mock("../components/DayOverview", () => ({ DayOverview: () => null }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 

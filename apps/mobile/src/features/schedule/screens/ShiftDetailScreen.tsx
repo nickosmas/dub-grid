@@ -20,6 +20,7 @@ import {
   formatShiftRequestNote,
 } from "@dubgrid/domain";
 import { getAvatarTone } from "@dubgrid/design-tokens";
+import { formatScheduleDayLabel } from "@dubgrid/schedule-core";
 import {
   BottomSheetModal,
   SheetActions,
@@ -35,6 +36,9 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { InlineError } from "../../../shared/components/InlineError";
 import { Card, Screen } from "../../../shared/components/Screen";
+import { AppText } from "../../../shared/components/AppText";
+import { PUSHED_BY_FOLD_PARAM, shouldReturnToSplit } from "../../../shared/layout/fold-rule";
+import { useSplitLayout } from "../../../shared/layout/SplitView";
 import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { CardRowListSkeleton } from "../../../shared/components/skeleton/CardRowListSkeleton";
@@ -249,17 +253,45 @@ function MentoredPill() {
   );
 }
 
-export default function ShiftDetailScreen() {
+export type ShiftDetailTarget = {
+  employeeId: string;
+  date: string;
+  rangeStart: string;
+  rangeEnd: string;
+  source: "team" | "mine";
+};
+
+/**
+ * A shift's page. On its own route it reads the shift from the URL;
+ * `embedded` in a split view's detail pane (iPhone Duo open) it takes the
+ * shift from the list and draws its own heading, since the native bar
+ * belongs to the list's page.
+ */
+export default function ShiftDetailScreen({
+  shift,
+  embedded = false,
+}: { shift?: ShiftDetailTarget; embedded?: boolean } = {}) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  const params = useLocalSearchParams<{
+  const routeParams = useLocalSearchParams<{
     employeeId?: string;
     date?: string;
     rangeStart?: string;
     rangeEnd?: string;
     source?: string;
+    [PUSHED_BY_FOLD_PARAM]?: string;
   }>();
+  const params = shift ?? routeParams;
+  // Pushed when an open iPhone Duo was folded closed: opening it again goes
+  // back to Schedule, which still has this shift picked beside the list.
+  const split = useSplitLayout();
+  const pushedByFold = !embedded && routeParams[PUSHED_BY_FOLD_PARAM] === "1";
+  useEffect(() => {
+    if (shouldReturnToSplit({ isSplit: split !== null, pushedByFold }) && router.canGoBack()) {
+      router.back();
+    }
+  }, [split, pushedByFold]);
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
   const focusAreaFieldLabel = capitalizeFirst(
@@ -1383,6 +1415,16 @@ export default function ShiftDetailScreen() {
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
     >
+      {embedded && shiftDate ? (
+        <View style={styles.paneHeading}>
+          <AppText tone="secondary" variant="meta">
+            {formatScheduleDayLabel(shiftDate, new Date(), timeZone)}
+          </AppText>
+          <AppText accessibilityRole="header" variant="screenTitle">
+            {employeeId === linkedEmployeeId ? "Your shift" : "Shift detail"}
+          </AppText>
+        </View>
+      ) : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           // Drop and Swap belong to the viewer's own shift, and "Working
