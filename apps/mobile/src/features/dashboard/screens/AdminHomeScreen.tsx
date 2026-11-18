@@ -296,14 +296,17 @@ export function AdminHomeScreen() {
   // Home keeps its wash on every platform (owner, 2026-11-04).
   const wash = <HomeWash height={windowHeight} />;
 
+  // Split, the wash runs behind both panes (the split paints it once), so
+  // the list doesn't draw its own.
+  const splitShown = homeSplit.split !== null || teamSplit !== null;
   const page = (
     <Screen
       bottomPaddingMode="tabbed"
       scrollViewRef={scrollViewRef}
-      pageBackground={wash}
+      pageBackground={splitShown ? undefined : wash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      stickyHeaderBackground={wash}
+      stickyHeaderBackground={splitShown ? undefined : wash}
       stickyHeader={header}
     >
       <View style={styles.cards}>
@@ -320,6 +323,7 @@ export function AdminHomeScreen() {
   if (homeSplit.split) {
     return (
       <SplitView
+        background={wash}
         layout={homeSplit.split}
         list={page}
         detail={<HomeSplitPane now={now} range={range} shown={homeSplit.shown} />}
@@ -329,6 +333,7 @@ export function AdminHomeScreen() {
   if (teamSplit) {
     return (
       <SplitView
+        background={wash}
         layout={teamSplit}
         list={page}
         detail={
