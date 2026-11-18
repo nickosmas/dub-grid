@@ -67,7 +67,9 @@ vi.mock("expo-router", async () => {
     });
   return {
     router: { push: routerPush },
-    Stack: { Toolbar, SearchBar },
+    Stack: { Toolbar, SearchBar, Screen: () => null },
+    useIsFocused: () => true,
+    useLocalSearchParams: () => ({}),
   };
 });
 

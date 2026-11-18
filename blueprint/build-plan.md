@@ -1331,7 +1331,7 @@
       tall, the list narrows and goes compact. iOS app only. Owner
       decisions, 2026-11-17; design reference: the "DubGrid on iPhone Duo"
       canvas.
-  - [ ] 59a. **Split view frame and People** - the hinge reaches the app,
+  - [x] 59a. **Split view frame and People** - the hinge reaches the app,
         the shared split view, and People with the person's page in the
         right pane (before a pick, the first person in the list), the
         list's Add and Filter above the list and Edit as a symbol in the side
