@@ -288,8 +288,7 @@ export default function SettingsPage({
   const banner =
     canAccessSettings && !isSuperAdmin && !isGridmaster ? (
       <Banner tone="info" icon={Lock}>
-        Some settings are read-only based on your permissions. Contact your super admin to request
-        changes.
+        Some settings are read-only for you.
       </Banner>
     ) : null;
 

@@ -26,19 +26,16 @@ export type NotificationCategoryDetail = {
 const CHANNELS: Array<{
   id: NotificationChannel;
   label: string;
-  description: string;
   icon: ComponentProps<typeof Ionicons>["name"];
 }> = [
   {
     id: "in_app",
     label: "In-app",
-    description: "Shows up in your in-app notification list.",
     icon: "phone-portrait-outline",
   },
   {
     id: "email",
     label: "Email",
-    description: "Sent to the address on your account.",
     icon: "mail-outline",
   },
 ];
@@ -87,7 +84,6 @@ export function NotificationCategorySheet({
               <ProfileIcon name={channel.icon} />
               <View style={styles.copy}>
                 <Text style={styles.label}>{channel.label}</Text>
-                <Text style={styles.description}>{channel.description}</Text>
               </View>
               <AppSwitch
                 accessibilityLabel={`${channel.label} notifications`}
@@ -147,9 +143,5 @@ const createStyles = (mobileColors: MobileColors) =>
     label: {
       ...(IS_NATIVE_LIST ? mobileText.rowTitle : mobileTextWeighted("cardTitle", "medium")),
       color: mobileColors.textPrimary,
-    },
-    description: {
-      ...mobileText.meta,
-      color: mobileColors.textMuted,
     },
   });

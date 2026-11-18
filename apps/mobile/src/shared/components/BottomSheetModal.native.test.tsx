@@ -3,7 +3,11 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../test/native";
 
-type NativeSheetProps = { enablePanDownToClose?: boolean; onClose?: () => void };
+type NativeSheetProps = {
+  enablePanDownToClose?: boolean;
+  onClose?: () => void;
+  handleComponent?: null;
+};
 
 const nativeSheet = vi.hoisted(() => ({ props: null as NativeSheetProps | null }));
 
@@ -118,5 +122,51 @@ describe("BottomSheetModal (native) with unsaved changes", () => {
     );
     nativeSheet.props?.onClose?.();
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+});
+
+describe("BottomSheetModal (native) as a gate", () => {
+  async function renderGate(platformOS: "ios" | "android") {
+    const sheet = await loadSheet(platformOS);
+    const { SheetActions } = await import("./BottomSheetModalDrawn");
+    const { Button } = await import("./Button");
+    const onAccept = vi.fn();
+    render(
+      <sheet.BottomSheetModal
+        dismissDisabled
+        footer={
+          <SheetActions primaryAction={<Button label="Accept all" onPress={onAccept} />}>
+            <Button label="Essential only" onPress={vi.fn()} tone="secondary" />
+          </SheetActions>
+        }
+        header={<sheet.SheetHeader title="Your privacy" />}
+        presentationKind="gate"
+        visible
+        onDismiss={vi.fn()}
+      >
+        <span>Body</span>
+      </sheet.BottomSheetModal>,
+    );
+    return { onAccept };
+  }
+
+  it("is the native sheet on iOS, with no grabber, swipe or close button", async () => {
+    const { onAccept } = await renderGate("ios");
+
+    expect(nativeSheet.props).not.toBeNull();
+    expect(nativeSheet.props?.handleComponent).toBeNull();
+    expect(nativeSheet.props?.enablePanDownToClose).toBe(false);
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    // Its answers stay at its foot rather than moving into the bar.
+    expect(screen.getByRole("button", { name: "Essential only" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Accept all" }));
+    expect(onAccept).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays the drawn sheet on Android", async () => {
+    await renderGate("android");
+
+    expect(nativeSheet.props).toBeNull();
+    expect(screen.getByRole("button", { name: "Accept all" })).toBeTruthy();
   });
 });

@@ -346,9 +346,6 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 <div className="text-[14px] font-medium text-[var(--dg-color-text-primary)]">
                   Two-factor authentication
                 </div>
-                <p className="dg-card-description">
-                  Add a second sign-in step using an authenticator app.
-                </p>
               </div>
               <MFASetup
                 mfaEnabled={mfaEnabled}
@@ -376,9 +373,6 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
             <h2 id="security-devices-title" className="dg-card-title">
               Devices
             </h2>
-            <p className="dg-card-description">
-              Where you&apos;re signed in, and when you last signed in.
-            </p>
           </div>
         </div>
         <div className="dg-card-body">

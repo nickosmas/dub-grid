@@ -429,7 +429,7 @@ export default function ProfilePasswordScreen() {
           }}
         />
       ) : (
-        <ProfileSection description="Choose a password you don't use anywhere else. You'll be signed out everywhere once it changes.">
+        <ProfileSection>
           <ProfilePanel>
             <ProfileTextInput
               accessibilityLabel="Current password"

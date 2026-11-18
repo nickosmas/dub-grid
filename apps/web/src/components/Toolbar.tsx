@@ -451,16 +451,14 @@ function ToolsMenu({
 
         {/* Publish History */}
         {onPublishHistory && (
-          <Hint content={hint("View all past schedule publications and changes")} side="left">
-            <MenuItem
-              onClick={() => {
-                onPublishHistory();
-              }}
-            >
-              <Clock size={14} strokeWidth={2.5} />
-              Publish History
-            </MenuItem>
-          </Hint>
+          <MenuItem
+            onClick={() => {
+              onPublishHistory();
+            }}
+          >
+            <Clock size={14} strokeWidth={2.5} />
+            Publish History
+          </MenuItem>
         )}
 
         {onBulkDeleteToggle && (
@@ -475,7 +473,7 @@ function ToolsMenu({
                 }}
               >
                 <Trash2 size={14} />
-                {isBulkDeleteMode ? "Exit Bulk Delete" : "Bulk Delete Entries"}
+                {isBulkDeleteMode ? "Exit Bulk Delete" : "Bulk Delete"}
               </MenuItem>
             </Hint>
           </>

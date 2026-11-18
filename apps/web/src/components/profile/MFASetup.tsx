@@ -420,7 +420,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       <p
         style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--dg-color-text-muted)", margin: 0 }}
       >
-        Use an app like Google Authenticator, Authy, or 1Password to scan the QR code below.
+        Google Authenticator, Authy and 1Password all work.
       </p>
 
       {qrCode && (

@@ -161,10 +161,7 @@ export function ManagementUserInviteSheet({
         </>
       }
       header={
-        <SheetHeader
-          subtitle="They'll get an invitation to join an administrative team, with no schedule profile."
-          title="Invite to an administrative team"
-        />
+        <SheetHeader subtitle="No schedule profile." title="Invite to an administrative team" />
       }
       scrollable
       visible={visible}

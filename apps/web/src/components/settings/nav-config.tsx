@@ -130,15 +130,12 @@ export function buildNavGroups(
         id: "org-general",
         label: "Organization Details",
         Icon: BuildingIcon,
-        description: "Manage your organization's name and basic profile information.",
       });
     if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels)
       generalItems.push({
         id: "org-labels",
         label: "Labels",
         Icon: LabelsIcon,
-        description:
-          "Customize the terminology used in your organization. For example, rename 'Schedule Areas' to 'Wings' or 'Units'.",
       });
     if (generalItems.length > 0)
       groups.push({ id: "general", label: "General", items: generalItems });
@@ -186,31 +183,24 @@ export function buildNavGroups(
         id: "org-display",
         label: "Schedule Display",
         Icon: DisplayIcon,
-        description: "How shifts look on the schedule, and what staff see after a publish.",
       });
     if (perms.isSuperAdmin)
       schedItems.push({
         id: "schedule-rules",
         label: "Schedule Rules",
         Icon: ShieldIcon,
-        description:
-          "Overlapping shifts, pay periods, mentored coverage, and which open shifts staff see.",
       });
     if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions)
       schedItems.push({
         id: "schedule-shifts",
         label: "Shifts",
         Icon: ShiftsIcon,
-        description:
-          "Configure your core Day, Evening, Night, and similar shift definitions with default times and colors.",
       });
     if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions)
       schedItems.push({
         id: "schedule-jobs",
         label: "Jobs",
         Icon: JobsIcon,
-        description:
-          "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility.",
       });
     if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions)
       schedItems.push({
@@ -231,8 +221,6 @@ export function buildNavGroups(
         id: "staff-indicators",
         label: "Schedule notes",
         Icon: IndicatorIcon,
-        description:
-          "Define custom schedule notes that can be attached to shift cells on the schedule.",
       });
     if (schedItems.length > 0)
       groups.push({ id: "scheduling", label: "Scheduling", items: schedItems });
@@ -248,7 +236,6 @@ export function buildNavGroups(
           id: "org-billing",
           label: "Subscription",
           Icon: BillingIcon,
-          description: "Review subscription status, seats, and Stripe billing access.",
         },
       ],
     });
@@ -264,7 +251,6 @@ export function buildNavGroups(
           id: "org-activity",
           label: "Activity Log",
           Icon: ActivityIcon,
-          description: "Every change made in your organization, who made it, and when.",
         },
       ],
     });
@@ -280,7 +266,6 @@ export function buildNavGroups(
           id: "org-danger",
           label: "Delete Organization",
           Icon: DangerIcon,
-          description: "Close your organization for good.",
         },
       ],
     });

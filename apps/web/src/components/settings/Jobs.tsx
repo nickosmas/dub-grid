@@ -604,15 +604,6 @@ function EligibilityModeToggle({
         <div id="job-matching-rule-label" style={{ ...labelStyle, marginBottom: 0 }}>
           Matching rule
         </div>
-        <div
-          style={{
-            fontSize: "var(--dg-fs-caption)",
-            color: "var(--dg-color-text-muted)",
-            lineHeight: 1.35,
-          }}
-        >
-          Decide whether staff must match both lists, or just one.
-        </div>
       </div>
       <div
         className="dg-segment dg-segment-grid"
@@ -684,7 +675,7 @@ function DefaultShiftCard({
         <div style={{ minWidth: 0 }}>
           <div className="dg-card-title">Allow shifts without a job</div>
           <div className="dg-card-description">
-            Staff can be scheduled with just a shift, like Day Shift. Jobs still work as before.
+            Staff can be scheduled with just a shift, like Day Shift.
           </div>
         </div>
         {toggle ? <div style={{ flexShrink: 0 }}>{toggle}</div> : null}
@@ -832,11 +823,9 @@ function JobSectionCard({
   canManageScheduleDefinitions,
   onAdd,
   hideAddButton = false,
-  focusAreasTerm,
   children,
 }: {
   section: JobSection;
-  focusAreasTerm: string;
   rows: Array<JobDefinition & { isNew?: boolean }>;
   canManageScheduleDefinitions: boolean;
   onAdd: () => void;
@@ -867,11 +856,6 @@ function JobSectionCard({
         <EmptyState
           size="compact"
           title={section === "shiftless" ? "No general jobs yet" : "No scheduled jobs yet"}
-          description={
-            section === "shiftless"
-              ? "Create shiftless jobs for work that should appear without a Day, Evening, or Night shift."
-              : `Create jobs that start with departments, then narrow to the ${focusAreasTerm} and shifts where they apply.`
-          }
           action={
             canManageScheduleDefinitions ? (
               <Button onClick={onAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
@@ -1469,9 +1453,7 @@ function JobRow({
                 ? isNameMode
                   ? "Use this row for assignments that should display as the shift only."
                   : "Use this row for assignments that should display as the shift only, like D or Day Shift."
-                : section === "scheduled"
-                  ? "Name the job once, then configure exactly how it behaves on the selected shifts."
-                  : "Use shiftless jobs for work that stands on its own without a scheduled shift."
+                : undefined
             }
           >
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1631,17 +1613,6 @@ function JobRow({
                             m
                           </span>
                         </div>
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: "var(--dg-fs-caption)",
-                            color: "var(--dg-color-text-muted)",
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          Use a duration when this general job should stay untethered from a fixed
-                          start and end time.
-                        </p>
                         {canManageScheduleDefinitions ? (
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <Button
@@ -1740,17 +1711,6 @@ function JobRow({
                             </span>
                           </div>
                         ) : null}
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: "var(--dg-fs-caption)",
-                            color: "var(--dg-color-text-muted)",
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          Fixed times take priority over duration for general jobs, so only one
-                          timing mode can be saved at once.
-                        </p>
                         {canManageScheduleDefinitions ? (
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <Button
@@ -1795,8 +1755,7 @@ function JobRow({
                             lineHeight: 1.45,
                           }}
                         >
-                          Choose one timing mode for general jobs. Use either a fixed start and end
-                          time or a duration.
+                          Set a fixed time or a duration.
                         </p>
                         {canManageScheduleDefinitions ? (
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1864,7 +1823,6 @@ function JobRow({
           {isScheduledLikeSection(section) ? (
             <SectionBlock
               title="Placement"
-              description={`Choose the departments first. Then select the ${pluralLabelNoun(focusAreaLabel)} inside them and the shifts where this job applies.`}
               summary={placementSummary}
               collapsible
               defaultOpen={form.departmentIds.length === 0}
@@ -2108,7 +2066,7 @@ function JobRow({
           {isScheduledLikeSection(section) ? (
             <SectionBlock
               title="Per-shift Settings"
-              description="Scheduled jobs inherit each selected shift by default. Customize the color and time only where this job needs to behave differently."
+              description="Uses each shift's color and time unless you override them."
               summary={perShiftSettingsSummary}
               collapsible
               defaultOpen={overrideCount > 0}
@@ -2963,7 +2921,6 @@ export default function JobsSettings({
 
       <JobSectionCard
         section="scheduled"
-        focusAreasTerm={pluralLabelNoun(focusAreaLabel)}
         rows={scheduledRows}
         canManageScheduleDefinitions={canManageScheduleDefinitions && canCreateScheduledJob}
         onAdd={handleAddScheduledJob}
@@ -2988,7 +2945,6 @@ export default function JobsSettings({
 
       <JobSectionCard
         section="shiftless"
-        focusAreasTerm={pluralLabelNoun(focusAreaLabel)}
         rows={shiftlessRows}
         canManageScheduleDefinitions={canManageScheduleDefinitions}
         onAdd={handleAddShiftlessJob}

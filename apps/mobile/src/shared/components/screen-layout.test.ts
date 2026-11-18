@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getFooterBottomPadding, getScreenBottomPadding, getScreenGutter } from "./screen-layout";
+import {
+  getFooterBottomPadding,
+  getScreenBottomPadding,
+  getScreenGutter,
+  getScreenSidePadding,
+  getSideColumnTopOffset,
+} from "./screen-layout";
 
 // Read at call time by `getScreenBottomPadding`, so flipping this between tests
 // is enough — no re-import needed.
@@ -104,5 +110,47 @@ describe("getScreenGutter", () => {
     platform.OS = "android";
 
     expect(getScreenGutter()).toBe(16);
+  });
+});
+
+describe("getScreenSidePadding", () => {
+  it("adds each side's safe area to the base", () => {
+    expect(getScreenSidePadding({ left: 0, right: 74 }, 20)).toEqual({
+      paddingLeft: 20,
+      paddingRight: 94,
+    });
+  });
+
+  it("is just the safe area with no base", () => {
+    expect(getScreenSidePadding({ left: 12, right: 74 })).toEqual({
+      paddingLeft: 12,
+      paddingRight: 74,
+    });
+  });
+
+  it("ignores a negative safe area", () => {
+    expect(getScreenSidePadding({ left: -4, right: -1 }, 16)).toEqual({
+      paddingLeft: 16,
+      paddingRight: 16,
+    });
+  });
+});
+
+describe("getSideColumnTopOffset", () => {
+  it("drops a top row to the camera when the status bar is in a side column", () => {
+    expect(getSideColumnTopOffset({ top: 0, left: 0, right: 84 })).toBe(18);
+  });
+
+  it("adds nothing where the screen has a top inset", () => {
+    expect(getSideColumnTopOffset({ top: 62, left: 0, right: 0 })).toBe(0);
+    expect(getSideColumnTopOffset({ top: 24, left: 0, right: 84 })).toBe(0);
+  });
+
+  it("centres a taller row on the camera", () => {
+    expect(getSideColumnTopOffset({ top: 0, left: 0, right: 84 }, 34)).toBe(14);
+  });
+
+  it("adds nothing with no inset on any side", () => {
+    expect(getSideColumnTopOffset({ top: 0, left: 0, right: 0 })).toBe(0);
   });
 });

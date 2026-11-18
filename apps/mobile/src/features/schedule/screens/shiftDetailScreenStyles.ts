@@ -647,9 +647,6 @@ export const createStyles = (mobileColors: MobileColors, isDark = false) =>
       justifyContent: "center",
       backgroundColor: mobileColors.brand,
     },
-    swapSelectedPanel: {
-      gap: 12,
-    },
     swapDateFilteredList: {
       gap: 12,
     },

@@ -232,8 +232,7 @@ export default function ScheduleRules({
               Biweekly pay period start date
             </label>
             <div style={ruleDescriptionStyle}>
-              Pick the first day of any pay period, and 2 Weeks view lines up with your pay periods.
-              Leave it blank to follow calendar weeks.
+              Lines up the 2 Weeks view with your pay periods. Leave blank for calendar weeks.
             </div>
           </div>
           <div style={{ maxWidth: 260 }}>
@@ -252,9 +251,6 @@ export default function ScheduleRules({
             <label htmlFor="mentored-coverage-credit" style={ruleTitleStyle}>
               Mentored coverage credit
             </label>
-            <div style={ruleDescriptionStyle}>
-              Controls how mentored assignments count toward coverage requirements.
-            </div>
           </div>
           <CustomSelect
             id="mentored-coverage-credit"
@@ -301,8 +297,7 @@ export default function ScheduleRules({
               Show coverage shortages to staff
             </label>
             <div style={ruleDescriptionStyle}>
-              Open shifts made when a published schedule is short. Staff see them when the shift
-              fits their availability, always, or never. Schedulers always see them.
+              Open shifts made when a published schedule is short. Schedulers always see them.
             </div>
           </div>
           <CustomSelect
@@ -318,10 +313,7 @@ export default function ScheduleRules({
             <label htmlFor="open-shift-calloff-visibility" style={ruleTitleStyle}>
               Show call-off vacancies to staff
             </label>
-            <div style={ruleDescriptionStyle}>
-              Open shifts left when someone calls off. Staff see them when the shift fits their
-              availability, always, or never.
-            </div>
+            <div style={ruleDescriptionStyle}>Open shifts left when someone calls off.</div>
           </div>
           <CustomSelect
             id="open-shift-calloff-visibility"

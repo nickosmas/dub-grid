@@ -31,7 +31,8 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Every item has shipped except 40, which is
-in progress, and 57, which is in progress (57a shipped).
+in progress, 57, which is in progress (57a shipped), and 59, which is in
+progress.
 
 - **1** - Multi-tenant organizations with subdomain isolation and organization-specific settings.
 - **2** - Four-tier RBAC with per-person Admin permissions.
@@ -91,6 +92,7 @@ in progress, and 57, which is in progress (57a shipped).
 - **56** - The app feels built for each phone: native navigation, sheets and alerts, one DubGrid design, and a My schedule | Team switch.
 - **57** (in progress) - Every day a shift request touches is marked on the web grid while it waits and after approval; approvals count as changes in Highlight changes.
 - **58** - The shift picker shows a person's shift and job preferences and warns, without blocking, when a choice goes outside an Only preference.
+- **59** (in progress) - On the iPhone Duo open or partly folded, every app page is a split view: the page as a list on the left and a useful detail on the right.
 
 Each item's parts, what each part shipped and its migration live in
 `blueprint/build-plan.md` (the checklist) and `blueprint/history/` (the
@@ -252,6 +254,21 @@ one it names.
   (2026-11-09). A lint rule keeps platform checks out of screens.
 - The mobile app stays signed in until the person signs out; only web sessions
   end after 35 minutes idle (2026-11-08).
+
+### iPhone Duo (item 59)
+
+- Open or partly folded, every app page is a split view (Apple's Mail
+  model): the page as a list on the left, keeping the closed screen's cards,
+  and a detail on the right. The right pane is never empty: each page has a
+  useful default until a row is tapped (People: the first person in the
+  list). Partly folded, each pane fills its half and nothing sits in the
+  fold. Closing keeps a picked row as a page pushed with Back; a default pane
+  gives way to the list. The right pane's actions join the side column with
+  the status bar and tab bar, so each needs a symbol. Held tall, the list
+  narrows and goes compact. iOS only (owner, 2026-11-17). Design: "DubGrid
+  on iPhone Duo" canvas.
+- Content clears the side column and top rows line up with its camera; iOS
+  ignores the portrait lock on the Duo, so the open poses always apply.
 
 ### Platform and security
 

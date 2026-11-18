@@ -564,14 +564,6 @@
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still open. Staff are now scoped on the server; paging must keep that scope and the open-pickup pool.
 
-### F-173 [P2] closed - The staffed call-off trigger resolves every publish change before checking whether any pickup is waiting
-
-**File:** `supabase/migrations/099_away_until.sql:3811-3930` (`finalize_scheduler_staffed_calloffs`, AFTER INSERT on `schedule_publish_changes`); `082` `resolve_schedule_state_storage`
-**Found:** 2026-10-30 by /audit (scope: full; lens: performance; second pass)
-**Why it matters:** Each worked change runs `resolve_schedule_state_storage` twice (several job, shift and absence-type lookups) before scanning for open pickups that day, which usually returns none. A month publish for 150 people is about 3,000 runs. Out of lens and unchecked: `resolve_schedule_state_storage` raises on a since-archived job or shift, which could fail a whole publish.
-**Suggested fix:** Return early unless an open pickup with a parent exists for the org and date (`idx_shift_requests_org_open_pickups`). Check the archived-reference case separately.
-**Resolution:** Fixed by migration 117 (`117_archived_items_stay_scheduled.sql`), found by the 2026-11-13 re-check: `finalize_scheduler_staffed_calloffs` returns early unless an open pickup with a parent exists for the organization and date, and uses `resolve_existing_schedule_state_storage`, so an archived reference no longer fails a publish.
-
 ### F-174 [P2] fixed - Leaving the grid locks the person's whole schedule history
 
 **File:** `supabase/migrations/100_away_absence.sql:170-212` (`clear_schedule_for_departed_employee`)
@@ -1041,14 +1033,6 @@ Traced, not run on a device. Whether `allowBackup` carries the cache into device
 **Suggested fix:** Confirm on the stack. If it holds, require `canEditShifts` or `canManageEmployees` in the SQL for acting on someone else, and never auto-approve a request that someone other than the requester filed.
 **Resolution:**
 **Update 2026-11-13 (re-check against dev):** still unverified. Request functions were rewritten since (121, 126, 129, 135); start any fix from those.
-
-### F-244 [P2] closed - An Admin never configured shows no permissions, and can't be edited on mobile
-
-**File:** `apps/mobile/src/features/people/screens/PersonDetailScreen.tsx:1051-1055, 1811`; `apps/web/src/components/staff-detail/PersonInfoCards.tsx:177-189`
-**Found:** 2026-11-10 by /audit (scope: admin permissions; lens: UX)
-**Why it matters:** Both gate on a stored set. For an Admin with `NULL` (F-239's common case), web drops the Permissions line and mobile hides the Permissions row, so a Super Admin on the phone has no way to set them.
-**Suggested fix:** Gate on `orgRole === "admin"` and count from `buildInitialPermissions(stored)`.
-**Resolution:** Fixed by migration 131 (`131_admin_permissions_complete.sql`), found by the 2026-11-13 re-check: a trigger stores a complete permission set for every Admin and backfilled existing ones, so the web Permissions line and the mobile Permissions row always show.
 
 ### F-246 [P3] open - Permission counts and change summaries disagree with the editor
 

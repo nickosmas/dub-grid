@@ -308,9 +308,6 @@ export function BulkImportModal({
         <span className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
           Drop a CSV file here
         </span>
-        <span className="text-[13px] text-[var(--dg-color-text-muted)]">
-          or choose one from your computer
-        </span>
         <span className="dg-btn dg-btn-secondary mt-1">Choose file</span>
       </button>
       <input

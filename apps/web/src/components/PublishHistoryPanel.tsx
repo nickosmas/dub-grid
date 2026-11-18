@@ -7,8 +7,6 @@ import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { ScrollOverflowCue } from "@/components/ui/ScrollOverflowCue";
-import { Hint } from "@/components/ui/hint";
-import { hint } from "@/components/ui/hint.types";
 import { fetchPublishHistory } from "@/features/schedule/client";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useSlideoverClose } from "@/hooks/useSlideoverClose";
@@ -740,11 +738,7 @@ export default function PublishHistoryPanel({
           )}
 
           {!loading && entries.length === 0 && (
-            <EmptyState
-              size="compact"
-              title="No publish history yet"
-              description="Published schedules appear here."
-            />
+            <EmptyState size="compact" title="No publish history yet" />
           )}
 
           {entries.map((entry) => {
@@ -815,20 +809,13 @@ export default function PublishHistoryPanel({
                     >
                       {isExpanded ? "Hide" : "Details"}
                     </Button>
-                    <Hint
-                      content={hint(
-                        "Navigate to this date range and highlight changes on the grid",
-                      )}
-                      side="bottom"
+                    <Button
+                      onClick={() => onSelectEntry(entry)}
+                      className="dg-btn dg-btn-secondary"
+                      style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 8px" }}
                     >
-                      <Button
-                        onClick={() => onSelectEntry(entry)}
-                        className="dg-btn dg-btn-secondary"
-                        style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 8px" }}
-                      >
-                        Show on grid
-                      </Button>
-                    </Hint>
+                      Show on grid
+                    </Button>
                   </div>
                 </div>
 

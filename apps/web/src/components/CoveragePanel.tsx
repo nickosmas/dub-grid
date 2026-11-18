@@ -411,7 +411,7 @@ export default function CoveragePanel({
               size="compact"
               style={{ minHeight: 260 }}
               title="No coverage requirements"
-              description="Schedule Builder compares the schedule with how many people each shift needs. Set those numbers in Settings > Coverage."
+              description="Set them in Settings > Coverage."
             />
           ) : hidesForViewer ? (
             <EmptyState

@@ -18,7 +18,7 @@ import { mobileSpace } from "../theme/tokens";
 import { AppText } from "./AppText";
 import { ChromeIconButton } from "./ChromeIconButton";
 import { ICON_CONTROL_SIZE } from "./icon-control-style";
-import { liftSheetActions, type ButtonProps } from "./sheet-bar-actions";
+import { liftSheetActions, type ButtonProps, type LiftedActions } from "./sheet-bar-actions";
 import { sheetOpenSize, type SheetSizes } from "./sheet-open-size";
 import { BarAction } from "./SheetBarAction";
 import {
@@ -62,8 +62,12 @@ function useKeyboardHeight() {
 }
 
 const IS_IOS = Platform.OS === "ios";
+/** The narrowest regular-width screen, an iPad mini held tall. */
+const WIDE_SHEET_MIN_WIDTH = 744;
 /** iOS 26 floats a sheet that isn't full height above the screen's foot. */
 const IOS_FLOATING_SHEETS = IS_IOS && Number.parseInt(String(Platform.Version), 10) >= 26;
+/** How far a floating sheet stands in from each side (measured on iOS 27). */
+const IOS_FLOATING_SHEET_INSET = 8;
 
 type SheetClose = {
   onClose: () => void;
@@ -78,6 +82,8 @@ type SheetClose = {
    * sheets otherwise have no close button, needs one to leave by.
    */
   needsCloseButton: boolean;
+  /** A gate is answered with its own buttons, so it draws no close button. */
+  gate: boolean;
 };
 
 /** Set inside a native sheet, so its header draws the platform's own bar. */
@@ -86,13 +92,17 @@ const SheetCloseContext = createContext<SheetClose | null>(null);
 /**
  * The platform's own sheet: SwiftUI's sheet on iOS (the grabber, detents,
  * Liquid Glass on iOS 26) and Material 3's ModalBottomSheet on Android,
- * closed by a swipe down or the scrim. A gate that must
- * hide what is behind it (the app lock) keeps the drawn sheet, whose cover
- * backdrop a native sheet can't give.
+ * closed by a swipe down or the scrim. On iOS a gate (consent, terms) is the
+ * native sheet too, with no grabber or close button and its answers kept at
+ * its foot. The app lock, which must hide what is behind it, keeps the drawn
+ * sheet, whose cover backdrop a native sheet can't give, and so do Android's
+ * gates.
  */
 export function BottomSheetModal(props: BottomSheetModalProps) {
   const mobileColors = useMobileColors();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const wide = windowWidth >= WIDE_SHEET_MIN_WIDTH;
+  const phoneSheetWidth = windowWidth - (IOS_FLOATING_SHEETS ? 2 * IOS_FLOATING_SHEET_INSET : 0);
   const keyboardHeight = useKeyboardHeight();
   const { bottom: bottomInset, top: topInset } = useSafeAreaInsets();
   const scrollBodyMaxHeight =
@@ -110,7 +120,8 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
   };
   const androidResizableRef = useRef<boolean | null>(null);
 
-  if (props.presentationKind === "gate" || props.backdrop === "cover") {
+  const gate = props.presentationKind === "gate";
+  if (props.backdrop === "cover" || (gate && !IS_IOS)) {
     return <DrawnBottomSheetModal {...props} />;
   }
 
@@ -127,7 +138,7 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
     children,
   } = props;
 
-  const lifted = liftSheetActions(footer);
+  const lifted: LiftedActions = gate ? { rest: footer } : liftSheetActions(footer);
   const barFooter = lifted.primary ? lifted.rest : footer;
   const { overflows, resizable, snapPoints } = sheetOpenSize({
     isIos: IS_IOS,
@@ -139,6 +150,7 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
     windowHeight,
     scrollable,
     expandable,
+    wide,
     androidResizable: androidResizableRef.current,
   });
   // Android's sheet is either sized to its content or full screen, and
@@ -152,6 +164,8 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
       // The grouped page colour, as a system sheet holding a list has: its
       // groups and cards are white on it, with no outline.
       backgroundStyle={{ backgroundColor: mobileColors.background }}
+      // No grabber on a gate: nothing but its own buttons closes it.
+      handleComponent={gate ? null : undefined}
       enableDynamicSizing={!resizable}
       // The native sheet closes itself on a swipe, scrim tap or Android back and
       // only then reports it, so a guard's Keep editing would leave `visible`
@@ -173,13 +187,19 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
             primary: lifted.primary,
             secondary: lifted.secondary,
             needsCloseButton: hasUnsavedChanges,
+            gate,
           }}
         >
           {/* A sheet sized to its content lays React Native out without a set
-            width, so text in a row never wraps. The app is phone-only, where
-            a sheet is as wide as the screen. */}
+            width, so text in a row never wraps. On a phone the sheet spans
+            the screen, less iOS 26's floating inset; a wide screen's form
+            sheet is narrower, and its detent passes the width on instead. */}
           <BottomSheetView
-            style={[styles.sheet, { width: windowWidth }, resizable && styles.sheetFill]}
+            style={[
+              styles.sheet,
+              !wide && { width: phoneSheetWidth },
+              resizable && styles.sheetFill,
+            ]}
           >
             <View onLayout={(event) => measure("header", event.nativeEvent.layout.height)}>
               {header ?? (IS_IOS || lifted.primary ? <SheetHeader title="" /> : null)}
@@ -204,7 +224,12 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
                 {children}
               </BottomSheetScrollView>
             ) : (
-              <View style={styles.body}>{children}</View>
+              <View
+                onLayout={(event) => measure("content", event.nativeEvent.layout.height)}
+                style={styles.body}
+              >
+                {children}
+              </View>
             )}
             {barFooter ? (
               <View
@@ -301,7 +326,7 @@ function IosSheetBar({ title, subtitle }: { title?: string; subtitle?: string })
           <View onLayout={measure("leading")} style={styles.iosSideContent}>
             {close?.secondary ? (
               <BarAction action={close.secondary} kind="secondary" />
-            ) : close ? (
+            ) : close && !close.gate ? (
               <ChromeIconButton
                 accessibilityLabel={close.label}
                 onPress={close.disabled ? () => undefined : close.onClose}

@@ -6,12 +6,12 @@ import {
   ADMINISTRATIVE_TEAM_LABELS,
 } from "@dubgrid/domain";
 import { ActionButtons } from "../../../shared/components/ActionButtons";
-import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { router } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileDepartment,
@@ -32,6 +32,12 @@ import { formatLocalDateKey } from "@dubgrid/schedule-core";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
+import { DISCARD_CONFIRM } from "../../../shared/navigation/EditBarActions";
+import { PaneHeader } from "../../../shared/layout/PaneHeader";
+import { SplitStackTitle } from "../../../shared/layout/SplitStackTitle";
+import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
+import PersonDetailScreen from "./PersonDetailScreen";
 import {
   FilterSheet,
   SelectionRow,
@@ -648,6 +654,68 @@ export default function PeopleScreen() {
       : filteredPeople.map((person) => ({ kind: "person" as const, person }));
   }, [contentState.kind, filteredManagementUsers, filteredPeople, isManagementTab]);
 
+  // Open on the iPhone Duo, the list sits beside a person's page. Before a
+  // pick it shows the first person in the list other than you, since your
+  // own page is the Profile tab.
+  const split = useSplitLayout();
+  const [pickedPersonId, setPickedPersonId] = useState<string | null>(null);
+  const firstPersonId = useMemo(() => {
+    for (const item of rosterItems) {
+      const employeeId = item.kind === "person" ? item.person.id : item.user.employeeId;
+      const userId = item.kind === "person" ? item.person.userId : item.user.userId;
+      if (!employeeId) continue;
+      if (currentEmployeeId !== null && employeeId === currentEmployeeId) continue;
+      if (currentUserId !== null && userId !== null && userId === currentUserId) continue;
+      return employeeId;
+    }
+    return null;
+  }, [rosterItems, currentEmployeeId, currentUserId]);
+  const shownPersonId = pickedPersonId ?? firstPersonId;
+  const searchPlaceholder = isManagementTab ? "Search administrative teams" : "Search people";
+  // Folding closed turns a picked person into their pushed page, marked so
+  // it goes back into the split when the Duo opens again; a default gives way
+  // to the list. Only on screen: a hidden People tab never pushes.
+  const isFocused = useIsFocused();
+  const wasSplitRef = useRef(split !== null);
+  useEffect(() => {
+    const wasSplit = wasSplitRef.current;
+    wasSplitRef.current = split !== null;
+    if (!isFocused) return;
+    if (shouldPushPickOnClose({ wasSplit, isSplit: split !== null, pickedId: pickedPersonId })) {
+      router.push({
+        pathname: "/person/[id]",
+        params: { id: pickedPersonId as string, [PUSHED_BY_FOLD_PARAM]: "1" },
+      });
+    }
+  }, [split, isFocused, pickedPersonId]);
+  // Swapping the person beside the list isn't navigation, so the editor's
+  // own discard guard can't catch it: ask here before dropping their edits.
+  const detailUnsavedRef = useRef(false);
+  const handleDetailUnsavedChange = useCallback((unsaved: boolean) => {
+    detailUnsavedRef.current = unsaved;
+  }, []);
+  const openPerson = (id: string) => {
+    if (split) {
+      if (!detailUnsavedRef.current || id === shownPersonId) {
+        setPickedPersonId(id);
+        return;
+      }
+      Alert.alert(DISCARD_CONFIRM.title, undefined, [
+        { text: DISCARD_CONFIRM.keepLabel, style: "cancel" },
+        {
+          text: DISCARD_CONFIRM.label,
+          style: "destructive",
+          onPress: () => {
+            detailUnsavedRef.current = false;
+            setPickedPersonId(id);
+          },
+        },
+      ]);
+      return;
+    }
+    router.push({ pathname: "/person/[id]", params: { id } });
+  };
+
   const renderRosterItem = (item: RosterItem, index: number) => {
     const isLast = index === rosterItems.length - 1;
     if (item.kind === "management") {
@@ -671,6 +739,7 @@ export default function PeopleScreen() {
             name={getManagementUserName(managementUser)}
             navigable
             orgRole={managementUser.orgRole}
+            selected={split ? managementUser.employeeId === shownPersonId : undefined}
             onPress={() => {
               // Every row opens the one profile page there is. Your own goes
               // to the profile tab, which owns the only page that can edit
@@ -681,10 +750,7 @@ export default function PeopleScreen() {
                 return;
               }
               if (managementUser.employeeId) {
-                router.push({
-                  pathname: "/person/[id]",
-                  params: { id: managementUser.employeeId },
-                });
+                openPerson(managementUser.employeeId);
                 return;
               }
               // No staff profile to open: a management-only invitation has no
@@ -722,15 +788,13 @@ export default function PeopleScreen() {
           navigable
           orgRole={person.orgRole}
           staffStatus={statusForViewer(person, canManageEmployees) ?? undefined}
+          selected={split ? person.id === shownPersonId : undefined}
           onPress={() => {
             if (isSelf) {
               router.push("/(tabs)/profile");
               return;
             }
-            router.push({
-              pathname: "/person/[id]",
-              params: { id: person.id },
-            });
+            openPerson(person.id);
           }}
           subtitle={subtitle}
         />
@@ -738,7 +802,7 @@ export default function PeopleScreen() {
     );
   };
 
-  return (
+  const listScreen = (
     <Screen
       // The only field here is the search bar at the top, which the keyboard
       // never covers. Insetting for it just collapses the large title and
@@ -966,15 +1030,47 @@ export default function PeopleScreen() {
         )}
       </FilterSheet>
 
-      <PeopleHeaderActions
-        activeFilterCount={activeFilterCount}
-        onAddPerson={canAddScheduled || canAddManagement ? openAddPerson : undefined}
-        onOpenFilters={() => setIsFilterModalVisible(true)}
-      />
-      <ScreenSearch
-        placeholder={isManagementTab ? "Search administrative teams" : "Search people"}
-        onSearchChange={setSearchValue}
-      />
+      <SplitStackTitle split={split !== null} title="People" />
+      {split ? (
+        <>
+          {/* Split, the native bar spans both panes and carries the person's
+              actions; the list's own title, buttons and search sit above the
+              list instead. */}
+          <PaneHeader
+            actions={[
+              ...(canAddScheduled || canAddManagement
+                ? [
+                    {
+                      label: "Add person",
+                      icon: "person-add-outline" as const,
+                      onPress: openAddPerson,
+                    },
+                  ]
+                : []),
+              {
+                label:
+                  activeFilterCount > 0
+                    ? `Open people filters and sort, ${activeFilterCount} active`
+                    : "Open people filters and sort",
+                icon: "filter" as const,
+                active: activeFilterCount > 0,
+                onPress: () => setIsFilterModalVisible(true),
+              },
+            ]}
+            search={{ placeholder: searchPlaceholder, onChange: setSearchValue }}
+            title="People"
+          />
+        </>
+      ) : (
+        <>
+          <PeopleHeaderActions
+            activeFilterCount={activeFilterCount}
+            onAddPerson={canAddScheduled || canAddManagement ? openAddPerson : undefined}
+            onOpenFilters={() => setIsFilterModalVisible(true)}
+          />
+          <ScreenSearch placeholder={searchPlaceholder} onSearchChange={setSearchValue} />
+        </>
+      )}
 
       {canManageEmployees && profileRequests.length > 0 ? (
         // One grouped section on the phones: each request a row, with Reject
@@ -1096,12 +1192,7 @@ export default function PeopleScreen() {
           />
         ) : null
       ) : visiblePeople.length === 0 ? (
-        <EmptyStateCard
-          fillScreen
-          body="Teammates show here once they're added."
-          scene="teammates-none"
-          title="No teammates yet"
-        />
+        <EmptyStateCard fillScreen scene="teammates-none" title="No teammates yet" />
       ) : filteredPeople.length === 0 ? (
         <EmptyStateCard
           fillScreen
@@ -1173,6 +1264,32 @@ export default function PeopleScreen() {
       />
     </Screen>
   );
+
+  if (!split) return listScreen;
+
+  return (
+    <SplitView
+      layout={split}
+      list={listScreen}
+      detail={
+        shownPersonId ? (
+          <PersonDetailScreen
+            key={shownPersonId}
+            embedded
+            onUnsavedChange={handleDetailUnsavedChange}
+            personId={shownPersonId}
+          />
+        ) : (
+          <EmptyStateCard
+            body="Pick someone in the list to see their page."
+            fillScreen
+            scene="people-nomatch"
+            title="No one to show"
+          />
+        )
+      }
+    />
+  );
 }
 
 function countManagementUsersInDepartment(
@@ -1195,6 +1312,7 @@ function PersonRow({
   staffStatus,
   subtitle,
   isLast,
+  selected,
   onPress,
 }: {
   id: string;
@@ -1217,6 +1335,11 @@ function PersonRow({
   >;
   subtitle: string;
   isLast: boolean;
+  /**
+   * Set only in a split view, true for the person shown beside the list. A
+   * split row picks rather than opens, so it has no chevron.
+   */
+  selected?: boolean;
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
@@ -1243,9 +1366,10 @@ function PersonRow({
     <View style={!isLast && styles.personRowDivider}>
       <PressableRow
         accessibilityLabel={name}
+        selected={selected}
         disabled={!navigable}
         onPress={onPress}
-        style={styles.personRow}
+        style={[styles.personRow, selected === true && { backgroundColor: mobileColors.brandSoft }]}
       >
         <View
           style={[
@@ -1286,7 +1410,7 @@ function PersonRow({
             {subtitle}
           </Text>
         </View>
-        {navigable ? (
+        {navigable && selected === undefined ? (
           <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
         ) : null}
       </PressableRow>

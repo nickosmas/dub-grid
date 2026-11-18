@@ -1051,10 +1051,7 @@ function EditPanel({
       ) : null}
 
       {isNameRequest ? (
-        <ProfileSection
-          description="Add a note for the Admin who reviews it, if it helps."
-          title="Name change request"
-        >
+        <ProfileSection title="Name change request">
           <ProfilePanel>
             <ProfileTextInput
               accessibilityLabel="Note for admins"

@@ -95,6 +95,7 @@ export * from "./absence-runs";
 export * from "./shift-change";
 export * from "./shift-change-input";
 export * from "./shift-change-text";
+export * from "./request-text";
 import { getRequestSortTime } from "./open-shifts";
 
 export function isDeletedScheduleHistory(entry: Pick<ScheduleEntryLike, "change">): boolean {
