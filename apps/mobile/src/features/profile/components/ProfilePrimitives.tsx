@@ -460,6 +460,13 @@ export function ProfileTextInput({
     );
   }
 
+  // The label shows above the field here, so a placeholder that only repeats it
+  // is dropped; one that adds something (a format, an example) still shows.
+  const labeledInputProps =
+    resolvedInputProps.placeholder?.trim().toLowerCase() === label.trim().toLowerCase()
+      ? { ...resolvedInputProps, placeholder: undefined }
+      : resolvedInputProps;
+
   return (
     <View style={[styles.field, containerStyle]}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -471,7 +478,7 @@ export function ProfileTextInput({
             // The visible <Text> label isn't associated with the input on
             // native, so without this the field is announced unlabeled.
             accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
-            {...resolvedInputProps}
+            {...labeledInputProps}
             inputAccessoryViewID={inputAccessoryViewID}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             placeholderTextColor={mobileColors.textSubtle}
@@ -489,7 +496,7 @@ export function ProfileTextInput({
       ) : (
         <TextInput
           accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
-          {...resolvedInputProps}
+          {...labeledInputProps}
           inputAccessoryViewID={inputAccessoryViewID}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           placeholderTextColor={mobileColors.textSubtle}

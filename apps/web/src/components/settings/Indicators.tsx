@@ -584,9 +584,6 @@ export default function Indicators({
           overflow: "hidden",
         }}
       >
-        <div className="dg-card-header-bar" style={{ paddingInline: 16 }}>
-          <div className="dg-card-title">Indicators</div>
-        </div>
         {local.length > 0 ? (
           <div style={{ padding: "0 16px" }}>
             {local.map((indicator, indicatorIndex) => (
