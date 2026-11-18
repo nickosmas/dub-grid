@@ -1,3 +1,4 @@
+import { useTransparentPane } from "../layout/TransparentPaneContext";
 import {
   useEffect,
   useMemo,
@@ -206,10 +207,13 @@ export function Screen<T = never>({
 }>) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const hasPageBackground = pageBackground != null;
+  // Inside a split view with one background behind both panes, the page
+  // keeps no ground of its own so that background shows through.
+  const transparentPane = useTransparentPane();
+  const hasPageBackground = pageBackground != null || transparentPane;
   const styles = useMemo(
-    () => createStyles(mobileColors, isDark, hasPageBackground),
-    [mobileColors, isDark, hasPageBackground],
+    () => createStyles(mobileColors, isDark, hasPageBackground, transparentPane),
+    [mobileColors, isDark, hasPageBackground, transparentPane],
   );
   const insets = useSafeAreaInsets();
   const nativeTabBarVisible = useNativeTabBarPresence();
@@ -529,11 +533,16 @@ export function Card({
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackground: boolean) =>
+const createStyles = (
+  mobileColors: MobileColors,
+  isDark: boolean,
+  hasPageBackground: boolean,
+  transparentPane = false,
+) =>
   StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: mobileColors.background,
+      backgroundColor: transparentPane ? "transparent" : mobileColors.background,
     },
     // Transparent over a page background, so the wash behind shows through;
     // the root above still carries the theme's ground under it.
@@ -583,8 +592,9 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean, hasPageBackgr
       // here made that strip flash white while the destination was revealed.
       // Over a page background the shell keeps this ground and paints
       // `stickyHeaderBackground` on top of it, so the header shows the same
-      // ground-plus-wash the page shows behind it while staying opaque.
-      backgroundColor: mobileColors.background,
+      // ground-plus-wash the page shows behind it while staying opaque. In a
+      // split with one background behind both panes it shows that instead.
+      backgroundColor: transparentPane ? "transparent" : mobileColors.background,
       paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.lg,
