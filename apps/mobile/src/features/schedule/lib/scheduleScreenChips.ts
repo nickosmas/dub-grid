@@ -61,7 +61,7 @@ export function joinMetaParts(parts: Array<string | null | undefined>): string |
 
 export function getScheduleItemShiftName(item: FeaturedMeScheduleSegment["item"]): string {
   if (!item) {
-    return "Nothing scheduled this week";
+    return "Nothing scheduled for you this week";
   }
 
   return item.segment.shiftName || getScheduleEntryTitle(item.entry);

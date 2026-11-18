@@ -680,7 +680,7 @@ describe("ScheduleScreen", () => {
 
     const emptyState = screen.getByTestId("me-empty-schedule-state");
 
-    expect(within(emptyState).getByText("Nothing scheduled this week")).toBeInTheDocument();
+    expect(within(emptyState).getByText("Nothing scheduled for you this week")).toBeInTheDocument();
     expect(screen.queryByTestId("me-hero-card")).not.toBeInTheDocument();
     expect(screen.queryByText("Needs your response")).not.toBeInTheDocument();
     expect(screen.queryByText("Open shifts")).not.toBeInTheDocument();
