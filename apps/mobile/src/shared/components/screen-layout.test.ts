@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getFooterBottomPadding, getScreenBottomPadding, getScreenGutter } from "./screen-layout";
+import {
+  getFooterBottomPadding,
+  getScreenBottomPadding,
+  getScreenGutter,
+  getScreenSidePadding,
+} from "./screen-layout";
 
 // Read at call time by `getScreenBottomPadding`, so flipping this between tests
 // is enough — no re-import needed.
@@ -104,5 +109,28 @@ describe("getScreenGutter", () => {
     platform.OS = "android";
 
     expect(getScreenGutter()).toBe(16);
+  });
+});
+
+describe("getScreenSidePadding", () => {
+  it("adds each side's safe area to the base", () => {
+    expect(getScreenSidePadding({ left: 0, right: 74 }, 20)).toEqual({
+      paddingLeft: 20,
+      paddingRight: 94,
+    });
+  });
+
+  it("is just the safe area with no base", () => {
+    expect(getScreenSidePadding({ left: 12, right: 74 })).toEqual({
+      paddingLeft: 12,
+      paddingRight: 74,
+    });
+  });
+
+  it("ignores a negative safe area", () => {
+    expect(getScreenSidePadding({ left: -4, right: -1 }, 16)).toEqual({
+      paddingLeft: 16,
+      paddingRight: 16,
+    });
   });
 });

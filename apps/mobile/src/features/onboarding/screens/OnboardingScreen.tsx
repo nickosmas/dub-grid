@@ -160,7 +160,7 @@ export default function OnboardingScreen() {
           so inside the SafeAreaView it started below the notch and left a flat
           band of background across the status bar. */}
       <GradientBackdrop height="100%" kind="aurora" />
-      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea}>
         <View style={styles.headerRow}>
           <View style={styles.brand}>
             <DubGridLockup color={mobileColors.textPrimary} fontSize={30} />

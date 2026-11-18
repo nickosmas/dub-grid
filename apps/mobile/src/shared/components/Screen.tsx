@@ -83,6 +83,7 @@ import {
   getFooterBottomPadding,
   getScreenBottomPadding,
   getScreenGutter,
+  getScreenSidePadding,
   type ScreenBottomPaddingMode,
 } from "./screen-layout";
 import { KEYBOARD_DISMISS_MODE } from "./keyboard-dismiss";
@@ -292,7 +293,10 @@ export function Screen<T = never>({
   // which collapses, and the whole page visibly jumps the instant the keyboard
   // opens. A screen whose only field is a search bar at the top never needed
   // lifting, so it turns this off and simply does not move on focus.
+  const sideInsetPadding = getScreenSidePadding(insets);
+  const guttedSidePadding = getScreenSidePadding(insets, getScreenGutter());
   const contentContainerStyle = {
+    ...sideInsetPadding,
     paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding,
     ...(usesIosNativeInsets && visibleHeight !== null
       ? { minHeight: visibleHeight }
@@ -415,7 +419,11 @@ export function Screen<T = never>({
   // this is a plain flex-column sibling of the `flex: 1` scroll view/content,
   // no absolute positioning needed, so it's pinned to the bottom for free.
   const footerBar = footer ? (
-    <View style={[styles.footer, { paddingBottom: resolvedFooterBottomPadding }]}>{footer}</View>
+    <View
+      style={[styles.footer, guttedSidePadding, { paddingBottom: resolvedFooterBottomPadding }]}
+    >
+      {footer}
+    </View>
   ) : null;
 
   if (shouldExposeNativeScrollRoot) {
@@ -454,6 +462,7 @@ export function Screen<T = never>({
           <View
             style={[
               styles.stickyHeaderShell,
+              guttedSidePadding,
               stickyHeaderShellStyle,
               { paddingTop: resolvedStickyHeaderTopPadding },
             ]}
