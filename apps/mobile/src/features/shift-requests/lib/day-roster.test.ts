@@ -76,6 +76,21 @@ describe("buildDayRoster", () => {
       ["Evening Shift", ["Grace Kim"]],
     ]);
     expect(roster[0]?.time).toBeTruthy();
+    expect(roster.map((shift) => shift.focusArea)).toEqual([null, null]);
+  });
+
+  it("names the focus area of shifts that share a name", () => {
+    const rehab = entry("Ana Cruz", segment(3, "Day Shift", "07:00:00", "15:00:00"));
+    rehab.presentation = { ...rehab.presentation, displayFocusAreaName: "Rehab" };
+    const roster = buildDayRoster(
+      [entry("Lena Novak", DAY), rehab, entry("Grace Kim", EVENING)],
+      "2026-11-19",
+    );
+    expect(roster.map((shift) => [shift.title, shift.focusArea, shift.names])).toEqual([
+      ["Day Shift", "Rehab", ["Ana Cruz"]],
+      ["Day Shift", "ICU", ["Lena Novak"]],
+      ["Evening Shift", null, ["Grace Kim"]],
+    ]);
   });
 
   it("leaves out absences and is empty for a day with no shifts", () => {

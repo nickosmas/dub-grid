@@ -44,6 +44,8 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("expo-router", () => ({
   router: { push: routerPush, setParams: vi.fn() },
+  Stack: { Screen: () => null },
+  useIsFocused: () => true,
   useLocalSearchParams,
 }));
 

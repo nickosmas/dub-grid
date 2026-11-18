@@ -1336,7 +1336,7 @@
         right pane (before a pick, the first person in the list), the
         list's Add and Filter above the list and Edit as a symbol in the side
         column.
-  - [ ] 59b. **Requests** - the list keeps its full cards with Approve and
+  - [x] 59b. **Requests** - the list keeps its full cards with Approve and
         Reject; the right pane shows the whole request, "If approved" or
         "If you accept", and that day's roster. Staff open on Mine.
   - [ ] 59c. **Schedule** - the right pane is the day's overview: coverage

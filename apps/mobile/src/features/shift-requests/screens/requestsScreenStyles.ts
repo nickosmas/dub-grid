@@ -62,6 +62,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       gap: 12,
     },
+    cardHeaderStacked: {
+      flexDirection: "column",
+      alignItems: "flex-start",
+      gap: mobileSpace.sm,
+    },
     openShiftTitleRow: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -73,6 +78,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       minWidth: 0,
       color: mobileColors.textPrimary,
+    },
+    requestTitleStacked: {
+      flex: 0,
+      alignSelf: "stretch",
     },
     openShiftTitle: {
       ...mobileText.sectionTitle,
