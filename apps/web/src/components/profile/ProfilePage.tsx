@@ -161,9 +161,9 @@ export function ProfilePage() {
   } = usePersonPeriod(payPeriodStartDate);
   const periodPhrase = formatPersonPeriodPhrase(period, periodToday, payPeriodStartDate);
   const periodShiftsQuery = useQuery({
-    queryKey: queryKeys.account.selfShifts(
+    queryKey: queryKeys.shifts.self(
+      orgId ?? "no-org",
       user?.id ?? "anonymous",
-      orgId,
       period.range.startDate,
       period.range.endDate,
     ),
