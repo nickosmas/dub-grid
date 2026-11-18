@@ -11,7 +11,7 @@ import { Alert, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { router, Stack, useIsFocused } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileDepartment,
@@ -35,6 +35,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { DISCARD_CONFIRM } from "../../../shared/navigation/EditBarActions";
 import { PaneHeader } from "../../../shared/layout/PaneHeader";
+import { SplitStackTitle } from "../../../shared/layout/SplitStackTitle";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import PersonDetailScreen from "./PersonDetailScreen";
 import {
@@ -1029,12 +1030,12 @@ export default function PeopleScreen() {
         )}
       </FilterSheet>
 
+      <SplitStackTitle split={split !== null} title="People" />
       {split ? (
         <>
           {/* Split, the native bar spans both panes and carries the person's
               actions; the list's own title, buttons and search sit above the
               list instead. */}
-          <Stack.Screen options={{ headerLargeTitle: false, title: "" }} />
           <PaneHeader
             actions={[
               ...(canAddScheduled || canAddManagement

@@ -8,9 +8,14 @@ import {
   isAwaitingRecipient,
   formatShiftRequestNote,
 } from "@dubgrid/domain";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
+import { PaneHeader } from "../../../shared/layout/PaneHeader";
+import { SplitStackTitle } from "../../../shared/layout/SplitStackTitle";
+import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
+import { RequestDetail } from "../components/RequestDetail";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
@@ -111,6 +116,8 @@ type ShiftRequestsResponse = Awaited<ReturnType<typeof getShiftRequests>>;
  * return null and wait rather than guessing. Being confidently wrong about
  * who is working is worse than being slow about it.
  */
+const NARROW_LIST_MAX_WIDTH = 340;
+
 function getOptimisticRequestStatus(body: RequestActionBody): MobileShiftRequest["status"] | null {
   if (body.action === "resolve") {
     return body.approved ? "approved" : "rejected";
@@ -841,6 +848,59 @@ export default function RequestsScreen() {
     visibleTabs,
   ]);
   const activeTab = selectedTab ?? defaultTab;
+
+  // Open on the iPhone Duo, the list sits beside the whole request. Before a
+  // pick it shows the first request in the tab.
+  const split = useSplitLayout();
+  const [pickedRequestId, setPickedRequestId] = useState<string | null>(null);
+  const tabRequests = useMemo((): MobileShiftRequest[] => {
+    if (activeTab === "available") {
+      return availableOpenShiftFeed.groups.flatMap((group) =>
+        group.items.flatMap((item) => (item.kind === "open_shift" ? [] : [item.request])),
+      );
+    }
+    if (activeTab === "all") return allRequests;
+    if (activeTab === "mine") return myRequests;
+    if (activeTab === "approval") return approvalRequests;
+    return historyRequests;
+  }, [
+    activeTab,
+    availableOpenShiftFeed,
+    allRequests,
+    myRequests,
+    approvalRequests,
+    historyRequests,
+  ]);
+  const shownRequest =
+    tabRequests.find((request) => request.id === pickedRequestId) ?? tabRequests[0] ?? null;
+  const isShown = (id: string) => split !== null && shownRequest?.id === id;
+  // A held-tall list pane is too narrow for the name beside its pill.
+  const narrowList = split !== null && split.listWidth < NARROW_LIST_MAX_WIDTH;
+  // Folding closed keeps a picked request in view: the closed list shows it
+  // outlined, with its answers, the way a link to a request does. A default
+  // the split chose on its own leaves the list as it was.
+  const isFocused = useIsFocused();
+  const wasSplitRef = useRef(split !== null);
+  useEffect(() => {
+    const wasSplit = wasSplitRef.current;
+    wasSplitRef.current = split !== null;
+    if (!isFocused) return;
+    if (shouldPushPickOnClose({ wasSplit, isSplit: split !== null, pickedId: pickedRequestId })) {
+      router.setParams({ requestId: pickedRequestId as string });
+    }
+  }, [split, isFocused, pickedRequestId]);
+  const selectable = (request: MobileShiftRequest, card: ReactNode) =>
+    split ? (
+      <Pressable
+        key={request.id}
+        accessibilityLabel={`Show ${request.requesterName}'s request`}
+        onPress={() => setPickedRequestId(request.id)}
+      >
+        {card}
+      </Pressable>
+    ) : (
+      card
+    );
   // The default is chosen once from the first loaded counts and then held:
   // recomputing it on every change moved the strip out from under a manager
   // the moment they approved the last pending request.
@@ -860,7 +920,7 @@ export default function RequestsScreen() {
     }
   }, [routeTab]);
 
-  return (
+  const listScreen = (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
@@ -871,6 +931,8 @@ export default function RequestsScreen() {
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
     >
+      <SplitStackTitle split={split !== null} title="Requests" />
+      {split ? <PaneHeader actions={[]} title="Requests" /> : null}
       {/* Active request counts wait for their shared data. History resolves
           independently so a slow archive cannot hide active request actions. */}
       {contentState.kind === "loading" ? (
@@ -938,18 +1000,24 @@ export default function RequestsScreen() {
                         showDate={false}
                       />
                     ) : (
-                      <RequestCard
-                        now={now}
-                        timeZone={timeZone}
-                        key={item.key}
-                        canApprove={false}
-                        linkedEmployeeId={linkedEmployeeId}
-                        pendingAction={pendingAction}
-                        onAction={(body) => runRequestAction(item.request.id, body)}
-                        highlighted={highlightedRequestId === item.request.id}
-                        request={item.request}
-                        showDate={false}
-                      />
+                      selectable(
+                        item.request,
+                        <RequestCard
+                          stackHeader={narrowList}
+                          now={now}
+                          timeZone={timeZone}
+                          key={item.key}
+                          canApprove={false}
+                          linkedEmployeeId={linkedEmployeeId}
+                          pendingAction={pendingAction}
+                          onAction={(body) => runRequestAction(item.request.id, body)}
+                          highlighted={
+                            highlightedRequestId === item.request.id || isShown(item.request.id)
+                          }
+                          request={item.request}
+                          showDate={false}
+                        />,
+                      )
                     ),
                   )}
                 </View>
@@ -967,19 +1035,23 @@ export default function RequestsScreen() {
               title="No active requests"
             />
           ) : (
-            allRequests.map((request) => (
-              <RequestCard
-                now={now}
-                timeZone={timeZone}
-                key={request.id}
-                canApprove={canApprove}
-                linkedEmployeeId={linkedEmployeeId}
-                pendingAction={pendingAction}
-                onAction={(body) => runRequestAction(request.id, body)}
-                highlighted={highlightedRequestId === request.id}
-                request={request}
-              />
-            ))
+            allRequests.map((request) =>
+              selectable(
+                request,
+                <RequestCard
+                  stackHeader={narrowList}
+                  now={now}
+                  timeZone={timeZone}
+                  key={request.id}
+                  canApprove={canApprove}
+                  linkedEmployeeId={linkedEmployeeId}
+                  pendingAction={pendingAction}
+                  onAction={(body) => runRequestAction(request.id, body)}
+                  highlighted={highlightedRequestId === request.id || isShown(request.id)}
+                  request={request}
+                />,
+              ),
+            )
           )}
         </View>
       ) : activeTab === "mine" ? (
@@ -991,19 +1063,23 @@ export default function RequestsScreen() {
               hasOwnShifts={hasOwnShifts}
             />
           ) : (
-            myRequests.map((request) => (
-              <RequestCard
-                now={now}
-                timeZone={timeZone}
-                key={request.id}
-                canApprove={false}
-                linkedEmployeeId={linkedEmployeeId}
-                pendingAction={pendingAction}
-                onAction={(body) => runRequestAction(request.id, body)}
-                highlighted={highlightedRequestId === request.id}
-                request={request}
-              />
-            ))
+            myRequests.map((request) =>
+              selectable(
+                request,
+                <RequestCard
+                  stackHeader={narrowList}
+                  now={now}
+                  timeZone={timeZone}
+                  key={request.id}
+                  canApprove={false}
+                  linkedEmployeeId={linkedEmployeeId}
+                  pendingAction={pendingAction}
+                  onAction={(body) => runRequestAction(request.id, body)}
+                  highlighted={highlightedRequestId === request.id || isShown(request.id)}
+                  request={request}
+                />,
+              ),
+            )
           )}
         </View>
       ) : activeTab === "approval" ? (
@@ -1019,19 +1095,23 @@ export default function RequestsScreen() {
             approvalGroups.map((group) => (
               <RequestListSection count={group.requests.length} key={group.key} title={group.label}>
                 <View style={styles.groupItems}>
-                  {group.requests.map((request) => (
-                    <RequestCard
-                      now={now}
-                      timeZone={timeZone}
-                      key={request.id}
-                      canApprove={canApprove}
-                      linkedEmployeeId={linkedEmployeeId}
-                      pendingAction={pendingAction}
-                      onAction={(body) => runRequestAction(request.id, body)}
-                      highlighted={highlightedRequestId === request.id}
-                      request={request}
-                    />
-                  ))}
+                  {group.requests.map((request) =>
+                    selectable(
+                      request,
+                      <RequestCard
+                        stackHeader={narrowList}
+                        now={now}
+                        timeZone={timeZone}
+                        key={request.id}
+                        canApprove={canApprove}
+                        linkedEmployeeId={linkedEmployeeId}
+                        pendingAction={pendingAction}
+                        onAction={(body) => runRequestAction(request.id, body)}
+                        highlighted={highlightedRequestId === request.id || isShown(request.id)}
+                        request={request}
+                      />,
+                    ),
+                  )}
                 </View>
               </RequestListSection>
             ))
@@ -1063,19 +1143,23 @@ export default function RequestsScreen() {
             />
           ) : (
             <>
-              {historyRequests.map((request) => (
-                <RequestCard
-                  now={now}
-                  timeZone={timeZone}
-                  key={request.id}
-                  canApprove={canApprove}
-                  linkedEmployeeId={linkedEmployeeId}
-                  pendingAction={pendingAction}
-                  onAction={(body) => runRequestAction(request.id, body)}
-                  highlighted={highlightedRequestId === request.id}
-                  request={request}
-                />
-              ))}
+              {historyRequests.map((request) =>
+                selectable(
+                  request,
+                  <RequestCard
+                    stackHeader={narrowList}
+                    now={now}
+                    timeZone={timeZone}
+                    key={request.id}
+                    canApprove={canApprove}
+                    linkedEmployeeId={linkedEmployeeId}
+                    pendingAction={pendingAction}
+                    onAction={(body) => runRequestAction(request.id, body)}
+                    highlighted={highlightedRequestId === request.id || isShown(request.id)}
+                    request={request}
+                  />,
+                ),
+              )}
               {historyQuery.hasNextPage ? (
                 <RequestListActionRow
                   label="Load more"
@@ -1152,6 +1236,39 @@ export default function RequestsScreen() {
       </BottomSheetModal>
     </Screen>
   );
+
+  // With nothing in the tab, the list's own empty state says so once; a
+  // second one beside it would only repeat it.
+  if (!split || !shownRequest) return listScreen;
+
+  return (
+    <SplitView
+      layout={split}
+      list={listScreen}
+      detail={
+        <Screen bottomPaddingMode="tabbed" key={shownRequest.id}>
+          <RequestDetail
+            card={
+              <RequestCard
+                canApprove={canApprove}
+                highlighted={false}
+                linkedEmployeeId={linkedEmployeeId}
+                now={now}
+                onAction={(body) => runRequestAction(shownRequest.id, body)}
+                pendingAction={pendingAction}
+                request={shownRequest}
+                timeZone={timeZone}
+              />
+            }
+            now={now}
+            request={shownRequest}
+            timeZone={timeZone}
+            viewerEmpId={linkedEmployeeId}
+          />
+        </Screen>
+      }
+    />
+  );
 }
 
 function MineEmptyState(props: Parameters<typeof getMineEmptyState>[0]) {
@@ -1180,11 +1297,14 @@ function RequestCard({
   now,
   timeZone,
   showDate = true,
+  stackHeader = false,
 }: {
   request: MobileShiftRequest;
   linkedEmployeeId: string | null;
   canApprove: boolean;
   highlighted: boolean;
+  /** The pill under the name rather than beside it. */
+  stackHeader?: boolean;
   pendingAction: PendingRequestAction;
   onAction: (body: RequestActionBody) => void;
   now: Date;
@@ -1263,8 +1383,10 @@ function RequestCard({
   return (
     <View style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}>
       <View style={styles.cardRow}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.requestTitle}>{copy.title}</Text>
+        <View style={[styles.cardHeader, stackHeader && styles.cardHeaderStacked]}>
+          <Text style={[styles.requestTitle, stackHeader && styles.requestTitleStacked]}>
+            {copy.title}
+          </Text>
           <View style={[styles.statusChip, { backgroundColor: pillTone.backgroundColor }]}>
             <Text fit="compact" style={[styles.statusChipText, { color: pillTone.textColor }]}>
               {pill.label}
