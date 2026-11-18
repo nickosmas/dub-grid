@@ -61,6 +61,20 @@ describe("sheetOpenSize", () => {
     });
   });
 
+  // A wide screen's form sheet is narrower than the window, and only a detent
+  // sheet tells React Native its width.
+  it("gives a sheet that doesn't scroll a detent at its content's height on a wide screen", () => {
+    expect(sheetOpenSize({ ...base, scrollable: false, wide: true })).toMatchObject({
+      resizable: true,
+      snapPoints: [350],
+    });
+  });
+
+  it("leaves Android's sizing alone on a wide screen", () => {
+    const android = { ...base, isIos: false, floating: false, scrollable: false, wide: true };
+    expect(sheetOpenSize(android)).toMatchObject({ resizable: false, snapPoints: undefined });
+  });
+
   it("keeps Android sized to its content unless it overflows", () => {
     const android = { ...base, isIos: false, floating: false };
     expect(sheetOpenSize(android)).toMatchObject({ resizable: false, snapPoints: undefined });
