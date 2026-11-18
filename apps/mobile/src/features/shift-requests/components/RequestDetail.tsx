@@ -84,9 +84,11 @@ export function RequestDetail({
                 <AppText variant="rowTitle">
                   {[shift.title, shift.focusArea, shift.time].filter(Boolean).join(" · ")}
                 </AppText>
-                <AppText tone="secondary" variant="meta">
-                  {shift.names.join(", ")}
-                </AppText>
+                {shift.names.map((name, nameIndex) => (
+                  <AppText key={`${name}-${nameIndex}`} tone="secondary" variant="body">
+                    {name}
+                  </AppText>
+                ))}
               </View>
             ))}
           </View>
