@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Linking, StyleSheet, View } from "react-native";
 import { Screen } from "../../../shared/components/Screen";
@@ -81,16 +81,27 @@ export default function ProfileNotificationsScreen() {
     autoRegister: false,
   });
 
+  const prefsKey = mobileQueryKeys.notificationPreferences(accessToken);
+  // Every save sends all preferences. Saves run one at a time and only the
+  // last one's reply is written back, and a refetch that overlaps a toggle
+  // keeps the cache: either reply predates toggles made since and would undo
+  // them.
+  const toggleCountRef = useRef(0);
+  const pendingSavesRef = useRef(0);
+
   const prefsQuery = useQuery({
-    queryKey: mobileQueryKeys.notificationPreferences(accessToken),
+    queryKey: prefsKey,
     enabled: Boolean(accessToken),
-    queryFn: ({ signal }) => getProfileNotificationPreferences(accessToken!, signal),
+    queryFn: async ({ signal }) => {
+      const togglesBefore = toggleCountRef.current;
+      const fresh = await getProfileNotificationPreferences(accessToken!, signal);
+      const overlapped = togglesBefore !== toggleCountRef.current || pendingSavesRef.current > 0;
+      return overlapped ? (queryClient.getQueryData<typeof fresh>(prefsKey) ?? fresh) : fresh;
+    },
   });
 
-  // Derived from the query cache — never local state. The toggle handler
-  // writes the new value to the cache BEFORE firing the mutation, so a
-  // concurrent background refetch can't overwrite the user's in-progress
-  // toggles with stale server data.
+  // Derived from the query cache, never local state: the toggle handler
+  // writes the new value to the cache before saving it.
   const localPrefs = useMemo<PrefsShape>(
     () => normalizePrefs(prefsQuery.data?.prefs),
     [prefsQuery.data],
@@ -100,13 +111,19 @@ export default function ProfileNotificationsScreen() {
     await prefsQuery.refetch();
   });
 
+  const finishSave = () => {
+    pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
+    return pendingSavesRef.current === 0;
+  };
+
   const saveMutation = useMutation({
+    scope: { id: "profile-notification-preferences" },
     mutationFn: async (next: PrefsShape) => {
       if (!accessToken) throw new Error("Not authenticated");
       return saveProfileNotificationPreferences(accessToken, next);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(mobileQueryKeys.notificationPreferences(accessToken), data);
+      if (finishSave()) queryClient.setQueryData(prefsKey, data);
     },
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
@@ -114,20 +131,25 @@ export default function ProfileNotificationsScreen() {
         title: "Couldn't save preferences",
         fallbackMessage: "We couldn't save your notification preferences.",
       });
-      // Revert by re-syncing from server.
-      void prefsQuery.refetch();
+      // A later save still sends this toggle; after the last, show the server's.
+      if (finishSave()) void prefsQuery.refetch();
     },
   });
 
   const togglePref = (category: CategoryKey, channel: Channel) => {
+    // From the cache, not the render: a second tap can land before the first
+    // re-renders.
+    const current = normalizePrefs(queryClient.getQueryData<{ prefs?: unknown }>(prefsKey)?.prefs);
     const next: PrefsShape = {
-      ...localPrefs,
+      ...current,
       [category]: {
-        ...localPrefs[category],
-        [channel]: !localPrefs[category][channel],
+        ...current[category],
+        [channel]: !current[category][channel],
       },
     };
-    queryClient.setQueryData(mobileQueryKeys.notificationPreferences(accessToken), { prefs: next });
+    toggleCountRef.current += 1;
+    pendingSavesRef.current += 1;
+    queryClient.setQueryData(prefsKey, { prefs: next });
     saveMutation.mutate(next);
   };
 

@@ -1,3 +1,4 @@
+import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import {
   changesPublishedSchedule,
@@ -100,4 +101,21 @@ describe("getOrgRealtimeFlushKeys", () => {
       queryKeys.reports.operationsAll("org-1"),
     ]);
   });
+});
+
+describe("My profile's Schedule tab", () => {
+  it.each(["publish_history", "schedule_cell_snapshots"] as const)(
+    "refetches when %s changes, as a publish does",
+    async (table) => {
+      const queryClient = new QueryClient();
+      const key = queryKeys.shifts.self("org-1", "user-1", "2026-11-01", "2026-11-30");
+      queryClient.setQueryData(key, []);
+
+      for (const queryKey of getOrgRealtimeFlushKeys("org-1", [table], true)) {
+        await queryClient.invalidateQueries({ queryKey });
+      }
+
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    },
+  );
 });
