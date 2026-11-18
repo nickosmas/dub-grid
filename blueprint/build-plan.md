@@ -1321,3 +1321,34 @@
       open-shift picker or the Staffing check. Web only. Owner decisions,
       2026-11-15; design reference: the "Shift preferences in the picker"
       canvas.
+- [ ] 59. **iPhone Duo open layouts** - open or partly folded, every app
+      page is a split view (Apple's Mail model): the page as a list on the
+      left, keeping the closed screen's cards, and a useful default in the
+      right pane until a row is tapped. Partly folded, each pane fills its
+      half and nothing sits in the fold. Closing keeps a picked row as a
+      page pushed with Back; a default pane gives way to the list. The right
+      pane's actions join the side column, so each needs a symbol. Held
+      tall, the list narrows and goes compact. iOS app only. Owner
+      decisions, 2026-11-17; design reference: the "DubGrid on iPhone Duo"
+      canvas.
+  - [x] 59a. **Split view frame and People** - the hinge reaches the app,
+        the shared split view, and People with the person's page in the
+        right pane (before a pick, the first person in the list), the
+        list's Add and Filter above the list and Edit as a symbol in the side
+        column.
+  - [ ] 59b. **Requests** - the list keeps its full cards with Approve and
+        Reject; the right pane shows the whole request, "If approved" or
+        "If you accept", and that day's roster. Staff open on Mine.
+  - [ ] 59c. **Schedule** - the right pane is the day's overview: coverage
+        by area, open shifts and that day's requests; staff get their own
+        day, claimable shifts and their requests, with no coverage numbers.
+        Tapping a person shows their shift.
+  - [ ] 59d. **Home** - My schedule: today's shift, or the next one, a day
+        off's roster and claimable shifts, or an open shift's Claim or why
+        not. Team: today's roster and coverage; a day or approval tapped
+        replaces it.
+  - [ ] 59e. **Alerts and Profile** - the page an alert points to; the
+        chosen setting beside Profile.
+  - [ ] 59f. **This week on a person's page** - a person's page shows This
+        week (their shift each day); staff see "Working with you this week"
+        first and no contact details. Every pose and phone.
