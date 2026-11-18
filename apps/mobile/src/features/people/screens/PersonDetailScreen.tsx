@@ -66,6 +66,9 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { PUSHED_BY_FOLD_PARAM, shouldReturnToSplit } from "../../../shared/layout/fold-rule";
+import { useSplitLayout } from "../../../shared/layout/SplitView";
+import { HeaderBarAction } from "../../../shared/navigation/HeaderBarAction";
 import { HeaderTextBarAction } from "../../../shared/navigation/HeaderTextAction";
 import { DISCARD_CONFIRM, EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
@@ -256,12 +259,39 @@ function getPersonEditFieldErrors(
   };
 }
 
-export default function PersonDetailScreen() {
+/**
+ * A person's page. On its own route it reads the id from the URL and titles
+ * the native bar with the name; `embedded` in a split view's detail pane
+ * (iPhone Duo open) it takes the id from the list and leaves the bar, which
+ * belongs to the list's page, alone.
+ */
+export default function PersonDetailScreen({
+  personId: personIdProp,
+  embedded = false,
+  onUnsavedChange,
+}: {
+  personId?: string;
+  embedded?: boolean;
+  /**
+   * Embedded, the list beside it swaps people without navigating, so the
+   * route's discard guard never runs; this tells the list to ask instead.
+   */
+  onUnsavedChange?: (unsaved: boolean) => void;
+} = {}) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDark = useIsDarkMode();
-  const params = useLocalSearchParams<{ id?: string }>();
-  const personId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const params = useLocalSearchParams<{ id?: string; [PUSHED_BY_FOLD_PARAM]?: string }>();
+  const personId = personIdProp ?? (Array.isArray(params.id) ? params.id[0] : params.id);
+  // Pushed when an open iPhone Duo was folded closed: opening it again goes
+  // back to People, which still has this person picked beside the list.
+  const split = useSplitLayout();
+  const pushedByFold = !embedded && params[PUSHED_BY_FOLD_PARAM] === "1";
+  useEffect(() => {
+    if (shouldReturnToSplit({ isSplit: split !== null, pushedByFold }) && router.canGoBack()) {
+      router.back();
+    }
+  }, [split, pushedByFold]);
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
@@ -773,6 +803,10 @@ export default function PersonDetailScreen() {
   }
 
   const hasChanges = Boolean(draft && person && personDraftHasChanges(draft, person));
+  const unsaved = editing && hasChanges;
+  useEffect(() => {
+    onUnsavedChange?.(unsaved);
+  }, [onUnsavedChange, unsaved]);
   // `editing && hasChanges`, not just `editing`: on iOS the whole screen is a
   // back-swipe target, so a guard that fired for an untouched open panel would
   // put a confirmation in front of an ordinary swipe back.
@@ -1663,34 +1697,54 @@ export default function PersonDetailScreen() {
       refreshing={manualRefresh.isRefreshing}
       scrollEventThrottle={16}
     >
+      {/* No large title above it in a pane, so the page keeps its own room
+          under the top edge, level with the list's header. */}
+      {embedded ? <View style={styles.paneTop} /> : null}
       {/* The native inline header is deliberately the person, not "Staff
           Profile". It stays compact and gets UIKit's scroll-edge blur from the
           route while the hero below scrolls beneath it, the same pattern
           ProfileScreen uses for the signed-in user's own name. */}
-      <Stack.Screen
-        options={{
-          title: fullName,
-          headerTitleStyle: {
-            color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
-            fontFamily: mobileTypography.fontFamily.bold,
-          },
-        }}
-      />
+      {embedded ? null : (
+        <Stack.Screen
+          options={{
+            title: fullName,
+            headerTitleStyle: {
+              color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
+              fontFamily: mobileTypography.fontFamily.bold,
+            },
+          }}
+        />
+      )}
       {/* Edit lives in the bar, where iOS puts it, not in the action row: it
           is the one action about the page rather than about the person.
           While editing, the phones put Save and Cancel in the bar too; the web
           build keeps them in the footer. */}
-      <HeaderTextBarAction
-        action={
-          canEdit && !editing
-            ? {
-                label: "Edit",
-                accessibilityHint: "Opens the staff details editor",
-                onPress: () => startEditing(),
-              }
-            : null
-        }
-      />
+      {/* In a split view's detail pane the bar is the side column, where only
+          symbols stand; text-only items don't go vertical. */}
+      {embedded ? (
+        canEdit && !editing ? (
+          <HeaderBarAction
+            iconOnly
+            label="Edit"
+            materialIcon="edit"
+            placement="right"
+            sfSymbol="pencil"
+            onPress={() => startEditing()}
+          />
+        ) : null
+      ) : (
+        <HeaderTextBarAction
+          action={
+            canEdit && !editing
+              ? {
+                  label: "Edit",
+                  accessibilityHint: "Opens the staff details editor",
+                  onPress: () => startEditing(),
+                }
+              : null
+          }
+        />
+      )}
       {editing && IS_NATIVE_LIST ? (
         <EditBarActions
           discard={{
@@ -2950,6 +3004,9 @@ function EditPanel({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    paneTop: {
+      height: mobileSpace.lg,
+    },
     actionsRow: {
       flexDirection: "row",
       gap: mobileSpace.md,
