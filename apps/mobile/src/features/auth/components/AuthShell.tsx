@@ -1,15 +1,20 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { getActionItems } from "../../../shared/components/action-button-layout";
-import { DubGridLockup } from "../../../shared/components/BrandMark";
+import { DubGridLockup, getLockupOpticalCenter } from "../../../shared/components/BrandMark";
 import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
 import { Pressable } from "../../../shared/components/Pressable";
-import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
+import {
+  getScreenBottomPadding,
+  getSideColumnTopOffset,
+} from "../../../shared/components/screen-layout";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import { KEYBOARD_DISMISS_MODE } from "../../../shared/components/keyboard-dismiss";
+
+const LOCKUP_SIZE = 30;
 
 /**
  * Keeps the form readable on tablets without stretching the fields. The brand
@@ -44,6 +49,8 @@ export function AuthShell({
 }) {
   const mobileColors = useMobileColors();
   const insets = useSafeAreaInsets();
+  // Where the logo centres in its row, so it can line up with the camera.
+  const [brandCentre, setBrandCentre] = useState<number | null>(null);
 
   return (
     <View style={[styles.root, { backgroundColor: mobileColors.background }]}>
@@ -55,9 +62,20 @@ export function AuthShell({
       <SafeAreaView style={styles.safeArea}>
         {/* Constrained to the same column as the fields below, so the logo's left
           edge lines up with the copy instead of drifting out on wide screens. */}
-        <View style={styles.brandRow}>
-          <Pressable style={styles.brandHeader} onLongPress={onBrandLongPress}>
-            <DubGridLockup color={mobileColors.textPrimary} fontSize={30} />
+        <View
+          style={[
+            styles.brandRow,
+            { marginTop: getSideColumnTopOffset(insets, brandCentre ?? undefined) },
+          ]}
+        >
+          <Pressable
+            onLayout={({ nativeEvent: { layout } }) =>
+              setBrandCentre(getLockupOpticalCenter(layout.y + layout.height / 2, LOCKUP_SIZE))
+            }
+            style={styles.brandHeader}
+            onLongPress={onBrandLongPress}
+          >
+            <DubGridLockup color={mobileColors.textPrimary} fontSize={LOCKUP_SIZE} />
           </Pressable>
         </View>
         {/* One scroll view that knows about the keyboard, in place of a

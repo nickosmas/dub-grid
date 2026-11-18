@@ -4,6 +4,7 @@ import {
   getScreenBottomPadding,
   getScreenGutter,
   getScreenSidePadding,
+  getSideColumnTopOffset,
 } from "./screen-layout";
 
 // Read at call time by `getScreenBottomPadding`, so flipping this between tests
@@ -132,5 +133,24 @@ describe("getScreenSidePadding", () => {
       paddingLeft: 16,
       paddingRight: 16,
     });
+  });
+});
+
+describe("getSideColumnTopOffset", () => {
+  it("drops a top row to the camera when the status bar is in a side column", () => {
+    expect(getSideColumnTopOffset({ top: 0, left: 0, right: 84 })).toBe(18);
+  });
+
+  it("adds nothing where the screen has a top inset", () => {
+    expect(getSideColumnTopOffset({ top: 62, left: 0, right: 0 })).toBe(0);
+    expect(getSideColumnTopOffset({ top: 24, left: 0, right: 84 })).toBe(0);
+  });
+
+  it("centres a taller row on the camera", () => {
+    expect(getSideColumnTopOffset({ top: 0, left: 0, right: 84 }, 34)).toBe(14);
+  });
+
+  it("adds nothing with no inset on any side", () => {
+    expect(getSideColumnTopOffset({ top: 0, left: 0, right: 0 })).toBe(0);
   });
 });

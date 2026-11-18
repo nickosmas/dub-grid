@@ -84,6 +84,7 @@ import {
   getScreenBottomPadding,
   getScreenGutter,
   getScreenSidePadding,
+  getSideColumnTopOffset,
   type ScreenBottomPaddingMode,
 } from "./screen-layout";
 import { KEYBOARD_DISMISS_MODE } from "./keyboard-dismiss";
@@ -254,7 +255,8 @@ export function Screen<T = never>({
   // A sticky header only exists on a route that hides the native header (the
   // dashboard and the schedule), so nothing above it clears the status bar on
   // its behalf: the shell pads itself by the safe-area inset.
-  const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? Math.max(insets.top, 8);
+  const resolvedStickyHeaderTopPadding =
+    stickyHeaderTopPadding ?? Math.max(insets.top, 8) + getSideColumnTopOffset(insets);
   const scrollHandle = useMemo<ScreenScrollHandle>(
     () =>
       ({
