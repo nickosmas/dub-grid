@@ -91,14 +91,13 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
   return (
     <StepLayout
       title="Schedule"
-      description="Pick how shifts display, define your shift blocks, then place the jobs that need staffing."
       onNext={handleNext}
       onBack={onBack}
       nextDisabled={savingMode || !hasCategories || !hasJobs}
       nextLoading={savingMode}
       wide
     >
-      <CompositeSection title="Display mode" description="How shifts appear on the schedule grid.">
+      <CompositeSection title="Display mode">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
           {DISPLAY_MODES.map((mode) => {
             const isActive = selectedMode === mode.id;

@@ -470,7 +470,6 @@ export function UsersTab({
       {editingPerms && (
         <PermissionsEditor
           title={`Admin permissions: ${[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}`}
-          subtitle="Choose what this admin can view and manage."
           initialPermissions={editingPerms.adminPermissions}
           showPermissionCounter
           buildReview={(perms, initial) => {

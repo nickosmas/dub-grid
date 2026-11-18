@@ -437,8 +437,7 @@ export const EmployeeManagementAccessEditor = forwardRef<
               color: "var(--dg-color-text-muted)",
             }}
           >
-            You don't have any administrative teams yet. Add one in Settings, under Departments,
-            then come back to assign it here.
+            No administrative teams yet. Add one in Settings &gt; Departments.
           </div>
         ) : (
           <>

@@ -46,7 +46,7 @@ export default function IdentityStep({ onNext, onBack }: IdentityStepProps) {
   return (
     <StepLayout
       title="Identity"
-      description="Name your organization and tailor the words your team will see throughout the app. You can edit any of this later in Settings."
+      description="You can change any of this later in Settings."
       onNext={handleNext}
       onBack={onBack}
       showBack={!!onBack}
@@ -59,8 +59,8 @@ export default function IdentityStep({ onNext, onBack }: IdentityStepProps) {
           title="Organization details"
           description={
             org.timezone === "UTC"
-              ? "Facility name, location, and time zone. The time zone is currently UTC, so pick your facility's zone here for schedule times to read correctly."
-              : "Facility name, location, and time zone."
+              ? "Time zone is set to UTC. Pick your facility's zone so schedule times read correctly."
+              : undefined
           }
         >
           <OrganizationGeneral organization={org} onSave={setOrg} />

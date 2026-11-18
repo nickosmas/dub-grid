@@ -704,11 +704,7 @@ export function MeHeroCard({
               : undefined
           }
           title={hasWeekItems ? "Nothing more this week" : "Nothing scheduled this week"}
-          body={
-            hasWeekItems
-              ? "You've finished your shifts for this week."
-              : "Your shifts show here once they're published."
-          }
+          body={hasWeekItems ? undefined : "Your shifts show here once they're published."}
         />
       </View>
     );

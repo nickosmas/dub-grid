@@ -58,7 +58,7 @@ export default function ProfilePrivacyScreen() {
           still has a home below, under Policies, because it documents the site. */}
       <ProfileSection
         title="Analytics"
-        description="Essential data keeps the app working, including error monitoring, and can't be turned off. Analytics is optional and helps us improve the app."
+        description="Essential data, including error monitoring, keeps the app working and can't be turned off."
       >
         <ProfileList>
           <ProfileSwitchRow

@@ -361,9 +361,6 @@ export function ProfileChangeRequestQueue({
         <h1 className="m-0 text-[length:var(--dg-type-page-title-size)] font-bold tracking-tight text-[var(--dg-color-text-primary)]">
           People requests
         </h1>
-        <p className="mb-0 mt-1 text-[14px] text-[var(--dg-color-text-muted)]">
-          Review profile updates and account deletion requests from regular users.
-        </p>
       </div>
 
       <ProgressBar loading={loading} />
@@ -371,11 +368,7 @@ export function ProfileChangeRequestQueue({
       {loading ? (
         <RequestQueueSkeleton />
       ) : requests.length === 0 ? (
-        <EmptyState
-          size="compact"
-          heading="No pending people requests"
-          description="Profile updates and account deletion requests from members will appear here for review."
-        />
+        <EmptyState size="compact" heading="No pending people requests" />
       ) : (
         requests.map((request) => (
           <div key={request.id} className="dg-card">

@@ -1601,7 +1601,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Your shift")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Pick a teammate's published shift to trade for. The same shift on a different day works too.",
+        "Pick a teammate's shift to trade for. The same shift on another day works too.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("Eligible teammates")).toBeInTheDocument();
@@ -2467,8 +2467,10 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getAllByText("Back")).toHaveLength(1);
     expect(screen.getByText("Submit")).toBeInTheDocument();
     expect(
-      screen.getByText("Review the trade below, then submit your swap request."),
-    ).toBeInTheDocument();
+      screen.queryByText(
+        "Pick a teammate's shift to trade for. The same shift on another day works too.",
+      ),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Back"));
 

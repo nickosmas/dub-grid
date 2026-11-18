@@ -1192,12 +1192,7 @@ export default function PeopleScreen() {
           />
         ) : null
       ) : visiblePeople.length === 0 ? (
-        <EmptyStateCard
-          fillScreen
-          body="Teammates show here once they're added."
-          scene="teammates-none"
-          title="No teammates yet"
-        />
+        <EmptyStateCard fillScreen scene="teammates-none" title="No teammates yet" />
       ) : filteredPeople.length === 0 ? (
         <EmptyStateCard
           fillScreen

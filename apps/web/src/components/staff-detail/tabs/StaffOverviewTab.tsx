@@ -33,7 +33,7 @@ interface StaffOverviewTabProps {
     title: string;
     periodLabel: string;
     emptyTitle: string;
-    emptyDescription: string;
+    emptyDescription?: string;
     /** Shows drafts and their marks, as the schedule does for editors. */
     editorView?: boolean;
   };
@@ -157,7 +157,6 @@ export function StaffOverviewTab({
             nextDaysCopy ?? {
               title: "Next 7 days",
               emptyTitle: `${firstName} isn't scheduled in the next 7 days`,
-              emptyDescription: "Shifts show up here once they're on the schedule.",
             }
           }
         />

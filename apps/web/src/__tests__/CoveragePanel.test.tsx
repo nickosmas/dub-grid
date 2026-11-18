@@ -734,7 +734,6 @@ describe("CoveragePanel", () => {
           .getAllByRole("listitem")
           .map((item) => item.textContent),
       ).toEqual([
-        "Fills open shifts with qualified staff who are free.",
         "Starts from recurring schedules and works around absences and waiting requests.",
         "Nothing changes until you apply it.",
       ]);

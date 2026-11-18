@@ -33,15 +33,8 @@ export function StaffEmptyState({
           ? "No one is suspended"
           : "No one is offboarded";
 
-  const description = hasFilters
-    ? undefined
-    : activeTab === "active"
-      ? "Add your first staff member."
-      : activeTab === "inactive"
-        ? "People you mark away will appear here."
-        : activeTab === "suspended"
-          ? "People you suspend will appear here."
-          : "People you offboard will appear here.";
+  const description =
+    !hasFilters && activeTab === "active" ? "Add your first staff member." : undefined;
 
   return (
     <EmptyState

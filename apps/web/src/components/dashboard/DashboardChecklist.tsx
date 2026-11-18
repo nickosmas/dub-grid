@@ -37,7 +37,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
         <div>
           <h3 className="dg-card-title">Get started with DubGrid</h3>
           <p className="dg-card-description">
-            Complete these steps to set up your organization. {doneCount} of {steps.length} done.
+            {doneCount} of {steps.length} done
           </p>
         </div>
         <div style={{ minWidth: 120, textAlign: "right" }}>

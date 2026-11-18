@@ -1085,12 +1085,7 @@ export default function RequestsScreen() {
       ) : activeTab === "approval" ? (
         <View style={styles.section}>
           {approvalRequests.length === 0 ? (
-            <EmptyStateCard
-              fillScreen
-              body="Requests that need your approval show here."
-              scene="approve-none"
-              title="Nothing to approve"
-            />
+            <EmptyStateCard fillScreen scene="approve-none" title="Nothing to approve" />
           ) : (
             approvalGroups.map((group) => (
               <RequestListSection count={group.requests.length} key={group.key} title={group.label}>

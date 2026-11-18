@@ -100,7 +100,7 @@ type MyScheduleRowProps = Pick<
   /** Sees draft notes, as on the schedule page. */
   isScheduleEditor?: boolean;
   /** The card's wording when it shows someone else's days, as on the staff page. */
-  copy?: { title: string; emptyTitle: string; emptyDescription: string };
+  copy?: { title: string; emptyTitle: string; emptyDescription?: string };
 };
 
 type MyScheduleShift = {
@@ -1001,8 +1001,9 @@ export default function MyScheduleRow({
             size="inline"
             title={copy?.emptyTitle ?? `You're not scheduled ${periodLabel}`}
             description={
-              copy?.emptyDescription ??
-              "When your shifts get published, they'll show up right here."
+              copy
+                ? copy.emptyDescription
+                : "When your shifts get published, they'll show up right here."
             }
           />
         ) : (

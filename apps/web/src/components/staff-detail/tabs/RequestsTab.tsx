@@ -75,11 +75,6 @@ export function RequestsTab({
         <EmptyState
           size="compact"
           title={`No requests ${periodPhrase}`}
-          description={
-            elsewhere
-              ? undefined
-              : "Pickups, swaps, call-offs and profile changes they send show up here."
-          }
           action={
             elsewhere && onJumpToDate ? (
               <Button

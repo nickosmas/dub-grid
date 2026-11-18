@@ -1559,7 +1559,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       title: "This week",
                       periodLabel: formatCompactRangeLabel(stripRange),
                       emptyTitle: `${employee.firstName} isn't scheduled this week`,
-                      emptyDescription: "Shifts show up here once they're on the schedule.",
                       editorView: true,
                     }}
                   />

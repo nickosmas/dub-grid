@@ -1167,7 +1167,7 @@ export function RecurringScheduleSection({
             color: "var(--dg-color-text-muted)",
           }}
         >
-          Set recurring shift patterns for each staff member. Click any cell to assign a shift.
+          Click a cell to assign a shift.
         </p>
       </div>
 

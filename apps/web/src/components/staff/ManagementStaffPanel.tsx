@@ -728,7 +728,7 @@ export function ManagementStaffPanel({
                       color: "var(--dg-color-text-muted)",
                     }}
                   >
-                    This is their contact email from Staff details. Change it there to update it.
+                    Edit in Staff details.
                   </div>
                 )}
                 {fieldErrors.email && (

@@ -2661,17 +2661,9 @@ function CoverRequestsSection({
         }}
       >
         {requests.length === 0 ? (
-          <EmptyState
-            size="inline"
-            title="No requests for you"
-            description="When a teammate asks you to swap or cover a shift, it shows here."
-          />
+          <EmptyState size="inline" title="No requests for you" />
         ) : (
-          <SummaryMetricPanel
-            body="Awaiting your response."
-            label="Need response"
-            value={requests.length}
-          />
+          <SummaryMetricPanel label="Need response" value={requests.length} />
         )}
       </div>
     </section>
@@ -2720,11 +2712,7 @@ function AvailableShiftsSection({
         }}
       >
         {items.length === 0 ? (
-          <EmptyState
-            size="inline"
-            title="No open shifts"
-            description="Shifts you can pick up show here."
-          />
+          <EmptyState size="inline" title="No open shifts" />
         ) : (
           <SummaryMetricPanel
             body={summaryParts.length > 0 ? summaryParts.join(" · ") : "Upcoming open shifts"}
@@ -2789,11 +2777,7 @@ function ActionRailSection({
         ) : null}
       </div>
       {items.length === 0 ? (
-        <EmptyState
-          size="inline"
-          title="Nothing to pick up"
-          description="Open shifts and requests for you show here."
-        />
+        <EmptyState size="inline" title="Nothing to pick up" />
       ) : (
         <div
           aria-label="Upcoming open shifts and requests"
@@ -2983,7 +2967,7 @@ function SummaryMetricPanel({
   label,
   value,
 }: {
-  body: string;
+  body?: string;
   label: string;
   value: number;
 }) {
@@ -3029,16 +3013,18 @@ function SummaryMetricPanel({
         >
           {label}
         </div>
-        <div
-          style={{
-            color: "var(--dg-color-text-muted)",
-            fontSize: 12,
-            lineHeight: 1.4,
-            marginTop: 3,
-          }}
-        >
-          {body}
-        </div>
+        {body ? (
+          <div
+            style={{
+              color: "var(--dg-color-text-muted)",
+              fontSize: 12,
+              lineHeight: 1.4,
+              marginTop: 3,
+            }}
+          >
+            {body}
+          </div>
+        ) : null}
       </div>
     </div>
   );

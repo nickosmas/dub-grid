@@ -227,17 +227,9 @@ export default function ProfileSessionsScreen() {
         />
       ) : (
         <>
-          <ProfileSection
-            title="Signed in"
-            description="Tap a device to see where it signed in from, or to sign it out."
-          >
+          <ProfileSection title="Signed in">
             {active.length === 0 ? (
-              <EmptyStateCard
-                compact
-                body="Devices you sign in on show here."
-                scene="no-devices"
-                title="No devices signed in"
-              />
+              <EmptyStateCard compact scene="no-devices" title="No devices signed in" />
             ) : (
               <ProfileList>
                 {active.map((session, index) => (

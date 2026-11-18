@@ -613,15 +613,6 @@ export function InboxView({
         >
           Alerts
         </h1>
-        <p
-          style={{
-            margin: "4px 0 0",
-            color: "var(--dg-color-text-muted)",
-            fontSize: "var(--dg-fs-label)",
-          }}
-        >
-          Everything that needs your attention, newest first. Open one to go to what it is about.
-        </p>
       </header>
 
       <main style={{ minWidth: 0 }}>
@@ -681,7 +672,7 @@ export function InboxView({
               activeFilterCount > 0 || debouncedSearch
                 ? undefined
                 : filters.includeArchived
-                  ? "Alerts you archive show up here."
+                  ? undefined
                   : "You're all caught up."
             }
             action={
