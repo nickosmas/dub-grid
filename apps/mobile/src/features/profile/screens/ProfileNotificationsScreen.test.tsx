@@ -88,7 +88,10 @@ describe("ProfileNotificationsScreen", () => {
 
     useAccessToken.mockReturnValue("token-123");
     useBootstrap.mockReturnValue({ data: { currentOrg: { id: "org-1" } } });
-    useQueryClient.mockReturnValue({ setQueryData });
+    useQueryClient.mockReturnValue({
+      setQueryData,
+      getQueryData: () => useQuery.mock.results.at(-1)?.value?.data,
+    });
     usePushRegistration.mockReturnValue(defaultPush());
     useMutation.mockReturnValue({ isPending: false, mutate: vi.fn() });
   });

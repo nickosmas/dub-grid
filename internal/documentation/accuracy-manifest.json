@@ -1522,7 +1522,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:5d1e5f28076c8d00ab2d60326ecfd25d2fd78dea5c42ddb8730157c20de012ab"
+      "evidenceFingerprint": "sha256:84c755cd1673a027b190e2ee0f9d63c2a5f2c81814a3d505f597b20e53e9cc09"
     },
     {
       "id": "security-sessions",
@@ -1664,7 +1664,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:dc55eb0c25e82a7987cf0897ca8722f971b24bdabefbea488634e14219522965"
+      "evidenceFingerprint": "sha256:58277d674a7666d3ce71f890b83bc6161de239162bbe754e318379492ee9ce18"
     },
     {
       "id": "schedule-rules-display",
