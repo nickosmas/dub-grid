@@ -53,12 +53,15 @@ export type OpenSwipeRegistry = MutableRefObject<SwipeableMethods | null>;
 export function NotificationRow({
   notification,
   openRegistry,
+  selected,
   onPress,
   onToggleRead,
   onArchive,
 }: {
   notification: MobileNotification;
   openRegistry?: OpenSwipeRegistry;
+  /** Set only in a split view, true for the alert shown beside the list. */
+  selected?: boolean;
   onPress: () => void;
   onToggleRead: () => void;
   onArchive: () => void;
@@ -130,7 +133,8 @@ export function NotificationRow({
         <PressableRow
           accessibilityLabel={`${isUnread ? "Unread: " : ""}${notification.title}`}
           onPress={onPress}
-          style={styles.row}
+          selected={selected}
+          style={[styles.row, selected === true && { backgroundColor: mobileColors.brandSoft }]}
         >
           <View style={styles.leading}>{isUnread ? <View style={styles.unreadDot} /> : null}</View>
           <View style={styles.copy}>

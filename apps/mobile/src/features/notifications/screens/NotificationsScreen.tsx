@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Stack } from "expo-router";
+import { PaneHeader } from "../../../shared/layout/PaneHeader";
+import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
+import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
+import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
+import { AlertPane } from "../components/AlertPane";
 import { StyleSheet, View } from "react-native";
 import { HeaderLeadingTitle } from "../../../shared/navigation/HeaderLeadingTitle";
 import { useLargeTitleCollapse } from "../../../shared/navigation/useLargeTitleCollapse";
@@ -8,7 +14,11 @@ import type { MobileNotification, MobileNotificationsResponse } from "@dubgrid/c
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ALERTS_SEARCH_PLACEHOLDER, ScreenSearch } from "../../../shared/components/ScreenSearch";
+import {
+  ALERTS_SEARCH_PLACEHOLDER,
+  ScreenSearch,
+  screenSearchRouteOptions,
+} from "../../../shared/components/ScreenSearch";
 import { Screen } from "../../../shared/components/Screen";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
 import {
@@ -63,6 +73,12 @@ type FilterKey = (typeof FILTERS)[number]["key"];
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 
+const ALERTS_SPLIT_HEADER = {
+  title: "",
+  headerLargeTitle: false,
+  headerSearchBarOptions: undefined,
+} as const;
+
 function chipToParams(filter: FilterKey): Partial<MobileNotificationsListParams> {
   switch (filter) {
     case "unread":
@@ -91,6 +107,18 @@ export default function NotificationsScreen() {
   const { pushToast } = useToast();
   const [filter, setFilter] = useState<FilterKey>("all");
   const [searchInput, setSearchInput] = useState("");
+  // Open on the iPhone Duo, the inbox sits beside what the picked alert (or
+  // the first one) points to.
+  const split = useSplitLayout();
+  const isSplit = split !== null;
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const alertsRouteOptions = useMemo(
+    () => ({
+      ...createDetailStackOptions(mobileColors, "Alerts", { largeTitle: true }),
+      ...screenSearchRouteOptions(ALERTS_SEARCH_PLACEHOLDER, mobileColors),
+    }),
+    [mobileColors],
+  );
   const [debouncedSearch, setDebouncedSearch] = useState("");
   // Searched once typing pauses, not on every keystroke.
   useEffect(() => {
@@ -228,7 +256,9 @@ export default function NotificationsScreen() {
       // the navigation with the row already marked, and a failure puts the
       // row back and says so.
       const route = resolveAlertNativeRoute(notification, linkedEmployeeId);
-      if (route) {
+      if (isSplit) {
+        setPickedId(notification.id);
+      } else if (route) {
         openNativeRoute(route);
       } else {
         pushToast({ tone: "info", message: WEB_ONLY_ALERT_MESSAGE });
@@ -250,6 +280,7 @@ export default function NotificationsScreen() {
         });
     },
     [
+      isSplit,
       accessToken,
       facetsQuery,
       linkedEmployeeId,
@@ -340,8 +371,35 @@ export default function NotificationsScreen() {
   // per-row inset are unchanged, so a swiped row's actions still reach the
   // screen edge.
   const listItems = contentState.kind === "ready" ? notifications : [];
+  const shownNotification =
+    (pickedId ? listItems.find((notification) => notification.id === pickedId) : null) ??
+    listItems[0] ??
+    null;
+  const shownRoute = shownNotification
+    ? resolveAlertNativeRoute(shownNotification, linkedEmployeeId)
+    : null;
+  // Folding closed with an alert picked pushes the shift it points to, a
+  // page with Back that goes back into the split on opening; anything else
+  // would switch tabs, so the inbox stays.
+  const wasSplitRef = useRef(isSplit);
+  const pickedRoute =
+    pickedId &&
+    shownNotification?.id === pickedId &&
+    shownRoute?.pathname === "/shift/[employeeId]/[date]"
+      ? shownRoute
+      : null;
+  useEffect(() => {
+    const wasSplit = wasSplitRef.current;
+    wasSplitRef.current = isSplit;
+    if (pickedRoute && shouldPushPickOnClose({ wasSplit, isSplit, pickedId })) {
+      openNativeRoute({
+        ...pickedRoute,
+        params: { ...pickedRoute.params, [PUSHED_BY_FOLD_PARAM]: "1" },
+      });
+    }
+  }, [isSplit, pickedId, pickedRoute]);
 
-  return (
+  const page = (
     <Screen
       // Same as People: the search field sits at the top, so the keyboard
       // inset buys nothing and costs a jump when the large title recalculates.
@@ -362,6 +420,7 @@ export default function NotificationsScreen() {
           <NotificationRow
             openRegistry={openSwipe}
             notification={notification}
+            selected={isSplit ? notification.id === shownNotification?.id : undefined}
             onPress={() => handleRowPress(notification)}
             onToggleRead={() => handleToggleRead(notification)}
             onArchive={() => handleArchive(notification)}
@@ -382,7 +441,29 @@ export default function NotificationsScreen() {
       }}
     >
       <View style={styles.headerArea}>
-        <ScreenSearch placeholder={ALERTS_SEARCH_PLACEHOLDER} onSearchChange={setSearchInput} />
+        {/* Split, the native bar spans both panes, so the inbox's own title,
+            search and Mark all read sit above the list instead. Options a
+            Stack.Screen sets outlive it, so both poses set theirs. */}
+        <Stack.Screen options={isSplit ? ALERTS_SPLIT_HEADER : alertsRouteOptions} />
+        {isSplit ? (
+          <PaneHeader
+            actions={
+              unreadCount > 0
+                ? [
+                    {
+                      label: "Mark all read",
+                      icon: "checkmark-done-circle-outline",
+                      onPress: () => setConfirmingMarkAllRead(true),
+                    },
+                  ]
+                : []
+            }
+            search={{ placeholder: ALERTS_SEARCH_PLACEHOLDER, onChange: setSearchInput }}
+            title="Alerts"
+          />
+        ) : (
+          <ScreenSearch placeholder={ALERTS_SEARCH_PLACEHOLDER} onSearchChange={setSearchInput} />
+        )}
 
         {/* Held back until the facets land: every tab carries a count, and
             painting the strip first made each badge pop in afterwards and shove
@@ -403,12 +484,12 @@ export default function NotificationsScreen() {
             leading edge, as Mail names a mailbox; alone it stays centered. */}
         <HeaderLeadingTitle
           collapsed={largeTitle.collapsed}
-          enabled={unreadCount > 0}
+          enabled={!isSplit && unreadCount > 0}
           title="Alerts"
         />
         {/* Mark all read is a bar action, as in Mail; how many are unread is
             already on the Unread filter. */}
-        {unreadCount > 0 ? (
+        {unreadCount > 0 && !isSplit ? (
           <HeaderBarAction
             disabled={busy}
             label="Mark all read"
@@ -474,6 +555,16 @@ export default function NotificationsScreen() {
         visible={confirmingMarkAllRead}
       />
     </Screen>
+  );
+
+  if (!split || !shownNotification) return page;
+
+  return (
+    <SplitView
+      layout={split}
+      list={page}
+      detail={<AlertPane notification={shownNotification} route={shownRoute} />}
+    />
   );
 }
 

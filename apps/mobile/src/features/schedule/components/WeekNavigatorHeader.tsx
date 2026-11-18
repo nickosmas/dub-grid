@@ -7,6 +7,9 @@ import { formatScheduleDayLabel, formatScheduleRange } from "@dubgrid/schedule-c
 import { NumericBadge } from "../../../shared/components/NumericBadge";
 import { ChromeIconButton } from "../../../shared/components/ChromeIconButton";
 import { Text } from "../../../shared/components/Text";
+import { compactSameMonthRange } from "../lib/week-range-label";
+import { NARROW_LIST_MAX_WIDTH } from "../../../shared/layout/split-layout";
+import { useSplitLayout } from "../../../shared/layout/SplitView";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { createStyles } from "../screens/scheduleScreenStyles";
 
@@ -97,18 +100,33 @@ export function WeekNavigatorHeader({
   // week, forward from a past one. Ionicons only draws the clockwise arrow,
   // which reads as forward, so the backward one is that glyph mirrored.
   const todayIconStyle = selectedDate > todayDate ? styles.iconControlMirrored : undefined;
+  // In the narrow list of an iPhone Duo held tall, three controls leave the
+  // date too little room for one line, so it wraps rather than truncating.
+  const split = useSplitLayout();
+  const wraps = split !== null && split.listWidth < NARROW_LIST_MAX_WIDTH;
+  const titleFit = wraps
+    ? ({ allowFontScaling: false, numberOfLines: 2 } as const)
+    : ({ fit: "fixed" } as const);
 
   return (
     <View style={styles.meWeekNavigator}>
       <View style={styles.meWeekNavigatorCopy}>
         {/* Both shrink rather than wrap or truncate: a header is one row,
             and a date is bounded text that fits at the default size. */}
-        <Text fit="fixed" style={styles.meWeekNavigatorTitle}>
+        <Text {...titleFit} style={styles.meWeekNavigatorTitle}>
           {formatScheduleDayLabel(selectedDate, now, timeZone)}
         </Text>
         <View style={styles.meWeekNavigatorRangeRow}>
-          <Text fit="fixed" style={styles.meWeekNavigatorRangeLabel}>
-            {formatScheduleRange(range, timeZone)}
+          <Text
+            fit="fixed"
+            style={[
+              styles.meWeekNavigatorRangeLabel,
+              wraps && styles.meWeekNavigatorRangeLabelNarrow,
+            ]}
+          >
+            {wraps
+              ? compactSameMonthRange(formatScheduleRange(range, timeZone))
+              : formatScheduleRange(range, timeZone)}
           </Text>
           {loading ? (
             <ActivityIndicator

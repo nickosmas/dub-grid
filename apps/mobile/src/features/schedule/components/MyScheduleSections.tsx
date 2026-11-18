@@ -960,12 +960,18 @@ export function MeHeroCard({
 export function UpcomingShiftsSection({
   items,
   onPressEntry,
+  onPressDay,
+  highlightedDate,
   summary,
   todayDate,
   weekDays,
 }: {
   items: Array<NonNullable<FeaturedMeScheduleSegment["item"]>>;
   onPressEntry: (entry: MobileScheduleEntry) => void;
+  /** Set in a split view, where an Unscheduled day opens that day beside the list. */
+  onPressDay?: (date: string) => void;
+  /** The day shown beside the list in a split view. */
+  highlightedDate?: string | null;
   summary: WeeklyHoursSummary | null;
   todayDate: string;
   weekDays: MobileScheduleWeekDay[];
@@ -1029,6 +1035,7 @@ export function UpcomingShiftsSection({
                 isToday &&
                   groupIndex === groupedItems.length - 1 &&
                   styles.upcomingShiftRowTodayLast,
+                group.date === highlightedDate && { backgroundColor: mobileColors.brandSoft },
               ]}
               testID={isToday ? `upcoming-today-row-${group.date}` : undefined}
             >
@@ -1042,7 +1049,28 @@ export function UpcomingShiftsSection({
               </View>
 
               <View style={styles.upcomingDateShiftStack}>
-                {group.items.length === 0 ? (
+                {group.items.length === 0 && onPressDay ? (
+                  <PressableRow
+                    accessibilityLabel={`Unscheduled ${formatCompactScheduleDate(group.date)}`}
+                    onPress={() => onPressDay(group.date)}
+                    style={styles.upcomingUnscheduledRow}
+                  >
+                    <Text
+                      maxFontSizeMultiplier={MAX_FONT_SCALE}
+                      style={styles.upcomingUnscheduledTitle}
+                    >
+                      Unscheduled
+                    </Text>
+                    {group.deletedEntries.map((entry) => (
+                      <PreviousChange
+                        key={`${entry.employeeId}:${entry.date}`}
+                        entry={entry}
+                        change={entry.change}
+                        firstOfDay
+                      />
+                    ))}
+                  </PressableRow>
+                ) : group.items.length === 0 ? (
                   <View
                     accessibilityLabel={`Unscheduled ${formatCompactScheduleDate(group.date)}`}
                     style={styles.upcomingUnscheduledRow}

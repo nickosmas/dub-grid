@@ -31,8 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Every item has shipped except 40, which is
-in progress, 57, which is in progress (57a shipped), and 59, which is in
-progress.
+in progress, and 57, which is in progress (57a shipped).
 
 - **1** - Multi-tenant organizations with subdomain isolation and organization-specific settings.
 - **2** - Four-tier RBAC with per-person Admin permissions.
@@ -92,7 +91,7 @@ progress.
 - **56** - The app feels built for each phone: native navigation, sheets and alerts, one DubGrid design, and a My schedule | Team switch.
 - **57** (in progress) - Every day a shift request touches is marked on the web grid while it waits and after approval; approvals count as changes in Highlight changes.
 - **58** - The shift picker shows a person's shift and job preferences and warns, without blocking, when a choice goes outside an Only preference.
-- **59** (in progress) - On the iPhone Duo open or partly folded, every app page is a split view: the page as a list on the left and a useful detail on the right.
+- **59** - On the iPhone Duo open or partly folded, every app page is a split view: the page as a list on the left and a useful detail on the right.
 
 Each item's parts, what each part shipped and its migration live in
 `blueprint/build-plan.md` (the checklist) and `blueprint/history/` (the

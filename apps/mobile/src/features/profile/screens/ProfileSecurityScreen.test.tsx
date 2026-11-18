@@ -2,6 +2,9 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
+// The page goes back into an open iPhone Duo's split; nothing to fold here.
+vi.mock("../../../shared/layout/useReturnToSplit", () => ({ useReturnToSplit: () => undefined }));
+
 const useMutation = vi.fn();
 const useQuery = vi.fn();
 const useAccessToken = vi.fn();

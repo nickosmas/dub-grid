@@ -1,4 +1,6 @@
 import { router } from "expo-router";
+import { PaneTitle } from "../../../shared/layout/PaneTitle";
+import { useReturnToSplit } from "../../../shared/layout/useReturnToSplit";
 import { useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -49,7 +51,8 @@ const PENDING_ACCOUNT_DELETION_MESSAGE =
  * machine. The three flows now live on their own pushed screens, and only the
  * app-lock toggle (one switch, nothing to unfold) stays inline.
  */
-export default function ProfileSecurityScreen() {
+export default function ProfileSecurityScreen({ embedded = false }: { embedded?: boolean } = {}) {
+  useReturnToSplit(!embedded);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [isConfirmingDeletion, setIsConfirmingDeletion] = useState(false);
@@ -147,6 +150,7 @@ export default function ProfileSecurityScreen() {
       onRefresh={manualRefresh.refresh}
       scrollEnabled={contentState.kind !== "loading"}
     >
+      {embedded ? <PaneTitle eyebrow="Profile" title="Security & sessions" /> : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowVariant="nav" rowsPerSection={2} sections={3} showHero={false} />

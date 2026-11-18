@@ -41,11 +41,18 @@ export function MyHomeSections({
   data,
   range,
   selectedDate,
+  split,
 }: {
   data: MyHomeSectionsData;
   range: MobileScheduleRange;
   /** The header stepper's day; the hero reads the week from it, as on the staff Home. */
   selectedDate: string;
+  /** Set in a split view: a tapped shift or day shows beside the list instead of opening. */
+  split?: {
+    pickShift: (entry: MobileScheduleEntry) => void;
+    pickDay: (date: string) => void;
+    highlightedDate: string | null;
+  };
 }) {
   const now = useRealtimeNow();
   const { entries, linkedEmployeeId, timeZone } = data;
@@ -99,6 +106,10 @@ export function MyHomeSections({
   const hasScheduledDay = entries.some((entry) => !isDeletedScheduleHistory(entry));
 
   const openShiftDetail = (entry: MobileScheduleEntry) => {
+    if (split) {
+      split.pickShift(entry);
+      return;
+    }
     // Shift detail reads `/me/schedule` under the schedule key for this range;
     // handing it this copy puts the shift on screen before its own fetch.
     if (data.scheduleResponse) {
@@ -177,6 +188,8 @@ export function MyHomeSections({
           todayDate={todayDate}
           weekDays={weekDays}
           onPressEntry={openShiftDetail}
+          onPressDay={split?.pickDay}
+          highlightedDate={split?.highlightedDate}
         />
       ) : null}
     </View>
