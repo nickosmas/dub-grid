@@ -304,6 +304,9 @@ does.
   default English term in UI copy
 - "Organization" in copy, `org`/`organization` in code; "subdomain" for
   the URL; "workspace" is banned except the literal `workspace_kind` field
+- On the iPhone Duo open or partly folded, the app follows Apple's split
+  view: each page as a list on the left and a useful detail on the right,
+  with the bars in one icon column on the trailing edge (owner, 2026-11-17)
 
 ## 8. Deployment - Where and how will this ship?
 
