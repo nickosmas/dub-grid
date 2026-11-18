@@ -29,7 +29,7 @@ import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useModalHandoff } from "../../../shared/hooks/useModalHandoff";
-import { HeaderTextBarAction } from "../../../shared/navigation/HeaderTextAction";
+import { EDIT_SYMBOL, HeaderTextBarAction } from "../../../shared/navigation/HeaderTextAction";
 import {
   getProfile,
   getProfileChangeRequests,
@@ -526,15 +526,13 @@ export default function ProfileScreen() {
               details", which is this profile's editor; the Settings row of
               that name below stays as the list's way in. */}
           <HeaderTextBarAction
-            action={
-              split
-                ? null
-                : {
-                    label: "Edit",
-                    accessibilityHint: "Opens your profile details",
-                    onPress: () => router.push("/(tabs)/profile/work"),
-                  }
-            }
+            action={{
+              label: "Edit",
+              symbol: EDIT_SYMBOL,
+              accessibilityHint: "Opens your profile details",
+              // Split, Profile details shows beside the list instead.
+              onPress: () => openSection("work"),
+            }}
           />
           {/* Centered, the same way both person pages are: this page's subject is
               a person, and a left-aligned 64pt avatar reads as a settings row

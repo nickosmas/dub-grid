@@ -1,4 +1,7 @@
 import { Stack } from "expo-router";
+import { useHasSideColumn } from "./useHasSideColumn";
+import { HeaderBarAction } from "./HeaderBarAction";
+import type { MaterialIconName, SFSymbol } from "./useToolbarIcon";
 import type { NativeStackNavigationOptions } from "expo-router/native-stack";
 import { useMemo } from "react";
 import { Platform, Pressable, StyleSheet } from "react-native";
@@ -17,9 +20,17 @@ import {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+/** Edit's symbol where its word doesn't fit. */
+export const EDIT_SYMBOL = { sfSymbol: "pencil", materialIcon: "edit" } as const;
+
 export type HeaderTextAction = {
   /** A verb, never an icon: "Edit", "Done", "Select". */
   label: string;
+  /**
+   * The symbol that stands for the verb where words don't fit: the iPhone
+   * Duo's side column, which the bar's trailing items move into.
+   */
+  symbol?: { sfSymbol: SFSymbol; materialIcon: MaterialIconName };
   onPress: () => void;
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -38,12 +49,26 @@ type HeaderTextActionOptions = Pick<NativeStackNavigationOptions, "headerRight">
  * clears the slot (for an editor's own bar actions, say).
  */
 export function HeaderTextBarAction({ action }: { action: HeaderTextAction | null }) {
+  const sideColumn = useHasSideColumn();
   if (Platform.OS !== "ios") {
     return <Stack.Screen options={createHeaderTextAction(action)} />;
   }
 
   if (!action) {
     return null;
+  }
+
+  if (sideColumn && action.symbol) {
+    return (
+      <HeaderBarAction
+        iconOnly
+        label={action.accessibilityLabel ?? action.label}
+        materialIcon={action.symbol.materialIcon}
+        placement="right"
+        sfSymbol={action.symbol.sfSymbol}
+        onPress={action.onPress}
+      />
+    );
   }
 
   return (

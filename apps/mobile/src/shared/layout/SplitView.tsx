@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMobileColors } from "../providers/ThemeModeProvider";
+import { WindowInsetsContext } from "../navigation/useHasSideColumn";
 import { getSplitLayout, type SplitLayout } from "./split-layout";
 import { useHingeStatus } from "./useHingeStatus";
 
@@ -32,17 +33,19 @@ export function SplitView({
   const detailInsets = useMemo(() => ({ ...insets, left: 0 }), [insets]);
 
   return (
-    <View style={styles.row}>
-      <View style={{ width: layout.listWidth }}>
-        <SafeAreaInsetsContext.Provider value={listInsets}>{list}</SafeAreaInsetsContext.Provider>
+    <WindowInsetsContext.Provider value={insets}>
+      <View style={styles.row}>
+        <View style={{ width: layout.listWidth }}>
+          <SafeAreaInsetsContext.Provider value={listInsets}>{list}</SafeAreaInsetsContext.Provider>
+        </View>
+        <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
+        <View style={styles.detail}>
+          <SafeAreaInsetsContext.Provider value={detailInsets}>
+            {detail}
+          </SafeAreaInsetsContext.Provider>
+        </View>
       </View>
-      <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
-      <View style={styles.detail}>
-        <SafeAreaInsetsContext.Provider value={detailInsets}>
-          {detail}
-        </SafeAreaInsetsContext.Provider>
-      </View>
-    </View>
+    </WindowInsetsContext.Provider>
   );
 }
 
