@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { PersonWeek } from "../components/PersonWeek";
 import { ConfirmSummaryBox } from "../../../shared/components/ConfirmSummaryBox";
 import {
   AWAY_ABSENCE_NEEDS_DATE_MESSAGE,
@@ -1851,9 +1850,6 @@ export default function PersonDetailScreen({
           />
         </ProfileList>
       ) : null}
-
-      {/* Their shift each day this week, and the days you share one. */}
-      {!editing ? <PersonWeek personId={person.id} /> : null}
 
       {editing ? (
         <>
