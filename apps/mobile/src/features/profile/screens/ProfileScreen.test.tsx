@@ -36,7 +36,11 @@ type StackScreenOptions = {
   headerRight?: () => ReactNode;
 };
 
+// The settings pane only renders on an open iPhone Duo.
+vi.mock("../components/ProfileSplitPane", () => ({ ProfileSplitPane: () => null }));
+
 vi.mock("expo-router", () => ({
+  useIsFocused: () => true,
   router: {
     push: routerPush,
     replace: routerReplace,

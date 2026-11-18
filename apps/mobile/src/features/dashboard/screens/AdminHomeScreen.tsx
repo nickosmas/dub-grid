@@ -14,6 +14,7 @@ import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { isManagementOnly } from "../../auth/hooks/employmentStatus";
 import {
   addDaysToIsoDate,
+  getFeaturedMeScheduleSegment,
   getIsoDateInTimeZone,
   getScheduleRangeForDate,
 } from "@dubgrid/schedule-core";
@@ -30,6 +31,10 @@ import { ActionQueueCard } from "../components/ActionQueueCard";
 import { MyHomeSections } from "../components/MyHomeSections";
 import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
 import { ActivityFeedCard } from "../components/ActivityFeedCard";
+import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
+import { DayOverview } from "../../schedule/components/DayOverview";
+import { HomeSplitPane, useHomeSplit } from "../../schedule/components/HomeSplit";
+import { getCurrentTimeValue } from "../../schedule/lib/scheduleScreenHelpers";
 import { StaffHoursCard } from "../components/StaffHoursCard";
 
 type HomeView = "mine" | "team";
@@ -69,6 +74,28 @@ export function AdminHomeScreen() {
   const hasOwnView = !managementOnly && (mine.isOn || bootstrapQuery.isLoading);
   const [chosenView, setChosenView] = useState<HomeView>(lastHomeView);
   const view: HomeView = hasOwnView ? chosenView : "team";
+  // Open on the iPhone Duo, My schedule sits beside the shift now or next
+  // (or a picked shift or day), and Team beside the day's overview.
+  const homeDefaultEntry = useMemo(() => {
+    if (view !== "mine") return null;
+    return (
+      getFeaturedMeScheduleSegment({
+        entries: mine.entries,
+        rangeStartDate: range.startDate,
+        selectedDate,
+        todayDate,
+        currentTime: getCurrentTimeValue(now, timeZone),
+      }).item?.entry ?? null
+    );
+  }, [view, mine.entries, range.startDate, selectedDate, todayDate, now, timeZone]);
+  const homeSplit = useHomeSplit({
+    enabled: view === "mine",
+    range,
+    defaultEntry: homeDefaultEntry,
+    defaultDate: selectedDate,
+  });
+  const splitLayout = useSplitLayout();
+  const teamSplit = view === "team" ? splitLayout : null;
   const scrollViewRef = useRef<ScreenScrollHandle | null>(null);
   useScrollToTopOnChange(scrollViewRef, `${view}:${range.startDate}`);
   const chooseView = (next: HomeView) => {
@@ -254,7 +281,14 @@ export function AdminHomeScreen() {
       ? [
           {
             key: "mine",
-            node: <MyHomeSections data={mine} range={range} selectedDate={selectedDate} />,
+            node: (
+              <MyHomeSections
+                data={mine}
+                range={range}
+                selectedDate={selectedDate}
+                split={homeSplit.split ? homeSplit : undefined}
+              />
+            ),
           },
         ]
       : teamSections;
@@ -262,7 +296,7 @@ export function AdminHomeScreen() {
   // Home keeps its wash on every platform (owner, 2026-11-04).
   const wash = <HomeWash height={windowHeight} />;
 
-  return (
+  const page = (
     <Screen
       bottomPaddingMode="tabbed"
       scrollViewRef={scrollViewRef}
@@ -282,6 +316,35 @@ export function AdminHomeScreen() {
       {mine.confirmationModal}
     </Screen>
   );
+
+  if (homeSplit.split) {
+    return (
+      <SplitView
+        layout={homeSplit.split}
+        list={page}
+        detail={<HomeSplitPane now={now} range={range} shown={homeSplit.shown} />}
+      />
+    );
+  }
+  if (teamSplit) {
+    return (
+      <SplitView
+        layout={teamSplit}
+        list={page}
+        detail={
+          <DayOverview
+            key={selectedDate}
+            date={selectedDate}
+            now={now}
+            range={range}
+            showRoster
+            showViewerDay
+          />
+        }
+      />
+    );
+  }
+  return page;
 }
 
 const styles = StyleSheet.create({

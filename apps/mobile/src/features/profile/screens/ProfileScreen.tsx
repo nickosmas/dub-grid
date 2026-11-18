@@ -1,9 +1,19 @@
-import { router, Stack } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { router, Stack, useIsFocused } from "expo-router";
+import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
+import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
+import { DISCARD_CONFIRM } from "../../../shared/navigation/EditBarActions";
+import { ProfileSplitPane, type ProfileSplitSection } from "../components/ProfileSplitPane";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { getOrgRoleLabel, ADMINISTRATIVE_TEAM_LABELS } from "@dubgrid/domain";
-import { StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import {
+  Alert,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { AnimatedDubGridLogo } from "../../../shared/components/AnimatedDubGridLogo";
@@ -114,6 +124,54 @@ export default function ProfileScreen() {
   const [pendingConfirmation, setPendingConfirmation] = useState<ProfileConfirmation | null>(null);
   const [isAppearanceSheetVisible, setIsAppearanceSheetVisible] = useState(false);
   const [isCompactTitleVisible, setIsCompactTitleVisible] = useState(false);
+  // Open on the iPhone Duo, the settings sit beside the one chosen, Profile
+  // details until another is picked. Folding closed with a pick pushes its
+  // page; the default gives way to the list.
+  const split = useSplitLayout();
+  const [pickedSection, setPickedSection] = useState<ProfileSplitSection | null>(null);
+  const isFocused = useIsFocused();
+  const wasSplitRef = useRef(split !== null);
+  useEffect(() => {
+    const wasSplit = wasSplitRef.current;
+    wasSplitRef.current = split !== null;
+    if (!isFocused) return;
+    if (shouldPushPickOnClose({ wasSplit, isSplit: split !== null, pickedId: pickedSection })) {
+      router.push({
+        pathname: `/(tabs)/profile/${pickedSection as ProfileSplitSection}`,
+        params: { [PUSHED_BY_FOLD_PARAM]: "1" },
+      });
+    }
+  }, [split, isFocused, pickedSection]);
+  const shownSection: ProfileSplitSection = pickedSection ?? "work";
+  // Swapping the setting beside the list isn't navigation, so the editor's
+  // own discard guard can't catch it: ask here before dropping its edits.
+  const detailUnsavedRef = useRef(false);
+  const handleDetailUnsavedChange = useCallback((unsaved: boolean) => {
+    detailUnsavedRef.current = unsaved;
+  }, []);
+  const openSection = (section: ProfileSplitSection) => {
+    if (split) {
+      if (!detailUnsavedRef.current || section === shownSection) {
+        setPickedSection(section);
+        return;
+      }
+      Alert.alert(DISCARD_CONFIRM.title, undefined, [
+        { text: DISCARD_CONFIRM.keepLabel, style: "cancel" },
+        {
+          text: DISCARD_CONFIRM.label,
+          style: "destructive",
+          onPress: () => {
+            detailUnsavedRef.current = false;
+            setPickedSection(section);
+          },
+        },
+      ]);
+      return;
+    }
+    router.push(`/(tabs)/profile/${section}`);
+  };
+  const sectionRowState = (section: ProfileSplitSection) =>
+    split ? shownSection === section : undefined;
   const switchInFlightRef = useRef(false);
   const profileQuery = useQuery({
     queryKey: mobileQueryKeys.profile(accessToken),
@@ -378,7 +436,7 @@ export default function ProfileScreen() {
     setIsCompactTitleVisible((visible) => (visible === nextVisible ? visible : nextVisible));
   }
 
-  return (
+  const page = (
     <Screen
       bottomPaddingMode="tabbed"
       onScroll={handleProfileScroll}
@@ -468,11 +526,15 @@ export default function ProfileScreen() {
               details", which is this profile's editor; the Settings row of
               that name below stays as the list's way in. */}
           <HeaderTextBarAction
-            action={{
-              label: "Edit",
-              accessibilityHint: "Opens your profile details",
-              onPress: () => router.push("/(tabs)/profile/work"),
-            }}
+            action={
+              split
+                ? null
+                : {
+                    label: "Edit",
+                    accessibilityHint: "Opens your profile details",
+                    onPress: () => router.push("/(tabs)/profile/work"),
+                  }
+            }
           />
           {/* Centered, the same way both person pages are: this page's subject is
               a person, and a left-aligned 64pt avatar reads as a settings row
@@ -579,27 +641,32 @@ export default function ProfileScreen() {
               <ProfileNavRow
                 iconName="id-card-outline"
                 label="Profile details"
-                onPress={() => router.push("/(tabs)/profile/work")}
+                selected={sectionRowState("work")}
+                onPress={() => openSection("work")}
               />
               <ProfileNavRow
                 iconName="lock-closed-outline"
                 label="Security & sessions"
-                onPress={() => router.push("/(tabs)/profile/security")}
+                selected={sectionRowState("security")}
+                onPress={() => openSection("security")}
               />
               <ProfileNavRow
                 iconName="notifications-outline"
                 label="Notifications"
-                onPress={() => router.push("/(tabs)/profile/notifications")}
+                selected={sectionRowState("notifications")}
+                onPress={() => openSection("notifications")}
               />
               <ProfileNavRow
                 iconName="calendar-outline"
                 label="Calendar subscription"
-                onPress={() => router.push("/(tabs)/profile/calendar")}
+                selected={sectionRowState("calendar")}
+                onPress={() => openSection("calendar")}
               />
               <ProfileNavRow
                 iconName="shield-outline"
                 label="Privacy & data"
-                onPress={() => router.push("/(tabs)/profile/privacy")}
+                selected={sectionRowState("privacy")}
+                onPress={() => openSection("privacy")}
               />
               <ProfileNavRow
                 iconName="color-palette-outline"
@@ -687,6 +754,18 @@ export default function ProfileScreen() {
         onDismiss={() => setIsAppearanceSheetVisible(false)}
       />
     </Screen>
+  );
+
+  if (!split) return page;
+
+  return (
+    <SplitView
+      layout={split}
+      list={page}
+      detail={
+        <ProfileSplitPane onUnsavedChange={handleDetailUnsavedChange} section={shownSection} />
+      }
+    />
   );
 }
 

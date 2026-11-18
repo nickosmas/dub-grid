@@ -3,6 +3,9 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
+// The page goes back into an open iPhone Duo's split; nothing to fold here.
+vi.mock("../../../shared/layout/useReturnToSplit", () => ({ useReturnToSplit: () => undefined }));
+
 const getProfileNotificationPreferences = vi.fn();
 const saveProfileNotificationPreferences = vi.fn();
 

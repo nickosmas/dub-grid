@@ -7,6 +7,9 @@ const WIDE_MIN_WIDTH = 744;
 const WIDE_LIST_WIDTH = 360;
 const NARROW_LIST_WIDTH = 300;
 
+/** A list narrower than this (the Duo held tall) stacks what would sit side by side in a row. */
+export const NARROW_LIST_MAX_WIDTH = 340;
+
 export type SplitLayout = { listWidth: number };
 
 /**

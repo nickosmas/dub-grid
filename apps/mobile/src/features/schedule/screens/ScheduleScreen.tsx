@@ -48,8 +48,10 @@ import {
 } from "../components/WeekNavigatorHeader";
 import { SplitShiftBadge } from "../components/SplitShift";
 import { DayOverview } from "../components/DayOverview";
+import { HomeSplitPane, useHomeSplit } from "../components/HomeSplit";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
+import { NARROW_LIST_MAX_WIDTH } from "../../../shared/layout/split-layout";
 import ShiftDetailScreen from "./ShiftDetailScreen";
 import { getMySchedule, getOrgSchedule, getShiftRequests } from "../../../shared/lib/api";
 import { getAvatarTone } from "@dubgrid/design-tokens";
@@ -128,8 +130,6 @@ import {
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
-/** Narrower than this, a split's list rows put the role pill under the name. */
-const NARROW_LIST_MAX_WIDTH = 340;
 const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_EXPAND_TIMING = {
   duration: 240,
@@ -757,6 +757,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           },
     [activeEntries, currentTimeValue, isTeamScope, range.startDate, selectedDate, todayDate],
   );
+  const homeSplit = useHomeSplit({
+    enabled: !isTeamScope && linkedEmployee !== null,
+    range,
+    defaultEntry: meHeroState.item?.entry ?? null,
+    defaultDate: selectedDate,
+  });
   const meHeroTiming = useMemo(
     () =>
       !isTeamScope && meHeroState.item
@@ -936,6 +942,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   }
 
   function handleOpenShiftDetail(entry: MobileScheduleEntry) {
+    if (homeSplit.split) {
+      homeSplit.pickShift(entry);
+      return;
+    }
     if (split) {
       setPickedShift({ employeeId: entry.employeeId, date: entry.date });
       return;
@@ -1618,6 +1628,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               <UpcomingShiftsSection
                 items={meUpcomingItems}
                 onPressEntry={handleOpenShiftDetail}
+                onPressDay={homeSplit.split ? homeSplit.pickDay : undefined}
+                highlightedDate={homeSplit.highlightedDate}
                 summary={meWeeklyHours}
                 todayDate={todayDate}
                 weekDays={weekDays}
@@ -1701,6 +1713,16 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       </View>
     </Screen>
   );
+
+  if (homeSplit.split) {
+    return (
+      <SplitView
+        layout={homeSplit.split}
+        list={listScreen}
+        detail={<HomeSplitPane now={now} range={range} shown={homeSplit.shown} />}
+      />
+    );
+  }
 
   if (!split) return listScreen;
 

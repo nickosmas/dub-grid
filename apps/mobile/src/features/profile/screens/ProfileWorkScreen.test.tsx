@@ -9,6 +9,9 @@ import {
   resetNavigationShim,
 } from "../../../test/shims/react-navigation-native";
 
+// The page goes back into an open iPhone Duo's split; nothing to fold here.
+vi.mock("../../../shared/layout/useReturnToSplit", () => ({ useReturnToSplit: () => undefined }));
+
 const useMutation = vi.fn();
 const useQuery = vi.fn();
 const useAccessToken = vi.fn();

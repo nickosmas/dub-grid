@@ -117,6 +117,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
     },
+    meWeekNavigatorRangeLabelNarrow: {
+      ...mobileText.meta,
+    },
     meWeekNavigatorRangeLabel: {
       ...mobileText.bodyStrong,
       color: mobileColors.textSecondary,
