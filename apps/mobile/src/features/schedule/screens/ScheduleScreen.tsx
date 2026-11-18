@@ -1394,7 +1394,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         </View>
       </View>
 
-      <View>
+      <View style={styles.calendarCard}>
         {/* Weekday labels: always visible, fixed in place — never move. */}
         <View style={styles.monthCalendarWeekdays}>
           {MONTH_WEEKDAY_LABELS.map((label, index) => (
@@ -1480,8 +1480,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const listScreen = (
     <Screen
       bottomPaddingMode="tabbed"
-      pageBackground={homeWash}
-      stickyHeaderBackground={homeWash}
+      // Split, the wash runs behind both panes instead (the split paints it).
+      pageBackground={homeSplit.split ? undefined : homeWash}
+      stickyHeaderBackground={homeSplit.split ? undefined : homeWash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there
@@ -1491,7 +1492,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       scrollEnabled={contentState.kind !== "loading"}
       scrollViewRef={scrollViewRef}
       stickyHeader={stickyHeader}
-      stickyHeaderShellStyle={isTeamScope ? styles.teamHeaderCard : undefined}
     >
       <View>
         {/* The focus-area pills carry per-day counts, so they can't paint before
@@ -1717,6 +1717,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   if (homeSplit.split) {
     return (
       <SplitView
+        background={homeWash}
         layout={homeSplit.split}
         list={listScreen}
         detail={<HomeSplitPane now={now} range={range} shown={homeSplit.shown} />}

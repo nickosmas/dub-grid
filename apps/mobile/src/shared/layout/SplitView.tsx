@@ -4,6 +4,7 @@ import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { WindowInsetsContext } from "../navigation/useHasSideColumn";
 import { getSplitLayout, type SplitLayout } from "./split-layout";
+import { TransparentPaneContext } from "./TransparentPaneContext";
 import { useHingeStatus } from "./useHingeStatus";
 
 /** The current split, or null when the screen shows one page at a time. */
@@ -22,10 +23,13 @@ export function SplitView({
   layout,
   list,
   detail,
+  background,
 }: {
   layout: SplitLayout;
   list: ReactNode;
   detail: ReactNode;
+  /** Painted once behind both panes, whose pages then leave their ground transparent. */
+  background?: ReactNode;
 }) {
   const mobileColors = useMobileColors();
   const insets = useSafeAreaInsets();
@@ -34,22 +38,40 @@ export function SplitView({
 
   return (
     <WindowInsetsContext.Provider value={insets}>
-      <View style={styles.row}>
-        <View style={{ width: layout.listWidth }}>
-          <SafeAreaInsetsContext.Provider value={listInsets}>{list}</SafeAreaInsetsContext.Provider>
+      <TransparentPaneContext.Provider value={background != null}>
+        {background != null ? (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              styles.background,
+              { backgroundColor: mobileColors.background },
+            ]}
+          >
+            {background}
+          </View>
+        ) : null}
+        <View style={styles.row}>
+          <View style={{ width: layout.listWidth }}>
+            <SafeAreaInsetsContext.Provider value={listInsets}>
+              {list}
+            </SafeAreaInsetsContext.Provider>
+          </View>
+          <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
+          <View style={styles.detail}>
+            <SafeAreaInsetsContext.Provider value={detailInsets}>
+              {detail}
+            </SafeAreaInsetsContext.Provider>
+          </View>
         </View>
-        <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
-        <View style={styles.detail}>
-          <SafeAreaInsetsContext.Provider value={detailInsets}>
-            {detail}
-          </SafeAreaInsetsContext.Provider>
-        </View>
-      </View>
+      </TransparentPaneContext.Provider>
     </WindowInsetsContext.Provider>
   );
 }
 
 const styles = StyleSheet.create({
+  background: {
+    pointerEvents: "none",
+  },
   row: {
     flex: 1,
     flexDirection: "row",

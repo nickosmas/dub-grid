@@ -870,14 +870,20 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     weekStripFrame: {
       overflow: "hidden",
     },
-    // The team schedule's header is one white card on the gray page, its
-    // handle at the card's foot (owner, 2026-11-02).
-    teamHeaderCard: {
+    // The team schedule's calendar is a card floating on the page under the
+    // month's name, its handle at the card's foot (owner, 2026-11-18,
+    // replacing 2026-11-02's header card flush with the top): it reads the
+    // same on a phone and in an iPhone Duo's narrow list pane.
+    calendarCard: {
       backgroundColor: mobileColors.surface,
-      borderBottomLeftRadius: 28,
-      borderBottomRightRadius: 28,
-      paddingBottom: mobileSpace.xs,
+      borderRadius: mobileRadii.card,
+      borderWidth: isDark ? 1 : 0,
+      borderColor: mobileColors.borderSubtle,
+      paddingHorizontal: mobileSpace.sm,
+      paddingTop: mobileSpace.sm,
+      ...mobileElevation("card", isDark),
     },
+
     dateScheduledDot: {
       position: "absolute",
       top: DATE_SLOT_INSET + DATE_HIGHLIGHT_SIZE + DATE_DOT_GAP,
