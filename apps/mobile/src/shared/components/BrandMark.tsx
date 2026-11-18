@@ -62,6 +62,18 @@ export function BrandSymbol({ height, style }: { height: number; style?: StylePr
 }
 
 /**
+ * How far the lockup's optical center (the middle of the word's lowercase
+ * height, where the symbol is centered) sits below the center of its text
+ * box, as a share of the font size. Measured on iOS: 2.8 at 30.
+ */
+const LOCKUP_OPTICAL_DROP_EM = 0.093;
+
+/** Where the lockup's optical center falls, given its box's center. */
+export function getLockupOpticalCenter(boxCenter: number, fontSize: number): number {
+  return boxCenter + LOCKUP_OPTICAL_DROP_EM * fontSize;
+}
+
+/**
  * Symbol and wordmark on one line, the word's optical center level with the
  * visible middle of the symbol's center card.
  */

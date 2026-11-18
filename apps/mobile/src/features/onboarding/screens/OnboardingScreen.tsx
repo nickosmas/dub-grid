@@ -7,11 +7,12 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { Button } from "../../../shared/components/Button";
-import { DubGridLockup } from "../../../shared/components/BrandMark";
+import { DubGridLockup, getLockupOpticalCenter } from "../../../shared/components/BrandMark";
 import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
+import { getSideColumnTopOffset } from "../../../shared/components/screen-layout";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { markHasSeenOnboarding } from "../../auth/hooks/useHasSeenOnboarding";
 import {
@@ -27,6 +28,8 @@ import { OnboardingPagination } from "../components/OnboardingPagination";
 import { CoverShiftsPreview } from "../components/previews/CoverShiftsPreview";
 import { UpcomingShiftPreview } from "../components/previews/UpcomingShiftPreview";
 import { WelcomeVisual } from "../components/WelcomeVisual";
+
+const LOCKUP_SIZE = 30;
 
 const SLIDES: Array<{ visual: ReactNode; title: string; body: string }> = [
   {
@@ -57,8 +60,12 @@ const AnimatedScrollView = Animated.ScrollView;
 
 export default function OnboardingScreen() {
   const mobileColors = useMobileColors();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [pageWidth, setPageWidth] = useState(Dimensions.get("window").width);
+  // Where the logo centres in the header row, so it can line up with the
+  // camera; the Skip button beside it grows with the text size.
+  const [brandCentre, setBrandCentre] = useState<number | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [pushPermission, setPushPermission] = useState<PushPermissionState | null>(null);
   const scrollX = useSharedValue(0);
@@ -161,9 +168,19 @@ export default function OnboardingScreen() {
           band of background across the status bar. */}
       <GradientBackdrop height="100%" kind="aurora" />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.headerRow}>
-          <View style={styles.brand}>
-            <DubGridLockup color={mobileColors.textPrimary} fontSize={30} />
+        <View
+          style={[
+            styles.headerRow,
+            { marginTop: getSideColumnTopOffset(insets, brandCentre ?? undefined) },
+          ]}
+        >
+          <View
+            onLayout={({ nativeEvent: { layout } }) =>
+              setBrandCentre(getLockupOpticalCenter(layout.y + layout.height / 2, LOCKUP_SIZE))
+            }
+            style={styles.brand}
+          >
+            <DubGridLockup color={mobileColors.textPrimary} fontSize={LOCKUP_SIZE} />
           </View>
           {/* Hidden rather than removed on the last slide, where the footer's
               own actions are the way on: unmounting it let the header row
