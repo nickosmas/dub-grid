@@ -1343,7 +1343,7 @@
         by area, open shifts and that day's requests; staff get their own
         day, claimable shifts and their requests, with no coverage numbers.
         Tapping a person shows their shift.
-  - [ ] 59d. **Home** - My schedule: today's shift, or the next one, a day
+  - [x] 59d. **Home** - My schedule: today's shift, or the next one, a day
         off's roster and claimable shifts, or an open shift's Claim or why
         not. Team: today's roster and coverage; a day or approval tapped
         replaces it.

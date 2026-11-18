@@ -7,7 +7,7 @@ import { StyleSheet, View } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
-import { getDashboard, getShiftRequests } from "../../../shared/lib/api";
+import { getDashboard, getOrgSchedule, getShiftRequests } from "../../../shared/lib/api";
 import {
   keepPreviousDataForMobileIdentity,
   mobileQueryKeys,
@@ -30,6 +30,9 @@ import {
   buildDayRequests,
   findViewerDay,
 } from "../lib/day-overview";
+import { buildDayRoster } from "../../shift-requests/lib/day-roster";
+
+const NO_ENTRIES: readonly MobileScheduleEntry[] = [];
 
 /**
  * One day at a glance, the Schedule split view's right pane on an open
@@ -40,14 +43,23 @@ import {
 export function DayOverview({
   date,
   range,
-  entries,
+  entries: entriesProp,
   now,
+  eyebrow = "Day overview",
+  showViewerDay,
+  showRoster = false,
 }: {
   date: string;
   range: MobileScheduleRange;
-  /** The team's schedule for the week, already loaded by the page. */
-  entries: readonly MobileScheduleEntry[];
+  /** The team's schedule for the week, when the page already has it; otherwise loaded here. */
+  entries?: readonly MobileScheduleEntry[];
   now: Date;
+  /** The small line over the date. */
+  eyebrow?: string;
+  /** The viewer's own day first; staff only unless set. */
+  showViewerDay?: boolean;
+  /** Each shift that day with who works it, as Home's Team view lists it. */
+  showRoster?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -70,6 +82,13 @@ export function DayOverview({
     placeholderData: (previousData, previousQuery) =>
       keepPreviousDataForMobileIdentity(accessToken, previousData, previousQuery),
   });
+  const canViewSchedule = Boolean(permissions?.canViewSchedule);
+  const teamQuery = useQuery({
+    queryKey: mobileQueryKeys.schedule(accessToken, "team", range),
+    queryFn: ({ signal }) => getOrgSchedule(accessToken!, range, signal),
+    enabled: Boolean(accessToken) && canViewSchedule && entriesProp === undefined,
+  });
+  const entries = entriesProp ?? teamQuery.data?.entries ?? NO_ENTRIES;
   const dashboardQuery = useQuery({
     queryKey: getAdminDashboardQueryKey(accessToken, range),
     queryFn: ({ signal }) => getDashboard(accessToken!, range, signal),
@@ -102,7 +121,11 @@ export function DayOverview({
     () => findViewerDay(entries, date, viewerEmpId),
     [entries, date, viewerEmpId],
   );
-  const showsViewerDay = viewerEmpId !== null && !showsCoverage;
+  const roster = useMemo(
+    () => (showRoster ? buildDayRoster(entries, date) : []),
+    [showRoster, entries, date],
+  );
+  const showsViewerDay = viewerEmpId !== null && (showViewerDay ?? !showsCoverage);
   const isSettled =
     requestsData !== undefined && (!showsCoverage || dashboardQuery.data !== undefined);
   const isEmpty =
@@ -110,14 +133,15 @@ export function DayOverview({
     !showsViewerDay &&
     coverage.length === 0 &&
     openShifts.length === 0 &&
-    requests.length === 0;
+    requests.length === 0 &&
+    roster.length === 0;
 
   return (
     <Screen bottomPaddingMode="tabbed">
       <View style={styles.page}>
         <View style={styles.heading}>
           <AppText tone="secondary" variant="meta">
-            Day overview
+            {eyebrow}
           </AppText>
           <AppText accessibilityRole="header" variant="screenTitle">
             {formatScheduleDayLabel(date, now, timeZone)}
@@ -226,9 +250,25 @@ export function DayOverview({
             ))}
           </Section>
         ) : null}
+        {roster.length > 0 ? (
+          <Section title="Working" styles={styles}>
+            {roster.map((shift, index) => (
+              <View key={shift.key} style={[styles.row, index > 0 && styles.rowDivider]}>
+                <AppText variant="rowTitle">
+                  {[shift.title, shift.focusArea, shift.time].filter(Boolean).join(" · ")}
+                </AppText>
+                <AppText tone="secondary" variant="meta">
+                  {shift.names.join(", ")}
+                </AppText>
+              </View>
+            ))}
+          </Section>
+        ) : null}
         {isEmpty ? (
           <AppText tone="secondary" variant="body">
-            No coverage to measure, open shifts or requests this day.
+            {showRoster
+              ? "Nobody is working, and there are no open shifts or requests this day."
+              : "No coverage to measure, open shifts or requests this day."}
           </AppText>
         ) : null}
       </View>

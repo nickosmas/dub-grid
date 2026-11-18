@@ -15,6 +15,7 @@ import { shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { PaneHeader } from "../../../shared/layout/PaneHeader";
 import { SplitStackTitle } from "../../../shared/layout/SplitStackTitle";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
+import { NARROW_LIST_MAX_WIDTH } from "../../../shared/layout/split-layout";
 import { RequestDetail } from "../components/RequestDetail";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -116,7 +117,6 @@ type ShiftRequestsResponse = Awaited<ReturnType<typeof getShiftRequests>>;
  * return null and wait rather than guessing. Being confidently wrong about
  * who is working is worse than being slow about it.
  */
-const NARROW_LIST_MAX_WIDTH = 340;
 
 function getOptimisticRequestStatus(body: RequestActionBody): MobileShiftRequest["status"] | null {
   if (body.action === "resolve") {

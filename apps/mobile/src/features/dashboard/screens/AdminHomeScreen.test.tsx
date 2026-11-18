@@ -19,7 +19,12 @@ const routerPush = vi.fn();
 
 vi.mock("expo-router", () => ({
   router: { push: routerPush },
+  useIsFocused: () => true,
 }));
+
+// The split's panes only render on an open iPhone Duo.
+vi.mock("../../schedule/screens/ShiftDetailScreen", () => ({ default: () => null }));
+vi.mock("../../schedule/components/DayOverview", () => ({ DayOverview: () => null }));
 
 vi.mock("../../../shared/providers/AuthSessionProvider", () => ({
   useSessionState,
