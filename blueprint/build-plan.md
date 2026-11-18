@@ -1351,4 +1351,5 @@
         chosen setting beside Profile.
   - [x] 59f. **This week on a person's page** - a person's page shows This
         week (their shift each day); staff see "Working with you this week"
-        first and no contact details. Every pose and phone.
+        first and no contact details. Every pose and phone. Removed
+        2026-11-18 (owner): a person's page on mobile shows no schedule.
