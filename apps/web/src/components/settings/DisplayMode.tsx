@@ -333,26 +333,16 @@ export const DISPLAY_MODES: {
   id: ShiftDisplayMode;
   title: string;
   description: string;
-  details: string[];
 }[] = [
   {
     id: "code",
     title: "Short Codes",
     description: "Abbreviations like D, EVE, N.",
-    details: [
-      "The schedule grid, monthly calendar, and recurring-pattern editor show short codes in each cell",
-      "Shift previews in Settings follow this choice too",
-      "Compact display fits well in all views including 2-week",
-    ],
   },
   {
     id: "name",
     title: "Full Names",
     description: "Names like Day Shift, Evening, Night.",
-    details: [
-      "The schedule grid, monthly calendar, and recurring-pattern editor show the full shift name in each cell",
-      "Shift cells take up more room to fit the longer text",
-    ],
   },
 ];
 
