@@ -25,6 +25,23 @@ export function getScreenGutter(): number {
 /** What UIKit insets a large title by. */
 const IOS_LARGE_TITLE_INSET = 20;
 
+/**
+ * Leading and trailing padding that keeps content clear of the side safe
+ * area. On iPhone Duo the status bar, camera and tab bar stand in a column on
+ * the trailing edge, and UIKit doesn't inset a scroll view's content for it.
+ * `base` is the gutter to add on top, or 0 where something inside already
+ * pads by it.
+ */
+export function getScreenSidePadding(
+  insets: { left: number; right: number },
+  base = 0,
+): { paddingLeft: number; paddingRight: number } {
+  return {
+    paddingLeft: base + Math.max(insets.left, 0),
+    paddingRight: base + Math.max(insets.right, 0),
+  };
+}
+
 export type ScreenBottomPaddingMode = "tabbed" | "stack" | "modal";
 
 const SCREEN_BOTTOM_PADDING = {

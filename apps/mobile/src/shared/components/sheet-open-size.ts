@@ -20,6 +20,13 @@ export type SheetOpenSizeInput = {
   scrollable: boolean;
   expandable: boolean;
   /**
+   * A regular-width screen, where iOS presents a sheet as a centred form
+   * sheet (iPhone Duo open). Sized to its content, `@expo/ui` passes React
+   * Native only the sheet's height, so the content can't learn the width; a
+   * detent sheet passes both.
+   */
+  wide?: boolean;
+  /**
    * Android's choice of sized or full screen, held while the sheet shows;
    * null before it is made, when the content decides.
    */
@@ -53,7 +60,9 @@ export function sheetOpenSize(input: SheetOpenSizeInput): SheetOpenSize {
   // short of the status bar.
   const fullHeight = windowHeight - topInset - FULL_SHEET_TOP_GAP;
   const overflows = naturalHeight > fullHeight;
-  const resizable = input.scrollable && (isIos || (input.androidResizable ?? overflows));
+  const resizable =
+    (input.scrollable && (isIos || (input.androidResizable ?? overflows))) ||
+    (isIos && input.wide === true);
   const snapPoints = !resizable
     ? undefined
     : !isIos || overflows
