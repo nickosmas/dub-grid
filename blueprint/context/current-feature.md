@@ -51,17 +51,17 @@ Never accept a step you haven't read. If a diff is too big to review, the step w
 
 ## Build steps
 
-- [ ] **Step 1 - Shared request text** - move `describeRequestMark` and its
+- [x] **Step 1 - Shared request text** - move `describeRequestMark` and its
       helpers from `apps/web/src/app/(app)/schedule/_lib/request-mark-text.ts`
       into `@dubgrid/schedule-core`, taking the time formatter as an
       argument; the web imports it from there. _Done when:_ the web's
       existing tests for the text pass unchanged and the package builds.
-- [ ] **Step 2 - Text for the request page** - a request-level wrapper that
+- [x] **Step 2 - Text for the request page** - a request-level wrapper that
       picks the viewer's side (an approver reads "If approved", the asked
       teammate "If you accept", the asker their own status) and returns the
       status, the outcome and when it was asked. _Done when:_ tests cover a
       pickup, a swap, a call-off and an offered shift for each side.
-- [ ] **Step 3 - That day's roster** - a hook that reads the day's shifts
+- [x] **Step 3 - That day's roster** - a hook that reads the day's shifts
       from the schedule data the app already loads, grouped by shift with
       who works it and how many are open. _Done when:_ a test covers the
       grouping and an empty day.
