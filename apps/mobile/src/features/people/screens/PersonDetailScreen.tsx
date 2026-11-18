@@ -70,7 +70,7 @@ import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { PUSHED_BY_FOLD_PARAM, shouldReturnToSplit } from "../../../shared/layout/fold-rule";
 import { useSplitLayout } from "../../../shared/layout/SplitView";
 import { HeaderBarAction } from "../../../shared/navigation/HeaderBarAction";
-import { HeaderTextBarAction } from "../../../shared/navigation/HeaderTextAction";
+import { EDIT_SYMBOL, HeaderTextBarAction } from "../../../shared/navigation/HeaderTextAction";
 import { DISCARD_CONFIRM, EditBarActions } from "../../../shared/navigation/EditBarActions";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
@@ -1739,6 +1739,7 @@ export default function PersonDetailScreen({
             canEdit && !editing
               ? {
                   label: "Edit",
+                  symbol: EDIT_SYMBOL,
                   accessibilityHint: "Opens the staff details editor",
                   onPress: () => startEditing(),
                 }

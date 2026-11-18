@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { useHasSideColumn } from "./useHasSideColumn";
 import { useEffect } from "react";
 import { Stack, useNavigation } from "expo-router";
 import { barActionIsCheckmark } from "../lib/bar-action";
@@ -59,7 +60,11 @@ export function EditBarActions({
   const saveIcon = IS_IOS ? (saveImage ?? saveSymbol) : saveSymbol;
   // A save is a checkmark; Send or Finish keep their words. Android's toolbar
   // draws only icons, so there a send is its arrow and the rest a checkmark.
-  const saveAsCheckmark = !IS_IOS || barActionIsCheckmark(save.label);
+  // In an iPhone Duo's side column words don't fit, so Send is its paper plane.
+  const sideColumn = useHasSideColumn();
+  const sendSymbol = useToolbarIcon("paperplane", "send");
+  const sendInColumn = IS_IOS && sideColumn && !barActionIsCheckmark(save.label);
+  const saveAsCheckmark = !IS_IOS || barActionIsCheckmark(save.label) || sendInColumn;
 
   return (
     <>
@@ -95,8 +100,8 @@ export function EditBarActions({
           <Stack.Toolbar.Button
             accessibilityLabel={save.accessibilityLabel ?? save.label}
             disabled={Boolean(save.disabled || save.loading)}
-            icon={saveIcon}
-            iconRenderingMode={IS_IOS ? "original" : undefined}
+            icon={sendInColumn ? sendSymbol : saveIcon}
+            iconRenderingMode={IS_IOS && !sendInColumn ? "original" : undefined}
             onPress={save.onPress}
             tintColor={mobileColors.brand}
             variant="prominent"
