@@ -3,16 +3,17 @@ import { AppText } from "../components/AppText";
 import { mobileSpace } from "../theme/tokens";
 
 /**
- * A page's own title in a split view's detail pane, where the native bar
- * belongs to the list's page: a small line naming where it sits, then the
- * page's name.
+ * A split view's detail pane names its page, where the native bar belongs to
+ * the list's page. Only what the list beside it doesn't show goes above.
  */
-export function PaneTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
+export function PaneTitle({ eyebrow, title }: { eyebrow?: string; title: string }) {
   return (
     <View style={styles.heading}>
-      <AppText tone="secondary" variant="meta">
-        {eyebrow}
-      </AppText>
+      {eyebrow ? (
+        <AppText tone="secondary" variant="meta">
+          {eyebrow}
+        </AppText>
+      ) : null}
       <AppText accessibilityRole="header" variant="screenTitle">
         {title}
       </AppText>

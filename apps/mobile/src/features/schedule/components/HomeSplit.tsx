@@ -106,7 +106,6 @@ export function HomeSplitPane({
     <DayOverview
       key={shown.date}
       date={shown.date}
-      eyebrow="You're not scheduled"
       now={now}
       range={range}
       showRoster

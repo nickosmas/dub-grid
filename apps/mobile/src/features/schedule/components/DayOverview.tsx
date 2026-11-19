@@ -45,7 +45,7 @@ export function DayOverview({
   range,
   entries: entriesProp,
   now,
-  eyebrow = "Day overview",
+  showDate = false,
   showViewerDay,
   showRoster = false,
 }: {
@@ -54,8 +54,8 @@ export function DayOverview({
   /** The team's schedule for the week, when the page already has it; otherwise loaded here. */
   entries?: readonly MobileScheduleEntry[];
   now: Date;
-  /** The small line over the date. */
-  eyebrow?: string;
+  /** The day over the title, where the list beside it doesn't show it. */
+  showDate?: boolean;
   /** The viewer's own day first; staff only unless set. */
   showViewerDay?: boolean;
   /** Each shift that day with who works it, as Home's Team view lists it. */
@@ -125,7 +125,9 @@ export function DayOverview({
     () => (showRoster ? buildDayRoster(entries, date) : []),
     [showRoster, entries, date],
   );
-  const showsViewerDay = viewerEmpId !== null && (showViewerDay ?? !showsCoverage);
+  // Only a day the viewer works is said: not being on it shows already.
+  const showsViewerDay =
+    viewerEmpId !== null && viewerDay !== null && (showViewerDay ?? !showsCoverage);
   const isSettled =
     requestsData !== undefined && (!showsCoverage || dashboardQuery.data !== undefined);
   const isEmpty =
@@ -140,23 +142,23 @@ export function DayOverview({
     <Screen bottomPaddingMode="tabbed">
       <View style={styles.page}>
         <View style={styles.heading}>
-          <AppText tone="secondary" variant="meta">
-            {eyebrow}
-          </AppText>
+          {showDate ? (
+            <AppText tone="secondary" variant="meta">
+              {formatScheduleDayLabel(date, now, timeZone)}
+            </AppText>
+          ) : null}
           <AppText accessibilityRole="header" variant="screenTitle">
-            {formatScheduleDayLabel(date, now, timeZone)}
+            Day overview
           </AppText>
         </View>
-        {showsViewerDay ? (
+        {showsViewerDay && viewerDay ? (
           <View style={styles.viewerDay}>
             <AppText style={styles.brandText} variant="meta">
-              {viewerDay ? "You work this day" : "You're not scheduled this day"}
+              You work this day
             </AppText>
-            {viewerDay ? (
-              <AppText variant="rowTitle">
-                {[viewerDay.title, viewerDay.time].filter(Boolean).join(" · ")}
-              </AppText>
-            ) : null}
+            <AppText variant="rowTitle">
+              {[viewerDay.title, viewerDay.time].filter(Boolean).join(" · ")}
+            </AppText>
           </View>
         ) : null}
         {coverage.length > 0 ? (
@@ -268,9 +270,7 @@ export function DayOverview({
         ) : null}
         {isEmpty ? (
           <AppText tone="secondary" variant="body">
-            {showRoster
-              ? "Nobody is working, and there are no open shifts or requests this day."
-              : "No coverage to measure, open shifts or requests this day."}
+            {showRoster ? "Nobody works this day." : "No open shifts or requests this day."}
           </AppText>
         ) : null}
       </View>

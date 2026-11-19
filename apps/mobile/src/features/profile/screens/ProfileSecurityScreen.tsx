@@ -150,7 +150,7 @@ export default function ProfileSecurityScreen({ embedded = false }: { embedded?:
       onRefresh={manualRefresh.refresh}
       scrollEnabled={contentState.kind !== "loading"}
     >
-      {embedded ? <PaneTitle eyebrow="Profile" title="Security & sessions" /> : null}
+      {embedded ? <PaneTitle title="Security & sessions" /> : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowVariant="nav" rowsPerSection={2} sections={3} showHero={false} />

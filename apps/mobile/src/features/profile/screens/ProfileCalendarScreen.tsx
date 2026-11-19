@@ -187,7 +187,7 @@ export default function ProfileCalendarScreen({ embedded = false }: { embedded?:
       onRefresh={manualRefresh.refresh}
       scrollEnabled={contentState.kind !== "loading"}
     >
-      {embedded ? <PaneTitle eyebrow="Profile" title="Calendar subscription" /> : null}
+      {embedded ? <PaneTitle title="Calendar subscription" /> : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowsPerSection={4} sections={1} showHero={false} />
