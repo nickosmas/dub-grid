@@ -15,7 +15,6 @@ import {
   openNativeRoute,
   type NativeRoute,
 } from "../lib/openNotificationAction";
-import { formatRelativeTime } from "../../dashboard/components/ActivityFeedCard";
 
 /** Where a route opens, said on the button that opens it. */
 function openLabel(pathname: string): string {
@@ -28,8 +27,9 @@ function openLabel(pathname: string): string {
 
 /**
  * What an alert points to, beside Alerts on an open iPhone Duo: a shift's
- * page, a person's page or a day's overview inline; anything else is the
- * alert itself with a way to open where it leads.
+ * page, a person's page or a day's overview inline, dated since the alert
+ * may not say the day; anything else is the alert itself with a way to
+ * open where it leads.
  */
 export function AlertPane({
   notification,
@@ -46,6 +46,7 @@ export function AlertPane({
       <ShiftDetailScreen
         key={`${params.employeeId}:${params.date}`}
         embedded
+        showDate
         shift={{
           employeeId: params.employeeId,
           date: params.date,
@@ -66,6 +67,7 @@ export function AlertPane({
         date={params.date}
         now={now}
         range={getScheduleRangeForDate(params.date)}
+        showDate
         showRoster
       />
     );
@@ -73,7 +75,7 @@ export function AlertPane({
 
   return (
     <Screen bottomPaddingMode="stack">
-      <PaneTitle eyebrow={formatRelativeTime(notification.createdAt)} title={notification.title} />
+      <PaneTitle title={notification.title} />
       {notification.message ? <AppText variant="body">{notification.message}</AppText> : null}
       <View style={styles.action}>
         {route ? (

@@ -192,7 +192,7 @@ export default function ProfileNotificationsScreen({
       onRefresh={manualRefresh.refresh}
       scrollEnabled={contentState.kind !== "loading"}
     >
-      {embedded ? <PaneTitle eyebrow="Profile" title="Notifications" /> : null}
+      {embedded ? <PaneTitle title="Notifications" /> : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowVariant="toggle" rowsPerSection={3} sections={2} showHero={false} />

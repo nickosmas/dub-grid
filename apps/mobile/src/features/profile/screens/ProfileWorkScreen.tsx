@@ -613,7 +613,7 @@ export default function ProfileWorkScreen({
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
     >
-      {embedded ? <PaneTitle eyebrow="Profile" title="Profile details" /> : null}
+      {embedded ? <PaneTitle title="Profile details" /> : null}
       {barActions}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (

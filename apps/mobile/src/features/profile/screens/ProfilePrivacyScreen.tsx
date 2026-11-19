@@ -55,7 +55,7 @@ export default function ProfilePrivacyScreen({ embedded = false }: { embedded?: 
 
   return (
     <Screen bottomPaddingMode="tabbed">
-      {embedded ? <PaneTitle eyebrow="Profile" title="Privacy & data" /> : null}
+      {embedded ? <PaneTitle title="Privacy & data" /> : null}
       {/* "Analytics", not "Cookies & analytics": that title came over from the
           web consent banner, and a native app sets no cookies. `analytics` is
           the only user-controlled flag here (see consent.ts). The cookie policy
