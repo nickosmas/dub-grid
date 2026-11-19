@@ -16,7 +16,7 @@ Open, each right pane repeated what the list on its left already showed:
 - Profile settings were headed "Profile" and the setting's name, the row
   just picked, and the Profile hub's Departments sat beside Profile details,
   which lists the same departments.
-- An alert repeated its title and time from the picked row.
+- An alert repeated its time from the picked row.
 
 ## The fix
 
@@ -28,8 +28,7 @@ Open, each right pane repeated what the list on its left already showed:
 - "You work this day" shows only when the viewer works that day.
 - Split, the Profile hub leaves out Departments, which Profile details
   beside it lists.
-- A plain alert's pane shows its message and where to open it, its title and
-  time being the picked row's.
+- A plain alert's pane keeps the alert's title and drops the time over it.
 - The empty day reads "Nobody works this day." (Home) or "No open shifts or
   requests this day." (Schedule).
 

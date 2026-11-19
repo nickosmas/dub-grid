@@ -4,6 +4,7 @@ import { StyleSheet, View } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
 import { Button } from "../../../shared/components/Button";
 import { Screen } from "../../../shared/components/Screen";
+import { PaneTitle } from "../../../shared/layout/PaneTitle";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import PersonDetailScreen from "../../people/screens/PersonDetailScreen";
@@ -27,8 +28,8 @@ function openLabel(pathname: string): string {
 /**
  * What an alert points to, beside Alerts on an open iPhone Duo: a shift's
  * page, a person's page or a day's overview inline, dated since the alert
- * may not say the day; anything else is the alert's message with a way to
- * open where it leads, its title and time being the picked row's.
+ * may not say the day; anything else is the alert itself with a way to
+ * open where it leads.
  */
 export function AlertPane({
   notification,
@@ -74,11 +75,8 @@ export function AlertPane({
 
   return (
     <Screen bottomPaddingMode="stack">
-      {notification.message ? (
-        <AppText style={styles.message} variant="body">
-          {notification.message}
-        </AppText>
-      ) : null}
+      <PaneTitle title={notification.title} />
+      {notification.message ? <AppText variant="body">{notification.message}</AppText> : null}
       <View style={styles.action}>
         {route ? (
           <Button label={openLabel(route.pathname)} onPress={() => openNativeRoute(route)} />
@@ -93,10 +91,6 @@ export function AlertPane({
 }
 
 const styles = StyleSheet.create({
-  // Level with the inbox's title beside it.
-  message: {
-    paddingTop: mobileSpace.md,
-  },
   action: {
     alignItems: "flex-start",
     paddingTop: mobileSpace.sm,
