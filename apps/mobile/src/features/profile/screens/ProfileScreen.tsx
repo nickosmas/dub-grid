@@ -607,8 +607,10 @@ export default function ProfileScreen() {
               staff detail it used to be tangled with stays on "Profile
               details". Both kinds get a row: where you are scheduled and what
               you manage are different facts, and plenty of people have one
-              without the other. */}
-          {scheduledDepartmentNames.length > 0 || managementDepartmentNames.length > 0 ? (
+              without the other. Split, "Profile details" beside it shows
+              them already. */}
+          {!split &&
+          (scheduledDepartmentNames.length > 0 || managementDepartmentNames.length > 0) ? (
             <ProfileSection title="Departments">
               <ProfileList>
                 {scheduledDepartmentNames.length > 0 ? (

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { PaneTitle } from "../../../shared/layout/PaneTitle";
 import { useReturnToSplit } from "../../../shared/layout/useReturnToSplit";
 import type { MobileCalendarSubscriptionIssued } from "@dubgrid/contracts";
 import {
@@ -187,7 +186,6 @@ export default function ProfileCalendarScreen({ embedded = false }: { embedded?:
       onRefresh={manualRefresh.refresh}
       scrollEnabled={contentState.kind !== "loading"}
     >
-      {embedded ? <PaneTitle eyebrow="Profile" title="Calendar subscription" /> : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowsPerSection={4} sections={1} showHero={false} />
