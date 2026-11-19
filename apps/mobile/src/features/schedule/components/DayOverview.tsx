@@ -54,7 +54,7 @@ export function DayOverview({
   /** The team's schedule for the week, when the page already has it; otherwise loaded here. */
   entries?: readonly MobileScheduleEntry[];
   now: Date;
-  /** The day as a title, where the list beside it doesn't already show it. */
+  /** The day over the title, where the list beside it doesn't show it. */
   showDate?: boolean;
   /** The viewer's own day first; staff only unless set. */
   showViewerDay?: boolean;
@@ -141,11 +141,16 @@ export function DayOverview({
   return (
     <Screen bottomPaddingMode="tabbed">
       <View style={styles.page}>
-        {showDate ? (
+        <View style={styles.heading}>
+          {showDate ? (
+            <AppText tone="secondary" variant="meta">
+              {formatScheduleDayLabel(date, now, timeZone)}
+            </AppText>
+          ) : null}
           <AppText accessibilityRole="header" variant="screenTitle">
-            {formatScheduleDayLabel(date, now, timeZone)}
+            Day overview
           </AppText>
-        ) : null}
+        </View>
         {showsViewerDay && viewerDay ? (
           <View style={styles.viewerDay}>
             <AppText style={styles.brandText} variant="meta">
@@ -297,6 +302,9 @@ function createStyles(mobileColors: MobileColors) {
     page: {
       gap: mobileSpace.xl,
       paddingTop: mobileSpace.lg,
+    },
+    heading: {
+      gap: mobileSpace.xs,
     },
     viewerDay: {
       backgroundColor: mobileColors.surface,

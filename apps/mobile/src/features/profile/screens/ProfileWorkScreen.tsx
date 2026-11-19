@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { PaneTitle } from "../../../shared/layout/PaneTitle";
 import { useReturnToSplit } from "../../../shared/layout/useReturnToSplit";
 import { mobileSpace } from "../../../shared/theme/tokens";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -612,6 +613,7 @@ export default function ProfileWorkScreen({
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
     >
+      {embedded ? <PaneTitle title="Profile details" /> : null}
       {barActions}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (

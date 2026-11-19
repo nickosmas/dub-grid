@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PaneTitle } from "../../../shared/layout/PaneTitle";
 import { useReturnToSplit } from "../../../shared/layout/useReturnToSplit";
 import { Screen } from "../../../shared/components/Screen";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
@@ -54,6 +55,7 @@ export default function ProfilePrivacyScreen({ embedded = false }: { embedded?: 
 
   return (
     <Screen bottomPaddingMode="tabbed">
+      {embedded ? <PaneTitle title="Privacy & data" /> : null}
       {/* "Analytics", not "Cookies & analytics": that title came over from the
           web consent banner, and a native app sets no cookies. `analytics` is
           the only user-controlled flag here (see consent.ts). The cookie policy

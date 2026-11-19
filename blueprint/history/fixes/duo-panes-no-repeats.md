@@ -1,4 +1,4 @@
-# Fix: iPhone Duo panes say nothing the list beside them already says
+# Fix: iPhone Duo panes name their page, not what the list already says
 
 **Type:** Fix
 **Status:** verified
@@ -20,12 +20,16 @@ Open, each right pane repeated what the list on its left already showed:
 
 ## The fix
 
-- The day's overview and the shift page draw no heading in a pane. Alerts
-  is the exception: there the list may not name the day, so a shift or day an
-  alert points to is headed with its date alone.
+- Each pane is titled by its page alone (owner, 2026-11-18): "Day
+  overview", "Your shift" or "Shift detail", and each Profile setting's name,
+  with no date or "Profile" line over it. Alerts is the exception: there the
+  list may not name the day, so a shift or day an alert points to keeps the
+  date above its title.
 - "You work this day" shows only when the viewer works that day.
-- Profile setting panes and alert panes carry no title. Split, the Profile
-  hub leaves out Departments. `PaneTitle` is gone.
+- Split, the Profile hub leaves out Departments, which Profile details
+  beside it lists.
+- A plain alert's pane shows its message and where to open it, its title and
+  time being the picked row's.
 - The empty day reads "Nobody works this day." (Home) or "No open shifts or
   requests this day." (Schedule).
 

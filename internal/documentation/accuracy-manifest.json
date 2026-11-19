@@ -390,7 +390,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:7b735ccdcba501bb4d29bb01f9f8f53c8216398ff6fd9628652ab4d7a0311453"
+      "evidenceFingerprint": "sha256:80496e3e3b084a04d3dde891b3a752b5a36ebd23e262734aaf935361663230ed"
     },
     {
       "id": "draft-publish",
@@ -620,7 +620,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:ce770ccfb1078d928afc2e6af4fee27148d4bbe1a444d534f174f3c74206bdee"
+      "evidenceFingerprint": "sha256:41696fed7f85b38f0b03853a02ea55d9b6cf59210bb862b21b07ee7bae5fd4a6"
     },
     {
       "id": "dashboard",
@@ -1326,7 +1326,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:f98444875b62c4cd1bba524429ea524b1a5dbf66688e0b447d866b82256dbda9"
+      "evidenceFingerprint": "sha256:2baa1c7f81aea2f1e9373038e751c74955ef0f164ee2c1251d2dfcdaf46e521f"
     },
     {
       "id": "alerts",
@@ -1522,7 +1522,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:51a8d6f4e33589d8149e3dadaba77d0b1c561154f5453ff32a2e313db90c12da"
+      "evidenceFingerprint": "sha256:ab9b51afeb4b9c5cd82c465c5f2149a446f27af9753efc47990f5fd12662fc04"
     },
     {
       "id": "security-sessions",
@@ -1601,7 +1601,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3bc16ca44fde6d2c8a2296c8a243e1c7fc85adafd782f5fc2b4bb020e933bead"
+      "evidenceFingerprint": "sha256:093c67e532435c84d82a1da4b065693c20e0cd0c92fbe0b977c1a7e6526ce477"
     },
     {
       "id": "privacy-controls",
@@ -1664,7 +1664,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:863822eb16020bb099d6607b33331c23a0a5e16726c60d20d28c0be71599275a"
+      "evidenceFingerprint": "sha256:e9ae039e3da41abdecf699f866c956987225df7531f1ee18b0c0a58ba08589e6"
     },
     {
       "id": "schedule-rules-display",
@@ -2106,7 +2106,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:7c5b391b71f3b834a7221083c966921c5806d57126bfbdc1ca01ee4125063584"
+      "evidenceFingerprint": "sha256:b9a2fe1f1a2fc7b77446bd70d3c04d45f2b5f9bfd63ebd3c2e48bc26a68effac"
     },
     {
       "id": "integrations-exports",
@@ -2164,7 +2164,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:b4f9a9021cd27646c8d613b8c16bd063c10728518f052b6b9ba8753a105e1975"
+      "evidenceFingerprint": "sha256:80bd50c1214b411b9cf242c3cd418d2f99c533e1128358662114399e1df85b06"
     }
   ],
   "surfaceExclusions": [

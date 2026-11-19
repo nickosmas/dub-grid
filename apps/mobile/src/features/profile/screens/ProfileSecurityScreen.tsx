@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { PaneTitle } from "../../../shared/layout/PaneTitle";
 import { useReturnToSplit } from "../../../shared/layout/useReturnToSplit";
 import { useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
@@ -149,6 +150,7 @@ export default function ProfileSecurityScreen({ embedded = false }: { embedded?:
       onRefresh={manualRefresh.refresh}
       scrollEnabled={contentState.kind !== "loading"}
     >
+      {embedded ? <PaneTitle title="Security & sessions" /> : null}
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowVariant="nav" rowsPerSection={2} sections={3} showHero={false} />
