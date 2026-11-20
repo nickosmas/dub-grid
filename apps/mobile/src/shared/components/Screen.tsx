@@ -1,5 +1,5 @@
 import { useTransparentPane } from "../layout/TransparentPaneContext";
-import { useInDetailPane } from "../layout/DetailPaneContext";
+import { useInDetailPane, usePaneTopInset } from "../layout/DetailPaneContext";
 import {
   useEffect,
   useMemo,
@@ -223,6 +223,7 @@ export function Screen<T = never>({
   // still lines up with the camera in it.
   const windowInsets = useWindowInsets();
   const inDetailPane = useInDetailPane();
+  const paneTopInset = usePaneTopInset();
   const nativeTabBarVisible = useNativeTabBarPresence();
   const resolvedBottomPadding = getScreenBottomPadding(bottomPaddingMode, insets.bottom);
   const resolvedFooterBottomPadding = getFooterBottomPadding(
@@ -266,7 +267,10 @@ export function Screen<T = never>({
   // A sticky header only exists on a route that hides the native header (the
   // dashboard and the schedule), so nothing above it clears the status bar on
   // its behalf: the shell pads itself by the safe-area inset.
-  const topRowPadding = Math.max(insets.top, 8) + getSideColumnTopOffset(windowInsets);
+  const topRowPadding = Math.max(
+    Math.max(insets.top, 8) + getSideColumnTopOffset(windowInsets) - paneTopInset,
+    0,
+  );
   // A detail pane opens on its title, which centres on the camera like the
   // list's top row beside it.
   const paneTopPadding =

@@ -10,3 +10,14 @@ export const DetailPaneContext = createContext(false);
 export function useInDetailPane(): boolean {
   return useContext(DetailPaneContext);
 }
+
+/**
+ * How far a split pane's top sits below the window's, when the pane is drawn
+ * as a card inset from the screen; a page's top row subtracts it so it still
+ * lines up with the camera.
+ */
+export const PaneTopInsetContext = createContext(0);
+
+export function usePaneTopInset(): number {
+  return useContext(PaneTopInsetContext);
+}

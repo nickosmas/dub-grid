@@ -342,6 +342,7 @@ export function AdminHomeScreen() {
       <SplitView
         detailBackground={wash}
         layout={splitLayout}
+        listCard
         list={
           <MonthCalendarPane
             now={now}

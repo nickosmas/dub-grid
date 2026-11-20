@@ -1788,6 +1788,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         <SplitView
           detailBackground={homeWash}
           layout={homeSplit.split}
+          listCard
           list={
             <MonthCalendarPane
               now={now}
@@ -1824,11 +1825,16 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   const selectedDayTitle = formatLongDayTitle(selectedDate);
 
+  // Split, the day beside the month carries Home's wash, as Home's pane does.
+  const splitWash = <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />;
+
   return (
     <>
       {sideColumnBar}
       <SplitView
+        detailBackground={splitWash}
         layout={split}
+        listCard
         list={listScreen}
         detail={
           shownShift ? (

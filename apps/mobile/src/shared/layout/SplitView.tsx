@@ -2,9 +2,10 @@ import { useMemo, type ReactNode } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileSpace } from "../theme/tokens";
 import { WindowInsetsContext } from "../navigation/useHasSideColumn";
 import { getSplitLayout, type SplitLayout } from "./split-layout";
-import { DetailPaneContext } from "./DetailPaneContext";
+import { DetailPaneContext, PaneTopInsetContext } from "./DetailPaneContext";
 import { TransparentPaneContext } from "./TransparentPaneContext";
 import { useHingeStatus } from "./useHingeStatus";
 
@@ -26,6 +27,7 @@ export function SplitView({
   detail,
   background,
   detailBackground,
+  listCard = false,
 }: {
   layout: SplitLayout;
   list: ReactNode;
@@ -34,6 +36,12 @@ export function SplitView({
   background?: ReactNode;
   /** Painted behind the detail pane alone, whatever page it shows. */
   detailBackground?: ReactNode;
+  /**
+   * The list as a card inset from the screen, its leading corners following
+   * the display's and square where it meets the detail, as Calendar draws
+   * its month.
+   */
+  listCard?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const insets = useSafeAreaInsets();
@@ -57,10 +65,22 @@ export function SplitView({
         <View style={styles.row}>
           <View style={{ width: layout.listWidth }}>
             <SafeAreaInsetsContext.Provider value={listInsets}>
-              {list}
+              {listCard ? (
+                <View style={[styles.listCard, { backgroundColor: mobileColors.surface }]}>
+                  <TransparentPaneContext.Provider value={true}>
+                    <PaneTopInsetContext.Provider value={LIST_CARD_INSET}>
+                      {list}
+                    </PaneTopInsetContext.Provider>
+                  </TransparentPaneContext.Provider>
+                </View>
+              ) : (
+                list
+              )}
             </SafeAreaInsetsContext.Provider>
           </View>
-          <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
+          {listCard ? null : (
+            <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
+          )}
           <View style={styles.detail}>
             {detailBackground != null ? (
               <View
@@ -87,7 +107,22 @@ export function SplitView({
   );
 }
 
+/** The open iPhone Duo's display corner radius, which the card's corners follow. */
+const DISPLAY_CORNER_RADIUS = 55;
+/** The card's gap from the screen's edges; its corners stay concentric with the display's. */
+const LIST_CARD_INSET = mobileSpace.sm;
+
 const styles = StyleSheet.create({
+  listCard: {
+    flex: 1,
+    marginTop: LIST_CARD_INSET,
+    marginLeft: LIST_CARD_INSET,
+    marginBottom: LIST_CARD_INSET,
+    borderTopLeftRadius: DISPLAY_CORNER_RADIUS - LIST_CARD_INSET,
+    borderBottomLeftRadius: DISPLAY_CORNER_RADIUS - LIST_CARD_INSET,
+    borderCurve: "continuous",
+    overflow: "hidden",
+  },
   background: {
     pointerEvents: "none",
   },
