@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileElevation, mobileSpace } from "../theme/tokens";
+import { mobileElevation, mobileRadii, mobileSpace } from "../theme/tokens";
 import { WindowInsetsContext } from "../navigation/useHasSideColumn";
 import { getSplitLayout, type SplitLayout } from "./split-layout";
 import { DetailPaneContext, PaneTopInsetContext } from "./DetailPaneContext";
@@ -35,7 +35,7 @@ export function SplitView({
   background?: ReactNode;
   /**
    * The list as a card floating over `background`, its leading corners
-   * concentric with the display's and its trailing ones square.
+   * concentric with the display's and its trailing ones a control's.
    */
   listCard?: boolean;
 }) {
@@ -110,12 +110,16 @@ const styles = StyleSheet.create({
     margin: LIST_CARD_INSET,
     borderTopLeftRadius: LIST_CARD_LEADING_RADIUS,
     borderBottomLeftRadius: LIST_CARD_LEADING_RADIUS,
+    borderTopRightRadius: mobileRadii.control,
+    borderBottomRightRadius: mobileRadii.control,
     borderCurve: "continuous",
   },
   listCardClip: {
     flex: 1,
     borderTopLeftRadius: LIST_CARD_LEADING_RADIUS,
     borderBottomLeftRadius: LIST_CARD_LEADING_RADIUS,
+    borderTopRightRadius: mobileRadii.control,
+    borderBottomRightRadius: mobileRadii.control,
     borderCurve: "continuous",
     overflow: "hidden",
   },
