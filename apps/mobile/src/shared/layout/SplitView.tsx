@@ -101,7 +101,7 @@ export function SplitView({
 /** The open iPhone Duo's display corner radius, which the card's corners follow. */
 const DISPLAY_CORNER_RADIUS = 55;
 /** The card's gap from the screen's edges; its corners stay concentric with the display's. */
-const LIST_CARD_INSET = mobileSpace.lg;
+const LIST_CARD_INSET = mobileSpace.sm;
 const LIST_CARD_LEADING_RADIUS = DISPLAY_CORNER_RADIUS - LIST_CARD_INSET;
 
 const styles = StyleSheet.create({
