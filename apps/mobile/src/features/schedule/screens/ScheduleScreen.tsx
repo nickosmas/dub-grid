@@ -1,4 +1,5 @@
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
+import { FoldFade, useFoldEntering } from "../../../shared/layout/FoldFade";
 import { scheduleNotesForRow } from "../lib/scheduleNotes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
@@ -766,6 +767,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     defaultEntry: meHeroState.item?.entry ?? null,
     defaultDate: selectedDate,
   });
+  // The page fades into its new layout when the Duo folds or opens.
+  const foldEntering = useFoldEntering((isTeamScope ? split : homeSplit.split) !== null);
   const meHeroTiming = useMemo(
     () =>
       !isTeamScope && meHeroState.item
@@ -893,7 +896,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       calendarExpandProgress.value = withTiming(1, MONTH_EXPAND_TIMING);
       setIsCalendarOpen(true);
     } else {
-      closeCalendarExpansion();
+      // At once: the closed phone fades in on its week strip, never the month.
+      closeCalendarExpansion({ immediate: true });
     }
     // Only the split's arrival and departure open or close the month.
   }, [isSplit, hasSplitRowHeight]);
@@ -927,12 +931,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     }
   }, [isSplit, isFocused, shownShift, range.startDate, range.endDate, scope]);
 
-  function closeCalendarExpansion() {
+  function closeCalendarExpansion({ immediate = false }: { immediate?: boolean } = {}) {
     if (!isCalendarOpen) {
       return;
     }
 
-    calendarExpandProgress.value = withTiming(0, MONTH_EXPAND_TIMING);
+    calendarExpandProgress.value = immediate ? 0 : withTiming(0, MONTH_EXPAND_TIMING);
     setIsCalendarOpen(false);
     // Browsing months (chevrons or the month swipe) without picking a date
     // leaves calendarMonthAnchor pointed at a month that may not contain
@@ -1786,6 +1790,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         {sideColumnBar}
         <SplitView
           background={homeWash}
+          entering={foldEntering}
           layout={homeSplit.split}
           listCard
           list={
@@ -1818,7 +1823,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     return (
       <>
         {sideColumnBar}
-        {listScreen}
+        <FoldFade entering={foldEntering}>{listScreen}</FoldFade>
       </>
     );
 
@@ -1832,6 +1837,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       {sideColumnBar}
       <SplitView
         background={splitWash}
+        entering={foldEntering}
         layout={split}
         listCard
         list={listScreen}

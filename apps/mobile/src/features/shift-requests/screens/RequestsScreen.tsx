@@ -1,4 +1,5 @@
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
+import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import {
   describeAwaitingRecipient,
   describeShiftRequest,
@@ -852,6 +853,7 @@ export default function RequestsScreen() {
   // Open on the iPhone Duo, the list sits beside the whole request. Before a
   // pick it shows the first request in the tab.
   const split = useSplitLayout();
+  const foldEntering = useFoldEntering(split !== null);
   const [pickedRequestId, setPickedRequestId] = useState<string | null>(null);
   const tabRequests = useMemo((): MobileShiftRequest[] => {
     if (activeTab === "available") {
@@ -1238,6 +1240,7 @@ export default function RequestsScreen() {
 
   return (
     <SplitView
+      entering={foldEntering}
       layout={split}
       list={listScreen}
       detail={

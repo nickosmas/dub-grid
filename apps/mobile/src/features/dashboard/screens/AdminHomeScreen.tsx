@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
+import { FoldFade, useFoldEntering } from "../../../shared/layout/FoldFade";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
@@ -98,6 +99,7 @@ export function AdminHomeScreen() {
   // Open on the iPhone Duo, the month fills the left pane, as in Calendar,
   // and Home sits beside it; a shift or day tapped on Home opens over it.
   const splitLayout = useSplitLayout();
+  const foldEntering = useFoldEntering(splitLayout !== null);
   const scrollViewRef = useRef<ScreenScrollHandle | null>(null);
   useScrollToTopOnChange(scrollViewRef, `${view}:${range.startDate}`);
   const chooseView = (next: HomeView) => {
@@ -331,7 +333,7 @@ export function AdminHomeScreen() {
     return (
       <>
         {alertsBar}
-        {page}
+        <FoldFade entering={foldEntering}>{page}</FoldFade>
       </>
     );
   }
@@ -340,6 +342,7 @@ export function AdminHomeScreen() {
       {alertsBar}
       <SplitView
         background={wash}
+        entering={foldEntering}
         layout={splitLayout}
         listCard
         list={

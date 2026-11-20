@@ -5,6 +5,7 @@ import {
   DEFAULT_ORGANIZATION_LABELS,
   ADMINISTRATIVE_TEAM_LABELS,
 } from "@dubgrid/domain";
+import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
@@ -658,6 +659,7 @@ export default function PeopleScreen() {
   // pick it shows the first person in the list other than you, since your
   // own page is the Profile tab.
   const split = useSplitLayout();
+  const foldEntering = useFoldEntering(split !== null);
   const [pickedPersonId, setPickedPersonId] = useState<string | null>(null);
   const firstPersonId = useMemo(() => {
     for (const item of rosterItems) {
@@ -1269,6 +1271,7 @@ export default function PeopleScreen() {
 
   return (
     <SplitView
+      entering={foldEntering}
       layout={split}
       list={listScreen}
       detail={

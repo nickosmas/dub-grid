@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import { Stack } from "expo-router";
 import { PaneHeader } from "../../../shared/layout/PaneHeader";
 import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
@@ -110,6 +111,7 @@ export default function NotificationsScreen() {
   // Open on the iPhone Duo, the inbox sits beside what the picked alert (or
   // the first one) points to.
   const split = useSplitLayout();
+  const foldEntering = useFoldEntering(split !== null);
   const isSplit = split !== null;
   const [pickedId, setPickedId] = useState<string | null>(null);
   const alertsRouteOptions = useMemo(
@@ -561,6 +563,7 @@ export default function NotificationsScreen() {
 
   return (
     <SplitView
+      entering={foldEntering}
       layout={split}
       list={page}
       detail={<AlertPane notification={shownNotification} route={shownRoute} />}

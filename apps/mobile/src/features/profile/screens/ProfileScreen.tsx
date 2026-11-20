@@ -1,4 +1,5 @@
 import { router, Stack, useIsFocused } from "expo-router";
+import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { DISCARD_CONFIRM } from "../../../shared/navigation/EditBarActions";
@@ -128,6 +129,7 @@ export default function ProfileScreen() {
   // details until another is picked. Folding closed with a pick pushes its
   // page; the default gives way to the list.
   const split = useSplitLayout();
+  const foldEntering = useFoldEntering(split !== null);
   const [pickedSection, setPickedSection] = useState<ProfileSplitSection | null>(null);
   const isFocused = useIsFocused();
   const wasSplitRef = useRef(split !== null);
@@ -765,6 +767,7 @@ export default function ProfileScreen() {
 
   return (
     <SplitView
+      entering={foldEntering}
       layout={split}
       list={page}
       detail={
