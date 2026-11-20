@@ -37,4 +37,8 @@ export const fillScreenAnchorStyles = StyleSheet.create({
   spacerBelow: {
     flex: SPACE_BELOW,
   },
+  /** In an iPhone Duo's split the message sits dead centre in its pane (owner, 2026-11-20). */
+  spacerCentred: {
+    flex: 1,
+  },
 });

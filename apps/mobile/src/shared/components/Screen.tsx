@@ -94,6 +94,7 @@ import {
   getSideColumnTopOffset,
   PANE_TITLE_ROW_CENTRE,
   type ScreenBottomPaddingMode,
+  hasSideColumn,
 } from "./screen-layout";
 import { KEYBOARD_DISMISS_MODE } from "./keyboard-dismiss";
 
@@ -229,7 +230,11 @@ export function Screen<T = never>({
   const inDetailPane = useInDetailPane();
   const paneTopInset = usePaneTopInset();
   const nativeTabBarVisible = useNativeTabBarPresence();
-  const resolvedBottomPadding = getScreenBottomPadding(bottomPaddingMode, insets.bottom);
+  // On an iPhone Duo the tab bar stands in the side column, so a tabbed page
+  // keeps no room for one at its foot, and a full-page state centers truly.
+  const bottomMode =
+    bottomPaddingMode === "tabbed" && hasSideColumn(windowInsets) ? "stack" : bottomPaddingMode;
+  const resolvedBottomPadding = getScreenBottomPadding(bottomMode, insets.bottom);
   const resolvedFooterBottomPadding = getFooterBottomPadding(
     bottomPaddingMode,
     insets.bottom,
