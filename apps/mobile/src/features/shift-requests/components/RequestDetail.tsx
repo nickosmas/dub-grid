@@ -1,4 +1,5 @@
 import type { MobileShiftRequest } from "@dubgrid/contracts";
+import { splitSelectedRowStyle } from "../../../shared/layout/splitSelection";
 import { describeRequestForViewer, formatScheduleDayLabel } from "@dubgrid/schedule-core";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
@@ -153,9 +154,8 @@ function createStyles(mobileColors: MobileColors) {
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: mobileSpace.md,
     },
-    rosterRowAffected: {
-      backgroundColor: mobileColors.brandSoft,
-    },
+    // The same clear blue as a split list's picked row.
+    rosterRowAffected: splitSelectedRowStyle(mobileColors),
     rosterRowDivider: {
       borderTopColor: mobileColors.borderSubtle,
       borderTopWidth: StyleSheet.hairlineWidth,
