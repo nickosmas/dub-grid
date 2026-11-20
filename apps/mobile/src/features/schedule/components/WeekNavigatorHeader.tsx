@@ -10,6 +10,7 @@ import { Text } from "../../../shared/components/Text";
 import { compactSameMonthRange } from "../lib/week-range-label";
 import { NARROW_LIST_MAX_WIDTH } from "../../../shared/layout/split-layout";
 import { useSplitLayout } from "../../../shared/layout/SplitView";
+import { useHasSideColumn } from "../../../shared/navigation/useHasSideColumn";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { createStyles } from "../screens/scheduleScreenStyles";
 
@@ -106,6 +107,7 @@ export function WeekNavigatorHeader({
   // In the narrow list of an iPhone Duo held tall, three controls leave the
   // date too little room for one line, so it wraps rather than truncating.
   const split = useSplitLayout();
+  const sideColumn = useHasSideColumn();
   const wraps = split !== null && split.listWidth < NARROW_LIST_MAX_WIDTH;
   const titleFit = wraps
     ? ({ allowFontScaling: false, numberOfLines: 2 } as const)
@@ -167,7 +169,8 @@ export function WeekNavigatorHeader({
               onPress={onToday}
             />
           ) : null}
-          <AlertsChromeButton unreadCount={unreadCount} />
+          {/* On an iPhone Duo the bell stands in the side column instead. */}
+          {sideColumn ? null : <AlertsChromeButton unreadCount={unreadCount} />}
         </View>
       ) : null}
     </View>

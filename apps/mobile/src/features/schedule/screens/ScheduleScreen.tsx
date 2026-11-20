@@ -1,5 +1,6 @@
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
-import { FoldFade, useFoldEntering } from "../../../shared/layout/FoldFade";
+import { useHasSideColumn } from "../../../shared/navigation/useHasSideColumn";
+import { FOLD_FADE_MS, FoldFade, useFoldEntering } from "../../../shared/layout/FoldFade";
 import { scheduleNotesForRow } from "../lib/scheduleNotes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
@@ -18,6 +19,7 @@ import Reanimated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withTiming,
 } from "react-native-reanimated";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -138,6 +140,11 @@ const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_EXPAND_TIMING = {
   duration: 240,
   easing: Easing.out(Easing.cubic),
+};
+/** Slower when the Duo opens, so the strip is seen stretching into the month. */
+const MONTH_OPEN_TIMING = {
+  duration: 420,
+  easing: Easing.inOut(Easing.cubic),
 };
 /**
  * Week/month swipe springs, named so the two feels are legible and so the
@@ -869,6 +876,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // Split, the month fills the list pane and the chosen day sits beside it,
   // as Calendar lays them out; folding closed brings back the week strip.
   const isSplit = split !== null;
+  // On an iPhone Duo, open or closed, the bell stands in the side column.
+  const sideColumn = useHasSideColumn();
   // Where the month's dates start in the window, so its weeks can share the
   // height below them down to the bottom of the pane.
   const [monthGridTop, setMonthGridTop] = useState<number | null>(null);
@@ -893,7 +902,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     if (isSplit) {
       if (!hasSplitRowHeight) return;
       setCalendarMonthAnchor(getScheduleMonthStartDate(selectedDateRef.current ?? selectedDate));
-      calendarExpandProgress.value = withTiming(1, MONTH_EXPAND_TIMING);
+      // Once the split has faded in, the week strip stretches down into the
+      // month, so the eye follows it from the closed phone.
+      calendarExpandProgress.value = withDelay(FOLD_FADE_MS, withTiming(1, MONTH_OPEN_TIMING));
       setIsCalendarOpen(true);
     } else {
       // At once: the closed phone fades in on its week strip, never the month.
@@ -1437,7 +1448,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             />
           ) : null}
           {/* Split, alerts stand in the side column. */}
-          {isSplit ? null : <AlertsChromeButton unreadCount={unreadNotificationCount} />}
+          {sideColumn ? null : <AlertsChromeButton unreadCount={unreadNotificationCount} />}
         </View>
       </View>
 
@@ -1524,11 +1535,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
-  // The staff home carries Home's wash, the same blue the admin Home shows at
-  // normal coverage (owner, 2026-11-04); the team schedule stays plain.
-  const homeWash = isTeamScope ? undefined : (
-    <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />
-  );
+  // Home and the team schedule both carry Home's wash, the same blue the admin
+  // Home shows at normal coverage (owner, 2026-11-04; the schedule's, 2026-11-20).
+  const pageWash = <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />;
 
   // The day under the strip, or, split, in the pane beside the month.
   const dayBody = (
@@ -1755,8 +1764,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     <Screen
       bottomPaddingMode="tabbed"
       // Split, the wash runs behind both panes, with the month floating on it.
-      pageBackground={homeSplit.split ? undefined : homeWash}
-      stickyHeaderBackground={homeSplit.split ? undefined : homeWash}
+      pageBackground={isSplit || homeSplit.split ? undefined : pageWash}
+      stickyHeaderBackground={isSplit || homeSplit.split ? undefined : pageWash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there
@@ -1776,10 +1785,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   // Either page's bell stands in the side column while it is split.
   const sideColumnBar = (
-    <SideColumnAlertsBar
-      shown={(isTeamScope ? split : homeSplit.split) !== null}
-      unreadCount={unreadNotificationCount}
-    />
+    <SideColumnAlertsBar shown={sideColumn} unreadCount={unreadNotificationCount} />
   );
 
   // Open on the iPhone Duo, Home sits beside the month, as in Calendar; a
@@ -1789,7 +1795,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       <>
         {sideColumnBar}
         <SplitView
-          background={homeWash}
+          background={pageWash}
           entering={foldEntering}
           layout={homeSplit.split}
           listCard
@@ -1829,14 +1835,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   const selectedDayTitle = formatLongDayTitle(selectedDate);
 
-  // Split, Home's wash runs behind both panes, with the month floating on it.
-  const splitWash = <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />;
-
   return (
     <>
       {sideColumnBar}
       <SplitView
-        background={splitWash}
+        background={pageWash}
         entering={foldEntering}
         layout={split}
         listCard

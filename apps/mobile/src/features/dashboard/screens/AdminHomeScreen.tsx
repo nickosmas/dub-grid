@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useHasSideColumn } from "../../../shared/navigation/useHasSideColumn";
 import { FoldFade, useFoldEntering } from "../../../shared/layout/FoldFade";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
@@ -99,6 +100,8 @@ export function AdminHomeScreen() {
   // Open on the iPhone Duo, the month fills the left pane, as in Calendar,
   // and Home sits beside it; a shift or day tapped on Home opens over it.
   const splitLayout = useSplitLayout();
+  // On an iPhone Duo, open or closed, the bell stands in the side column.
+  const sideColumn = useHasSideColumn();
   const foldEntering = useFoldEntering(splitLayout !== null);
   const scrollViewRef = useRef<ScreenScrollHandle | null>(null);
   useScrollToTopOnChange(scrollViewRef, `${view}:${range.startDate}`);
@@ -325,7 +328,7 @@ export function AdminHomeScreen() {
 
   const alertsBar = (
     <SideColumnAlertsBar
-      shown={splitLayout !== null}
+      shown={sideColumn}
       unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
     />
   );

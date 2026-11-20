@@ -15,9 +15,9 @@ const SPLIT_BAR_OPTIONS = {
 } as const;
 
 /**
- * Split, the alerts bell stands in the iPhone Duo's side column with the tab
- * bar, where the Duo puts a page's bar buttons; that takes a bar of its own,
- * with no title, over the two panes. For a route that otherwise has no bar.
+ * On an iPhone Duo, open or closed, the alerts bell stands in the side column
+ * with the tab bar, where the Duo puts a page's bar buttons; that takes a bar
+ * of its own, with no title. For a route that otherwise has no bar.
  */
 export function SideColumnAlertsBar({
   shown,
