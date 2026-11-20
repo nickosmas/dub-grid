@@ -1,4 +1,5 @@
 import { useMemo, useRef, type MutableRefObject } from "react";
+import { splitSelectedRowStyle } from "../../../shared/layout/splitSelection";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
@@ -134,7 +135,7 @@ export function NotificationRow({
           accessibilityLabel={`${isUnread ? "Unread: " : ""}${notification.title}`}
           onPress={onPress}
           selected={selected}
-          style={[styles.row, selected === true && { backgroundColor: mobileColors.brandSoft }]}
+          style={[styles.row, selected === true && splitSelectedRowStyle(mobileColors)]}
         >
           <View style={styles.leading}>{isUnread ? <View style={styles.unreadDot} /> : null}</View>
           <View style={styles.copy}>

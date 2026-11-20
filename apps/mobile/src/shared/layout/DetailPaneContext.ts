@@ -24,8 +24,8 @@ export function usePaneTopInset(): number {
 
 /**
  * The height of a native bar the detail pane sits under, when the list's page
- * shows one (People's large title): the pane starts below it, so its page
- * keeps only a small gap at the top.
+ * shows one (People's large title): the pane's page starts below it and
+ * scrolls up under it, as a page does under its own bar.
  */
 export const DetailBarClearanceContext = createContext(0);
 

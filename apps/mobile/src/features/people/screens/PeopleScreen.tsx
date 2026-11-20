@@ -5,6 +5,7 @@ import {
   DEFAULT_ORGANIZATION_LABELS,
   ADMINISTRATIVE_TEAM_LABELS,
 } from "@dubgrid/domain";
+import { splitSelectedRowStyle } from "../../../shared/layout/splitSelection";
 import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import { ActionButtons } from "../../../shared/components/ActionButtons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -232,6 +233,11 @@ function countPeopleWithRole(people: MobilePerson[], role: NonNullable<MobileOrg
 
 type RosterItem =
   { kind: "management"; user: MobileManagementUser } | { kind: "person"; person: MobilePerson };
+
+const SPLIT_CLEAR_BAR = {
+  headerTransparent: true,
+  headerStyle: { backgroundColor: "transparent" },
+} as const;
 
 export default function PeopleScreen() {
   const mobileColors = useMobileColors();
@@ -663,9 +669,14 @@ export default function PeopleScreen() {
   // The native bar's height, with People's large title: split, the person's
   // page starts below it.
   const headerHeight = useHeaderHeight();
+  // Split, the bar stays clear: it spans both panes, and a background it drew
+  // once the person's page scrolled under it would band the top of that page.
   const peopleStackOptions = useMemo(
-    () => createTopLevelStackOptions(mobileColors, "People"),
-    [mobileColors],
+    () => ({
+      ...createTopLevelStackOptions(mobileColors, "People"),
+      ...(split ? SPLIT_CLEAR_BAR : null),
+    }),
+    [mobileColors, split],
   );
   const foldEntering = useFoldEntering(split !== null);
   const [pickedPersonId, setPickedPersonId] = useState<string | null>(null);
@@ -1357,7 +1368,7 @@ function PersonRow({
         selected={selected}
         disabled={!navigable}
         onPress={onPress}
-        style={[styles.personRow, selected === true && { backgroundColor: mobileColors.brandSoft }]}
+        style={[styles.personRow, selected === true && splitSelectedRowStyle(mobileColors)]}
       >
         <View
           style={[

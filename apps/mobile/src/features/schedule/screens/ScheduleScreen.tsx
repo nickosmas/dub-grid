@@ -1,4 +1,5 @@
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
+import { splitSelectedRowStyle } from "../../../shared/layout/splitSelection";
 import { useHasSideColumn } from "../../../shared/navigation/useHasSideColumn";
 import { FoldFade, useFoldEntering } from "../../../shared/layout/FoldFade";
 import { scheduleNotesForRow } from "../lib/scheduleNotes";
@@ -2023,10 +2024,7 @@ function TeamShiftMemberRow({
       <PressableRow
         onPress={onPress}
         selected={selected}
-        style={[
-          styles.teamMemberRow,
-          selected === true && { backgroundColor: mobileColors.brandSoft },
-        ]}
+        style={[styles.teamMemberRow, selected === true && splitSelectedRowStyle(mobileColors)]}
       >
         <View
           style={[

@@ -278,10 +278,10 @@ export function Screen<T = never>({
   // A detail pane opens on its title, which centres on the camera like the
   // list's top row beside it.
   const barClearance = useDetailBarClearance();
-  // Under a native bar the pane already starts below it.
+  // Under a native bar the pane's page starts below it and scrolls up under it.
   const paneTopPadding =
     barClearance > 0
-      ? mobileSpace.sm
+      ? barClearance + mobileSpace.sm
       : Math.max(insets.top, 8) + getSideColumnTopOffset(windowInsets, PANE_TITLE_ROW_CENTRE);
   const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? topRowPadding;
   const scrollHandle = useMemo<ScreenScrollHandle>(

@@ -58,7 +58,7 @@ export function SplitView({
    * concentric with the display's and its trailing ones a control's.
    */
   listCard?: boolean;
-  /** A native bar's height over the panes, which the detail's page starts below. */
+  /** A native bar's height over the panes, which the detail's page is padded below. */
   detailBarHeight?: number;
   /** The fade from `useFoldEntering`, as the page arrives from one pane. */
   entering?: ReturnType<typeof useFoldEntering>;
@@ -118,9 +118,7 @@ export function SplitView({
           {listCard ? null : (
             <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
           )}
-          {/* Below a native bar, the pane starts under it: a scroll view the bar
-              overlaps gets iOS's edge blur, a band over the pane's top. */}
-          <View style={[styles.detail, detailBarHeight > 0 && { paddingTop: detailBarHeight }]}>
+          <View style={styles.detail}>
             <SafeAreaInsetsContext.Provider value={detailInsets}>
               <DetailBarClearanceContext.Provider value={detailBarHeight}>
                 <DetailPaneContext.Provider value={true}>{detail}</DetailPaneContext.Provider>
