@@ -6,7 +6,7 @@ import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { router, useIsFocused, useLocalSearchParams } from "expo-router";
+import { Stack, router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Reanimated, {
@@ -63,7 +63,7 @@ import {
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileMotion, type MobileColors } from "../../../shared/theme/tokens";
+import { mobileMotion, mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -860,7 +860,40 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   useScrollToTopOnChange(scrollViewRef, `${range.startDate}:${selectedDate}`);
 
+  // Split, the month fills the list pane and the chosen day sits beside it,
+  // as Calendar lays them out; folding closed brings back the week strip.
   const isSplit = split !== null;
+  // Where the month's dates start in the window, so its weeks can share the
+  // height below them down to the bottom of the pane.
+  const [monthGridTop, setMonthGridTop] = useState<number | null>(null);
+  const monthGridRef = useRef<View>(null);
+  const splitRowHeight =
+    isSplit && monthGridTop !== null && monthWeeks.length > 0
+      ? Math.max(
+          WEEK_STRIP_ROW_HEIGHT,
+          Math.floor(
+            (viewportHeight -
+              monthGridTop -
+              mobileSpace.lg -
+              (monthWeeks.length - 1) * MONTH_GRID_ROW_GAP) /
+              monthWeeks.length,
+          ),
+        )
+      : undefined;
+  // The weeks take their full height before the month opens, so it opens in
+  // one movement rather than opening and then growing.
+  const hasSplitRowHeight = splitRowHeight !== undefined;
+  useEffect(() => {
+    if (isSplit) {
+      if (!hasSplitRowHeight) return;
+      setCalendarMonthAnchor(getScheduleMonthStartDate(selectedDateRef.current ?? selectedDate));
+      calendarExpandProgress.value = withTiming(1, MONTH_EXPAND_TIMING);
+      setIsCalendarOpen(true);
+    } else {
+      closeCalendarExpansion();
+    }
+    // Only the split's arrival and departure open or close the month.
+  }, [isSplit, hasSplitRowHeight]);
   // Folding closed turns a picked shift into its pushed page, marked so it
   // goes back into the split when the Duo opens again; the day overview, a
   // default, gives way to the list. Only on screen: a hidden tab never pushes.
@@ -926,7 +959,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     // Cleared here too: closeCalendarExpansion returns early while collapsed,
     // and a month pinned by a tap would outlive the swipes that leave it.
     setCalendarMonthAnchor(null);
-    closeCalendarExpansion();
+    if (!split) closeCalendarExpansion();
   }
 
   function handleOpenShiftDetail(entry: MobileScheduleEntry) {
@@ -1217,7 +1250,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   function handleSelectFocusArea(nextFocusAreaKey: string) {
     setSelectedTeamFocusAreaKey(nextFocusAreaKey);
-    closeCalendarExpansion();
+    if (!split) closeCalendarExpansion();
   }
 
   const weekStripRenderWidth = weekStripWidth || WEEK_SWIPE_FALLBACK_WIDTH;
@@ -1318,6 +1351,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                 >
                   {row.days.map((day) => (
                     <MonthDayCell
+                      minHeight={splitRowHeight}
                       key={day.date}
                       day={{
                         ...day,
@@ -1347,6 +1381,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         <View key={week[0]?.date ?? "week"} style={styles.monthCalendarWeek}>
           {week.map((day) => (
             <MonthDayCell
+              minHeight={splitRowHeight}
               key={day.date}
               day={day}
               accessible={isCenterMonth}
@@ -1378,11 +1413,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               onPress={handleGoToToday}
             />
           ) : null}
-          <AlertsChromeButton unreadCount={unreadNotificationCount} />
+          {/* Split, alerts sit with the day in the pane beside the month. */}
+          {isSplit ? null : <AlertsChromeButton unreadCount={unreadNotificationCount} />}
         </View>
       </View>
 
-      <View style={styles.calendarCard}>
+      <View style={isSplit ? styles.calendarPlain : styles.calendarCard}>
         {/* Weekday labels: always visible, fixed in place — never move. */}
         <View style={styles.monthCalendarWeekdays}>
           {MONTH_WEEKDAY_LABELS.map((label, index) => (
@@ -1397,8 +1433,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             a plain slide, no fading. */}
         <Reanimated.View
           accessibilityLabel="Schedule month grid"
+          ref={monthGridRef}
           onLayout={(event) => {
             setWeekStripWidth(event.nativeEvent.layout.width);
+            if (isSplit) {
+              monthGridRef.current?.measureInWindow((_x, y) => {
+                setMonthGridTop((current) => (current === y ? current : y));
+              });
+            }
           }}
           onTouchCancel={handleMonthSwipeCancel}
           onTouchEnd={handleMonthSwipeRelease}
@@ -1432,23 +1474,27 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           </Reanimated.View>
         </Reanimated.View>
 
-        <GestureDetector gesture={calendarHandleGesture}>
-          <View
-            accessibilityLabel={isCalendarOpen ? "Collapse month calendar" : "Open month calendar"}
-            accessibilityActions={[{ name: "activate" }]}
-            accessibilityRole="adjustable"
-            hitSlop={{ top: 8, bottom: 16, left: 40, right: 40 }}
-            onAccessibilityAction={() => {
-              const shouldOpen = !isCalendarOpen;
-              if (shouldOpen) handleCalendarDragStart();
-              calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
-              handleCalendarDragEnd(shouldOpen);
-            }}
-            style={styles.calendarDragHandleRow}
-          >
-            <View style={styles.calendarDragHandleBar} />
-          </View>
-        </GestureDetector>
+        {isSplit ? null : (
+          <GestureDetector gesture={calendarHandleGesture}>
+            <View
+              accessibilityLabel={
+                isCalendarOpen ? "Collapse month calendar" : "Open month calendar"
+              }
+              accessibilityActions={[{ name: "activate" }]}
+              accessibilityRole="adjustable"
+              hitSlop={{ top: 8, bottom: 16, left: 40, right: 40 }}
+              onAccessibilityAction={() => {
+                const shouldOpen = !isCalendarOpen;
+                if (shouldOpen) handleCalendarDragStart();
+                calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
+                handleCalendarDragEnd(shouldOpen);
+              }}
+              style={styles.calendarDragHandleRow}
+            >
+              <View style={styles.calendarDragHandleBar} />
+            </View>
+          </GestureDetector>
+        )}
       </View>
     </View>
   ) : (
@@ -1459,6 +1505,227 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // normal coverage (owner, 2026-11-04); the team schedule stays plain.
   const homeWash = isTeamScope ? undefined : (
     <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />
+  );
+
+  // The day under the strip, or, split, in the pane beside the month.
+  const dayBody = (
+    <>
+      {/* The focus-area pills carry per-day counts, so they can't paint before
+            the schedule resolves without every badge popping in behind them.
+            While loading there is no tab list yet either — it comes from
+            bootstrap — so the skeleton stands in at a fixed width. */}
+      {isTeamScope && contentState.kind === "loading" ? (
+        contentState.showSkeleton ? (
+          <ScrollableTabStripSkeleton tabs={4} />
+        ) : null
+      ) : isTeamScope && teamFocusAreaTabs.length > 0 ? (
+        <ScrollableTabStrip
+          accessibilityLabel={
+            bootstrapQuery.data?.currentOrg.labels.focusArea ??
+            DEFAULT_ORGANIZATION_LABELS.focusArea
+          }
+          activeKey={activeTeamFocusAreaKey}
+          onSelect={handleSelectFocusArea}
+          tabs={teamFocusAreaTabs}
+        />
+      ) : null}
+      {contentState.kind === "loading" || isRangeSwitching ? (
+        showRangeSkeleton || (contentState.kind === "loading" && contentState.showSkeleton) ? (
+          isTeamScope ? (
+            <ScheduleTeamSkeleton />
+          ) : (
+            <ScheduleMeSkeleton />
+          )
+        ) : null
+      ) : contentState.kind === "error" ? (
+        <StatusBanner
+          actionLabel="Try again"
+          body={contentState.message}
+          fillScreen
+          title="Couldn't load schedule"
+          variant="centered"
+          onAction={() => refetchScreenContent()}
+        />
+      ) : isBlockedTeamView ? (
+        <EmptyStateCard
+          fillScreen
+          body="Your access role doesn't include the team schedule. Ask an admin if you need it."
+          scene="team-locked"
+          title="Team schedule unavailable"
+        />
+      ) : !isTeamScope && !linkedEmployee ? (
+        <EmptyStateCard
+          fillScreen
+          body={
+            canManageEmployees
+              ? "Open the People tab to link your account to a staff profile. This page updates once you're done."
+              : "Ask an admin to finish setting up your account. This page updates once they're done."
+          }
+          scene="account-not-linked"
+          title="Your account isn't linked yet"
+        />
+      ) : !isTeamScope ? (
+        <View
+          style={[
+            styles.mePage,
+            isMeScheduleEmpty && [styles.mePageEmpty, { minHeight: meEmptyPageMinHeight }],
+          ]}
+        >
+          <MeHeroCard
+            currentDate={todayDate}
+            currentTime={currentTimeValue}
+            featuredItem={meHeroState.item}
+            hasWeekItems={hasScheduledWeekDay}
+            timing={meHeroTiming}
+            weekDays={weekDays}
+            shiftmates={meHeroShiftmates}
+            status={meHeroState.status}
+            onPress={
+              meHeroState.item ? () => handleOpenShiftDetail(meHeroState.item!.entry) : undefined
+            }
+          />
+          {!isMeScheduleEmpty ? (
+            <>
+              <ShiftCoverRequestsSection
+                linkedEmployeeId={linkedEmployee?.id ?? null}
+                pendingAction={pendingAction}
+                onRespond={(requestId, accept) => {
+                  if (!linkedEmployee?.id) {
+                    return;
+                  }
+
+                  runRequestAction(requestId, {
+                    action: "respond",
+                    empId: linkedEmployee.id,
+                    accept,
+                  });
+                }}
+                requests={meRequestSections.coverRequests}
+                requestsError={requestsQuery.error}
+              />
+              <OpenShiftsSection
+                linkedEmployeeId={linkedEmployee?.id ?? null}
+                pendingAction={pendingAction}
+                now={now}
+                onClaim={(requestId) => {
+                  if (!linkedEmployee?.id) {
+                    return;
+                  }
+
+                  runRequestAction(requestId, {
+                    action: "claim",
+                    claimerEmpId: linkedEmployee.id,
+                  });
+                }}
+                onVolunteer={(openShift) => {
+                  if (!linkedEmployee?.id) {
+                    return;
+                  }
+
+                  runRequestAction(openShift.id, {
+                    action: "volunteer_open_shift",
+                    empId: linkedEmployee.id,
+                    shiftDate: openShift.date,
+                    focusAreaId: openShift.focusAreaId,
+                    state: openShift.state,
+                  });
+                }}
+                onSeeAll={() => router.push("/(tabs)/requests")}
+                openShifts={meOpenShifts}
+                requests={meRequestSections.openShiftRequests}
+                requestsError={requestsQuery.error}
+                scheduleEntries={scheduleEntries}
+                timeZone={timeZone}
+                openShiftVisibility={openShiftVisibility}
+              />
+            </>
+          ) : null}
+          {hasScheduledWeekDay ? (
+            <UpcomingShiftsSection
+              items={meUpcomingItems}
+              onPressEntry={handleOpenShiftDetail}
+              onPressDay={homeSplit.split ? homeSplit.pickDay : undefined}
+              highlightedDate={homeSplit.highlightedDate}
+              summary={meWeeklyHours}
+              todayDate={todayDate}
+              weekDays={weekDays}
+            />
+          ) : null}
+        </View>
+      ) : shiftGroups.length === 0 ? (
+        <EmptyStateCard
+          fillScreen
+          body={emptyStateBody}
+          scene="team-day-empty"
+          sceneDay={emptySceneDayFromIso(selectedDate)}
+          title={emptyStateTitle}
+        />
+      ) : (
+        <View style={styles.shiftGroupsList}>
+          {shiftGroups.map((group, index) => {
+            const groupTimeRange = group.timeRange;
+
+            return (
+              <View key={group.key} style={styles.shiftGroupBlock}>
+                {/* Grouped lists part their groups with space alone. */}
+                {index > 0 && !IS_NATIVE_LIST ? <View style={styles.shiftGroupDivider} /> : null}
+                <View
+                  style={[
+                    styles.shiftGroupHeader,
+                    (stackGroupTime || narrowList) && styles.shiftGroupHeaderStacked,
+                  ]}
+                >
+                  {group.focusArea ? (
+                    <View style={styles.shiftGroupTitleStack}>
+                      <Text style={styles.shiftGroupStackTitle}>{group.title}</Text>
+                      <Text style={styles.shiftGroupFocusArea}>{group.focusArea}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.shiftGroupTitle}>{group.title}</Text>
+                  )}
+                  {groupTimeRange ? (
+                    <Text
+                      style={[
+                        styles.shiftGroupTime,
+                        (stackGroupTime || narrowList) && styles.shiftGroupTimeStacked,
+                      ]}
+                    >
+                      {groupTimeRange}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={styles.teamGroupCard}>
+                  <View style={styles.teamGroupMembers}>
+                    {group.rows.map((row, memberIndex) => (
+                      <TeamShiftMemberRow
+                        key={`${row.entry.employeeId}-${row.entry.date}-${group.key}`}
+                        groupTimeRange={groupTimeRange}
+                        isFirst={memberIndex === 0}
+                        linkedEmployeeId={linkedEmployee?.id ?? null}
+                        tabFocusAreaId={
+                          typeof activeTeamFocusAreaTab?.focusAreaId === "number"
+                            ? activeTeamFocusAreaTab.focusAreaId
+                            : undefined
+                        }
+                        row={row}
+                        narrow={narrowList}
+                        selected={
+                          split
+                            ? shownShift?.employeeId === row.entry.employeeId &&
+                              shownShift.date === row.entry.date
+                            : undefined
+                        }
+                        onPress={() => handleOpenShiftDetail(row.entry)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </>
   );
 
   const listScreen = (
@@ -1478,221 +1745,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       stickyHeader={stickyHeader}
     >
       <View>
-        {/* The focus-area pills carry per-day counts, so they can't paint before
-            the schedule resolves without every badge popping in behind them.
-            While loading there is no tab list yet either — it comes from
-            bootstrap — so the skeleton stands in at a fixed width. */}
-        {isTeamScope && contentState.kind === "loading" ? (
-          contentState.showSkeleton ? (
-            <ScrollableTabStripSkeleton tabs={4} />
-          ) : null
-        ) : isTeamScope && teamFocusAreaTabs.length > 0 ? (
-          <ScrollableTabStrip
-            accessibilityLabel={
-              bootstrapQuery.data?.currentOrg.labels.focusArea ??
-              DEFAULT_ORGANIZATION_LABELS.focusArea
-            }
-            activeKey={activeTeamFocusAreaKey}
-            onSelect={handleSelectFocusArea}
-            tabs={teamFocusAreaTabs}
-          />
-        ) : null}
-        {contentState.kind === "loading" || isRangeSwitching ? (
-          showRangeSkeleton || (contentState.kind === "loading" && contentState.showSkeleton) ? (
-            isTeamScope ? (
-              <ScheduleTeamSkeleton />
-            ) : (
-              <ScheduleMeSkeleton />
-            )
-          ) : null
-        ) : contentState.kind === "error" ? (
-          <StatusBanner
-            actionLabel="Try again"
-            body={contentState.message}
-            fillScreen
-            title="Couldn't load schedule"
-            variant="centered"
-            onAction={() => refetchScreenContent()}
-          />
-        ) : isBlockedTeamView ? (
-          <EmptyStateCard
-            fillScreen
-            body="Your access role doesn't include the team schedule. Ask an admin if you need it."
-            scene="team-locked"
-            title="Team schedule unavailable"
-          />
-        ) : !isTeamScope && !linkedEmployee ? (
-          <EmptyStateCard
-            fillScreen
-            body={
-              canManageEmployees
-                ? "Open the People tab to link your account to a staff profile. This page updates once you're done."
-                : "Ask an admin to finish setting up your account. This page updates once they're done."
-            }
-            scene="account-not-linked"
-            title="Your account isn't linked yet"
-          />
-        ) : !isTeamScope ? (
-          <View
-            style={[
-              styles.mePage,
-              isMeScheduleEmpty && [styles.mePageEmpty, { minHeight: meEmptyPageMinHeight }],
-            ]}
-          >
-            <MeHeroCard
-              currentDate={todayDate}
-              currentTime={currentTimeValue}
-              featuredItem={meHeroState.item}
-              hasWeekItems={hasScheduledWeekDay}
-              timing={meHeroTiming}
-              weekDays={weekDays}
-              shiftmates={meHeroShiftmates}
-              status={meHeroState.status}
-              onPress={
-                meHeroState.item ? () => handleOpenShiftDetail(meHeroState.item!.entry) : undefined
-              }
-            />
-            {!isMeScheduleEmpty ? (
-              <>
-                <ShiftCoverRequestsSection
-                  linkedEmployeeId={linkedEmployee?.id ?? null}
-                  pendingAction={pendingAction}
-                  onRespond={(requestId, accept) => {
-                    if (!linkedEmployee?.id) {
-                      return;
-                    }
-
-                    runRequestAction(requestId, {
-                      action: "respond",
-                      empId: linkedEmployee.id,
-                      accept,
-                    });
-                  }}
-                  requests={meRequestSections.coverRequests}
-                  requestsError={requestsQuery.error}
-                />
-                <OpenShiftsSection
-                  linkedEmployeeId={linkedEmployee?.id ?? null}
-                  pendingAction={pendingAction}
-                  now={now}
-                  onClaim={(requestId) => {
-                    if (!linkedEmployee?.id) {
-                      return;
-                    }
-
-                    runRequestAction(requestId, {
-                      action: "claim",
-                      claimerEmpId: linkedEmployee.id,
-                    });
-                  }}
-                  onVolunteer={(openShift) => {
-                    if (!linkedEmployee?.id) {
-                      return;
-                    }
-
-                    runRequestAction(openShift.id, {
-                      action: "volunteer_open_shift",
-                      empId: linkedEmployee.id,
-                      shiftDate: openShift.date,
-                      focusAreaId: openShift.focusAreaId,
-                      state: openShift.state,
-                    });
-                  }}
-                  onSeeAll={() => router.push("/(tabs)/requests")}
-                  openShifts={meOpenShifts}
-                  requests={meRequestSections.openShiftRequests}
-                  requestsError={requestsQuery.error}
-                  scheduleEntries={scheduleEntries}
-                  timeZone={timeZone}
-                  openShiftVisibility={openShiftVisibility}
-                />
-              </>
-            ) : null}
-            {hasScheduledWeekDay ? (
-              <UpcomingShiftsSection
-                items={meUpcomingItems}
-                onPressEntry={handleOpenShiftDetail}
-                onPressDay={homeSplit.split ? homeSplit.pickDay : undefined}
-                highlightedDate={homeSplit.highlightedDate}
-                summary={meWeeklyHours}
-                todayDate={todayDate}
-                weekDays={weekDays}
-              />
-            ) : null}
-          </View>
-        ) : shiftGroups.length === 0 ? (
-          <EmptyStateCard
-            fillScreen
-            body={emptyStateBody}
-            scene="team-day-empty"
-            sceneDay={emptySceneDayFromIso(selectedDate)}
-            title={emptyStateTitle}
-          />
-        ) : (
-          <View style={styles.shiftGroupsList}>
-            {shiftGroups.map((group, index) => {
-              const groupTimeRange = group.timeRange;
-
-              return (
-                <View key={group.key} style={styles.shiftGroupBlock}>
-                  {/* Grouped lists part their groups with space alone. */}
-                  {index > 0 && !IS_NATIVE_LIST ? <View style={styles.shiftGroupDivider} /> : null}
-                  <View
-                    style={[
-                      styles.shiftGroupHeader,
-                      (stackGroupTime || narrowList) && styles.shiftGroupHeaderStacked,
-                    ]}
-                  >
-                    {group.focusArea ? (
-                      <View style={styles.shiftGroupTitleStack}>
-                        <Text style={styles.shiftGroupStackTitle}>{group.title}</Text>
-                        <Text style={styles.shiftGroupFocusArea}>{group.focusArea}</Text>
-                      </View>
-                    ) : (
-                      <Text style={styles.shiftGroupTitle}>{group.title}</Text>
-                    )}
-                    {groupTimeRange ? (
-                      <Text
-                        style={[
-                          styles.shiftGroupTime,
-                          (stackGroupTime || narrowList) && styles.shiftGroupTimeStacked,
-                        ]}
-                      >
-                        {groupTimeRange}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <View style={styles.teamGroupCard}>
-                    <View style={styles.teamGroupMembers}>
-                      {group.rows.map((row, memberIndex) => (
-                        <TeamShiftMemberRow
-                          key={`${row.entry.employeeId}-${row.entry.date}-${group.key}`}
-                          groupTimeRange={groupTimeRange}
-                          isFirst={memberIndex === 0}
-                          linkedEmployeeId={linkedEmployee?.id ?? null}
-                          tabFocusAreaId={
-                            typeof activeTeamFocusAreaTab?.focusAreaId === "number"
-                              ? activeTeamFocusAreaTab.focusAreaId
-                              : undefined
-                          }
-                          row={row}
-                          narrow={narrowList}
-                          selected={
-                            split
-                              ? shownShift?.employeeId === row.entry.employeeId &&
-                                shownShift.date === row.entry.date
-                              : undefined
-                          }
-                          onPress={() => handleOpenShiftDetail(row.entry)}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
+        {split ? null : dayBody}
         {confirmationModal}
       </View>
     </Screen>
@@ -1709,31 +1762,101 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     );
   }
 
-  if (!split) return listScreen;
+  // Split, the bell stands in the side column with the tab bar, where an
+  // iPhone Duo puts a page's bar buttons; that takes a bar of its own, with
+  // no title, over the two panes.
+  const sideColumnBar = isTeamScope ? (
+    <>
+      <Stack.Screen options={split ? SPLIT_BAR_OPTIONS : NO_BAR_OPTIONS} />
+      {split ? (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            accessibilityLabel={
+              unreadNotificationCount > 0
+                ? `Open alerts, ${unreadNotificationCount} unread`
+                : "Open alerts"
+            }
+            onPress={() => router.push("/alerts")}
+          >
+            <Stack.Toolbar.Icon sf="bell" />
+            {unreadNotificationCount > 0 ? (
+              <Stack.Toolbar.Badge>
+                {unreadNotificationCount > 9 ? "9+" : String(unreadNotificationCount)}
+              </Stack.Toolbar.Badge>
+            ) : null}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      ) : null}
+    </>
+  ) : null;
+
+  if (!split)
+    return (
+      <>
+        {sideColumnBar}
+        {listScreen}
+      </>
+    );
+
+  const selectedDayTitle = formatLongDayTitle(selectedDate);
 
   return (
-    <SplitView
-      layout={split}
-      list={listScreen}
-      detail={
-        shownShift ? (
-          <ShiftDetailScreen
-            key={`${shownShift.employeeId}:${shownShift.date}`}
-            embedded
-            shift={{
-              employeeId: shownShift.employeeId,
-              date: shownShift.date,
-              rangeStart: range.startDate,
-              rangeEnd: range.endDate,
-              source: "team",
-            }}
-          />
-        ) : (
-          <DayOverview date={selectedDate} entries={scheduleEntries} now={now} range={range} />
-        )
-      }
-    />
+    <>
+      {sideColumnBar}
+      <SplitView
+        layout={split}
+        list={listScreen}
+        detail={
+          shownShift ? (
+            <ShiftDetailScreen
+              key={`${shownShift.employeeId}:${shownShift.date}`}
+              back={{ label: selectedDayTitle, onPress: () => setPickedShift(null) }}
+              embedded
+              shift={{
+                employeeId: shownShift.employeeId,
+                date: shownShift.date,
+                rangeStart: range.startDate,
+                rangeEnd: range.endDate,
+                source: "team",
+              }}
+            />
+          ) : (
+            <DayOverview
+              date={selectedDate}
+              entries={scheduleEntries}
+              now={now}
+              range={range}
+              title={selectedDayTitle}
+            >
+              <View>{dayBody}</View>
+            </DayOverview>
+          )
+        }
+      />
+    </>
   );
+}
+
+const NO_BAR_OPTIONS = { headerShown: false } as const;
+
+// No title and no edge blur: the bar exists only for the bell's place in the
+// side column, and each pane draws its own top.
+const SPLIT_BAR_OPTIONS = {
+  headerShown: true,
+  headerTransparent: true,
+  headerShadowVisible: false,
+  title: "",
+  scrollEdgeEffects: { top: "hidden" },
+} as const;
+
+/** "Friday, Nov 20": the day the Schedule split shows beside its month. */
+function formatLongDayTitle(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function combineScheduledDates(
@@ -1758,6 +1881,7 @@ function MonthDayCell({
   isScheduled = false,
   onPress,
   accessible = true,
+  minHeight,
 }: {
   day: MonthDayCellDay;
   /** Human-readable date, e.g. "Today, Apr 16" — see the label below. */
@@ -1770,6 +1894,8 @@ function MonthDayCell({
   // copies duplicate a week that's already accessible in the full month
   // grid, so they're excluded from the accessibility tree.
   accessible?: boolean;
+  /** Split, each week's height, so the month fills the list pane as in Calendar. */
+  minHeight?: number;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -1786,7 +1912,7 @@ function MonthDayCell({
       accessibilityState={accessible ? { selected: day.isSelected } : undefined}
       android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
       onPress={onPress}
-      style={styles.monthCalendarDaySlot}
+      style={[styles.monthCalendarDaySlot, minHeight != null && { minHeight }]}
     >
       <View
         style={[

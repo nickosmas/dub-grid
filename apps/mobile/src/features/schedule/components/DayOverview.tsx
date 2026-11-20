@@ -48,6 +48,9 @@ export function DayOverview({
   showDate = false,
   showViewerDay,
   showRoster = false,
+  title = "Day overview",
+  titleAccessory,
+  children,
 }: {
   date: string;
   range: MobileScheduleRange;
@@ -60,6 +63,11 @@ export function DayOverview({
   showViewerDay?: boolean;
   /** Each shift that day with who works it, as Home's Team view lists it. */
   showRoster?: boolean;
+  title?: string;
+  /** Beside the title, at the pane's trailing edge. */
+  titleAccessory?: ReactNode;
+  /** The page's own view of the day, after its open shifts and requests; it says when it's empty. */
+  children?: ReactNode;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -147,9 +155,12 @@ export function DayOverview({
               {formatScheduleDayLabel(date, now, timeZone)}
             </AppText>
           ) : null}
-          <AppText accessibilityRole="header" variant="screenTitle">
-            Day overview
-          </AppText>
+          <View style={styles.titleRow}>
+            <AppText accessibilityRole="header" style={styles.rowGrow} variant="screenTitle">
+              {title}
+            </AppText>
+            {titleAccessory ? <View style={styles.titleAccessory}>{titleAccessory}</View> : null}
+          </View>
         </View>
         {showsViewerDay && viewerDay ? (
           <View style={styles.viewerDay}>
@@ -272,7 +283,8 @@ export function DayOverview({
             ))}
           </Section>
         ) : null}
-        {isEmpty ? (
+        {children}
+        {isEmpty && children == null ? (
           <AppText tone="secondary" variant="body">
             {showRoster ? "Nobody works this day." : "No open shifts or requests this day."}
           </AppText>
@@ -308,6 +320,16 @@ function createStyles(mobileColors: MobileColors) {
     },
     heading: {
       gap: mobileSpace.xs,
+    },
+    titleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: mobileSpace.md,
+    },
+    // A button taller than the title hangs outside its line, so the title
+    // keeps its place and both centre on it.
+    titleAccessory: {
+      marginVertical: -mobileSpace.sm,
     },
     viewerDay: {
       backgroundColor: mobileColors.surface,
