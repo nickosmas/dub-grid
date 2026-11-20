@@ -1,5 +1,9 @@
 import { useTransparentPane } from "../layout/TransparentPaneContext";
-import { useInDetailPane, usePaneTopInset } from "../layout/DetailPaneContext";
+import {
+  useDetailBarClearance,
+  useInDetailPane,
+  usePaneTopInset,
+} from "../layout/DetailPaneContext";
 import {
   useEffect,
   useMemo,
@@ -273,8 +277,12 @@ export function Screen<T = never>({
   );
   // A detail pane opens on its title, which centres on the camera like the
   // list's top row beside it.
+  const barClearance = useDetailBarClearance();
+  // Under a native bar the pane already starts below it.
   const paneTopPadding =
-    Math.max(insets.top, 8) + getSideColumnTopOffset(windowInsets, PANE_TITLE_ROW_CENTRE);
+    barClearance > 0
+      ? mobileSpace.sm
+      : Math.max(insets.top, 8) + getSideColumnTopOffset(windowInsets, PANE_TITLE_ROW_CENTRE);
   const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? topRowPadding;
   const scrollHandle = useMemo<ScreenScrollHandle>(
     () =>

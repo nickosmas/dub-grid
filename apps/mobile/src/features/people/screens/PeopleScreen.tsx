@@ -12,7 +12,10 @@ import { Alert, StyleSheet, View } from "react-native";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { router, useIsFocused } from "expo-router";
+import { Stack, router, useIsFocused } from "expo-router";
+import { useHeaderHeight } from "expo-router/react-navigation";
+import { createTopLevelStackOptions } from "../../../shared/navigation/top-level-stack";
+import { PaneSearch } from "../../../shared/layout/PaneSearch";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileDepartment,
@@ -35,8 +38,6 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { DISCARD_CONFIRM } from "../../../shared/navigation/EditBarActions";
-import { PaneHeader } from "../../../shared/layout/PaneHeader";
-import { SplitStackTitle } from "../../../shared/layout/SplitStackTitle";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import PersonDetailScreen from "./PersonDetailScreen";
 import {
@@ -659,6 +660,13 @@ export default function PeopleScreen() {
   // pick it shows the first person in the list other than you, since your
   // own page is the Profile tab.
   const split = useSplitLayout();
+  // The native bar's height, with People's large title: split, the person's
+  // page starts below it.
+  const headerHeight = useHeaderHeight();
+  const peopleStackOptions = useMemo(
+    () => createTopLevelStackOptions(mobileColors, "People"),
+    [mobileColors],
+  );
   const foldEntering = useFoldEntering(split !== null);
   const [pickedPersonId, setPickedPersonId] = useState<string | null>(null);
   const firstPersonId = useMemo(() => {
@@ -1032,46 +1040,22 @@ export default function PeopleScreen() {
         )}
       </FilterSheet>
 
-      <SplitStackTitle split={split !== null} title="People" />
+      {/* The page's own large title and bar buttons in every pose; split, iOS
+          stands the buttons in the side column, and the search sits above the
+          list, since the bar's own search would span both panes. */}
+      <Stack.Screen options={peopleStackOptions} />
+      <PeopleHeaderActions
+        activeFilterCount={activeFilterCount}
+        onAddPerson={canAddScheduled || canAddManagement ? openAddPerson : undefined}
+        onOpenFilters={() => setIsFilterModalVisible(true)}
+        split={split !== null}
+      />
       {split ? (
-        <>
-          {/* Split, the native bar spans both panes and carries the person's
-              actions; the list's own title, buttons and search sit above the
-              list instead. */}
-          <PaneHeader
-            actions={[
-              ...(canAddScheduled || canAddManagement
-                ? [
-                    {
-                      label: "Add person",
-                      icon: "person-add-outline" as const,
-                      onPress: openAddPerson,
-                    },
-                  ]
-                : []),
-              {
-                label:
-                  activeFilterCount > 0
-                    ? `Open people filters and sort, ${activeFilterCount} active`
-                    : "Open people filters and sort",
-                icon: "filter" as const,
-                active: activeFilterCount > 0,
-                onPress: () => setIsFilterModalVisible(true),
-              },
-            ]}
-            search={{ placeholder: searchPlaceholder, onChange: setSearchValue }}
-            title="People"
-          />
-        </>
+        <View style={styles.paneSearch}>
+          <PaneSearch placeholder={searchPlaceholder} onChange={setSearchValue} />
+        </View>
       ) : (
-        <>
-          <PeopleHeaderActions
-            activeFilterCount={activeFilterCount}
-            onAddPerson={canAddScheduled || canAddManagement ? openAddPerson : undefined}
-            onOpenFilters={() => setIsFilterModalVisible(true)}
-          />
-          <ScreenSearch placeholder={searchPlaceholder} onSearchChange={setSearchValue} />
-        </>
+        <ScreenSearch placeholder={searchPlaceholder} onSearchChange={setSearchValue} />
       )}
 
       {canManageEmployees && profileRequests.length > 0 ? (
@@ -1271,6 +1255,7 @@ export default function PeopleScreen() {
 
   return (
     <SplitView
+      detailBarHeight={headerHeight}
       entering={foldEntering}
       layout={split}
       list={listScreen}
@@ -1507,6 +1492,11 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       gap: 8,
       minWidth: 0,
+    },
+    // Split, the list's search under the native title, with a row's room
+    // before the first person.
+    paneSearch: {
+      paddingBottom: mobileSpace.md,
     },
     personName: {
       ...mobileText.cardTitle,

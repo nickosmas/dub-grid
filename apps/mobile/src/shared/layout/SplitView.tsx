@@ -11,7 +11,11 @@ import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileElevation, mobileRadii, mobileSpace } from "../theme/tokens";
 import { WindowInsetsContext } from "../navigation/useHasSideColumn";
 import { getSplitLayout, type SplitLayout } from "./split-layout";
-import { DetailPaneContext, PaneTopInsetContext } from "./DetailPaneContext";
+import {
+  DetailBarClearanceContext,
+  DetailPaneContext,
+  PaneTopInsetContext,
+} from "./DetailPaneContext";
 import { TransparentPaneContext } from "./TransparentPaneContext";
 import { useHingeStatus } from "./useHingeStatus";
 import { hingeModule } from "../../../modules/hinge";
@@ -42,6 +46,7 @@ export function SplitView({
   background,
   listCard = false,
   entering,
+  detailBarHeight = 0,
 }: {
   layout: SplitLayout;
   list: ReactNode;
@@ -53,6 +58,8 @@ export function SplitView({
    * concentric with the display's and its trailing ones a control's.
    */
   listCard?: boolean;
+  /** A native bar's height over the panes, which the detail's page starts below. */
+  detailBarHeight?: number;
   /** The fade from `useFoldEntering`, as the page arrives from one pane. */
   entering?: ReturnType<typeof useFoldEntering>;
 }) {
@@ -111,9 +118,13 @@ export function SplitView({
           {listCard ? null : (
             <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
           )}
-          <View style={styles.detail}>
+          {/* Below a native bar, the pane starts under it: a scroll view the bar
+              overlaps gets iOS's edge blur, a band over the pane's top. */}
+          <View style={[styles.detail, detailBarHeight > 0 && { paddingTop: detailBarHeight }]}>
             <SafeAreaInsetsContext.Provider value={detailInsets}>
-              <DetailPaneContext.Provider value={true}>{detail}</DetailPaneContext.Provider>
+              <DetailBarClearanceContext.Provider value={detailBarHeight}>
+                <DetailPaneContext.Provider value={true}>{detail}</DetailPaneContext.Provider>
+              </DetailBarClearanceContext.Provider>
             </SafeAreaInsetsContext.Provider>
           </View>
         </Animated.View>

@@ -1,4 +1,5 @@
 import { router, Stack, useIsFocused } from "expo-router";
+import { useHeaderHeight } from "expo-router/react-navigation";
 import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
@@ -129,6 +130,9 @@ export default function ProfileScreen() {
   // details until another is picked. Folding closed with a pick pushes its
   // page; the default gives way to the list.
   const split = useSplitLayout();
+  // The native bar's height: split, the setting beside the profile starts
+  // below it, clear of its edge blur.
+  const headerHeight = useHeaderHeight();
   const foldEntering = useFoldEntering(split !== null);
   const [pickedSection, setPickedSection] = useState<ProfileSplitSection | null>(null);
   const isFocused = useIsFocused();
@@ -518,11 +522,6 @@ export default function ProfileScreen() {
               // label or renders an empty-title placeholder. Its colour alone
               // changes when the hero passes beneath the scroll-edge bar.
               title: displayName,
-              // Split, the bar spans both panes, and its edge blur would sit
-              // over the setting's title on the right.
-              ...(split
-                ? { headerTransparent: false, scrollEdgeEffects: { top: "hidden" } }
-                : null),
               headerTitleStyle: {
                 color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
                 fontFamily: mobileTypography.fontFamily.bold,
@@ -767,6 +766,7 @@ export default function ProfileScreen() {
 
   return (
     <SplitView
+      detailBarHeight={headerHeight}
       entering={foldEntering}
       layout={split}
       list={page}

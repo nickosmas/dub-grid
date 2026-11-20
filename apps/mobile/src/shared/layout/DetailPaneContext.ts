@@ -21,3 +21,14 @@ export const PaneTopInsetContext = createContext(0);
 export function usePaneTopInset(): number {
   return useContext(PaneTopInsetContext);
 }
+
+/**
+ * The height of a native bar the detail pane sits under, when the list's page
+ * shows one (People's large title): the pane starts below it, so its page
+ * keeps only a small gap at the top.
+ */
+export const DetailBarClearanceContext = createContext(0);
+
+export function useDetailBarClearance(): number {
+  return useContext(DetailBarClearanceContext);
+}
