@@ -14,7 +14,11 @@ export const WindowInsetsContext = createContext<EdgeInsets | null>(null);
  * view's list pane doesn't touch the column, but its bar items still go there.
  */
 export function useHasSideColumn(): boolean {
+  return hasSideColumn(useWindowInsets());
+}
+
+/** The window's insets inside a split view's pane, or the screen's own outside one. */
+export function useWindowInsets(): EdgeInsets {
   const paneInsets = useSafeAreaInsets();
-  const windowInsets = useContext(WindowInsetsContext);
-  return hasSideColumn(windowInsets ?? paneInsets);
+  return useContext(WindowInsetsContext) ?? paneInsets;
 }

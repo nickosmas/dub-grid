@@ -259,9 +259,13 @@ export function DayOverview({
                 <AppText variant="rowTitle">
                   {[shift.title, shift.focusArea, shift.time].filter(Boolean).join(" · ")}
                 </AppText>
-                {shift.names.map((name, nameIndex) => (
-                  <AppText key={`${name}-${nameIndex}`} tone="secondary" variant="body">
-                    {name}
+                {shift.people.map((person, personIndex) => (
+                  <AppText
+                    key={`${person.employeeId}-${personIndex}`}
+                    tone="secondary"
+                    variant="body"
+                  >
+                    {person.name}
                   </AppText>
                 ))}
               </View>
@@ -301,7 +305,6 @@ function createStyles(mobileColors: MobileColors) {
   return StyleSheet.create({
     page: {
       gap: mobileSpace.xl,
-      paddingTop: mobileSpace.lg,
     },
     heading: {
       gap: mobileSpace.xs,

@@ -516,6 +516,11 @@ export default function ProfileScreen() {
               // label or renders an empty-title placeholder. Its colour alone
               // changes when the hero passes beneath the scroll-edge bar.
               title: displayName,
+              // Split, the bar spans both panes, and its edge blur would sit
+              // over the setting's title on the right.
+              ...(split
+                ? { headerTransparent: false, scrollEdgeEffects: { top: "hidden" } }
+                : null),
               headerTitleStyle: {
                 color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
                 fontFamily: mobileTypography.fontFamily.bold,

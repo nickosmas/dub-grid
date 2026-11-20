@@ -1,4 +1,5 @@
 import { useTransparentPane } from "../layout/TransparentPaneContext";
+import { useInDetailPane } from "../layout/DetailPaneContext";
 import {
   useEffect,
   useMemo,
@@ -30,6 +31,7 @@ import { Pressable } from "./Pressable";
 import { SectionHeading } from "./SectionHeading";
 import { SafeAreaListener, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNativeTabBarPresence } from "../navigation/NativeTabBarPresence";
+import { useWindowInsets } from "../navigation/useHasSideColumn";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
   MAX_FONT_SCALE,
@@ -86,6 +88,7 @@ import {
   getScreenGutter,
   getScreenSidePadding,
   getSideColumnTopOffset,
+  PANE_TITLE_ROW_CENTRE,
   type ScreenBottomPaddingMode,
 } from "./screen-layout";
 import { KEYBOARD_DISMISS_MODE } from "./keyboard-dismiss";
@@ -216,6 +219,10 @@ export function Screen<T = never>({
     [mobileColors, isDark, hasPageBackground, transparentPane],
   );
   const insets = useSafeAreaInsets();
+  // A split view's list pane doesn't touch the side column, but its top row
+  // still lines up with the camera in it.
+  const windowInsets = useWindowInsets();
+  const inDetailPane = useInDetailPane();
   const nativeTabBarVisible = useNativeTabBarPresence();
   const resolvedBottomPadding = getScreenBottomPadding(bottomPaddingMode, insets.bottom);
   const resolvedFooterBottomPadding = getFooterBottomPadding(
@@ -226,7 +233,7 @@ export function Screen<T = never>({
   const internalScrollViewRef = useRef<KeyboardAwareScrollViewRef>(null);
   const internalListRef = useRef<FlatList<T>>(null);
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
-  const usesIosNativeInsets = Platform.OS === "ios" && !stickyHeader;
+  const usesIosNativeInsets = Platform.OS === "ios" && !stickyHeader && !inDetailPane;
   // The height left between the native header and tab bar. Content only fills
   // that much, so a page that fits springs back when dragged, as a short page
   // does in any iOS app. Filling the whole scroll view left the header and tab
@@ -247,7 +254,7 @@ export function Screen<T = never>({
     />
   ) : null;
   const overlay = renderOverlay?.({ stickyHeaderHeight });
-  const useNativeContentInsets = !stickyHeader;
+  const useNativeContentInsets = !stickyHeader && !inDetailPane;
   const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay && !footer;
   // iOS's native large-title collapse only tracks a scroll view that is a
   // shallow child of the screen, not one nested inside an extra wrapping
@@ -259,8 +266,12 @@ export function Screen<T = never>({
   // A sticky header only exists on a route that hides the native header (the
   // dashboard and the schedule), so nothing above it clears the status bar on
   // its behalf: the shell pads itself by the safe-area inset.
-  const resolvedStickyHeaderTopPadding =
-    stickyHeaderTopPadding ?? Math.max(insets.top, 8) + getSideColumnTopOffset(insets);
+  const topRowPadding = Math.max(insets.top, 8) + getSideColumnTopOffset(windowInsets);
+  // A detail pane opens on its title, which centres on the camera like the
+  // list's top row beside it.
+  const paneTopPadding =
+    Math.max(insets.top, 8) + getSideColumnTopOffset(windowInsets, PANE_TITLE_ROW_CENTRE);
+  const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? topRowPadding;
   const scrollHandle = useMemo<ScreenScrollHandle>(
     () =>
       ({
@@ -303,6 +314,7 @@ export function Screen<T = never>({
   const guttedSidePadding = getScreenSidePadding(insets, getScreenGutter());
   const contentContainerStyle = {
     ...sideInsetPadding,
+    ...(inDetailPane ? { paddingTop: paneTopPadding } : null),
     paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding,
     ...(usesIosNativeInsets && visibleHeight !== null
       ? { minHeight: visibleHeight }

@@ -1243,18 +1243,6 @@ export default function RequestsScreen() {
       detail={
         <Screen bottomPaddingMode="tabbed" key={shownRequest.id}>
           <RequestDetail
-            card={
-              <RequestCard
-                canApprove={canApprove}
-                highlighted={false}
-                linkedEmployeeId={linkedEmployeeId}
-                now={now}
-                onAction={(body) => runRequestAction(shownRequest.id, body)}
-                pendingAction={pendingAction}
-                request={shownRequest}
-                timeZone={timeZone}
-              />
-            }
             now={now}
             request={shownRequest}
             timeZone={timeZone}

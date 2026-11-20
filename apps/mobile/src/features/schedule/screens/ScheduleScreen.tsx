@@ -860,19 +860,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   useScrollToTopOnChange(scrollViewRef, `${range.startDate}:${selectedDate}`);
 
-  // The split's list has the height for the whole month, so it stays open
-  // there; folding closed brings back the week strip.
   const isSplit = split !== null;
-  useEffect(() => {
-    if (isSplit) {
-      setCalendarMonthAnchor(getScheduleMonthStartDate(selectedDateRef.current ?? selectedDate));
-      calendarExpandProgress.value = withTiming(1, MONTH_EXPAND_TIMING);
-      setIsCalendarOpen(true);
-    } else {
-      closeCalendarExpansion();
-    }
-    // Only the split's arrival and departure open or close the month.
-  }, [isSplit]);
   // Folding closed turns a picked shift into its pushed page, marked so it
   // goes back into the split when the Duo opens again; the day overview, a
   // default, gives way to the list. Only on screen: a hidden tab never pushes.
@@ -938,7 +926,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     // Cleared here too: closeCalendarExpansion returns early while collapsed,
     // and a month pinned by a tap would outlive the swipes that leave it.
     setCalendarMonthAnchor(null);
-    if (!split) closeCalendarExpansion();
+    closeCalendarExpansion();
   }
 
   function handleOpenShiftDetail(entry: MobileScheduleEntry) {
@@ -1229,7 +1217,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   function handleSelectFocusArea(nextFocusAreaKey: string) {
     setSelectedTeamFocusAreaKey(nextFocusAreaKey);
-    if (!split) closeCalendarExpansion();
+    closeCalendarExpansion();
   }
 
   const weekStripRenderWidth = weekStripWidth || WEEK_SWIPE_FALLBACK_WIDTH;
@@ -1444,27 +1432,23 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           </Reanimated.View>
         </Reanimated.View>
 
-        {isSplit ? null : (
-          <GestureDetector gesture={calendarHandleGesture}>
-            <View
-              accessibilityLabel={
-                isCalendarOpen ? "Collapse month calendar" : "Open month calendar"
-              }
-              accessibilityActions={[{ name: "activate" }]}
-              accessibilityRole="adjustable"
-              hitSlop={{ top: 8, bottom: 16, left: 40, right: 40 }}
-              onAccessibilityAction={() => {
-                const shouldOpen = !isCalendarOpen;
-                if (shouldOpen) handleCalendarDragStart();
-                calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
-                handleCalendarDragEnd(shouldOpen);
-              }}
-              style={styles.calendarDragHandleRow}
-            >
-              <View style={styles.calendarDragHandleBar} />
-            </View>
-          </GestureDetector>
-        )}
+        <GestureDetector gesture={calendarHandleGesture}>
+          <View
+            accessibilityLabel={isCalendarOpen ? "Collapse month calendar" : "Open month calendar"}
+            accessibilityActions={[{ name: "activate" }]}
+            accessibilityRole="adjustable"
+            hitSlop={{ top: 8, bottom: 16, left: 40, right: 40 }}
+            onAccessibilityAction={() => {
+              const shouldOpen = !isCalendarOpen;
+              if (shouldOpen) handleCalendarDragStart();
+              calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
+              handleCalendarDragEnd(shouldOpen);
+            }}
+            style={styles.calendarDragHandleRow}
+          >
+            <View style={styles.calendarDragHandleBar} />
+          </View>
+        </GestureDetector>
       </View>
     </View>
   ) : (
@@ -1887,7 +1871,18 @@ function TeamShiftMemberRow({
     : hasMentoredSegments(getScheduleEntrySegments(entry));
   // Once the reader raises the text size the role pill moves under the name:
   // the two no longer share a row's width, so neither has to give.
-  const stackRolePill = useWindowDimensions().fontScale > 1 || narrow;
+  // A name that doesn't fit beside a long pill ("Supervisor (Mentored)")
+  // moves the pill under it, so the name keeps whole words. Measured: a name
+  // that breaks beside the pill stacks it, and the name's one-line width
+  // then decides whether it can come back.
+  const [fit, setFit] = useState<RoleRowFit>({ broke: false });
+  const pillDoesntFit =
+    fit.broke ||
+    (fit.name != null &&
+      fit.pill != null &&
+      fit.row != null &&
+      fit.name + TEAM_MEMBER_HEADER_GAP + fit.pill > fit.row);
+  const stackRolePill = useWindowDimensions().fontScale > 1 || narrow || pillDoesntFit;
   // A double shift gives each note to one half; a single shift in a focus-area
   // tab lists that area's notes, and the all tab every note.
   const isSplitEntry = getScheduleEntrySegments(entry).length > 1;
@@ -1900,7 +1895,16 @@ function TeamShiftMemberRow({
   const restOfDayChip = buildRestOfDayAbsenceChip(mobileColors, isDark, entry);
   const rolePill =
     roleChip || isMentored || restOfDayChip ? (
-      <View style={[styles.teamMemberRoleRow, stackRolePill && styles.teamMemberRoleRowStacked]}>
+      <View
+        onLayout={(event) => {
+          // Stacked, the row stretches to the column; only beside the name is
+          // its width the pill's own.
+          if (stackRolePill) return;
+          const pill = event.nativeEvent.layout.width;
+          setFit((current) => (current.pill === pill ? current : { ...current, pill }));
+        }}
+        style={[styles.teamMemberRoleRow, stackRolePill && styles.teamMemberRoleRowStacked]}
+      >
         {roleChip || isMentored ? (
           <JobPill chip={roleChip} compact eyebrowDisplay="outside" isMentored={isMentored} />
         ) : null}
@@ -1936,9 +1940,35 @@ function TeamShiftMemberRow({
           {/* The role pill shares the name's line and the tags take the full
             width beneath, so a split chip is never squeezed into the column
             beside the pill and cut to "Also Day Shift ·…". */}
-          <View style={styles.teamMemberHeaderRow}>
+          <View
+            onLayout={(event) => {
+              const row = event.nativeEvent.layout.width;
+              setFit((current) => (current.row === row ? current : { ...current, row }));
+            }}
+            style={styles.teamMemberHeaderRow}
+          >
             <View style={styles.teamMemberNameRow}>
-              <Text style={styles.teamMemberName}>{memberName}</Text>
+              <Text
+                onTextLayout={(event) => {
+                  const { lines } = event.nativeEvent;
+                  if (lines.length > 1) {
+                    if (!stackRolePill && rolePill) {
+                      setFit((current) => ({ ...current, broke: true }));
+                    }
+                    return;
+                  }
+                  const name = lines[0]?.width;
+                  if (name == null) return;
+                  setFit((current) =>
+                    current.name === name && !current.broke
+                      ? current
+                      : { ...current, name, broke: false },
+                  );
+                }}
+                style={styles.teamMemberName}
+              >
+                {memberName}
+              </Text>
             </View>
             {stackRolePill ? null : rolePill}
           </View>
@@ -1955,6 +1985,11 @@ function TeamShiftMemberRow({
     </View>
   );
 }
+
+/** The role pill's gap from the name, as `teamMemberHeaderRow` sets it. */
+const TEAM_MEMBER_HEADER_GAP = 12;
+
+type RoleRowFit = { name?: number; pill?: number; row?: number; broke: boolean };
 
 function getTeamMemberRoleChip(
   mobileColors: MobileColors,

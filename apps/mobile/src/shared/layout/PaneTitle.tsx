@@ -24,6 +24,5 @@ export function PaneTitle({ eyebrow, title }: { eyebrow?: string; title: string 
 const styles = StyleSheet.create({
   heading: {
     gap: mobileSpace.xs,
-    paddingTop: mobileSpace.lg,
   },
 });

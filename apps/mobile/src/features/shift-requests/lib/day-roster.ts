@@ -12,21 +12,34 @@ export type DayRosterShift = {
   time: string | null;
   /** Its focus area, only when another shift that day has the same name. */
   focusArea: string | null;
-  names: string[];
+  people: DayRosterPerson[];
+  /** Someone the request touches works this shift. */
+  affected: boolean;
 };
 
-/** Who works each shift on one day, in the schedule's shift order. Absences are left out. */
+export type DayRosterPerson = { employeeId: string; name: string; affected: boolean };
+
+/**
+ * Who works each shift on one day. Shifts someone in `affectedIds` works come
+ * first, then the rest in the schedule's shift order. Absences are left out.
+ */
 export function buildDayRoster(
   entries: readonly MobileScheduleEntry[],
   date: string,
+  affectedIds: ReadonlySet<string> = new Set(),
 ): DayRosterShift[] {
   const worked = entries.filter(
     (entry) => entry.date === date && getScheduleEntryAbsenceTypeId(entry) == null,
   );
   const groups = buildScheduleShiftGroups(worked);
-  return groups.map((group) => {
+  const roster = groups.map((group) => {
     const first = group.entries[0];
     const sharesName = groups.some((other) => other !== group && other.title === group.title);
+    const people = group.entries.map((entry) => ({
+      employeeId: entry.employeeId,
+      name: entry.employeeName,
+      affected: affectedIds.has(entry.employeeId),
+    }));
     return {
       key: group.key,
       title: group.title,
@@ -34,7 +47,12 @@ export function buildDayRoster(
       focusArea: sharesName
         ? (first?.presentation.displayFocusAreaName ?? first?.presentation.focusAreaName ?? null)
         : null,
-      names: group.entries.map((entry) => entry.employeeName),
+      people,
+      affected: people.some((person) => person.affected),
     };
   });
+  return [
+    ...roster.filter((shift) => shift.affected),
+    ...roster.filter((shift) => !shift.affected),
+  ];
 }

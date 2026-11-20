@@ -4,6 +4,7 @@ import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { WindowInsetsContext } from "../navigation/useHasSideColumn";
 import { getSplitLayout, type SplitLayout } from "./split-layout";
+import { DetailPaneContext } from "./DetailPaneContext";
 import { TransparentPaneContext } from "./TransparentPaneContext";
 import { useHingeStatus } from "./useHingeStatus";
 
@@ -59,7 +60,7 @@ export function SplitView({
           <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
           <View style={styles.detail}>
             <SafeAreaInsetsContext.Provider value={detailInsets}>
-              {detail}
+              <DetailPaneContext.Provider value={true}>{detail}</DetailPaneContext.Provider>
             </SafeAreaInsetsContext.Provider>
           </View>
         </View>

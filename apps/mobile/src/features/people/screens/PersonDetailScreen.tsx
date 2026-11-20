@@ -1699,7 +1699,6 @@ export default function PersonDetailScreen({
     >
       {/* No large title above it in a pane, so the page keeps its own room
           under the top edge, level with the list's header. */}
-      {embedded ? <View style={styles.paneTop} /> : null}
       {/* The native inline header is deliberately the person, not "Staff
           Profile". It stays compact and gets UIKit's scroll-edge blur from the
           route while the hero below scrolls beneath it, the same pattern
@@ -2999,9 +2998,6 @@ function EditPanel({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    paneTop: {
-      height: mobileSpace.lg,
-    },
     actionsRow: {
       flexDirection: "row",
       gap: mobileSpace.md,
