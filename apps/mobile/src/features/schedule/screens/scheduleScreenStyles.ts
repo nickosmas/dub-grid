@@ -946,6 +946,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     monthSwipeTrack: {
       flexDirection: "row",
     },
+    // A swipe track holds three pages (previous, current, next) and starts one
+    // page to the left, all as shares of its frame's width.
+    weekStripTrackSized: {
+      width: "300%",
+      marginLeft: "-100%",
+    },
+    monthSwipeTrackSized: {
+      width: "300%",
+      marginLeft: "-100%",
+    },
+    swipeTrackColumn: {
+      width: "33.3333%",
+    },
     monthGridColumn: {
       gap: MONTH_GRID_ROW_GAP,
     },

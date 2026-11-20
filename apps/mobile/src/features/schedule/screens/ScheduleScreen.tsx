@@ -1,6 +1,6 @@
 import { ScheduleNoteLabels } from "../../../shared/components/ScheduleNoteLabels";
 import { useHasSideColumn } from "../../../shared/navigation/useHasSideColumn";
-import { FOLD_FADE_MS, FoldFade, useFoldEntering } from "../../../shared/layout/FoldFade";
+import { FoldFade, useFoldEntering } from "../../../shared/layout/FoldFade";
 import { scheduleNotesForRow } from "../lib/scheduleNotes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
@@ -141,6 +141,8 @@ const MONTH_EXPAND_TIMING = {
   duration: 240,
   easing: Easing.out(Easing.cubic),
 };
+/** After the split's fade and the hinge module's 0.35s cover over the resize. */
+const MONTH_OPEN_DELAY_MS = 400;
 /** Slower when the Duo opens, so the strip is seen stretching into the month. */
 const MONTH_OPEN_TIMING = {
   duration: 420,
@@ -661,12 +663,36 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     })),
     combine: combineScheduledDates,
   });
+  // Split, the month fills the list pane and the chosen day sits beside it,
+  // as Calendar lays them out; folding closed brings back the week strip.
+  const isSplit = split !== null;
+  // On an iPhone Duo, open or closed, the bell stands in the side column.
+  const sideColumn = useHasSideColumn();
+  // Where the month's dates start in the window, so its weeks can share the
+  // height below them down to the bottom of the pane.
+  const [monthGridTop, setMonthGridTop] = useState<number | null>(null);
+  const monthGridRef = useRef<View>(null);
+  const splitRowHeight =
+    isSplit && monthGridTop !== null && monthWeeks.length > 0
+      ? Math.max(
+          WEEK_STRIP_ROW_HEIGHT,
+          Math.floor(
+            (viewportHeight -
+              monthGridTop -
+              mobileSpace.lg -
+              (monthWeeks.length - 1) * MONTH_GRID_ROW_GAP) /
+              monthWeeks.length,
+          ),
+        )
+      : undefined;
   // One shared row height for every week row (swipeable or static) so the
   // grid stays perfectly aligned as it slides — no per-row measurement.
+  // Split, it's the split's own row height from the start: waiting for the
+  // taller rows to be measured put the strip on the wrong week as it opened.
+  const monthRowHeight = splitRowHeight ?? weekStripRowHeight;
   const monthGridRowsHeight =
-    monthWeeks.length * weekStripRowHeight +
-    Math.max(0, monthWeeks.length - 1) * MONTH_GRID_ROW_GAP;
-  const anchorRowOffsetInStack = anchorWeekIndex * (weekStripRowHeight + MONTH_GRID_ROW_GAP);
+    monthWeeks.length * monthRowHeight + Math.max(0, monthWeeks.length - 1) * MONTH_GRID_ROW_GAP;
+  const anchorRowOffsetInStack = anchorWeekIndex * (monthRowHeight + MONTH_GRID_ROW_GAP);
   // The dates panel clips from a single row's height up to the full month
   // grid height, so when fully expanded every week row is visible.
   const calendarOuterClipAnimatedStyle = useAnimatedStyle(
@@ -674,11 +700,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       height: interpolate(
         calendarExpandProgress.value,
         [0, 1],
-        [weekStripRowHeight, monthGridRowsHeight],
+        [monthRowHeight, monthGridRowsHeight],
         Extrapolation.CLAMP,
       ),
     }),
-    [weekStripRowHeight, monthGridRowsHeight],
+    [monthRowHeight, monthGridRowsHeight],
   );
   // The dates themselves just slide (no opacity/crossfade): the anchor
   // (selected) week starts exactly where the collapsed row sits and moves
@@ -873,28 +899,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   useScrollToTopOnChange(scrollViewRef, `${range.startDate}:${selectedDate}`);
 
-  // Split, the month fills the list pane and the chosen day sits beside it,
-  // as Calendar lays them out; folding closed brings back the week strip.
-  const isSplit = split !== null;
-  // On an iPhone Duo, open or closed, the bell stands in the side column.
-  const sideColumn = useHasSideColumn();
-  // Where the month's dates start in the window, so its weeks can share the
-  // height below them down to the bottom of the pane.
-  const [monthGridTop, setMonthGridTop] = useState<number | null>(null);
-  const monthGridRef = useRef<View>(null);
-  const splitRowHeight =
-    isSplit && monthGridTop !== null && monthWeeks.length > 0
-      ? Math.max(
-          WEEK_STRIP_ROW_HEIGHT,
-          Math.floor(
-            (viewportHeight -
-              monthGridTop -
-              mobileSpace.lg -
-              (monthWeeks.length - 1) * MONTH_GRID_ROW_GAP) /
-              monthWeeks.length,
-          ),
-        )
-      : undefined;
   // The weeks take their full height before the month opens, so it opens in
   // one movement rather than opening and then growing.
   const hasSplitRowHeight = splitRowHeight !== undefined;
@@ -902,9 +906,13 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     if (isSplit) {
       if (!hasSplitRowHeight) return;
       setCalendarMonthAnchor(getScheduleMonthStartDate(selectedDateRef.current ?? selectedDate));
-      // Once the split has faded in, the week strip stretches down into the
+      // Once the split has faded in, and the cover the hinge module lays over
+      // the resizing window has gone, the week strip stretches down into the
       // month, so the eye follows it from the closed phone.
-      calendarExpandProgress.value = withDelay(FOLD_FADE_MS, withTiming(1, MONTH_OPEN_TIMING));
+      calendarExpandProgress.value = withDelay(
+        MONTH_OPEN_DELAY_MS,
+        withTiming(1, MONTH_OPEN_TIMING),
+      );
       setIsCalendarOpen(true);
     } else {
       // At once: the closed phone fades in on its week strip, never the month.
@@ -1279,7 +1287,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     if (!split) closeCalendarExpansion();
   }
 
-  const weekStripRenderWidth = weekStripWidth || WEEK_SWIPE_FALLBACK_WIDTH;
   const weekStripRows = [
     {
       key: "previous",
@@ -1294,7 +1301,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       days: nextWeekDays,
     },
   ];
-  const calendarDragRange = Math.max(1, monthGridRowsHeight - weekStripRowHeight);
+  const calendarDragRange = Math.max(1, monthGridRowsHeight - monthRowHeight);
   const calendarDragGesture = Gesture.Pan()
     .onStart(() => {
       "worklet";
@@ -1362,20 +1369,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             <Animated.View
               style={[
                 styles.weekStripTrack,
-                {
-                  width: weekStripRenderWidth * weekStripRows.length,
-                  transform: [
-                    { translateX: -weekStripRenderWidth },
-                    { translateX: weekStripTranslateX },
-                  ],
-                },
+                // Sized in percentages of the strip, not a measured width: a
+                // measurement trails a resize by a frame, and that frame drew
+                // the old week's dates bunched against a wider strip.
+                styles.weekStripTrackSized,
+                { transform: [{ translateX: weekStripTranslateX }] },
               ]}
             >
               {weekStripRows.map((row) => (
-                <View
-                  key={row.key}
-                  style={[styles.monthCalendarWeek, { width: weekStripRenderWidth }]}
-                >
+                <View key={row.key} style={[styles.monthCalendarWeek, styles.swipeTrackColumn]}>
                   {row.days.map((day) => (
                     <MonthDayCell
                       minHeight={splitRowHeight}
@@ -1524,22 +1526,17 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               <Animated.View
                 style={[
                   styles.monthSwipeTrack,
-                  {
-                    width: weekStripRenderWidth * 3,
-                    transform: [
-                      { translateX: -weekStripRenderWidth },
-                      { translateX: monthSwipeTranslateX },
-                    ],
-                  },
+                  styles.monthSwipeTrackSized,
+                  { transform: [{ translateX: monthSwipeTranslateX }] },
                 ]}
               >
-                <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
+                <View style={[styles.monthGridColumn, styles.swipeTrackColumn]}>
                   {renderMonthWeeks(previousMonthWeeks, false)}
                 </View>
-                <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
+                <View style={[styles.monthGridColumn, styles.swipeTrackColumn]}>
                   {renderMonthWeeks(monthWeeks, true)}
                 </View>
-                <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
+                <View style={[styles.monthGridColumn, styles.swipeTrackColumn]}>
                   {renderMonthWeeks(nextMonthWeeks, false)}
                 </View>
               </Animated.View>

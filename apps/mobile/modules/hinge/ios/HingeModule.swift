@@ -10,7 +10,7 @@ import UIKit
 // JavaScript hears of it and draws the new layout; on the Duo that showed
 // the open split clipped on the closed screen, and the phone's week strip
 // stretched across the open one. A blurred picture of the last frame covers
-// that gap and fades once JavaScript calls `settle()`, or after a moment.
+// that gap and fades once JavaScript calls `settle()`, or after 2.5 seconds.
 public class HingeModule: Module {
   private var status = "unknown"
   private var interaction: UIInteraction?
@@ -100,8 +100,10 @@ public class HingeModule: Module {
 
     window.addSubview(cover)
     self.cover = cover
-    // JavaScript normally settles well before this; it's only a backstop.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
+    // JavaScript normally settles well before this; it's only a backstop. It
+    // allows for the inner screen lighting a second or more after the window
+    // has resized while opening.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
       self?.reveal(after: 0)
     }
   }
