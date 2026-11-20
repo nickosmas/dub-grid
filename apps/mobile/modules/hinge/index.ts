@@ -2,6 +2,8 @@ type HingeChange = { status: string };
 
 type HingeNativeModule = {
   getStatus(): string;
+  /** The new layout is drawn: fade the cover laid over the window while it resized. */
+  settle?(): void;
   addListener(event: "onChange", listener: (change: HingeChange) => void): { remove(): void };
 };
 

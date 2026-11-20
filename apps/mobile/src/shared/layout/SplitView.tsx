@@ -14,12 +14,19 @@ import { getSplitLayout, type SplitLayout } from "./split-layout";
 import { DetailPaneContext, PaneTopInsetContext } from "./DetailPaneContext";
 import { TransparentPaneContext } from "./TransparentPaneContext";
 import { useHingeStatus } from "./useHingeStatus";
+import { hingeModule } from "../../../modules/hinge";
 import { FOLD_FADE_MS, type useFoldEntering } from "./FoldFade";
 
 /** The current split, or null when the screen shows one page at a time. */
 export function useSplitLayout(): SplitLayout | null {
   const { width, height } = useWindowDimensions();
   const hinge = useHingeStatus();
+  // Once the layout for a new size has been drawn, the hinge module's cover
+  // over the resizing window can fade.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => hingeModule?.settle?.());
+    return () => cancelAnimationFrame(frame);
+  }, [width, height]);
   return useMemo(() => getSplitLayout({ width, height, hinge }), [width, height, hinge]);
 }
 
