@@ -1750,8 +1750,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const listScreen = (
     <Screen
       bottomPaddingMode="tabbed"
-      // Split, the wash stays behind the right pane, whatever it shows; the
-      // month beside it is plain.
+      // Split, the wash runs behind both panes, with the month floating on it.
       pageBackground={homeSplit.split ? undefined : homeWash}
       stickyHeaderBackground={homeSplit.split ? undefined : homeWash}
       refreshing={manualRefresh.isRefreshing}
@@ -1786,7 +1785,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       <>
         {sideColumnBar}
         <SplitView
-          detailBackground={homeWash}
+          background={homeWash}
           layout={homeSplit.split}
           listCard
           list={
@@ -1825,14 +1824,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   const selectedDayTitle = formatLongDayTitle(selectedDate);
 
-  // Split, the day beside the month carries Home's wash, as Home's pane does.
+  // Split, Home's wash runs behind both panes, with the month floating on it.
   const splitWash = <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />;
 
   return (
     <>
       {sideColumnBar}
       <SplitView
-        detailBackground={splitWash}
+        background={splitWash}
         layout={split}
         listCard
         list={listScreen}

@@ -299,8 +299,7 @@ export function AdminHomeScreen() {
   // Home keeps its wash on every platform (owner, 2026-11-04).
   const wash = <HomeWash height={windowHeight} />;
 
-  // Split, the wash stays behind the right pane, whatever it shows; the month
-  // beside it is plain.
+  // Split, the wash runs behind both panes, with the month floating on it.
   const page = (
     <Screen
       bottomPaddingMode="tabbed"
@@ -340,7 +339,7 @@ export function AdminHomeScreen() {
     <>
       {alertsBar}
       <SplitView
-        detailBackground={wash}
+        background={wash}
         layout={splitLayout}
         listCard
         list={
