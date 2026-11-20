@@ -1242,7 +1242,9 @@ export default function RequestsScreen() {
 
   // With nothing in the tab, the list's own empty state says so once; a
   // second one beside it would only repeat it.
-  if (!split) return listScreen;
+  // With nothing in the tab, one page, its empty state centered across the
+  // whole screen, as on the phone.
+  if (!split || !shownRequest) return listScreen;
 
   return (
     <SplitView
@@ -1251,20 +1253,14 @@ export default function RequestsScreen() {
       layout={split}
       list={listScreen}
       detail={
-        shownRequest ? (
-          <Screen bottomPaddingMode="tabbed" key={shownRequest.id}>
-            <RequestDetail
-              now={now}
-              request={shownRequest}
-              timeZone={timeZone}
-              viewerEmpId={linkedEmployeeId}
-            />
-          </Screen>
-        ) : (
-          // With nothing in the tab, the pane stays empty: today's staff
-          // aren't requests.
-          <View style={styles.emptyPane} />
-        )
+        <Screen bottomPaddingMode="tabbed" key={shownRequest.id}>
+          <RequestDetail
+            now={now}
+            request={shownRequest}
+            timeZone={timeZone}
+            viewerEmpId={linkedEmployeeId}
+          />
+        </Screen>
       }
     />
   );

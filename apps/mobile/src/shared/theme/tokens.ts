@@ -116,9 +116,11 @@ const MOBILE_LIGHT = {
    * list sits on, used on Android too. White cards separate from it by fill
    * alone, as native grouped lists do, so cards carry no shadow
    * (`mobileElevation("card")` is flat) and no border (owner, 2026-10-31:
-   * surfaces "fully native").
+   * surfaces "fully native"). Lightened from iOS's #F2F2F7, which read too
+   * dark (owner, 2026-11-20), accepting softer card edges over adding a
+   * border or a shadow.
    */
-  background: "#F2F2F7",
+  background: "#F7F7FA",
   /** The one flat gray every empty-state scene is drawn in: iOS's systemGray3. */
   emptySceneInk: "#C7C7CC",
   /**

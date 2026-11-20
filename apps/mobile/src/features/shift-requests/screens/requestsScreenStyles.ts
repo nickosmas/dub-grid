@@ -44,9 +44,6 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
         },
     // The request beside the list in a split, or the one a link opened: the
     // same clear blue as a split list's picked row, edged in the brand color.
-    emptyPane: {
-      flex: 1,
-    },
     requestCardHighlighted: {
       ...splitSelectedRowStyle(mobileColors),
       borderWidth: 2,
