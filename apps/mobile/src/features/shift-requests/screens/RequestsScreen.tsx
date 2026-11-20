@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Stack, router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { createSplitTopLevelStackOptions } from "../../../shared/navigation/top-level-stack";
-import { DayOverview } from "../../schedule/components/DayOverview";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
@@ -98,7 +97,6 @@ import {
   formatScheduleDayLabel,
   formatScheduleTimeRange,
   getIsoDateInTimeZone,
-  getScheduleRangeForDate,
   getSplitShiftSegmentsFromPresentation,
   hasShiftRequestStarted,
 } from "../../schedule/lib/schedule";
@@ -862,7 +860,6 @@ export default function RequestsScreen() {
   );
   // The native bar's height: split, the request beside the list starts below it.
   const headerHeight = useHeaderHeight();
-  const todayRange = useMemo(() => getScheduleRangeForDate(todayDate), [todayDate]);
   const [pickedRequestId, setPickedRequestId] = useState<string | null>(null);
   const tabRequests = useMemo((): MobileShiftRequest[] => {
     if (activeTab === "available") {
@@ -1264,9 +1261,9 @@ export default function RequestsScreen() {
             />
           </Screen>
         ) : (
-          // With nothing in the tab, today: its open shifts, its requests and
-          // who works, rather than an empty pane.
-          <DayOverview date={todayDate} now={now} range={todayRange} showRoster title="Today" />
+          // With nothing in the tab, the pane stays empty: today's staff
+          // aren't requests.
+          <View style={styles.emptyPane} />
         )
       }
     />
