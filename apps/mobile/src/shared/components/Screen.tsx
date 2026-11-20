@@ -281,7 +281,8 @@ export function Screen<T = never>({
   // Under a native bar the pane's page starts below it and scrolls up under it.
   const paneTopPadding =
     barClearance > 0
-      ? barClearance + mobileSpace.sm
+      ? // Clear of the soft edge iOS fades below the bar's own height.
+        barClearance + mobileSpace.xl
       : Math.max(insets.top, 8) + getSideColumnTopOffset(windowInsets, PANE_TITLE_ROW_CENTRE);
   const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? topRowPadding;
   const scrollHandle = useMemo<ScreenScrollHandle>(

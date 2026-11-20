@@ -31,6 +31,12 @@ public class HingeModule: Module {
       DispatchQueue.main.async { self.reveal(after: 0.05) }
     }
 
+    // A split view's detail pane: its scroll views get iOS's soft top edge
+    // effect, which only shows once content scrolls under the bar. Screens
+    // sets the edge effect on the first scroll view it finds, the list's, and
+    // iOS gave the pane's its hard one, a band over the pane at rest.
+    View(PaneEdgeView.self) {}
+
     OnStartObserving {
       DispatchQueue.main.async { self.attach() }
     }
@@ -156,6 +162,29 @@ private final class SizeSentinel: UIView {
   override var bounds: CGRect {
     didSet {
       if oldValue.size != bounds.size { onResize?(oldValue.size, bounds.size) }
+    }
+  }
+}
+
+/// Wraps a split view's detail pane and gives each scroll view in it the soft
+/// top edge effect. It stops at a scroll view rather than searching inside one.
+final class PaneEdgeView: ExpoView {
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    guard #available(iOS 26.0, *) else { return }
+    softenTopEdges(in: self)
+  }
+
+  @available(iOS 26.0, *)
+  private func softenTopEdges(in view: UIView) {
+    for child in view.subviews {
+      if let scrollView = child as? UIScrollView {
+        if scrollView.topEdgeEffect.style != .soft {
+          scrollView.topEdgeEffect.style = .soft
+        }
+      } else {
+        softenTopEdges(in: child)
+      }
     }
   }
 }

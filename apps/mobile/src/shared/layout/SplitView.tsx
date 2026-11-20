@@ -18,7 +18,7 @@ import {
 } from "./DetailPaneContext";
 import { TransparentPaneContext } from "./TransparentPaneContext";
 import { useHingeStatus } from "./useHingeStatus";
-import { hingeModule } from "../../../modules/hinge";
+import { PaneEdge, hingeModule } from "../../../modules/hinge";
 import { FOLD_FADE_MS, type useFoldEntering } from "./FoldFade";
 
 /** The current split, or null when the screen shows one page at a time. */
@@ -121,7 +121,9 @@ export function SplitView({
           <View style={styles.detail}>
             <SafeAreaInsetsContext.Provider value={detailInsets}>
               <DetailBarClearanceContext.Provider value={detailBarHeight}>
-                <DetailPaneContext.Provider value={true}>{detail}</DetailPaneContext.Provider>
+                <DetailPaneContext.Provider value={true}>
+                  {PaneEdge ? <PaneEdge style={styles.detail}>{detail}</PaneEdge> : detail}
+                </DetailPaneContext.Provider>
               </DetailBarClearanceContext.Provider>
             </SafeAreaInsetsContext.Provider>
           </View>

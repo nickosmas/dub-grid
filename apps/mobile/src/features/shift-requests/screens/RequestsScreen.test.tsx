@@ -48,6 +48,8 @@ vi.mock("expo-router", () => ({
   useIsFocused: () => true,
   useLocalSearchParams,
 }));
+// Today's overview only shows in an iPhone Duo split view.
+vi.mock("../../schedule/components/DayOverview", () => ({ DayOverview: () => null }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 

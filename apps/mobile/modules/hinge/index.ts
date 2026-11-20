@@ -1,3 +1,5 @@
+import type { ComponentType, ReactNode } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
 type HingeChange = { status: string };
 
 type HingeNativeModule = {
@@ -16,3 +18,17 @@ type ExpoGlobal = { expo?: { modules?: Record<string, unknown> } };
  */
 export const hingeModule =
   ((globalThis as ExpoGlobal).expo?.modules?.Hinge as HingeNativeModule | undefined) ?? null;
+
+type PaneEdgeProps = { style?: StyleProp<ViewStyle>; children?: ReactNode };
+
+/**
+ * A split view's detail pane wrapper that gives its scroll views iOS's soft
+ * top edge effect, or null where the module isn't built in.
+ */
+export const PaneEdge: ComponentType<PaneEdgeProps> | null = (() => {
+  if (!hingeModule) return null;
+  // Loaded only where the module exists, so tests never touch Expo's view registry.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { requireNativeView } = require("expo") as typeof import("expo");
+  return requireNativeView<PaneEdgeProps>("Hinge");
+})();

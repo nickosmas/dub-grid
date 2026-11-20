@@ -22,6 +22,9 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: vi.fn(),
 }));
 
+// The cover-shifts preview renders the real request card from the Requests
+// screen, which also holds the iPhone Duo split's day overview.
+vi.mock("../../../schedule/components/DayOverview", () => ({ DayOverview: () => null }));
 vi.mock("expo-router", () => ({
   router: {
     push: vi.fn(),
