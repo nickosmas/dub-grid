@@ -1133,6 +1133,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     });
   }
 
+  /** Split, the arrows move to the 1st of the next or previous month (today in this one). */
+  function stepSplitMonth(direction: -1 | 1) {
+    const nextMonthStartDate = addMonthsToIsoDate(visibleCalendarMonth, direction);
+    const isTargetCurrentMonth = nextMonthStartDate === getScheduleMonthStartDate(todayDate);
+    setCalendarMonthAnchor(nextMonthStartDate);
+    commitSelectedDate(isTargetCurrentMonth ? todayDate : nextMonthStartDate);
+  }
+
   function completeMonthSwipe(direction: -1 | 1, deltaX: number) {
     const completeOffset = getMonthSwipeWidth();
     const releaseOffset = clampWeekSwipeDelta(deltaX, completeOffset);
@@ -1429,12 +1437,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               <IconControlButton
                 accessibilityLabel="Previous month"
                 iconName="chevron-back"
-                onPress={() => completeMonthSwipe(-1, 0)}
+                onPress={() => stepSplitMonth(-1)}
               />
               <IconControlButton
                 accessibilityLabel="Next month"
                 iconName="chevron-forward"
-                onPress={() => completeMonthSwipe(1, 0)}
+                onPress={() => stepSplitMonth(1)}
               />
             </>
           ) : null}
@@ -1476,35 +1484,66 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               });
             }
           }}
-          onTouchCancel={handleMonthSwipeCancel}
-          onTouchEnd={handleMonthSwipeRelease}
-          onTouchMove={handleMonthSwipeMove}
-          onTouchStart={handleMonthSwipeStart}
+          onTouchCancel={isSplit ? undefined : handleMonthSwipeCancel}
+          onTouchEnd={isSplit ? undefined : handleMonthSwipeRelease}
+          onTouchMove={isSplit ? undefined : handleMonthSwipeMove}
+          onTouchStart={isSplit ? undefined : handleMonthSwipeStart}
           style={[styles.weekStripFrame, calendarOuterClipAnimatedStyle]}
         >
           <Reanimated.View style={[styles.monthCalendarWeeks, calendarDatesStackAnimatedStyle]}>
-            <Animated.View
-              style={[
-                styles.monthSwipeTrack,
-                {
-                  width: weekStripRenderWidth * 3,
-                  transform: [
-                    { translateX: -weekStripRenderWidth },
-                    { translateX: monthSwipeTranslateX },
-                  ],
-                },
-              ]}
-            >
-              <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
-                {renderMonthWeeks(previousMonthWeeks, false)}
+            {isSplit ? (
+              // Split, the month's weeks are plain rows the pane's width: no
+              // swipe track sized from a measured width, which trailed the
+              // pane as it slid between open and partly folded. The arrows
+              // change the month.
+              <View style={styles.monthGridColumn}>
+                {monthWeeks.map((week, weekIndex) => (
+                  <View
+                    key={week[0]?.date ?? weekIndex}
+                    onLayout={
+                      weekIndex === 0
+                        ? (event) => setWeekStripRowHeight(event.nativeEvent.layout.height)
+                        : undefined
+                    }
+                    style={styles.monthCalendarWeek}
+                  >
+                    {week.map((day) => (
+                      <MonthDayCell
+                        key={day.date}
+                        day={day}
+                        dateLabel={formatScheduleDayLabel(day.date, now, timeZone)}
+                        isScheduled={scheduledDates.has(day.date)}
+                        minHeight={splitRowHeight}
+                        onPress={() => handleSelectDate(day.date)}
+                      />
+                    ))}
+                  </View>
+                ))}
               </View>
-              <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
-                {renderMonthWeeks(monthWeeks, true)}
-              </View>
-              <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
-                {renderMonthWeeks(nextMonthWeeks, false)}
-              </View>
-            </Animated.View>
+            ) : (
+              <Animated.View
+                style={[
+                  styles.monthSwipeTrack,
+                  {
+                    width: weekStripRenderWidth * 3,
+                    transform: [
+                      { translateX: -weekStripRenderWidth },
+                      { translateX: monthSwipeTranslateX },
+                    ],
+                  },
+                ]}
+              >
+                <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
+                  {renderMonthWeeks(previousMonthWeeks, false)}
+                </View>
+                <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
+                  {renderMonthWeeks(monthWeeks, true)}
+                </View>
+                <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
+                  {renderMonthWeeks(nextMonthWeeks, false)}
+                </View>
+              </Animated.View>
+            )}
           </Reanimated.View>
         </Reanimated.View>
 
