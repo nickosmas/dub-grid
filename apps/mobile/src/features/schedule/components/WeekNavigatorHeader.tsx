@@ -81,7 +81,10 @@ export function WeekNavigatorHeader({
   onPreviousWeek,
   onNextWeek,
   onToday,
+  controls = true,
 }: {
+  /** Off beside a split's month, which steps the weeks, and whose bar holds the bell. */
+  controls?: boolean;
   loading?: boolean;
   selectedDate: string;
   todayDate: string;
@@ -138,33 +141,35 @@ export function WeekNavigatorHeader({
           ) : null}
         </View>
       </View>
-      <View style={styles.meWeekNavigatorActions}>
-        <View style={styles.meWeekRangeControlGroup}>
-          <IconControlButton
-            accessibilityLabel="Previous week"
-            iconName="chevron-back"
-            onPress={onPreviousWeek}
-          />
-          <IconControlButton
-            accessibilityLabel="Next week"
-            iconName="chevron-forward"
-            onPress={onNextWeek}
-          />
-        </View>
-        {/* Icon-only, like the chevrons beside it: with the word "Today" this
+      {controls ? (
+        <View style={styles.meWeekNavigatorActions}>
+          <View style={styles.meWeekRangeControlGroup}>
+            <IconControlButton
+              accessibilityLabel="Previous week"
+              iconName="chevron-back"
+              onPress={onPreviousWeek}
+            />
+            <IconControlButton
+              accessibilityLabel="Next week"
+              iconName="chevron-forward"
+              onPress={onNextWeek}
+            />
+          </View>
+          {/* Icon-only, like the chevrons beside it: with the word "Today" this
             row held five controls and the date title was cut to "Sat, Sep…"
             on any week but the current one. A circular arrow, "return to
             today"; a calendar glyph read as a date picker. */}
-        {selectedDate !== todayDate ? (
-          <IconControlButton
-            accessibilityLabel="Today"
-            iconName="refresh-outline"
-            iconStyle={todayIconStyle}
-            onPress={onToday}
-          />
-        ) : null}
-        <AlertsChromeButton unreadCount={unreadCount} />
-      </View>
+          {selectedDate !== todayDate ? (
+            <IconControlButton
+              accessibilityLabel="Today"
+              iconName="refresh-outline"
+              iconStyle={todayIconStyle}
+              onPress={onToday}
+            />
+          ) : null}
+          <AlertsChromeButton unreadCount={unreadCount} />
+        </View>
+      ) : null}
     </View>
   );
 }

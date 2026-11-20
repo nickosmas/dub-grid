@@ -32,7 +32,8 @@ import { MyHomeSections } from "../components/MyHomeSections";
 import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
 import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
-import { DayOverview } from "../../schedule/components/DayOverview";
+import { MonthCalendarPane } from "../../schedule/components/MonthCalendarPane";
+import { SideColumnAlertsBar } from "../../schedule/components/SideColumnAlertsBar";
 import { HomeSplitPane, useHomeSplit } from "../../schedule/components/HomeSplit";
 import { getCurrentTimeValue } from "../../schedule/lib/scheduleScreenHelpers";
 import { StaffHoursCard } from "../components/StaffHoursCard";
@@ -94,8 +95,9 @@ export function AdminHomeScreen() {
     defaultEntry: homeDefaultEntry,
     defaultDate: selectedDate,
   });
+  // Open on the iPhone Duo, the month fills the left pane, as in Calendar,
+  // and Home sits beside it; a shift or day tapped on Home opens over it.
   const splitLayout = useSplitLayout();
-  const teamSplit = view === "team" ? splitLayout : null;
   const scrollViewRef = useRef<ScreenScrollHandle | null>(null);
   useScrollToTopOnChange(scrollViewRef, `${view}:${range.startDate}`);
   const chooseView = (next: HomeView) => {
@@ -141,6 +143,7 @@ export function AdminHomeScreen() {
   const header = (
     <View style={styles.header}>
       <WeekNavigatorHeader
+        controls={splitLayout === null}
         loading={isRefetching}
         now={now}
         range={range}
@@ -296,17 +299,15 @@ export function AdminHomeScreen() {
   // Home keeps its wash on every platform (owner, 2026-11-04).
   const wash = <HomeWash height={windowHeight} />;
 
-  // Split, the wash runs behind both panes (the split paints it once), so
-  // the list doesn't draw its own.
-  const splitShown = homeSplit.split !== null || teamSplit !== null;
+  // Split, Home keeps its wash in its own pane; the month beside it is plain.
   const page = (
     <Screen
       bottomPaddingMode="tabbed"
       scrollViewRef={scrollViewRef}
-      pageBackground={splitShown ? undefined : wash}
+      pageBackground={wash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      stickyHeaderBackground={splitShown ? undefined : wash}
+      stickyHeaderBackground={wash}
       stickyHeader={header}
     >
       <View style={styles.cards}>
@@ -320,36 +321,49 @@ export function AdminHomeScreen() {
     </Screen>
   );
 
-  if (homeSplit.split) {
+  const alertsBar = (
+    <SideColumnAlertsBar
+      shown={splitLayout !== null}
+      unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
+    />
+  );
+  if (!splitLayout) {
     return (
-      <SplitView
-        background={wash}
-        layout={homeSplit.split}
-        list={page}
-        detail={<HomeSplitPane now={now} range={range} shown={homeSplit.shown} />}
-      />
+      <>
+        {alertsBar}
+        {page}
+      </>
     );
   }
-  if (teamSplit) {
-    return (
+  return (
+    <>
+      {alertsBar}
       <SplitView
-        background={wash}
-        layout={teamSplit}
-        list={page}
-        detail={
-          <DayOverview
-            key={selectedDate}
-            date={selectedDate}
+        layout={splitLayout}
+        list={
+          <MonthCalendarPane
             now={now}
-            range={range}
-            showRoster
-            showViewerDay
+            selectedDate={selectedDate}
+            timeZone={timeZone}
+            todayDate={todayDate}
+            onSelectDate={setSelectedDateOverride}
           />
         }
+        detail={
+          homeSplit.picked ? (
+            <HomeSplitPane
+              back={{ label: "Home", onPress: homeSplit.clearPick }}
+              now={now}
+              range={range}
+              shown={homeSplit.picked}
+            />
+          ) : (
+            page
+          )
+        }
       />
-    );
-  }
-  return page;
+    </>
+  );
 }
 
 const styles = StyleSheet.create({

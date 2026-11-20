@@ -1,4 +1,5 @@
 import type { MobileScheduleEntry, MobileScheduleRange } from "@dubgrid/contracts";
+import { PaneBackLink, type PaneBack } from "../../../shared/layout/PaneTitle";
 import { formatScheduleDayLabel } from "@dubgrid/schedule-core";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -50,6 +51,7 @@ export function DayOverview({
   showRoster = false,
   title = "Day overview",
   titleAccessory,
+  back,
   children,
 }: {
   date: string;
@@ -66,6 +68,8 @@ export function DayOverview({
   title?: string;
   /** Beside the title, at the pane's trailing edge. */
   titleAccessory?: ReactNode;
+  /** A link above the title back to the page this pane replaced. */
+  back?: PaneBack;
   /** The page's own view of the day, after its open shifts and requests; it says when it's empty. */
   children?: ReactNode;
 }) {
@@ -150,6 +154,7 @@ export function DayOverview({
     <Screen bottomPaddingMode="tabbed">
       <View style={styles.page}>
         <View style={styles.heading}>
+          {back ? <PaneBackLink back={back} /> : null}
           {showDate ? (
             <AppText tone="secondary" variant="meta">
               {formatScheduleDayLabel(date, now, timeZone)}

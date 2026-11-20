@@ -6,7 +6,7 @@ import { Text } from "../../../shared/components/Text";
 import { Pressable } from "../../../shared/components/Pressable";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { Stack, router, useIsFocused, useLocalSearchParams } from "expo-router";
+import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Reanimated, {
@@ -129,6 +129,9 @@ import {
 
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
+import { MonthDayCell } from "../components/MonthDayCell";
+import { SideColumnAlertsBar } from "../components/SideColumnAlertsBar";
+import { MonthCalendarPane } from "../components/MonthCalendarPane";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_EXPAND_TIMING = {
@@ -1304,6 +1307,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   const meStickyHeader = !isTeamScope ? (
     <WeekNavigatorHeader
+      controls={homeSplit.split === null}
       now={now}
       range={range}
       selectedDate={selectedDate}
@@ -1404,6 +1408,21 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           </Text>
         </View>
         <View style={styles.teamHeaderActions}>
+          {/* Split, the month steps with chevrons too, as Home's does. */}
+          {isSplit ? (
+            <>
+              <IconControlButton
+                accessibilityLabel="Previous month"
+                iconName="chevron-back"
+                onPress={() => completeMonthSwipe(-1, 0)}
+              />
+              <IconControlButton
+                accessibilityLabel="Next month"
+                iconName="chevron-forward"
+                onPress={() => completeMonthSwipe(1, 0)}
+              />
+            </>
+          ) : null}
           {/* The same control as Home's, so the two headers read as one set. */}
           {!isSelectedToday ? (
             <IconControlButton
@@ -1413,7 +1432,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               onPress={handleGoToToday}
             />
           ) : null}
-          {/* Split, alerts sit with the day in the pane beside the month. */}
+          {/* Split, alerts stand in the side column. */}
           {isSplit ? null : <AlertsChromeButton unreadCount={unreadNotificationCount} />}
         </View>
       </View>
@@ -1731,9 +1750,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const listScreen = (
     <Screen
       bottomPaddingMode="tabbed"
-      // Split, the wash runs behind both panes instead (the split paints it).
-      pageBackground={homeSplit.split ? undefined : homeWash}
-      stickyHeaderBackground={homeSplit.split ? undefined : homeWash}
+      // Split, Home keeps its wash in its own pane; the month beside it is plain.
+      pageBackground={homeWash}
+      stickyHeaderBackground={homeWash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there
@@ -1751,44 +1770,47 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     </Screen>
   );
 
+  // Either page's bell stands in the side column while it is split.
+  const sideColumnBar = (
+    <SideColumnAlertsBar
+      shown={(isTeamScope ? split : homeSplit.split) !== null}
+      unreadCount={unreadNotificationCount}
+    />
+  );
+
+  // Open on the iPhone Duo, Home sits beside the month, as in Calendar; a
+  // shift or day tapped on it opens over it.
   if (homeSplit.split) {
     return (
-      <SplitView
-        background={homeWash}
-        layout={homeSplit.split}
-        list={listScreen}
-        detail={<HomeSplitPane now={now} range={range} shown={homeSplit.shown} />}
-      />
+      <>
+        {sideColumnBar}
+        <SplitView
+          layout={homeSplit.split}
+          list={
+            <MonthCalendarPane
+              now={now}
+              selectedDate={selectedDate}
+              timeZone={timeZone}
+              todayDate={todayDate}
+              onSelectDate={(date) => (date ? handleSelectDate(date) : handleGoToToday())}
+            />
+          }
+          detail={
+            homeSplit.picked ? (
+              <HomeSplitPane
+                back={{ label: "Home", onPress: homeSplit.clearPick }}
+                now={now}
+                range={range}
+                shown={homeSplit.picked}
+              />
+            ) : (
+              listScreen
+            )
+          }
+        />
+      </>
     );
   }
-
-  // Split, the bell stands in the side column with the tab bar, where an
-  // iPhone Duo puts a page's bar buttons; that takes a bar of its own, with
-  // no title, over the two panes.
-  const sideColumnBar = isTeamScope ? (
-    <>
-      <Stack.Screen options={split ? SPLIT_BAR_OPTIONS : NO_BAR_OPTIONS} />
-      {split ? (
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            accessibilityLabel={
-              unreadNotificationCount > 0
-                ? `Open alerts, ${unreadNotificationCount} unread`
-                : "Open alerts"
-            }
-            onPress={() => router.push("/alerts")}
-          >
-            <Stack.Toolbar.Icon sf="bell" />
-            {unreadNotificationCount > 0 ? (
-              <Stack.Toolbar.Badge>
-                {unreadNotificationCount > 9 ? "9+" : String(unreadNotificationCount)}
-              </Stack.Toolbar.Badge>
-            ) : null}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      ) : null}
-    </>
-  ) : null;
 
   if (!split)
     return (
@@ -1837,18 +1859,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   );
 }
 
-const NO_BAR_OPTIONS = { headerShown: false } as const;
-
-// No title and no edge blur: the bar exists only for the bell's place in the
-// side column, and each pane draws its own top.
-const SPLIT_BAR_OPTIONS = {
-  headerShown: true,
-  headerTransparent: true,
-  headerShadowVisible: false,
-  title: "",
-  scrollEdgeEffects: { top: "hidden" },
-} as const;
-
 /** "Friday, Nov 20": the day the Schedule split shows beside its month. */
 function formatLongDayTitle(isoDate: string): string {
   const [year, month, day] = isoDate.split("-").map(Number);
@@ -1863,89 +1873,6 @@ function combineScheduledDates(
   results: Array<UseQueryResult<Awaited<ReturnType<typeof getMySchedule>>>>,
 ): Set<string> {
   return getScheduledDates(results.flatMap((result) => result.data?.entries ?? []));
-}
-
-type MonthDayCellDay = {
-  date: string;
-  dayLabel: string;
-  isToday: boolean;
-  isSelected: boolean;
-  isCurrentMonth?: boolean;
-};
-
-// Shared by the week strip's single row and the full month grid so the
-// highlight is always the same circle, in the same place, at the same size.
-function MonthDayCell({
-  day,
-  dateLabel,
-  isScheduled = false,
-  onPress,
-  accessible = true,
-  minHeight,
-}: {
-  day: MonthDayCellDay;
-  /** Human-readable date, e.g. "Today, Apr 16" — see the label below. */
-  dateLabel: string;
-  /** The person works a shift that day, marked with a dot under the date. */
-  isScheduled?: boolean;
-  onPress: () => void;
-  // The week-swipe strip always keeps the previous/next week mounted
-  // off-screen (clipped horizontally) so a swipe can start instantly. Those
-  // copies duplicate a week that's already accessible in the full month
-  // grid, so they're excluded from the accessibility tree.
-  accessible?: boolean;
-  /** Split, each week's height, so the month fills the list pane as in Calendar. */
-  minHeight?: number;
-}) {
-  const mobileColors = useMobileColors();
-  const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-
-  return (
-    <Pressable
-      // `day.date` is a raw ISO string; screen readers announce it digit by
-      // digit ("Select date 2026-08-03"). Speak it the way the UI reads it.
-      accessibilityLabel={
-        accessible ? `Select ${dateLabel}${isScheduled ? ", you're scheduled" : ""}` : undefined
-      }
-      accessibilityRole={accessible ? "button" : undefined}
-      accessibilityState={accessible ? { selected: day.isSelected } : undefined}
-      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
-      onPress={onPress}
-      style={[styles.monthCalendarDaySlot, minHeight != null && { minHeight }]}
-    >
-      <View
-        style={[
-          styles.dateHighlightCircle,
-          day.isSelected && !day.isToday && styles.dateHighlightSelected,
-          day.isSelected && day.isToday && styles.dateHighlightTodaySelected,
-          day.isToday && !day.isSelected && styles.dateHighlightToday,
-          day.isCurrentMonth === false && styles.dateHighlightOutsideMonth,
-        ]}
-      >
-        <Text
-          fit="fixed"
-          style={[
-            styles.dateHighlightText,
-            day.isSelected && !day.isToday && styles.dateHighlightTextSelected,
-            day.isToday && !day.isSelected && styles.dateHighlightTextToday,
-            day.isSelected && day.isToday && styles.dateHighlightTextTodaySelected,
-          ]}
-        >
-          {day.dayLabel}
-        </Text>
-      </View>
-      {isScheduled ? (
-        <View
-          style={[
-            styles.dateScheduledDot,
-            day.isSelected && styles.dateScheduledDotSelected,
-            day.isCurrentMonth === false && styles.dateHighlightOutsideMonth,
-          ]}
-        />
-      ) : null}
-    </Pressable>
-  );
 }
 
 export function HomeScheduleScreen() {

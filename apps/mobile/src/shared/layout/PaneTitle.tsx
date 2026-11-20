@@ -21,23 +21,9 @@ export function PaneTitle({
   title: string;
   back?: PaneBack;
 }) {
-  const mobileColors = useMobileColors();
   return (
     <View style={styles.heading}>
-      {back ? (
-        <Pressable
-          accessibilityLabel={`Back to ${back.label}`}
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={back.onPress}
-          style={styles.back}
-        >
-          <Ionicons color={mobileColors.brand} name="chevron-back" size={18} />
-          <AppText tone="brand" variant="meta">
-            {back.label}
-          </AppText>
-        </Pressable>
-      ) : null}
+      {back ? <PaneBackLink back={back} /> : null}
       {eyebrow ? (
         <AppText tone="secondary" variant="meta">
           {eyebrow}
@@ -47,6 +33,25 @@ export function PaneTitle({
         {title}
       </AppText>
     </View>
+  );
+}
+
+/** The link itself, for a pane that draws its own title. */
+export function PaneBackLink({ back }: { back: PaneBack }) {
+  const mobileColors = useMobileColors();
+  return (
+    <Pressable
+      accessibilityLabel={`Back to ${back.label}`}
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={back.onPress}
+      style={styles.back}
+    >
+      <Ionicons color={mobileColors.brand} name="chevron-back" size={18} />
+      <AppText tone="brand" variant="meta">
+        {back.label}
+      </AppText>
+    </Pressable>
   );
 }
 
