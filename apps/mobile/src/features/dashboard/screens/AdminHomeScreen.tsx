@@ -299,15 +299,16 @@ export function AdminHomeScreen() {
   // Home keeps its wash on every platform (owner, 2026-11-04).
   const wash = <HomeWash height={windowHeight} />;
 
-  // Split, Home keeps its wash in its own pane; the month beside it is plain.
+  // Split, the wash stays behind the right pane, whatever it shows; the month
+  // beside it is plain.
   const page = (
     <Screen
       bottomPaddingMode="tabbed"
       scrollViewRef={scrollViewRef}
-      pageBackground={wash}
+      pageBackground={splitLayout ? undefined : wash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      stickyHeaderBackground={wash}
+      stickyHeaderBackground={splitLayout ? undefined : wash}
       stickyHeader={header}
     >
       <View style={styles.cards}>
@@ -339,6 +340,7 @@ export function AdminHomeScreen() {
     <>
       {alertsBar}
       <SplitView
+        detailBackground={wash}
         layout={splitLayout}
         list={
           <MonthCalendarPane

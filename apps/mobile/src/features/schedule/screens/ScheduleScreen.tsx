@@ -1750,9 +1750,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const listScreen = (
     <Screen
       bottomPaddingMode="tabbed"
-      // Split, Home keeps its wash in its own pane; the month beside it is plain.
-      pageBackground={homeWash}
-      stickyHeaderBackground={homeWash}
+      // Split, the wash stays behind the right pane, whatever it shows; the
+      // month beside it is plain.
+      pageBackground={homeSplit.split ? undefined : homeWash}
+      stickyHeaderBackground={homeSplit.split ? undefined : homeWash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there
@@ -1785,6 +1786,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       <>
         {sideColumnBar}
         <SplitView
+          detailBackground={homeWash}
           layout={homeSplit.split}
           list={
             <MonthCalendarPane

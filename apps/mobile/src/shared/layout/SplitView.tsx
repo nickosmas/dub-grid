@@ -25,12 +25,15 @@ export function SplitView({
   list,
   detail,
   background,
+  detailBackground,
 }: {
   layout: SplitLayout;
   list: ReactNode;
   detail: ReactNode;
   /** Painted once behind both panes, whose pages then leave their ground transparent. */
   background?: ReactNode;
+  /** Painted behind the detail pane alone, whatever page it shows. */
+  detailBackground?: ReactNode;
 }) {
   const mobileColors = useMobileColors();
   const insets = useSafeAreaInsets();
@@ -59,8 +62,23 @@ export function SplitView({
           </View>
           <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
           <View style={styles.detail}>
+            {detailBackground != null ? (
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  styles.background,
+                  { backgroundColor: mobileColors.background },
+                ]}
+              >
+                {detailBackground}
+              </View>
+            ) : null}
             <SafeAreaInsetsContext.Provider value={detailInsets}>
-              <DetailPaneContext.Provider value={true}>{detail}</DetailPaneContext.Provider>
+              <TransparentPaneContext.Provider
+                value={background != null || detailBackground != null}
+              >
+                <DetailPaneContext.Provider value={true}>{detail}</DetailPaneContext.Provider>
+              </TransparentPaneContext.Provider>
             </SafeAreaInsetsContext.Provider>
           </View>
         </View>
