@@ -84,6 +84,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: mobileSpace.md,
     },
+    cardRowPressed: {
+      backgroundColor: mobileColors.navActiveBg,
+    },
     cardSeparator: {
       height: StyleSheet.hairlineWidth,
       marginLeft: mobileSpace.lg,

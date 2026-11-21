@@ -21,7 +21,10 @@ import {
 } from "react";
 import { Stack, router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { createSplitTopLevelStackOptions } from "../../../shared/navigation/top-level-stack";
+import {
+  createDetailStackOptions,
+  createSplitTopLevelStackOptions,
+} from "../../../shared/navigation/top-level-stack";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
@@ -391,11 +394,17 @@ function createChipTones(
   };
 }
 
-export default function RequestsScreen() {
+/**
+ * The Requests tab, or with `page` one request as its own page: the closed
+ * phone opens a request there, the same page the open iPhone Duo shows beside
+ * its list, answers included.
+ */
+export default function RequestsScreen({ page = false }: { page?: boolean }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const params = useLocalSearchParams<{
+    id?: string | string[];
     requestId?: string | string[];
     tab?: string | string[];
   }>();
@@ -864,6 +873,10 @@ export default function RequestsScreen() {
   // pick it shows the first request in the tab.
   const split = useSplitLayout();
   const foldEntering = useFoldEntering(split !== null);
+  const pageStackOptions = useMemo(
+    () => createDetailStackOptions(mobileColors, "Request"),
+    [mobileColors],
+  );
   const requestsStackOptions = useMemo(
     () => createSplitTopLevelStackOptions(mobileColors, "Requests", split !== null),
     [mobileColors, split],
@@ -904,6 +917,16 @@ export default function RequestsScreen() {
   }, [activeTab, availableOpenShiftFeed, tabRequests]);
   const shownItem =
     tabItems.find((item) => paneItemId(item) === pickedRequestId) ?? tabItems[0] ?? null;
+  const pageRequestId = page ? (Array.isArray(params.id) ? params.id[0] : params.id) : null;
+  // Opening the Duo on a request's page goes back to the list with it picked.
+  useEffect(() => {
+    if (pageRequestId && split) {
+      router.dismissTo({ pathname: "/(tabs)/requests", params: { requestId: pageRequestId } });
+    }
+  }, [pageRequestId, split]);
+  useEffect(() => {
+    if (!page && split && highlightedRequestId) setPickedRequestId(highlightedRequestId);
+  }, [page, split, highlightedRequestId]);
   const isShown = (id: string) =>
     split !== null && shownItem !== null && paneItemId(shownItem) === id;
   // A held-tall list pane is too narrow for the name beside its pill.
@@ -917,13 +940,14 @@ export default function RequestsScreen() {
     const wasSplit = wasSplitRef.current;
     wasSplitRef.current = split !== null;
     if (!isFocused) return;
-    // An open shift has no request to point the closed list at.
+    // A picked request becomes its page with Back; an open shift's card
+    // already holds all of it, so the closed list just shows it.
     const pickedRequest = tabRequests.some((request) => request.id === pickedRequestId);
     if (
       pickedRequest &&
       shouldPushPickOnClose({ wasSplit, isSplit: split !== null, pickedId: pickedRequestId })
     ) {
-      router.setParams({ requestId: pickedRequestId as string });
+      openRequestPage(pickedRequestId as string);
     }
   }, [split, isFocused, pickedRequestId, tabRequests]);
   // Split, each request is a row of one grouped list, as Mail lists mail,
@@ -945,6 +969,7 @@ export default function RequestsScreen() {
       pendingAction={pendingAction}
       onAction={(body) => runRequestAction(request.id, body)}
       highlighted={!split && highlightedRequestId === request.id}
+      onOpen={split ? undefined : () => openRequestPage(request.id)}
       request={request}
       showDate={showDate}
     />
@@ -980,6 +1005,119 @@ export default function RequestsScreen() {
       router.setParams({ tab: undefined });
     }
   }, [routeTab]);
+
+  const actionModals = (
+    <>
+      {/* A decision that takes a note is a small form, so it gets a sheet;
+        the confirmation modal stays for the one-tap actions. */}
+      <ConfirmationModal
+        body={requestActionConfirmation?.feedback.message}
+        confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
+        confirmTone={
+          requestActionConfirmation?.feedback.confirmStyle === "destructive" ? "danger" : "primary"
+        }
+        onCancel={() => setRequestActionConfirmation(null)}
+        onConfirm={confirmRequestAction}
+        title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
+        visible={Boolean(requestActionConfirmation) && !isResolveConfirmation}
+      />
+      <BottomSheetModal
+        footer={
+          <SheetActions
+            primaryAction={
+              <Button
+                label={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
+                onPress={confirmRequestAction}
+                tone={
+                  requestActionConfirmation?.feedback.confirmStyle === "destructive"
+                    ? "danger"
+                    : "primary"
+                }
+              />
+            }
+          >
+            {/* "Dismiss" when the decision itself is a cancel, so the two
+              buttons cannot read as the same word. */}
+            <Button
+              label={requestActionConfirmation?.body.action === "cancel" ? "Dismiss" : "Cancel"}
+              onPress={decisionNoteGuard.requestClose}
+              tone="neutral"
+            />
+          </SheetActions>
+        }
+        header={
+          <SheetHeader
+            subtitle={requestActionConfirmation?.feedback.message}
+            title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
+          />
+        }
+        hasUnsavedChanges={decisionNoteGuard.isDirty}
+        overlay={
+          <ConfirmationModal presentation="inline" {...decisionNoteGuard.confirmationProps} />
+        }
+        visible={isResolveConfirmation}
+        onDismiss={decisionNoteGuard.requestClose}
+      >
+        <SectionNotice
+          messages={requestActionConfirmation?.feedback.warning ?? []}
+          tone="warning"
+        />
+        <ProfileTextInput
+          label={`Note to ${resolveNoteRecipients} (optional)`}
+          maxLength={500}
+          multiline
+          onChangeText={setResolveNote}
+          placeholder="Anything they should know"
+          value={resolveNote}
+        />
+      </BottomSheetModal>
+    </>
+  );
+
+  const pageRequest = pageRequestId
+    ? ([...requests, ...historyRequests].find((request) => request.id === pageRequestId) ?? null)
+    : null;
+  const pageScreen = (
+    <Screen
+      bottomPaddingMode="tabbed"
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
+    >
+      <Stack.Screen options={pageStackOptions} />
+      {pageRequest ? (
+        <RequestDetail
+          heading={describeRequestHeading(pageRequest, linkedEmployeeId)}
+          card={
+            <RequestCard
+              variant="detail"
+              canApprove={canApprove}
+              highlighted={false}
+              linkedEmployeeId={linkedEmployeeId}
+              now={now}
+              onAction={(body) => runRequestAction(pageRequest.id, body)}
+              pendingAction={pendingAction}
+              request={pageRequest}
+              timeZone={timeZone}
+            />
+          }
+          now={now}
+          request={pageRequest}
+          timeZone={timeZone}
+          viewerEmpId={linkedEmployeeId}
+        />
+      ) : contentState.kind === "loading" || historyContentState.kind === "loading" ? (
+        <CardRowListSkeleton rows={2} />
+      ) : (
+        <EmptyStateCard
+          body="It may have been withdrawn, or it's older than your history."
+          fillScreen
+          scene="requests-none"
+          title="This request isn't here"
+        />
+      )}
+      {actionModals}
+    </Screen>
+  );
 
   const listScreen = (
     <Screen
@@ -1151,72 +1289,11 @@ export default function RequestsScreen() {
           )}
         </View>
       )}
-      {/* A decision that takes a note is a small form, so it gets a sheet;
-          the confirmation modal stays for the one-tap actions. */}
-      <ConfirmationModal
-        body={requestActionConfirmation?.feedback.message}
-        confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
-        confirmTone={
-          requestActionConfirmation?.feedback.confirmStyle === "destructive" ? "danger" : "primary"
-        }
-        onCancel={() => setRequestActionConfirmation(null)}
-        onConfirm={confirmRequestAction}
-        title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
-        visible={Boolean(requestActionConfirmation) && !isResolveConfirmation}
-      />
-      <BottomSheetModal
-        footer={
-          <SheetActions
-            primaryAction={
-              <Button
-                label={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
-                onPress={confirmRequestAction}
-                tone={
-                  requestActionConfirmation?.feedback.confirmStyle === "destructive"
-                    ? "danger"
-                    : "primary"
-                }
-              />
-            }
-          >
-            {/* "Dismiss" when the decision itself is a cancel, so the two
-                buttons cannot read as the same word. */}
-            <Button
-              label={requestActionConfirmation?.body.action === "cancel" ? "Dismiss" : "Cancel"}
-              onPress={decisionNoteGuard.requestClose}
-              tone="neutral"
-            />
-          </SheetActions>
-        }
-        header={
-          <SheetHeader
-            subtitle={requestActionConfirmation?.feedback.message}
-            title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
-          />
-        }
-        hasUnsavedChanges={decisionNoteGuard.isDirty}
-        overlay={
-          <ConfirmationModal presentation="inline" {...decisionNoteGuard.confirmationProps} />
-        }
-        visible={isResolveConfirmation}
-        onDismiss={decisionNoteGuard.requestClose}
-      >
-        <SectionNotice
-          messages={requestActionConfirmation?.feedback.warning ?? []}
-          tone="warning"
-        />
-        <ProfileTextInput
-          label={`Note to ${resolveNoteRecipients} (optional)`}
-          maxLength={500}
-          multiline
-          onChangeText={setResolveNote}
-          placeholder="Anything they should know"
-          value={resolveNote}
-        />
-      </BottomSheetModal>
+      {actionModals}
     </Screen>
   );
 
+  if (page) return pageScreen;
   // With nothing in the tab, the list's own empty state says so once; a
   // second one beside it would only repeat it.
   if (!split) return listScreen;
@@ -1278,6 +1355,10 @@ export default function RequestsScreen() {
       }
     />
   );
+}
+
+function openRequestPage(id: string) {
+  router.push({ pathname: "/(tabs)/requests/[id]", params: { id } });
 }
 
 type PaneItem =
@@ -1347,6 +1428,7 @@ function RequestCard({
   variant = "card",
   selected = false,
   onSelect,
+  onOpen,
 }: {
   request: MobileShiftRequest;
   /**
@@ -1357,6 +1439,8 @@ function RequestCard({
   variant?: "card" | "row" | "detail";
   selected?: boolean;
   onSelect?: () => void;
+  /** The closed list's card opens the request's page from its header row. */
+  onOpen?: () => void;
   linkedEmployeeId: string | null;
   canApprove: boolean;
   highlighted: boolean;
@@ -1509,16 +1593,25 @@ function RequestCard({
         ) : null
       ) : (
         <>
-          <View style={styles.cardRow}>
+          <Pressable
+            accessibilityHint={onOpen ? "Opens the whole request" : undefined}
+            accessibilityRole={onOpen ? "button" : undefined}
+            disabled={!onOpen}
+            onPress={onOpen}
+            style={({ pressed }) => [styles.cardRow, pressed && styles.cardRowPressed]}
+          >
             <View style={[styles.cardHeader, stackHeader && styles.cardHeaderStacked]}>
               <Text style={[styles.requestTitle, stackHeader && styles.requestTitleStacked]}>
                 {copy.title}
               </Text>
               {statusPill}
+              {onOpen && !stackHeader ? (
+                <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={18} />
+              ) : null}
             </View>
             <Text style={styles.metaText}>{copy.subtitle}</Text>
             {awaitingNote}
-          </View>
+          </Pressable>
           <View style={styles.cardSeparator} />
         </>
       )}

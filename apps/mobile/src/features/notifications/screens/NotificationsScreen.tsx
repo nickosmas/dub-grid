@@ -418,10 +418,19 @@ export default function NotificationsScreen() {
       list={{
         data: listItems,
         keyExtractor: (notification) => notification.id,
-        itemSeparator: <View style={styles.divider} />,
-        renderItem: (notification) => (
+        itemSeparator: isSplit ? (
+          <View style={styles.groupDividerTrack}>
+            <View style={styles.groupDivider} />
+          </View>
+        ) : (
+          <View style={styles.divider} />
+        ),
+        renderItem: (notification, index) => (
           <NotificationRow
             openRegistry={openSwipe}
+            grouped={
+              isSplit ? { first: index === 0, last: index === listItems.length - 1 } : undefined
+            }
             notification={notification}
             selected={isSplit ? notification.id === shownNotification?.id : undefined}
             onPress={() => handleRowPress(notification)}
@@ -481,7 +490,7 @@ export default function NotificationsScreen() {
             label="Mark all read"
             materialIcon="done-all"
             placement="right"
-            sfSymbol="checkmark.circle"
+            sfSymbol="checkmark"
             onPress={() => setConfirmingMarkAllRead(true)}
           />
         ) : null}
@@ -572,6 +581,15 @@ const createStyles = (mobileColors: MobileColors) =>
       marginHorizontal: getScreenGutter(),
       marginTop: mobileSpace.lg,
       marginBottom: mobileSpace.md,
+    },
+    groupDividerTrack: {
+      marginHorizontal: getScreenGutter(),
+      backgroundColor: mobileColors.surface,
+    },
+    groupDivider: {
+      height: StyleSheet.hairlineWidth,
+      marginLeft: mobileSpace.md + mobileSpace.lg + mobileSpace.sm,
+      backgroundColor: mobileColors.borderSubtle,
     },
     divider: {
       height: StyleSheet.hairlineWidth,

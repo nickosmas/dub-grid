@@ -55,6 +55,7 @@ export function NotificationRow({
   notification,
   openRegistry,
   selected,
+  grouped,
   onPress,
   onToggleRead,
   onArchive,
@@ -63,6 +64,11 @@ export function NotificationRow({
   openRegistry?: OpenSwipeRegistry;
   /** Set only in a split view, true for the alert shown beside the list. */
   selected?: boolean;
+  /**
+   * Split on an iPhone Duo, a row of one inset grouped list, as Requests
+   * lists requests there: the first and last rows round the group's corners.
+   */
+  grouped?: { first: boolean; last: boolean };
   onPress: () => void;
   onToggleRead: () => void;
   onArchive: () => void;
@@ -106,7 +112,7 @@ export function NotificationRow({
     borderRadius: interpolate(reveal.value, [0, 1], [0, mobileRadii.card], Extrapolation.CLAMP),
   }));
 
-  return (
+  const swipeableRow = (
     <ReanimatedSwipeable
       ref={swipeable}
       // White under the row, as Mail draws it: hidden while the row rests
@@ -130,12 +136,16 @@ export function NotificationRow({
       )}
       rightThreshold={SWIPE_ACTION_WIDTH / 2}
     >
-      <Animated.View style={[styles.card, cardStyle]}>
+      <Animated.View style={[styles.card, grouped && styles.cardGrouped, cardStyle]}>
         <PressableRow
           accessibilityLabel={`${isUnread ? "Unread: " : ""}${notification.title}`}
           onPress={onPress}
           selected={selected}
-          style={[styles.row, selected === true && splitSelectedRowStyle(mobileColors)]}
+          style={[
+            styles.row,
+            grouped && styles.rowGrouped,
+            selected === true && splitSelectedRowStyle(mobileColors),
+          ]}
         >
           <View style={styles.leading}>{isUnread ? <View style={styles.unreadDot} /> : null}</View>
           <View style={styles.copy}>
@@ -176,6 +186,15 @@ export function NotificationRow({
         </PressableRow>
       </Animated.View>
     </ReanimatedSwipeable>
+  );
+
+  if (!grouped) return swipeableRow;
+  return (
+    <View
+      style={[styles.group, grouped.first && styles.groupFirst, grouped.last && styles.groupLast]}
+    >
+      {swipeableRow}
+    </View>
   );
 }
 
@@ -269,6 +288,25 @@ const createStyles = (mobileColors: MobileColors) =>
     card: {
       backgroundColor: mobileColors.background,
       overflow: "hidden",
+    },
+    cardGrouped: {
+      backgroundColor: mobileColors.surface,
+    },
+    group: {
+      marginHorizontal: getScreenGutter(),
+      backgroundColor: mobileColors.surface,
+      overflow: "hidden",
+    },
+    groupFirst: {
+      borderTopLeftRadius: mobileRadii.card,
+      borderTopRightRadius: mobileRadii.card,
+    },
+    groupLast: {
+      borderBottomLeftRadius: mobileRadii.card,
+      borderBottomRightRadius: mobileRadii.card,
+    },
+    rowGrouped: {
+      paddingHorizontal: mobileSpace.md,
     },
     row: {
       flexDirection: "row",

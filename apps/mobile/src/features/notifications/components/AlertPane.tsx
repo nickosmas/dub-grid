@@ -75,8 +75,14 @@ export function AlertPane({
 
   return (
     <Screen bottomPaddingMode="stack">
-      <PaneTitle title={notification.title} />
-      {notification.message ? <AppText variant="body">{notification.message}</AppText> : null}
+      <View style={styles.heading}>
+        <PaneTitle eyebrow={formatAlertWhen(notification.createdAt)} title={notification.title} />
+        {notification.message ? (
+          <AppText tone="secondary" variant="body">
+            {notification.message}
+          </AppText>
+        ) : null}
+      </View>
       <View style={styles.action}>
         {route ? (
           <Button label={openLabel(route.pathname)} onPress={() => openNativeRoute(route)} />
@@ -90,7 +96,20 @@ export function AlertPane({
   );
 }
 
+/** When the alert arrived, as the pane's eyebrow: "Nov 8, 3:12 PM". */
+function formatAlertWhen(createdAt: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(createdAt));
+}
+
 const styles = StyleSheet.create({
+  heading: {
+    gap: mobileSpace.xs,
+  },
   action: {
     alignItems: "flex-start",
     paddingTop: mobileSpace.sm,

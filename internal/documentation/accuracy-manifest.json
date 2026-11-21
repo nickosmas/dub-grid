@@ -570,7 +570,8 @@
       },
       "surfaceIds": [
         "mobile:layout:/(tabs)/requests:all",
-        "mobile:screen:/(tabs)/requests:all"
+        "mobile:screen:/(tabs)/requests:all",
+        "mobile:screen:/(tabs)/requests/[id]:all"
       ],
       "sections": [
         {
@@ -620,7 +621,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:cbc8ccbdebd1a183c04ea3fb1e06081122ff48c2c50f013cbc5293d8cfe9d9a5"
+      "evidenceFingerprint": "sha256:5ef934ff27460139daeab513029b1c46d033cefdb7e7bae31a9b4ac27a08748e"
     },
     {
       "id": "dashboard",
@@ -1326,7 +1327,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:db5ee8d5bfb2fe9343bf9c1856a1b74cf3ee70ef762b900f2d540084b9bbe101"
+      "evidenceFingerprint": "sha256:17c080c7cdbad15a627180ba1a01605c36feb3f0a38d8326abc7773b0c7d4f49"
     },
     {
       "id": "alerts",
@@ -1392,7 +1393,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:194147e1108ffb2db48886057e4fc2c5cbe3625c31d9ff209cb121643a0fa2f0"
+      "evidenceFingerprint": "sha256:7254eaa8c0b2fe9ea8fb60bee322fe19a0f1790f9ce320469b90c29da1c20e5c"
     },
     {
       "id": "reports",
@@ -2106,7 +2107,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:c65e05a0b2f36c9d5870ee2a374cee95b3757f8a850a8c8337bda7ba15917b82"
+      "evidenceFingerprint": "sha256:7f30188fb4096943cf353f83cc3b431e02d581134df214a1acf813360fd9a186"
     },
     {
       "id": "integrations-exports",
