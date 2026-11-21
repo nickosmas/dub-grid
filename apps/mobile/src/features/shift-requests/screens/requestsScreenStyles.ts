@@ -42,13 +42,43 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
           overflow: "hidden",
           ...mobileElevation("card", isDark),
         },
-    // The request beside the list in a split, or the one a link opened: the
-    // same clear blue as a split list's picked row, edged in the brand color.
+    // Split on an iPhone Duo, a section's requests are rows of one inset
+    // grouped list, as Mail lists mail; the picked row turns clear blue.
+    rowGroup: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: isDark ? StyleSheet.hairlineWidth : 0,
+      borderColor: mobileColors.borderSubtle,
+      overflow: "hidden",
+    },
+    rowDivider: {
+      height: StyleSheet.hairlineWidth,
+      marginLeft: mobileSpace.lg,
+      backgroundColor: mobileColors.borderSubtle,
+    },
+    requestRow: {
+      gap: mobileSpace.xs,
+      paddingHorizontal: mobileSpace.lg,
+      paddingVertical: mobileSpace.md,
+    },
+    requestRowSelected: splitSelectedRowStyle(mobileColors, {
+      horizontal: mobileSpace.lg,
+      vertical: mobileSpace.md,
+    }),
+    rowShiftText: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+    },
+    detailPage: {
+      gap: mobileSpace.lg,
+    },
     emptyPane: {
       flex: 1,
     },
+    // The one a link opened: the same clear blue as a split list's picked
+    // row, edged in the brand color.
     requestCardHighlighted: {
-      ...splitSelectedRowStyle(mobileColors),
+      backgroundColor: mobileColors.brandBorder,
       borderWidth: 2,
       borderColor: mobileColors.brand,
     },
@@ -56,6 +86,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpace.sm,
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: mobileSpace.md,
+    },
+    cardRowPressed: {
+      backgroundColor: mobileColors.navActiveBg,
     },
     cardSeparator: {
       height: StyleSheet.hairlineWidth,

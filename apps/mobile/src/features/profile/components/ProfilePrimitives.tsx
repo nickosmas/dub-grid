@@ -48,6 +48,8 @@ import {
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
+const PROFILE_ROW_PADDING = 16;
+
 export function getProfileInitials(name: string, fallback = "DG") {
   const initials = name
     .split(" ")
@@ -381,7 +383,12 @@ export function ProfileNavRow({
         styles.navRow,
         IS_NATIVE_LIST && styles.rowNative,
         !isLast && !IS_NATIVE_LIST && styles.rowDivider,
-        selected === true && splitSelectedRowStyle(mobileColors),
+        selected === true &&
+          splitSelectedRowStyle(mobileColors, {
+            horizontal: PROFILE_ROW_PADDING,
+            vertical: IS_NATIVE_LIST ? mobileSpace.md : 12,
+            minHeight: IS_NATIVE_LIST ? 52 : 70,
+          }),
       ]}
     >
       <ProfileIcon name={iconName} />
@@ -396,7 +403,7 @@ export function ProfileNavRow({
       {selected === undefined ? (
         <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
       ) : null}
-      {!isLast && IS_NATIVE_LIST ? (
+      {!isLast && IS_NATIVE_LIST && !selected ? (
         <View style={[styles.insetDivider, styles.insetDividerIcon]} />
       ) : null}
     </PressableRow>
@@ -1162,7 +1169,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flexDirection: "row",
       gap: 12,
       minHeight: 66,
-      paddingHorizontal: 16,
+      paddingHorizontal: PROFILE_ROW_PADDING,
       paddingVertical: 12,
     },
     navRow: {

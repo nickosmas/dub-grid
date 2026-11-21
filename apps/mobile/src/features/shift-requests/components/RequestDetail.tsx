@@ -1,11 +1,15 @@
-import type { MobileShiftRequest } from "@dubgrid/contracts";
+import type {
+  MobileShiftRequest,
+  ResolvedSchedulePresentation,
+  ScheduleCellState,
+} from "@dubgrid/contracts";
 import {
   describeRequestForViewer,
   formatScheduleDayLabel,
   getScheduleEntryAbsenceTypeId,
   getScheduleEntryCategoryKey,
 } from "@dubgrid/schedule-core";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -14,7 +18,6 @@ import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useDayRoster } from "../hooks/useDayRoster";
 import { PaneTitle } from "../../../shared/layout/PaneTitle";
-import { REQUEST_TYPE_LABEL } from "../lib/request-type";
 import { buildRequestResolvers } from "../lib/request-resolvers";
 import { RequestListSection } from "./RequestListSection";
 
@@ -28,18 +31,24 @@ const askedFormatter = (timeZone: string | null | undefined) =>
   });
 
 /**
- * What the request's card in the list beside it doesn't say: what answering
- * it does (the web's words, from the request itself), when it was asked, and
- * who works that day. The split view's right pane on an open iPhone Duo; the
- * card itself, answers included, stays in the list.
+ * The whole request, the right pane of the split view on an open iPhone Duo:
+ * what answering it does (the web's words, from the request itself) and when
+ * it was asked, its card with the answers, then who works the shifts it is
+ * about. The list beside it only names each request.
  */
 export function RequestDetail({
   request,
+  heading,
+  card,
   viewerEmpId,
   now,
   timeZone,
 }: {
   request: MobileShiftRequest;
+  /** Who asked and what, its kind and status above. */
+  heading: { title: string; eyebrow: string; subtitle: string };
+  /** The request's card, answers included. */
+  card: ReactNode;
   viewerEmpId: string | null;
   now: Date;
   timeZone: string | null | undefined;
@@ -61,7 +70,12 @@ export function RequestDetail({
 
   return (
     <View style={styles.page}>
-      <PaneTitle title={REQUEST_TYPE_LABEL[request.type]} />
+      <View style={styles.heading}>
+        <PaneTitle eyebrow={heading.eyebrow} title={heading.title} />
+        <AppText tone="secondary" variant="body">
+          {heading.subtitle}
+        </AppText>
+      </View>
       {text ? (
         <View style={styles.outcome}>
           {text.body ? <AppText variant="body">{text.body}</AppText> : null}
@@ -70,8 +84,9 @@ export function RequestDetail({
           </AppText>
         </View>
       ) : null}
+      {card}
       {days.map((day) => (
-        <RosterDay
+        <ShiftRoster
           date={day.date}
           key={day.date}
           now={now}
@@ -97,16 +112,25 @@ function requestDays(request: MobileShiftRequest): { date: string; shifts: Reado
     if (!date || !state || !presentation) return;
     const shifts = days.get(date) ?? new Set<string>();
     days.set(date, shifts);
-    const cell = { state, presentation } as Parameters<typeof getScheduleEntryCategoryKey>[0];
-    if (getScheduleEntryAbsenceTypeId(cell) == null) shifts.add(getScheduleEntryCategoryKey(cell));
+    const key = shiftRosterKey(state, presentation);
+    if (key) shifts.add(key);
   };
   add(request.requesterShiftDate, request.requesterState, request.requesterPresentation);
   add(request.targetShiftDate, request.targetState, request.targetPresentation);
   return [...days].map(([date, shifts]) => ({ date, shifts }));
 }
 
-/** The shifts the request is about on one day, with everyone working them now. */
-function RosterDay({
+/** A schedule cell's shift, as the day's roster groups it. */
+export function shiftRosterKey(
+  state: ScheduleCellState,
+  presentation: ResolvedSchedulePresentation,
+): string | null {
+  const cell = { state, presentation } as Parameters<typeof getScheduleEntryCategoryKey>[0];
+  return getScheduleEntryAbsenceTypeId(cell) == null ? getScheduleEntryCategoryKey(cell) : null;
+}
+
+/** Shifts on one day, with everyone working them now. */
+export function ShiftRoster({
   date,
   shifts,
   now,
@@ -146,6 +170,9 @@ function createStyles(mobileColors: MobileColors) {
   return StyleSheet.create({
     page: {
       gap: mobileSpace.lg,
+    },
+    heading: {
+      gap: mobileSpace.xs,
     },
     outcome: {
       gap: mobileSpace.xs,
