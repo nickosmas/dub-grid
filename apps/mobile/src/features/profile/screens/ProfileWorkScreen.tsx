@@ -161,7 +161,7 @@ export default function ProfileWorkScreen({
    */
   onUnsavedChange?: (unsaved: boolean) => void;
 } = {}) {
-  useReturnToSplit(!embedded);
+  useReturnToSplit(!embedded, "work");
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [draft, setDraft] = useState<ProfileDraft | null>(null);

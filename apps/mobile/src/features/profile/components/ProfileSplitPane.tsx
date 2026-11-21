@@ -5,7 +5,19 @@ import ProfileSecurityScreen from "../screens/ProfileSecurityScreen";
 import ProfileWorkScreen from "../screens/ProfileWorkScreen";
 
 /** The Profile settings that open as their own page, by route name. */
-export type ProfileSplitSection = "work" | "security" | "notifications" | "calendar" | "privacy";
+const PROFILE_SPLIT_SECTIONS = [
+  "work",
+  "security",
+  "notifications",
+  "calendar",
+  "privacy",
+] as const;
+
+export type ProfileSplitSection = (typeof PROFILE_SPLIT_SECTIONS)[number];
+
+export function isProfileSplitSection(value: string): value is ProfileSplitSection {
+  return (PROFILE_SPLIT_SECTIONS as readonly string[]).includes(value);
+}
 
 /** The chosen setting beside Profile on an open iPhone Duo. */
 export function ProfileSplitPane({
