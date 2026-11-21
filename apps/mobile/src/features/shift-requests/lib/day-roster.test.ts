@@ -95,20 +95,20 @@ describe("buildDayRoster", () => {
     ]);
   });
 
-  it("leads with the shifts the request's people work and marks them", () => {
+  it("keeps only the request's shift, with everyone working it now", () => {
     const roster = buildDayRoster(
-      [entry("Lena Novak", DAY), entry("Priya Patel", DAY), entry("Grace Kim", EVENING)],
+      [
+        entry("Lena Novak", DAY),
+        entry("Priya Patel", DAY),
+        entry("Grace Kim", EVENING),
+        entry("Grace Kim", DAY, "2026-11-20"),
+      ],
       "2026-11-19",
-      new Set(["emp-Grace Kim"]),
+      new Set(["shift:1"]),
     );
-    expect(roster.map((shift) => [shift.title, shift.affected])).toEqual([
-      ["Evening Shift", true],
-      ["Day Shift", false],
+    expect(roster.map((shift) => [shift.title, shift.people.map((p) => p.name)])).toEqual([
+      ["Day Shift", ["Lena Novak", "Priya Patel"]],
     ]);
-    expect(roster[0]?.people).toEqual([
-      { employeeId: "emp-Grace Kim", name: "Grace Kim", affected: true },
-    ]);
-    expect(roster[1]?.people.every((person) => !person.affected)).toBe(true);
   });
 
   it("leaves out absences and is empty for a day with no shifts", () => {

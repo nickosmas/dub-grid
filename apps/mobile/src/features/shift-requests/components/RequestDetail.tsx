@@ -1,6 +1,10 @@
 import type { MobileShiftRequest } from "@dubgrid/contracts";
-import { splitSelectedRowStyle } from "../../../shared/layout/splitSelection";
-import { describeRequestForViewer, formatScheduleDayLabel } from "@dubgrid/schedule-core";
+import {
+  describeRequestForViewer,
+  formatScheduleDayLabel,
+  getScheduleEntryAbsenceTypeId,
+  getScheduleEntryCategoryKey,
+} from "@dubgrid/schedule-core";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
@@ -53,19 +57,7 @@ export function RequestDetail({
       formatAsked: (date) => formatter.format(date),
     });
   }, [request, viewerEmpId, bootstrap, timeZone]);
-  const affectedIds = useMemo(
-    () =>
-      new Set(
-        [request.requesterEmpId, request.targetEmpId].filter((id): id is string => id != null),
-      ),
-    [request.requesterEmpId, request.targetEmpId],
-  );
-  const dates = [
-    request.requesterShiftDate,
-    ...(request.targetShiftDate && request.targetShiftDate !== request.requesterShiftDate
-      ? [request.targetShiftDate]
-      : []),
-  ];
+  const days = useMemo(() => requestDays(request), [request]);
 
   return (
     <View style={styles.page}>
@@ -78,51 +70,68 @@ export function RequestDetail({
           </AppText>
         </View>
       ) : null}
-      {dates.map((date) => (
-        <RosterDay affectedIds={affectedIds} date={date} key={date} now={now} timeZone={timeZone} />
+      {days.map((day) => (
+        <RosterDay
+          date={day.date}
+          key={day.date}
+          now={now}
+          shifts={day.shifts}
+          timeZone={timeZone}
+        />
       ))}
     </View>
   );
 }
 
-/** Who works one day the request touches, its people and their shifts marked. */
+/**
+ * Each day the request touches and the shift on it the request is about: the
+ * asker's on their date, the other person's on theirs (both when it's one day).
+ */
+function requestDays(request: MobileShiftRequest): { date: string; shifts: ReadonlySet<string> }[] {
+  const days = new Map<string, Set<string>>();
+  const add = (
+    date: string | null,
+    state: MobileShiftRequest["requesterState"] | null | undefined,
+    presentation: MobileShiftRequest["requesterPresentation"] | null | undefined,
+  ) => {
+    if (!date || !state || !presentation) return;
+    const shifts = days.get(date) ?? new Set<string>();
+    days.set(date, shifts);
+    const cell = { state, presentation } as Parameters<typeof getScheduleEntryCategoryKey>[0];
+    if (getScheduleEntryAbsenceTypeId(cell) == null) shifts.add(getScheduleEntryCategoryKey(cell));
+  };
+  add(request.requesterShiftDate, request.requesterState, request.requesterPresentation);
+  add(request.targetShiftDate, request.targetState, request.targetPresentation);
+  return [...days].map(([date, shifts]) => ({ date, shifts }));
+}
+
+/** The shifts the request is about on one day, with everyone working them now. */
 function RosterDay({
   date,
-  affectedIds,
+  shifts,
   now,
   timeZone,
 }: {
   date: string;
-  affectedIds: ReadonlySet<string>;
+  shifts: ReadonlySet<string>;
   now: Date;
   timeZone: string | null | undefined;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const roster = useDayRoster(date, affectedIds);
+  const roster = useDayRoster(date, shifts);
   if (!roster.shifts || roster.shifts.length === 0) return null;
 
   return (
     <RequestListSection title={`Working ${formatScheduleDayLabel(date, now, timeZone)}`}>
       <View style={styles.roster}>
         {roster.shifts.map((shift, index) => (
-          <View
-            key={shift.key}
-            style={[
-              styles.rosterRow,
-              index > 0 && styles.rosterRowDivider,
-              shift.affected && styles.rosterRowAffected,
-            ]}
-          >
+          <View key={shift.key} style={[styles.rosterRow, index > 0 && styles.rosterRowDivider]}>
             <AppText variant="rowTitle">
               {[shift.title, shift.focusArea, shift.time].filter(Boolean).join(" · ")}
             </AppText>
             {shift.people.map((person, personIndex) => (
-              <AppText
-                key={`${person.employeeId}-${personIndex}`}
-                tone={person.affected ? "brand" : "secondary"}
-                variant={person.affected ? "rowTitle" : "body"}
-              >
+              <AppText key={`${person.employeeId}-${personIndex}`} tone="secondary" variant="body">
                 {person.name}
               </AppText>
             ))}
@@ -154,8 +163,6 @@ function createStyles(mobileColors: MobileColors) {
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: mobileSpace.md,
     },
-    // The same clear blue as a split list's picked row.
-    rosterRowAffected: splitSelectedRowStyle(mobileColors),
     rosterRowDivider: {
       borderTopColor: mobileColors.borderSubtle,
       borderTopWidth: StyleSheet.hairlineWidth,

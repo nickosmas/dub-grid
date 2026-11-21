@@ -14,7 +14,7 @@ import { buildDayRoster, type DayRosterShift } from "../lib/day-roster";
  */
 export function useDayRoster(
   date: string | null,
-  affectedIds?: ReadonlySet<string>,
+  onlyShifts?: ReadonlySet<string>,
 ): {
   shifts: DayRosterShift[] | null;
   isLoading: boolean;
@@ -33,8 +33,8 @@ export function useDayRoster(
     enabled: Boolean(accessToken && range && canViewSchedule),
   });
   const shifts = useMemo(
-    () => (query.data && date ? buildDayRoster(query.data.entries, date, affectedIds) : null),
-    [query.data, date, affectedIds],
+    () => (query.data && date ? buildDayRoster(query.data.entries, date, onlyShifts) : null),
+    [query.data, date, onlyShifts],
   );
   return { shifts: canViewSchedule ? shifts : null, isLoading: canViewSchedule && query.isLoading };
 }
