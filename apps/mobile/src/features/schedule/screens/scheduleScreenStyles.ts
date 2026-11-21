@@ -27,6 +27,9 @@ import { SCHEDULE_DATE_TILE_MIN_WIDTH } from "../components/ScheduleDateTile";
 const PRESSABLE_INSET = mobileSpace.sm;
 
 /** A rounded press highlight that reaches past the content on both sides. */
+/** How far a picked day's pill stands in from the card's edges, as a picked row's does. */
+const UPCOMING_PICK_INSET = 6;
+
 const pressableBleed = {
   borderRadius: mobileRadii.control,
   marginHorizontal: -PRESSABLE_INSET,
@@ -465,6 +468,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: mobileSpace.lg,
       marginHorizontal: -20,
       paddingHorizontal: 20,
+    },
+    // The day beside Home's list on an open iPhone Duo: a picked row's gray
+    // pill, standing in from the card's edges.
+    upcomingDateGroupPicked: {
+      backgroundColor: mobileColors.selectedRowBg,
+      borderRadius: mobileRadii.card - UPCOMING_PICK_INSET,
+      marginHorizontal: -20 + UPCOMING_PICK_INSET,
+      paddingHorizontal: 20 - UPCOMING_PICK_INSET,
     },
     upcomingDateColumn: {
       // minWidth, not width: at a raised OS text size the weekday and day

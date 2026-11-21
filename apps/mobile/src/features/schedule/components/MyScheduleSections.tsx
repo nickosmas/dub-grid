@@ -1035,7 +1035,7 @@ export function UpcomingShiftsSection({
                 isToday &&
                   groupIndex === groupedItems.length - 1 &&
                   styles.upcomingShiftRowTodayLast,
-                group.date === highlightedDate && { backgroundColor: mobileColors.brandSoft },
+                group.date === highlightedDate && styles.upcomingDateGroupPicked,
               ]}
               testID={isToday ? `upcoming-today-row-${group.date}` : undefined}
             >

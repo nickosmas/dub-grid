@@ -22,16 +22,23 @@ import { PaneEdge, hingeModule } from "../../../modules/hinge";
 import { FOLD_FADE_MS, type useFoldEntering } from "./FoldFade";
 
 /** The current split, or null when the screen shows one page at a time. */
-export function useSplitLayout(): SplitLayout | null {
+export function useSplitLayout({ halves = false }: { halves?: boolean } = {}): SplitLayout | null {
   const { width, height } = useWindowDimensions();
   const hinge = useHingeStatus();
+  const insets = useSafeAreaInsets();
   // Once the layout for a new size has been drawn, the hinge module's cover
   // over the resizing window can fade.
   useEffect(() => {
     const frame = requestAnimationFrame(() => hingeModule?.settle?.());
     return () => cancelAnimationFrame(frame);
   }, [width, height]);
-  return useMemo(() => getSplitLayout({ width, height, hinge }), [width, height, hinge]);
+  return useMemo(() => {
+    const layout = getSplitLayout({ width, height, hinge });
+    // Halves split the room left beside the side column evenly.
+    if (!layout || !halves) return layout;
+    const room = width - insets.left - insets.right;
+    return { listWidth: Math.round(insets.left + room / 2) };
+  }, [width, height, hinge, halves, insets.left, insets.right]);
 }
 
 /**

@@ -105,7 +105,8 @@ export default function NotificationsScreen() {
   const [searchInput, setSearchInput] = useState("");
   // Open on the iPhone Duo, the inbox sits beside what the picked alert (or
   // the first one) points to.
-  const split = useSplitLayout();
+  // The alert beside the list is as wide as the list (owner, 2026-11-21).
+  const split = useSplitLayout({ halves: true });
   const foldEntering = useFoldEntering(split !== null);
   const isSplit = split !== null;
   const [pickedId, setPickedId] = useState<string | null>(null);

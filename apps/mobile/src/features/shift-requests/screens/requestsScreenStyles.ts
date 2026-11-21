@@ -75,11 +75,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     emptyPane: {
       flex: 1,
     },
-    // The one a link opened: a clear blue edged in the brand color.
+    // The one a link opened: the gray of a picked row.
     requestCardHighlighted: {
-      backgroundColor: mobileColors.brandBorder,
-      borderWidth: 2,
-      borderColor: mobileColors.brand,
+      backgroundColor: mobileColors.selectedRowBg,
     },
     cardRow: {
       gap: mobileSpace.sm,
@@ -87,7 +85,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingVertical: mobileSpace.md,
     },
     cardRowPressed: {
-      backgroundColor: mobileColors.navActiveBg,
+      backgroundColor: mobileColors.selectedRowBg,
     },
     cardSeparator: {
       height: StyleSheet.hairlineWidth,
