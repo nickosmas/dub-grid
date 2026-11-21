@@ -20,6 +20,11 @@ const routerPush = vi.fn();
 vi.mock("expo-router", () => ({
   router: { push: routerPush },
   useIsFocused: () => true,
+  // The split's bar, which holds only the alerts bell in the side column.
+  Stack: Object.assign(() => null, {
+    Screen: () => null,
+    Toolbar: Object.assign(() => null, { Button: () => null, Icon: () => null, Badge: () => null }),
+  }),
 }));
 
 // The split's panes only render on an open iPhone Duo.

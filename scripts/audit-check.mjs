@@ -77,19 +77,6 @@ const ALLOWLIST = [
       "has no fixed release. Revisit with the Expo SDK upgrade (F-127).",
   },
   {
-    ids: ["GHSA-fc5q-39xc-vjpf"],
-    package: "picomatch",
-    reviewBy: "2026-12-01",
-    reason:
-      "A glob pattern with a single-branch repeated extglob can take super-linear time to match. " +
-      "No fixed release exists: the advisory covers every picomatch up to 4.0.7, the newest " +
-      "published. Every copy runs in build, lint, test or developer tooling over globs we write: " +
-      "Metro, the Expo CLI and React Native's codegen and CLI (bundling and prebuild), ESLint and " +
-      "typescript-eslint, Vite and Vitest, the shadcn CLI, @snaplet/seed's config loader, Sentry's " +
-      "Next.js build plugin (@rollup/plugin-commonjs) and next-intl's development file watcher. " +
-      "None is in the mobile bundle or on a web request. Revisit when picomatch publishes a fix.",
-  },
-  {
     ids: ["GHSA-mrhx-c7xc-m3w5"],
     package: "zod",
     reviewBy: "2026-12-01",

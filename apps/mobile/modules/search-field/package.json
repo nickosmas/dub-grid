@@ -1,0 +1,10 @@
+{
+  "name": "dubgrid-search-field",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UIKit's own search field as a React Native view for DubGrid",
+  "main": "index.ts",
+  "license": "UNLICENSED",
+  "author": "DubGrid",
+  "homepage": "https://dubgrid.com"
+}

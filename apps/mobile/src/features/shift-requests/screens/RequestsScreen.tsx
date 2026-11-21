@@ -1,4 +1,5 @@
 import { resolveJobChipTone } from "@dubgrid/design-tokens";
+import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import {
   describeAwaitingRecipient,
   describeShiftRequest,
@@ -9,11 +10,11 @@ import {
   formatShiftRequestNote,
 } from "@dubgrid/domain";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { router, useIsFocused, useLocalSearchParams } from "expo-router";
+import { Stack, router, useIsFocused, useLocalSearchParams } from "expo-router";
+import { useHeaderHeight } from "expo-router/react-navigation";
+import { createSplitTopLevelStackOptions } from "../../../shared/navigation/top-level-stack";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
-import { PaneHeader } from "../../../shared/layout/PaneHeader";
-import { SplitStackTitle } from "../../../shared/layout/SplitStackTitle";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { NARROW_LIST_MAX_WIDTH } from "../../../shared/layout/split-layout";
 import { RequestDetail } from "../components/RequestDetail";
@@ -852,6 +853,13 @@ export default function RequestsScreen() {
   // Open on the iPhone Duo, the list sits beside the whole request. Before a
   // pick it shows the first request in the tab.
   const split = useSplitLayout();
+  const foldEntering = useFoldEntering(split !== null);
+  const requestsStackOptions = useMemo(
+    () => createSplitTopLevelStackOptions(mobileColors, "Requests", split !== null),
+    [mobileColors, split],
+  );
+  // The native bar's height: split, the request beside the list starts below it.
+  const headerHeight = useHeaderHeight();
   const [pickedRequestId, setPickedRequestId] = useState<string | null>(null);
   const tabRequests = useMemo((): MobileShiftRequest[] => {
     if (activeTab === "available") {
@@ -931,8 +939,8 @@ export default function RequestsScreen() {
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
     >
-      <SplitStackTitle split={split !== null} title="Requests" />
-      {split ? <PaneHeader actions={[]} title="Requests" /> : null}
+      {/* The page's own large title in every pose, as People's. */}
+      <Stack.Screen options={requestsStackOptions} />
       {/* Active request counts wait for their shared data. History resolves
           independently so a slow archive cannot hide active request actions. */}
       {contentState.kind === "loading" ? (
@@ -1234,33 +1242,29 @@ export default function RequestsScreen() {
 
   // With nothing in the tab, the list's own empty state says so once; a
   // second one beside it would only repeat it.
-  if (!split || !shownRequest) return listScreen;
+  if (!split) return listScreen;
 
   return (
     <SplitView
+      detailBarHeight={headerHeight}
+      entering={foldEntering}
       layout={split}
       list={listScreen}
       detail={
-        <Screen bottomPaddingMode="tabbed" key={shownRequest.id}>
-          <RequestDetail
-            card={
-              <RequestCard
-                canApprove={canApprove}
-                highlighted={false}
-                linkedEmployeeId={linkedEmployeeId}
-                now={now}
-                onAction={(body) => runRequestAction(shownRequest.id, body)}
-                pendingAction={pendingAction}
-                request={shownRequest}
-                timeZone={timeZone}
-              />
-            }
-            now={now}
-            request={shownRequest}
-            timeZone={timeZone}
-            viewerEmpId={linkedEmployeeId}
-          />
-        </Screen>
+        shownRequest ? (
+          <Screen bottomPaddingMode="tabbed" key={shownRequest.id}>
+            <RequestDetail
+              now={now}
+              request={shownRequest}
+              timeZone={timeZone}
+              viewerEmpId={linkedEmployeeId}
+            />
+          </Screen>
+        ) : (
+          // With nothing in the tab the pane stays empty; the list's empty
+          // state sits centered beside it.
+          <View style={styles.emptyPane} />
+        )
       }
     />
   );

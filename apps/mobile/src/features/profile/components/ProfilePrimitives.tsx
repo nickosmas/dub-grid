@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { splitSelectedRowStyle } from "../../../shared/layout/splitSelection";
 import {
   Children,
   createContext,
@@ -380,7 +381,7 @@ export function ProfileNavRow({
         styles.navRow,
         IS_NATIVE_LIST && styles.rowNative,
         !isLast && !IS_NATIVE_LIST && styles.rowDivider,
-        selected === true && { backgroundColor: mobileColors.brandSoft },
+        selected === true && splitSelectedRowStyle(mobileColors),
       ]}
     >
       <ProfileIcon name={iconName} />

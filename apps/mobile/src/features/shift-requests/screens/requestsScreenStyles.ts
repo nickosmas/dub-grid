@@ -1,4 +1,5 @@
 import { StyleSheet } from "react-native";
+import { splitSelectedRowStyle } from "../../../shared/layout/splitSelection";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import {
   mobilePillOverflow,
@@ -41,10 +42,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
           overflow: "hidden",
           ...mobileElevation("card", isDark),
         },
+    // The request beside the list in a split, or the one a link opened: the
+    // same clear blue as a split list's picked row, edged in the brand color.
+    emptyPane: {
+      flex: 1,
+    },
     requestCardHighlighted: {
-      borderWidth: 1,
+      ...splitSelectedRowStyle(mobileColors),
+      borderWidth: 2,
       borderColor: mobileColors.brand,
-      backgroundColor: mobileColors.brandSoft,
     },
     cardRow: {
       gap: mobileSpace.sm,

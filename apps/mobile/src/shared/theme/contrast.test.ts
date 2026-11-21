@@ -50,6 +50,8 @@ function composite(rgba: string, groundHex: string): string {
  */
 const AA_TEXT = 4.5;
 const PERCEIVABLE_FILL = 1.1;
+/** White cards on the lighter page (#F7F7FA): 1.069:1, the edge the owner accepted. */
+const LIGHT_PAGE_CARD_FILL = 1.06;
 
 describe("light mode control contrast", () => {
   /**
@@ -60,8 +62,10 @@ describe("light mode control contrast", () => {
    * mode becomes invisible, which is exactly the regression worth catching.
    */
   it("separates light-mode cards from the grouped page by fill, with no shadow", () => {
+    // Below the 1.10 fill floor by choice: the owner took the lighter page and
+    // its softer card edges over a border or a shadow (2026-11-20).
     expect(contrastRatio(mobileColors.surface, mobileColors.background)).toBeGreaterThanOrEqual(
-      PERCEIVABLE_FILL,
+      LIGHT_PAGE_CARD_FILL,
     );
     expect(mobileColors.cardBorder).toBe("transparent");
     expect(mobileElevation("card", false).boxShadow ?? []).toHaveLength(0);

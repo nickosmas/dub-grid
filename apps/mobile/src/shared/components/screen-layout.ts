@@ -33,6 +33,9 @@ const IOS_LARGE_TITLE_INSET = 20;
 const SIDE_COLUMN_CAMERA_CENTRE = 48;
 const TOP_ROW_CENTRE = 30;
 
+/** Where a detail pane's title centres without help: 8 above a screen title's line. */
+export const PANE_TITLE_ROW_CENTRE = 23;
+
 /**
  * Extra room above a screen's top row so it lines up with the camera when
  * the status bar has moved to a side column and the top inset is 0. Nothing

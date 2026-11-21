@@ -12,7 +12,10 @@ import { buildDayRoster, type DayRosterShift } from "../lib/day-roster";
  * Schedule tab's own query key, so a week already open there costs nothing.
  * Null for someone who can't see the team schedule.
  */
-export function useDayRoster(date: string | null): {
+export function useDayRoster(
+  date: string | null,
+  onlyShifts?: ReadonlySet<string>,
+): {
   shifts: DayRosterShift[] | null;
   isLoading: boolean;
 } {
@@ -30,8 +33,8 @@ export function useDayRoster(date: string | null): {
     enabled: Boolean(accessToken && range && canViewSchedule),
   });
   const shifts = useMemo(
-    () => (query.data && date ? buildDayRoster(query.data.entries, date) : null),
-    [query.data, date],
+    () => (query.data && date ? buildDayRoster(query.data.entries, date, onlyShifts) : null),
+    [query.data, date, onlyShifts],
   );
   return { shifts: canViewSchedule ? shifts : null, isLoading: canViewSchedule && query.isLoading };
 }

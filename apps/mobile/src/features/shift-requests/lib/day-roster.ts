@@ -12,21 +12,32 @@ export type DayRosterShift = {
   time: string | null;
   /** Its focus area, only when another shift that day has the same name. */
   focusArea: string | null;
-  names: string[];
+  people: DayRosterPerson[];
 };
 
-/** Who works each shift on one day, in the schedule's shift order. Absences are left out. */
+export type DayRosterPerson = { employeeId: string; name: string };
+
+/**
+ * Who works each shift on one day, as scheduled now, in the schedule's shift
+ * order. Given `onlyShifts`, just the shifts with those keys (a request's
+ * shift; see `getScheduleEntryCategoryKey`). Absences are left out.
+ */
 export function buildDayRoster(
   entries: readonly MobileScheduleEntry[],
   date: string,
+  onlyShifts?: ReadonlySet<string>,
 ): DayRosterShift[] {
   const worked = entries.filter(
     (entry) => entry.date === date && getScheduleEntryAbsenceTypeId(entry) == null,
   );
   const groups = buildScheduleShiftGroups(worked);
-  return groups.map((group) => {
+  const roster = groups.map((group) => {
     const first = group.entries[0];
     const sharesName = groups.some((other) => other !== group && other.title === group.title);
+    const people = group.entries.map((entry) => ({
+      employeeId: entry.employeeId,
+      name: entry.employeeName,
+    }));
     return {
       key: group.key,
       title: group.title,
@@ -34,7 +45,8 @@ export function buildDayRoster(
       focusArea: sharesName
         ? (first?.presentation.displayFocusAreaName ?? first?.presentation.focusAreaName ?? null)
         : null,
-      names: group.entries.map((entry) => entry.employeeName),
+      people,
     };
   });
+  return onlyShifts ? roster.filter((shift) => onlyShifts.has(shift.key)) : roster;
 }

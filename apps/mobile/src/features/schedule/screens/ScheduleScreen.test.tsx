@@ -52,6 +52,11 @@ vi.mock("expo-router", () => ({
   },
   useIsFocused: () => true,
   useLocalSearchParams: () => useLocalSearchParams(),
+  // The split's bar, which holds only the alerts bell in the side column.
+  Stack: Object.assign(() => null, {
+    Screen: () => null,
+    Toolbar: Object.assign(() => null, { Button: () => null, Icon: () => null, Badge: () => null }),
+  }),
 }));
 
 // The shift page and day overview only render in an iPhone Duo split view.

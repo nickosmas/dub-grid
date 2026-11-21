@@ -1,3 +1,4 @@
+import { ICON_CONTROL_SIZE } from "../../../shared/components/icon-control-style";
 import { StyleSheet } from "react-native";
 import {
   mobileOnAccent,
@@ -833,7 +834,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       ...mobilePillOverflow.displayText,
       color: mobileColors.textSecondary,
     },
+    // As tall as its buttons even when they move to the split's other pane,
+    // so the month's name stays centred on the camera.
     teamHeaderUtilityRow: {
+      minHeight: ICON_CONTROL_SIZE,
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.md,
@@ -874,6 +878,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // month's name, its handle at the card's foot (owner, 2026-11-18,
     // replacing 2026-11-02's header card flush with the top): it reads the
     // same on a phone and in an iPhone Duo's narrow list pane.
+    // Split, the month is the list pane's whole page, as in Calendar.
+    calendarPlain: {
+      paddingTop: mobileSpace.sm,
+    },
     calendarCard: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
@@ -937,6 +945,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     monthSwipeTrack: {
       flexDirection: "row",
+    },
+    // A swipe track holds three pages (previous, current, next) and starts one
+    // page to the left, all as shares of its frame's width.
+    weekStripTrackSized: {
+      width: "300%",
+      marginLeft: "-100%",
+    },
+    monthSwipeTrackSized: {
+      width: "300%",
+      marginLeft: "-100%",
+    },
+    swipeTrackColumn: {
+      width: "33.3333%",
     },
     monthGridColumn: {
       gap: MONTH_GRID_ROW_GAP,
