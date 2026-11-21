@@ -83,8 +83,9 @@ const createStyles = (mobileColors: MobileColors) =>
     row: {
       minHeight: mobileListRow.minHeight,
     },
+    // The web sidebar's active gray, the same as a split view's picked row.
     pressed: {
-      backgroundColor: mobileColors.navActiveBg,
+      backgroundColor: mobileColors.selectedRowBg,
     },
     disabled: {
       opacity: 0.4,
