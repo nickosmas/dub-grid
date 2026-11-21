@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import { Stack } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
-import { PaneSearch } from "../../../shared/layout/PaneSearch";
-import { createSplitDetailStackOptions } from "../../../shared/navigation/top-level-stack";
-import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
-import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
-import { AlertPane } from "../components/AlertPane";
+import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
 import { StyleSheet, View } from "react-native";
 import { HeaderLeadingTitle } from "../../../shared/navigation/HeaderLeadingTitle";
 import { useLargeTitleCollapse } from "../../../shared/navigation/useLargeTitleCollapse";
@@ -103,26 +98,15 @@ export default function NotificationsScreen() {
   const { pushToast } = useToast();
   const [filter, setFilter] = useState<FilterKey>("all");
   const [searchInput, setSearchInput] = useState("");
-  // Open on the iPhone Duo, the inbox sits beside what the picked alert (or
-  // the first one) points to.
-  // The alert beside the list is as wide as the list (owner, 2026-11-21).
-  const split = useSplitLayout({ halves: true });
-  const foldEntering = useFoldEntering(split !== null);
-  const isSplit = split !== null;
-  const [pickedId, setPickedId] = useState<string | null>(null);
-  // Split, the bar's own search would span both panes, so the inbox's sits
-  // above its list instead. Options a Stack.Screen sets outlive it, so the
-  // split pose clears the search the other one set.
+  // One page in every pose, the iPhone Duo's open screen too: a pane beside
+  // the inbox only repeated the alert (owner, 2026-11-21).
   const alertsRouteOptions = useMemo(
     () => ({
-      ...createSplitDetailStackOptions(mobileColors, "Alerts", isSplit),
-      ...(isSplit
-        ? { headerSearchBarOptions: undefined }
-        : screenSearchRouteOptions(ALERTS_SEARCH_PLACEHOLDER, mobileColors)),
+      ...createDetailStackOptions(mobileColors, "Alerts", { largeTitle: true }),
+      ...screenSearchRouteOptions(ALERTS_SEARCH_PLACEHOLDER, mobileColors),
     }),
-    [isSplit, mobileColors],
+    [mobileColors],
   );
-  const headerHeight = useHeaderHeight();
   const [debouncedSearch, setDebouncedSearch] = useState("");
   // Searched once typing pauses, not on every keystroke.
   useEffect(() => {
@@ -260,9 +244,7 @@ export default function NotificationsScreen() {
       // the navigation with the row already marked, and a failure puts the
       // row back and says so.
       const route = resolveAlertNativeRoute(notification, linkedEmployeeId);
-      if (isSplit) {
-        setPickedId(notification.id);
-      } else if (route) {
+      if (route) {
         openNativeRoute(route);
       } else {
         pushToast({ tone: "info", message: WEB_ONLY_ALERT_MESSAGE });
@@ -284,7 +266,6 @@ export default function NotificationsScreen() {
         });
     },
     [
-      isSplit,
       accessToken,
       facetsQuery,
       linkedEmployeeId,
@@ -375,33 +356,6 @@ export default function NotificationsScreen() {
   // per-row inset are unchanged, so a swiped row's actions still reach the
   // screen edge.
   const listItems = contentState.kind === "ready" ? notifications : [];
-  const shownNotification =
-    (pickedId ? listItems.find((notification) => notification.id === pickedId) : null) ??
-    listItems[0] ??
-    null;
-  const shownRoute = shownNotification
-    ? resolveAlertNativeRoute(shownNotification, linkedEmployeeId)
-    : null;
-  // Folding closed with an alert picked pushes the shift it points to, a
-  // page with Back that goes back into the split on opening; anything else
-  // would switch tabs, so the inbox stays.
-  const wasSplitRef = useRef(isSplit);
-  const pickedRoute =
-    pickedId &&
-    shownNotification?.id === pickedId &&
-    shownRoute?.pathname === "/shift/[employeeId]/[date]"
-      ? shownRoute
-      : null;
-  useEffect(() => {
-    const wasSplit = wasSplitRef.current;
-    wasSplitRef.current = isSplit;
-    if (pickedRoute && shouldPushPickOnClose({ wasSplit, isSplit, pickedId })) {
-      openNativeRoute({
-        ...pickedRoute,
-        params: { ...pickedRoute.params, [PUSHED_BY_FOLD_PARAM]: "1" },
-      });
-    }
-  }, [isSplit, pickedId, pickedRoute]);
 
   const page = (
     <Screen
@@ -419,21 +373,11 @@ export default function NotificationsScreen() {
       list={{
         data: listItems,
         keyExtractor: (notification) => notification.id,
-        itemSeparator: isSplit ? (
-          <View style={styles.groupDividerTrack}>
-            <View style={styles.groupDivider} />
-          </View>
-        ) : (
-          <View style={styles.divider} />
-        ),
-        renderItem: (notification, index) => (
+        itemSeparator: <View style={styles.divider} />,
+        renderItem: (notification) => (
           <NotificationRow
             openRegistry={openSwipe}
-            grouped={
-              isSplit ? { first: index === 0, last: index === listItems.length - 1 } : undefined
-            }
             notification={notification}
-            selected={isSplit ? notification.id === shownNotification?.id : undefined}
             onPress={() => handleRowPress(notification)}
             onToggleRead={() => handleToggleRead(notification)}
             onArchive={() => handleArchive(notification)}
@@ -455,11 +399,7 @@ export default function NotificationsScreen() {
     >
       <View style={styles.headerArea}>
         <Stack.Screen options={alertsRouteOptions} />
-        {isSplit ? (
-          <PaneSearch placeholder={ALERTS_SEARCH_PLACEHOLDER} onChange={setSearchInput} />
-        ) : (
-          <ScreenSearch placeholder={ALERTS_SEARCH_PLACEHOLDER} onSearchChange={setSearchInput} />
-        )}
+        <ScreenSearch placeholder={ALERTS_SEARCH_PLACEHOLDER} onSearchChange={setSearchInput} />
 
         {/* Held back until the facets land: every tab carries a count, and
             painting the strip first made each badge pop in afterwards and shove
@@ -480,11 +420,11 @@ export default function NotificationsScreen() {
             leading edge, as Mail names a mailbox; alone it stays centered. */}
         <HeaderLeadingTitle
           collapsed={largeTitle.collapsed}
-          enabled={!isSplit && unreadCount > 0}
+          enabled={unreadCount > 0}
           title="Alerts"
         />
-        {/* Mark all read is a bar action, as in Mail (on an iPhone Duo, in the
-            side column); how many are unread is already on the Unread filter. */}
+        {/* Mark all read is a bar action, as in Mail; how many are unread is
+            already on the Unread filter. */}
         {unreadCount > 0 ? (
           <HeaderBarAction
             disabled={busy}
@@ -554,17 +494,7 @@ export default function NotificationsScreen() {
     </Screen>
   );
 
-  if (!split || !shownNotification) return page;
-
-  return (
-    <SplitView
-      detailBarHeight={headerHeight}
-      entering={foldEntering}
-      layout={split}
-      list={page}
-      detail={<AlertPane notification={shownNotification} route={shownRoute} />}
-    />
-  );
+  return page;
 }
 
 const createStyles = (mobileColors: MobileColors) =>
@@ -583,15 +513,6 @@ const createStyles = (mobileColors: MobileColors) =>
       marginHorizontal: getScreenGutter(),
       marginTop: mobileSpace.lg,
       marginBottom: mobileSpace.md,
-    },
-    groupDividerTrack: {
-      marginHorizontal: getScreenGutter(),
-      backgroundColor: mobileColors.surface,
-    },
-    groupDivider: {
-      height: StyleSheet.hairlineWidth,
-      marginLeft: mobileSpace.md + mobileSpace.lg + mobileSpace.sm,
-      backgroundColor: mobileColors.borderSubtle,
     },
     divider: {
       height: StyleSheet.hairlineWidth,
