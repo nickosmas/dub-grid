@@ -61,7 +61,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: mobileSpace.md,
     },
-    requestRowSelected: splitSelectedRowStyle(mobileColors, mobileSpace.lg),
+    requestRowSelected: splitSelectedRowStyle(mobileColors, {
+      horizontal: mobileSpace.lg,
+      vertical: mobileSpace.md,
+    }),
     rowShiftText: {
       ...mobileText.meta,
       color: mobileColors.textMuted,

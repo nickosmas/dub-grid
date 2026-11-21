@@ -1,27 +1,30 @@
 import type { ViewStyle } from "react-native";
-import { mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
+import { mobileRadii, type MobileColors } from "../theme/tokens";
 
-/** How far a picked row's fill stands in from the list's edges. */
-const SELECTED_ROW_INSET = mobileSpace.sm;
+/** How far a picked row's pill stands in from the card that holds it. */
+const CARD_INSET = 6;
 
 /**
  * The row a split view's detail pane shows, as People marks a person: a clear
- * blue pill with rounded corners. Pass the row's own horizontal padding to
- * stand the pill in from the list's edges with the text where it was; a row
- * that already bleeds past its gutter (People, Schedule) passes none.
+ * blue pill with rounded corners. A row inside a section card passes its own
+ * padding: the pill then stands in from the card by the same distance on
+ * every side, its corners follow the card's, and the row's text stays where
+ * it was. A row that already bleeds past its gutter (People, Schedule) passes
+ * none.
  */
 export function splitSelectedRowStyle(
   mobileColors: MobileColors,
-  rowPaddingHorizontal?: number,
+  rowPadding?: { horizontal: number; vertical: number; minHeight?: number },
 ): ViewStyle {
+  if (!rowPadding) {
+    return { backgroundColor: mobileColors.brandBorder, borderRadius: mobileRadii.control };
+  }
   return {
     backgroundColor: mobileColors.brandBorder,
-    borderRadius: mobileRadii.control,
-    ...(rowPaddingHorizontal != null
-      ? {
-          marginHorizontal: SELECTED_ROW_INSET,
-          paddingHorizontal: rowPaddingHorizontal - SELECTED_ROW_INSET,
-        }
-      : null),
+    borderRadius: mobileRadii.card - CARD_INSET,
+    margin: CARD_INSET,
+    paddingHorizontal: rowPadding.horizontal - CARD_INSET,
+    paddingVertical: rowPadding.vertical - CARD_INSET,
+    ...(rowPadding.minHeight != null ? { minHeight: rowPadding.minHeight - 2 * CARD_INSET } : null),
   };
 }

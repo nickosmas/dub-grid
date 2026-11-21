@@ -383,7 +383,12 @@ export function ProfileNavRow({
         styles.navRow,
         IS_NATIVE_LIST && styles.rowNative,
         !isLast && !IS_NATIVE_LIST && styles.rowDivider,
-        selected === true && splitSelectedRowStyle(mobileColors, PROFILE_ROW_PADDING),
+        selected === true &&
+          splitSelectedRowStyle(mobileColors, {
+            horizontal: PROFILE_ROW_PADDING,
+            vertical: IS_NATIVE_LIST ? mobileSpace.md : 12,
+            minHeight: IS_NATIVE_LIST ? 52 : 70,
+          }),
       ]}
     >
       <ProfileIcon name={iconName} />
