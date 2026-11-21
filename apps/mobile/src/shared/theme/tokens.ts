@@ -2,12 +2,14 @@ import {
   borderColorFromText,
   colorTokens,
   darkColorTokens,
+  darkShadcnTokens,
   getAvatarTypography,
   getMobileEasingCurve,
   getMobileElevation,
   getMobileElevationExtent,
   getMobileIconToneColor,
   getSoftGradientStops,
+  lightShadcnTokens,
   mobileMotionTokens,
   mobileNavigationTheme,
   mobileBrandTypographyTokens,
@@ -111,6 +113,8 @@ const BUTTON_SOLID_FILLS = {
 
 const MOBILE_LIGHT = {
   ...BUTTON_SOLID_FILLS,
+  /** A picked row's fill: the web sidebar's active item (owner, 2026-11-20). */
+  selectedRowBg: lightShadcnTokens.sidebarAccent,
   /**
    * The grouped page: iOS's `systemGroupedBackground`, the gray a Settings
    * list sits on, used on Android too. White cards separate from it by fill
@@ -201,6 +205,7 @@ const MOBILE_LIGHT = {
 
 const MOBILE_DARK = {
   ...BUTTON_SOLID_FILLS,
+  selectedRowBg: darkShadcnTokens.sidebarAccent,
   /**
    * iOS's dark grouped pair: a black page under `secondarySystemGroupedBackground`
    * cards, which separate by fill without a shadow or an edge.
