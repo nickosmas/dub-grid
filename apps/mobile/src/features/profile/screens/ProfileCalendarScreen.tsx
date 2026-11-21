@@ -72,7 +72,7 @@ async function openCalendarAction(action: CalendarAction, feedUrl: string) {
  * the rest of this visit so a second row reuses it instead of rotating again.
  */
 export default function ProfileCalendarScreen({ embedded = false }: { embedded?: boolean } = {}) {
-  useReturnToSplit(!embedded);
+  useReturnToSplit(!embedded, "calendar");
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [issued, setIssued] = useState<MobileCalendarSubscriptionIssued | null>(null);

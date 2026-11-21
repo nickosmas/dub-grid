@@ -74,7 +74,7 @@ function normalizePrefs(input: unknown): PrefsShape {
 export default function ProfileNotificationsScreen({
   embedded = false,
 }: { embedded?: boolean } = {}) {
-  useReturnToSplit(!embedded);
+  useReturnToSplit(!embedded, "notifications");
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const queryClient = useQueryClient();

@@ -52,7 +52,7 @@ const PENDING_ACCOUNT_DELETION_MESSAGE =
  * app-lock toggle (one switch, nothing to unfold) stays inline.
  */
 export default function ProfileSecurityScreen({ embedded = false }: { embedded?: boolean } = {}) {
-  useReturnToSplit(!embedded);
+  useReturnToSplit(!embedded, "security");
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [isConfirmingDeletion, setIsConfirmingDeletion] = useState(false);

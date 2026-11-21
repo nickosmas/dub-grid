@@ -15,7 +15,7 @@ import {
 } from "../components/ProfilePrimitives";
 
 export default function ProfilePrivacyScreen({ embedded = false }: { embedded?: boolean } = {}) {
-  useReturnToSplit(!embedded);
+  useReturnToSplit(!embedded, "privacy");
   const mobileColors = useMobileColors();
   const { pushToast } = useToast();
   // null until the stored consent is read. Defaulting to `false` rendered the

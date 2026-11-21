@@ -41,9 +41,11 @@ vi.mock("../components/ProfileSplitPane", () => ({ ProfileSplitPane: () => null 
 
 vi.mock("expo-router", () => ({
   useIsFocused: () => true,
+  useLocalSearchParams: () => ({}),
   router: {
     push: routerPush,
     replace: routerReplace,
+    setParams: vi.fn(),
   },
   Stack: Object.assign(() => null, {
     // The bar's trailing slot rendered in place, so a test can press the
