@@ -1,8 +1,11 @@
-import { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { Text } from "./Text";
 import { Button } from "./Button";
-import { EmptyScene } from "./empty-scene/EmptyScene";
+import { EmptyScene, getEmptySceneHeight } from "./empty-scene/EmptyScene";
+import { getEmptySceneFit } from "./empty-scene/fit";
+import { useScreenVisibleBottom } from "./ScreenVisibleBottom";
+import { useWindowTop } from "../layout/useWindowTop";
 import type { EmptySceneKind } from "./empty-scene/scenes";
 import type { EmptySceneDay } from "./empty-scene/day-scene";
 import type { EmptySceneWeek } from "./empty-scene/week-scene";
@@ -64,6 +67,35 @@ export function EmptyStateCard({
   // spacers place the message within it. See `fill-screen-anchor` for why not
   // dead centre.
   const isFilling = !compact && fillScreen;
+
+  // A page's empty state always shows whole above the tab bar: with too
+  // little room its drawing shrinks, and below half size it is left out.
+  // One inside a card scrolls with its page, so it keeps its drawing.
+  const visibleBottom = useScreenVisibleBottom();
+  const fits = !compact && visibleBottom !== null;
+  // The content's own top, which centring can move as the drawing changes;
+  // each new layout measures it again until the two agree.
+  const contentRef = useRef<View>(null);
+  const [contentTop, measureContentTop] = useWindowTop(contentRef, fits);
+  const [rest, setRest] = useState<number | null>(null);
+  const sceneHeight = getEmptySceneHeight(compact ? "card" : "page");
+  const gap = compact ? CARD_CONTENT_GAP : PAGE_CONTENT_GAP;
+  const fit = fits
+    ? getEmptySceneFit({
+        room: contentTop === null ? null : visibleBottom - contentTop,
+        rest,
+        sceneHeight,
+        gap,
+      })
+    : 1;
+  const onContentLayout = (event: LayoutChangeEvent) => {
+    if (!fits) return;
+    const shownScene = fit > 0 ? Math.round(sceneHeight * fit) + gap : 0;
+    const next = event.nativeEvent.layout.height - shownScene;
+    setRest((current) => (current === next ? current : next));
+    measureContentTop();
+  };
+
   return (
     <View style={[variant.card, isFilling ? fillScreenAnchorStyles.fill : null]}>
       {isFilling ? (
@@ -71,33 +103,43 @@ export function EmptyStateCard({
           style={split ? fillScreenAnchorStyles.spacerCentred : fillScreenAnchorStyles.spacerAbove}
         />
       ) : null}
-      <EmptyScene day={sceneDay} kind={scene} size={compact ? "card" : "page"} week={sceneWeek} />
-      <View style={variant.copy}>
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={variant.title}>
-          {title}
-        </Text>
-        {body ? (
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={variant.body}>
-            {body}
+      <View onLayout={onContentLayout} ref={contentRef} style={variant.content}>
+        {fit > 0 ? (
+          <EmptyScene
+            day={sceneDay}
+            fit={fit}
+            kind={scene}
+            size={compact ? "card" : "page"}
+            week={sceneWeek}
+          />
+        ) : null}
+        <View style={variant.copy}>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={variant.title}>
+            {title}
           </Text>
+          {body ? (
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={variant.body}>
+              {body}
+            </Text>
+          ) : null}
+        </View>
+        {actionLabel && onAction ? (
+          <View style={variant.actionRow}>
+            {actionVariant === "link" ? (
+              <Button
+                compact
+                icon="arrow-forward"
+                iconPosition="trailing"
+                label={actionLabel}
+                onPress={onAction}
+                tone="link"
+              />
+            ) : (
+              <Button compact label={actionLabel} onPress={onAction} tone="secondary" />
+            )}
+          </View>
         ) : null}
       </View>
-      {actionLabel && onAction ? (
-        <View style={variant.actionRow}>
-          {actionVariant === "link" ? (
-            <Button
-              compact
-              icon="arrow-forward"
-              iconPosition="trailing"
-              label={actionLabel}
-              onPress={onAction}
-              tone="link"
-            />
-          ) : (
-            <Button compact label={actionLabel} onPress={onAction} tone="secondary" />
-          )}
-        </View>
-      ) : null}
       {isFilling ? (
         <View
           style={split ? fillScreenAnchorStyles.spacerCentred : fillScreenAnchorStyles.spacerBelow}
@@ -106,6 +148,10 @@ export function EmptyStateCard({
     </View>
   );
 }
+
+/** The gap between the drawing, the copy and the action, on a page and in a card. */
+const PAGE_CONTENT_GAP = 16;
+const CARD_CONTENT_GAP = 12;
 
 // Owns the page: sits on the ground itself, with no panel behind it.
 const createStyles = (mobileColors: MobileColors) =>
@@ -117,6 +163,10 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingHorizontal: 4,
       paddingVertical: 32,
       gap: 16,
+      alignItems: "center",
+    },
+    content: {
+      gap: PAGE_CONTENT_GAP,
       alignItems: "center",
     },
     copy: {
@@ -150,6 +200,10 @@ const createCompactStyles = (mobileColors: MobileColors) =>
       paddingHorizontal: 4,
       paddingVertical: 24,
       gap: 12,
+      alignItems: "center",
+    },
+    content: {
+      gap: CARD_CONTENT_GAP,
       alignItems: "center",
     },
     copy: {

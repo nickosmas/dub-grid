@@ -228,6 +228,7 @@ vi.mock("react-native", async () => {
     },
     Text,
     View,
+    useWindowDimensions: () => ({ width: 402, height: 874, scale: 3, fontScale: 1 }),
   };
 });
 

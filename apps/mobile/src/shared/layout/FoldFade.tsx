@@ -1,9 +1,9 @@
 import { useRef, type PropsWithChildren } from "react";
 import { StyleSheet } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { FOLD_FADE_MS } from "./fold-timing";
 
-/** How long a page takes to fade into its new layout when the Duo folds or opens. */
-export const FOLD_FADE_MS = 220;
+export { FOLD_FADE_MS };
 
 const FOLD_ENTERING = FadeIn.duration(FOLD_FADE_MS);
 

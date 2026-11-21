@@ -10,7 +10,11 @@ const NARROW_LIST_WIDTH = 300;
 /** A list narrower than this (the Duo held tall) stacks what would sit side by side in a row. */
 export const NARROW_LIST_MAX_WIDTH = 340;
 
-export type SplitLayout = { listWidth: number };
+export type SplitLayout = {
+  listWidth: number;
+  /** Held tall, where a month page stacks its list over its detail, as Calendar does. */
+  tall: boolean;
+};
 
 /**
  * How a page splits into list and detail (Apple's split view): not at all
@@ -28,6 +32,16 @@ export function getSplitLayout({
   hinge: HingeStatus;
 }): SplitLayout | null {
   if (width < SPLIT_MIN_WIDTH) return null;
-  if (hinge === "partiallyOpen" && width > height) return { listWidth: Math.round(width / 2) };
-  return { listWidth: width >= WIDE_MIN_WIDTH ? WIDE_LIST_WIDTH : NARROW_LIST_WIDTH };
+  if (hinge === "partiallyOpen" && width > height) {
+    return { listWidth: Math.round(width / 2), tall: false };
+  }
+  return {
+    listWidth: width >= WIDE_MIN_WIDTH ? WIDE_LIST_WIDTH : NARROW_LIST_WIDTH,
+    tall: height > width,
+  };
+}
+
+/** Stacked, the list's height: the screen's top half, which ends at the Duo's fold. */
+export function getStackedListHeight(height: number): number {
+  return Math.round(height / 2);
 }

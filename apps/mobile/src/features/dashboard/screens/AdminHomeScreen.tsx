@@ -348,6 +348,7 @@ export function AdminHomeScreen() {
         entering={foldEntering}
         layout={splitLayout}
         listCard
+        stackWhenTall
         list={
           <MonthCalendarPane
             now={now}
