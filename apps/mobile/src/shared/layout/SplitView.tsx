@@ -10,7 +10,7 @@ import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileElevation, mobileRadii, mobileSpace } from "../theme/tokens";
 import { WindowInsetsContext } from "../navigation/useHasSideColumn";
-import { getSplitLayout, type SplitLayout } from "./split-layout";
+import { getSplitLayout, getStackedListHeight, type SplitLayout } from "./split-layout";
 import {
   DetailBarClearanceContext,
   DetailPaneContext,
@@ -35,6 +35,15 @@ export function useSplitLayout(): SplitLayout | null {
 }
 
 /**
+ * Where a stacking list pane ends in the window: the screen's foot beside its
+ * detail, or held tall, just above the fold.
+ */
+export function useListPaneBottom(layout: SplitLayout | null): number {
+  const { height } = useWindowDimensions();
+  return layout?.tall ? getStackedListHeight(height) - LIST_CARD_INSET : height;
+}
+
+/**
  * A list beside its detail. Each pane gets the safe-area insets of the edges
  * it actually touches, so the list doesn't keep room for the side column on
  * the far edge and the detail doesn't pad for the leading edge.
@@ -47,6 +56,7 @@ export function SplitView({
   listCard = false,
   entering,
   detailBarHeight = 0,
+  stackWhenTall = false,
 }: {
   layout: SplitLayout;
   list: ReactNode;
@@ -62,19 +72,38 @@ export function SplitView({
   detailBarHeight?: number;
   /** The fade from `useFoldEntering`, as the page arrives from one pane. */
   entering?: ReturnType<typeof useFoldEntering>;
+  /** Held tall, the list sits over the detail, above the fold, as Calendar puts its month. */
+  stackWhenTall?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const insets = useSafeAreaInsets();
-  const listInsets = useMemo(() => ({ ...insets, right: 0 }), [insets]);
-  const detailInsets = useMemo(() => ({ ...insets, left: 0 }), [insets]);
+  const { height } = useWindowDimensions();
+  const stacked = stackWhenTall && layout.tall;
+  const listInsets = useMemo(
+    () => (stacked ? { ...insets, bottom: 0 } : { ...insets, right: 0 }),
+    [insets, stacked],
+  );
+  const detailInsets = useMemo(
+    () => (stacked ? { ...insets, top: 0 } : { ...insets, left: 0 }),
+    [insets, stacked],
+  );
   // Opening flat from partly folded, or the other way, the list slides to
   // its new width instead of jumping there.
   const listWidth = useSharedValue(layout.listWidth);
   useEffect(() => {
     listWidth.value = withTiming(layout.listWidth, LIST_WIDTH_TIMING);
   }, [layout.listWidth, listWidth]);
-  const listWidthStyle = useAnimatedStyle(() => ({ width: listWidth.value }));
+  // Reanimated keeps the last size it set, so the stacked size comes from the
+  // same animated style rather than replacing it.
+  const stackedHeight = getStackedListHeight(height);
+  const listSizeStyle = useAnimatedStyle(
+    () =>
+      stacked
+        ? { width: "100%", height: stackedHeight }
+        : { width: listWidth.value, height: "100%" },
+    [stacked, stackedHeight],
+  );
 
   return (
     <WindowInsetsContext.Provider value={insets}>
@@ -90,19 +119,20 @@ export function SplitView({
             {background}
           </View>
         ) : null}
-        <Animated.View entering={entering} style={styles.row}>
-          <Animated.View style={listWidthStyle}>
+        <Animated.View entering={entering} style={stacked ? styles.column : styles.row}>
+          <Animated.View style={listSizeStyle}>
             <SafeAreaInsetsContext.Provider value={listInsets}>
               {listCard ? (
                 <View
                   style={[
                     styles.listCard,
+                    stacked && styles.listCardStacked,
                     { backgroundColor: mobileColors.surface },
                     mobileElevation("float", isDark),
                   ]}
                 >
                   {/* Clipped inside, so the shadow outside isn't. */}
-                  <View style={styles.listCardClip}>
+                  <View style={[styles.listCardClip, stacked && styles.listCardStacked]}>
                     <TransparentPaneContext.Provider value={true}>
                       <PaneTopInsetContext.Provider value={LIST_CARD_INSET}>
                         {list}
@@ -116,7 +146,12 @@ export function SplitView({
             </SafeAreaInsetsContext.Provider>
           </Animated.View>
           {listCard ? null : (
-            <View style={[styles.divider, { backgroundColor: mobileColors.borderSubtle }]} />
+            <View
+              style={[
+                stacked ? styles.dividerStacked : styles.divider,
+                { backgroundColor: mobileColors.borderSubtle },
+              ]}
+            />
           )}
           <View style={styles.detail}>
             <SafeAreaInsetsContext.Provider value={detailInsets}>
@@ -163,12 +198,26 @@ const styles = StyleSheet.create({
   background: {
     pointerEvents: "none",
   },
+  // Stacked, the card's top corners follow the display's and its bottom ones,
+  // over the detail, are a control's.
+  listCardStacked: {
+    borderTopLeftRadius: LIST_CARD_LEADING_RADIUS,
+    borderTopRightRadius: LIST_CARD_LEADING_RADIUS,
+    borderBottomLeftRadius: mobileRadii.control,
+    borderBottomRightRadius: mobileRadii.control,
+  },
   row: {
     flex: 1,
     flexDirection: "row",
   },
+  column: {
+    flex: 1,
+  },
   divider: {
     width: StyleSheet.hairlineWidth,
+  },
+  dividerStacked: {
+    height: StyleSheet.hairlineWidth,
   },
   detail: {
     flex: 1,

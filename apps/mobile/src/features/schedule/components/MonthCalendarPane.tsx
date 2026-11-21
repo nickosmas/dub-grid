@@ -1,7 +1,9 @@
 import { useQueries, type UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { View } from "react-native";
 import { Screen } from "../../../shared/components/Screen";
+import { useListPaneBottom, useSplitLayout } from "../../../shared/layout/SplitView";
+import { useWindowTop } from "../../../shared/layout/useWindowTop";
 import { Text } from "../../../shared/components/Text";
 import { getMySchedule } from "../../../shared/lib/api";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
@@ -52,7 +54,7 @@ export function MonthCalendarPane({
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const accessToken = useAccessToken();
   const linkedEmployee = useBootstrap(accessToken).data?.linkedEmployee ?? null;
-  const { height: viewportHeight } = useWindowDimensions();
+  const paneBottom = useListPaneBottom(useSplitLayout());
 
   const selectedMonth = getScheduleMonthStartDate(selectedDate);
   const [month, setMonth] = useState(selectedMonth);
@@ -82,16 +84,17 @@ export function MonthCalendarPane({
     combine: combineScheduledDates,
   });
 
-  // The weeks share the height under the weekday row, down to the pane's foot.
+  // The weeks share the height under the weekday row, down to the pane's foot
+  // (held tall, the fold).
   const gridRef = useRef<View>(null);
-  const [gridTop, setGridTop] = useState<number | null>(null);
+  const [gridTop, measureGridTop] = useWindowTop(gridRef, true);
   const rowHeight =
     gridTop === null
       ? WEEK_STRIP_ROW_HEIGHT
       : Math.max(
           WEEK_STRIP_ROW_HEIGHT,
           Math.floor(
-            (viewportHeight - gridTop - mobileSpace.lg - (weeks.length - 1) * MONTH_GRID_ROW_GAP) /
+            (paneBottom - gridTop - mobileSpace.lg - (weeks.length - 1) * MONTH_GRID_ROW_GAP) /
               weeks.length,
           ),
         );
@@ -136,11 +139,7 @@ export function MonthCalendarPane({
         <View
           accessibilityLabel="Month calendar"
           ref={gridRef}
-          onLayout={() =>
-            gridRef.current?.measureInWindow((_x, y) =>
-              setGridTop((current) => (current === y ? current : y)),
-            )
-          }
+          onLayout={measureGridTop}
           style={{ gap: MONTH_GRID_ROW_GAP }}
         >
           {weeks.map((week) => (

@@ -54,8 +54,9 @@ import { SplitShiftBadge } from "../components/SplitShift";
 import { DayOverview } from "../components/DayOverview";
 import { HomeSplitPane, useHomeSplit } from "../components/HomeSplit";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
-import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
-import { NARROW_LIST_MAX_WIDTH } from "../../../shared/layout/split-layout";
+import { SplitView, useListPaneBottom, useSplitLayout } from "../../../shared/layout/SplitView";
+import { NARROW_LIST_MAX_WIDTH, getStackedListHeight } from "../../../shared/layout/split-layout";
+import { useWindowTop } from "../../../shared/layout/useWindowTop";
 import ShiftDetailScreen from "./ShiftDetailScreen";
 import { getMySchedule, getOrgSchedule, getShiftRequests } from "../../../shared/lib/api";
 import { getAvatarTone } from "@dubgrid/design-tokens";
@@ -500,7 +501,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const split = isTeamScope && !isBlockedTeamView ? splitLayout : null;
   const [pickedShift, setPickedShift] = useState<{ employeeId: string; date: string } | null>(null);
   const shownShift = pickedShift?.date === selectedDate ? pickedShift : null;
-  const narrowList = split !== null && split.listWidth < NARROW_LIST_MAX_WIDTH;
+  // Stacked when held tall, both panes are the screen's width.
+  const narrowList = split !== null && !split.tall && split.listWidth < NARROW_LIST_MAX_WIDTH;
   // The week is keyed by "today" in the organization's time zone, which
   // bootstrap supplies. Fetching before it arrived keyed the first request
   // by the UTC date, which near the day boundary is the wrong week: a wasted
@@ -664,21 +666,22 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     })),
     combine: combineScheduledDates,
   });
-  // Split, the month fills the list pane and the chosen day sits beside it,
-  // as Calendar lays them out; folding closed brings back the week strip.
+  // Split, the month fills the list pane and the chosen day sits beside it
+  // (held tall, under it), as Calendar lays them out; folding closed brings back the week strip.
   const isSplit = split !== null;
   // On an iPhone Duo, open or closed, the bell stands in the side column.
   const sideColumn = useHasSideColumn();
   // Where the month's dates start in the window, so its weeks can share the
   // height below them down to the bottom of the pane.
-  const [monthGridTop, setMonthGridTop] = useState<number | null>(null);
   const monthGridRef = useRef<View>(null);
+  const [monthGridTop, measureMonthGridTop] = useWindowTop(monthGridRef, isSplit);
+  const monthPaneBottom = useListPaneBottom(split);
   const splitRowHeight =
     isSplit && monthGridTop !== null && monthWeeks.length > 0
       ? Math.max(
           WEEK_STRIP_ROW_HEIGHT,
           Math.floor(
-            (viewportHeight -
+            (monthPaneBottom -
               monthGridTop -
               mobileSpace.lg -
               (monthWeeks.length - 1) * MONTH_GRID_ROW_GAP) /
@@ -845,7 +848,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     () => meUpcomingItems.some((item) => !isDeletedScheduleHistory(item.entry)),
     [meUpcomingItems],
   );
-  const meEmptyPageMinHeight = Math.max(320, viewportHeight - insets.top - insets.bottom - 180);
+  // Held tall on an iPhone Duo, the page is the half under the month.
+  const meEmptyPageMinHeight = homeSplit.split?.tall
+    ? viewportHeight - getStackedListHeight(viewportHeight) - insets.bottom - 180
+    : Math.max(320, viewportHeight - insets.top - insets.bottom - 180);
   const meRequestSections = useMemo(
     () =>
       !isTeamScope
@@ -1481,11 +1487,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           ref={monthGridRef}
           onLayout={(event) => {
             setWeekStripWidth(event.nativeEvent.layout.width);
-            if (isSplit) {
-              monthGridRef.current?.measureInWindow((_x, y) => {
-                setMonthGridTop((current) => (current === y ? current : y));
-              });
-            }
+            if (isSplit) measureMonthGridTop();
           }}
           onTouchCancel={isSplit ? undefined : handleMonthSwipeCancel}
           onTouchEnd={isSplit ? undefined : handleMonthSwipeRelease}
@@ -1836,6 +1838,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           entering={foldEntering}
           layout={homeSplit.split}
           listCard
+          stackWhenTall
           list={
             <MonthCalendarPane
               now={now}
@@ -1880,6 +1883,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         entering={foldEntering}
         layout={split}
         listCard
+        stackWhenTall
         list={listScreen}
         detail={
           shownShift ? (
