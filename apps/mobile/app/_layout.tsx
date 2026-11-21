@@ -47,9 +47,7 @@ import {
   createDetailStackOptions,
 } from "../src/shared/navigation/top-level-stack";
 import { mobileTypography } from "../src/shared/theme/tokens";
-import { configureNativeStackUpdates } from "../src/shared/navigation/screensFlags";
 
-configureNativeStackUpdates();
 SplashScreen.preventAutoHideAsync().catch(() => {});
 markMobileAuthRuntimeStarted();
 warmStartup();
