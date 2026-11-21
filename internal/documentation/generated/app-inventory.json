@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceDigest": "sha256:db2aedd3c3d58a841f53c1e37c0db58d6c6a5e6fe1caf620943d2f8e90682b30",
+  "sourceDigest": "sha256:cefccb4f5d7b3572fb3a31b5b9974479247101d35f17da717879f0af743688e0",
   "webRoutes": [
     {
       "id": "web:/",
@@ -623,6 +623,19 @@
       "dynamicParameters": [],
       "source": {
         "path": "apps/mobile/app/(tabs)/profile/index.tsx"
+      }
+    },
+    {
+      "id": "mobile:screen:/(tabs)/requests/[id]:all",
+      "routerPath": "/(tabs)/requests/[id]",
+      "urlPattern": "/requests/[id]",
+      "kind": "screen",
+      "platform": "all",
+      "dynamicParameters": [
+        "id"
+      ],
+      "source": {
+        "path": "apps/mobile/app/(tabs)/requests/[id].tsx"
       }
     },
     {
