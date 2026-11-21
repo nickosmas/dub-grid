@@ -43,7 +43,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
           ...mobileElevation("card", isDark),
         },
     // Split on an iPhone Duo, a section's requests are rows of one inset
-    // grouped list, as Mail lists mail; the picked row turns clear blue.
+    // grouped list, as Mail lists mail; the picked row turns gray.
     rowGroup: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
@@ -75,8 +75,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     emptyPane: {
       flex: 1,
     },
-    // The one a link opened: the same clear blue as a split list's picked
-    // row, edged in the brand color.
+    // The one a link opened: a clear blue edged in the brand color.
     requestCardHighlighted: {
       backgroundColor: mobileColors.brandBorder,
       borderWidth: 2,
