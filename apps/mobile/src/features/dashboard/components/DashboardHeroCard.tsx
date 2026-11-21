@@ -239,7 +239,7 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: mobileSpace.xs,
     },
     statPressed: {
-      backgroundColor: mobileColors.navActiveBg,
+      backgroundColor: mobileColors.selectedRowBg,
     },
     statFigureRow: {
       flexDirection: "row",
