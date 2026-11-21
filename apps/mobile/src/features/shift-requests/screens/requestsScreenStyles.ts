@@ -61,7 +61,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: mobileSpace.lg,
       paddingVertical: mobileSpace.md,
     },
-    requestRowSelected: splitSelectedRowStyle(mobileColors),
+    requestRowSelected: splitSelectedRowStyle(mobileColors, mobileSpace.lg),
     rowShiftText: {
       ...mobileText.meta,
       color: mobileColors.textMuted,
@@ -75,7 +75,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // The one a link opened: the same clear blue as a split list's picked
     // row, edged in the brand color.
     requestCardHighlighted: {
-      ...splitSelectedRowStyle(mobileColors),
+      backgroundColor: mobileColors.brandBorder,
       borderWidth: 2,
       borderColor: mobileColors.brand,
     },

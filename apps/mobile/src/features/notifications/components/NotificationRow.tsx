@@ -144,7 +144,8 @@ export function NotificationRow({
           style={[
             styles.row,
             grouped && styles.rowGrouped,
-            selected === true && splitSelectedRowStyle(mobileColors),
+            selected === true &&
+              splitSelectedRowStyle(mobileColors, grouped ? mobileSpace.md : getScreenGutter()),
           ]}
         >
           <View style={styles.leading}>{isUnread ? <View style={styles.unreadDot} /> : null}</View>

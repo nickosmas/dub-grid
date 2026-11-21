@@ -16,6 +16,7 @@ export function HeaderBarAction({
   materialIcon,
   placement,
   iconOnly = false,
+  words = false,
   disabled,
   onPress,
 }: {
@@ -24,12 +25,17 @@ export function HeaderBarAction({
   materialIcon: MaterialIconName;
   placement: "left" | "right";
   iconOnly?: boolean;
+  /**
+   * Its words even on an iPhone Duo, where the button then stands at the top
+   * right rather than in the side column, which takes only symbols.
+   */
+  words?: boolean;
   disabled?: boolean;
   onPress: () => void;
 }) {
   const icon = useToolbarIcon(sfSymbol, materialIcon);
   const sideColumn = useHasSideColumn();
-  const showsWords = Platform.OS === "ios" && !iconOnly && !sideColumn;
+  const showsWords = Platform.OS === "ios" && !iconOnly && (!sideColumn || words);
 
   if (!showsWords && !icon) return null;
 

@@ -491,6 +491,7 @@ export default function NotificationsScreen() {
             materialIcon="done-all"
             placement="right"
             sfSymbol="checkmark"
+            words
             onPress={() => setConfirmingMarkAllRead(true)}
           />
         ) : null}
