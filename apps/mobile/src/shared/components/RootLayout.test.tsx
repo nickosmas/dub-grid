@@ -32,7 +32,6 @@ const splashScreen = vi.hoisted(() => ({
   hideAsync: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("expo-splash-screen", () => splashScreen);
-vi.mock("../navigation/screensFlags", () => ({ configureNativeStackUpdates: vi.fn() }));
 
 vi.mock("@expo-google-fonts/inter", () => ({
   useFonts: (fonts: Record<string, unknown>) => {
