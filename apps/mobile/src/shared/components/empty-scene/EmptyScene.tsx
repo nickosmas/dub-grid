@@ -15,6 +15,11 @@ import { weekSceneShapes, type EmptySceneWeek } from "./week-scene";
 /** Inside a card the scene draws at this share of its page size. */
 const CARD_SCALE = 0.6;
 
+/** The drawing's height at full size. */
+export function getEmptySceneHeight(size: "page" | "card"): number {
+  return EMPTY_SCENE_HEIGHT * (size === "card" ? CARD_SCALE : 1);
+}
+
 /**
  * The drawing above an empty state's title. `page` sits on the grouped page
  * and `card` on a card, which decides the ground colour the details are cut
@@ -25,16 +30,19 @@ export const EmptyScene = memo(function EmptyScene({
   size = "page",
   week,
   day,
+  fit = 1,
 }: {
   kind: EmptySceneKind;
   size?: "page" | "card";
+  /** A share of the full size, where the state has less room than the drawing needs. */
+  fit?: number;
   /** The viewer's week, for the two "this week" scenes. */
   week?: EmptySceneWeek;
   /** The day the screen is on, for the day scene's tile. */
   day?: EmptySceneDay;
 }) {
   const mobileColors = useMobileColors();
-  const scale = size === "card" ? CARD_SCALE : 1;
+  const scale = (size === "card" ? CARD_SCALE : 1) * fit;
   const paint = {
     ink: mobileColors.emptySceneInk,
     ground: size === "card" ? mobileColors.surface : mobileColors.background,

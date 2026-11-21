@@ -5,6 +5,7 @@ import {
   usePaneTopInset,
 } from "../layout/DetailPaneContext";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -22,6 +23,8 @@ import {
   StyleSheet,
   Platform,
   View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -97,6 +100,8 @@ import {
   hasSideColumn,
 } from "./screen-layout";
 import { KEYBOARD_DISMISS_MODE } from "./keyboard-dismiss";
+import { ScreenVisibleBottomContext } from "./ScreenVisibleBottom";
+import { FOLD_FADE_MS } from "../layout/fold-timing";
 
 export type ScreenScrollHandle = ScrollView;
 export type { ScreenBottomPaddingMode } from "./screen-layout";
@@ -251,12 +256,16 @@ export function Screen<T = never>({
   // it was let go. The header's tallest height is the one that counts: the
   // safe area shrinks as a large title folds away.
   const [visibleHeight, setVisibleHeight] = useState<number | null>(null);
+  const [nativeBottomInset, setNativeBottomInset] = useState(0);
   const tallestHeaderRef = useRef(0);
   const insetListener = usesIosNativeInsets ? (
     <SafeAreaListener
       pointerEvents="none"
       style={StyleSheet.absoluteFill}
       onChange={({ insets: viewInsets, frame }) => {
+        setNativeBottomInset((current) =>
+          current === viewInsets.bottom ? current : viewInsets.bottom,
+        );
         tallestHeaderRef.current = Math.max(tallestHeaderRef.current, viewInsets.top);
         const next = Math.max(frame.height - tallestHeaderRef.current - viewInsets.bottom, 0);
         setVisibleHeight((current) => (current === next ? current : next));
@@ -330,10 +339,11 @@ export function Screen<T = never>({
   // lifting, so it turns this off and simply does not move on focus.
   const sideInsetPadding = getScreenSidePadding(insets);
   const guttedSidePadding = getScreenSidePadding(insets, getScreenGutter());
+  const contentBottomPadding = footer ? mobileSpace.lg : resolvedBottomPadding;
   const contentContainerStyle = {
     ...sideInsetPadding,
     ...(inDetailPane ? { paddingTop: paneTopPadding } : null),
-    paddingBottom: footer ? mobileSpace.lg : resolvedBottomPadding,
+    paddingBottom: contentBottomPadding,
     ...(usesIosNativeInsets && visibleHeight !== null
       ? { minHeight: visibleHeight }
       : { flexGrow: 1 }),
@@ -356,6 +366,25 @@ export function Screen<T = never>({
     styles.content,
     stickyHeader ? styles.contentWithStickyHeader : styles.contentDefault,
   ];
+  // Where the page stops being visible: the scroll view's foot, less what
+  // covers it. On iOS the safe area already takes in the tab bar, so the
+  // content padding's breathing room above it would count it twice.
+  const scrollFrame = useScrollViewFrame();
+  const bottomCover =
+    footer || Platform.OS !== "ios"
+      ? contentBottomPadding
+      : (usesIosNativeInsets ? nativeBottomInset : insets.bottom) + mobileSpace["2xl"];
+  const visibleBottom =
+    scrollFrame.frame === null
+      ? null
+      : scrollFrame.frame.y + scrollFrame.frame.height - bottomCover;
+  const content = (
+    <View style={contentStyle}>
+      <ScreenVisibleBottomContext.Provider value={visibleBottom}>
+        {children}
+      </ScreenVisibleBottomContext.Provider>
+    </View>
+  );
   const scrollView = list ? (
     <FlatList
       ref={internalListRef}
@@ -366,7 +395,7 @@ export function Screen<T = never>({
       // and a native sheet's host in the header is a zero-height view at the
       // top edge, so the sheet never opened there (F-237).
       removeClippedSubviews={false}
-      ListHeaderComponent={<View style={contentStyle}>{children}</View>}
+      ListHeaderComponent={content}
       // With rows, the first one sits one section gap below the header, the
       // distance the page content keeps between its own sections. Without
       // rows the header is the whole page, and a `fillScreen` empty or error
@@ -381,6 +410,7 @@ export function Screen<T = never>({
       ItemSeparatorComponent={list.itemSeparator == null ? null : () => <>{list.itemSeparator}</>}
       onEndReached={list.onEndReached}
       onEndReachedThreshold={list.onEndReachedThreshold ?? 0.5}
+      onLayout={scrollFrame.onLayout}
       automaticallyAdjustContentInsets={useNativeContentInsets}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={contentContainerStyle}
@@ -406,6 +436,7 @@ export function Screen<T = never>({
       // Breathing room between the focused field and the keyboard, so a field
       // scrolled into view isn't flush against its top edge.
       bottomOffset={KEYBOARD_BOTTOM_OFFSET}
+      onLayout={scrollFrame.onLayout}
       automaticallyAdjustContentInsets={useNativeContentInsets}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       // paddingBottom: a footer takes over clearing whatever floats at the
@@ -443,7 +474,7 @@ export function Screen<T = never>({
       showsHorizontalScrollIndicator={false}
       style={styles.scrollView}
     >
-      <View style={contentStyle}>{children}</View>
+      {content}
     </KeyboardAwareScrollView>
   );
   const overlayLayer = (
@@ -661,3 +692,40 @@ const createStyles = (
       color: mobileColors.textMuted,
     },
   });
+
+type Measurable = Pick<View, "measureInWindow">;
+
+/**
+ * The scroll view's frame in the window, measured on layout and again once a
+ * change of window size (an iPhone Duo folding or turning) has settled, since
+ * a pane can move without its own frame changing.
+ */
+function useScrollViewFrame(): {
+  frame: { y: number; height: number } | null;
+  onLayout: (event: LayoutChangeEvent) => void;
+} {
+  const targetRef = useRef<Measurable | null>(null);
+  const [frame, setFrame] = useState<{ y: number; height: number } | null>(null);
+  const { width, height } = useWindowDimensions();
+  const measure = useCallback(() => {
+    targetRef.current?.measureInWindow((_x, y, _width, measuredHeight) =>
+      setFrame((current) =>
+        current?.y === y && current.height === measuredHeight
+          ? current
+          : { y, height: measuredHeight },
+      ),
+    );
+  }, []);
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      targetRef.current = event.currentTarget as unknown as Measurable;
+      measure();
+    },
+    [measure],
+  );
+  useEffect(() => {
+    const settled = setTimeout(measure, FOLD_FADE_MS + 50);
+    return () => clearTimeout(settled);
+  }, [width, height, measure]);
+  return { frame, onLayout };
+}

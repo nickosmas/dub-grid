@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type RefObject } from "react";
 import { useWindowDimensions, type View } from "react-native";
-import { FOLD_FADE_MS } from "./FoldFade";
+import { FOLD_FADE_MS } from "./fold-timing";
 
 /**
  * A view's top in the window. A pose change can move a view without changing
