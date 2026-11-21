@@ -1,6 +1,11 @@
 import type { MobileShiftRequest } from "@dubgrid/contracts";
-import { describeRequestForViewer, formatScheduleDayLabel } from "@dubgrid/schedule-core";
-import { useMemo, type ReactNode } from "react";
+import {
+  describeRequestForViewer,
+  formatScheduleDayLabel,
+  getScheduleEntryAbsenceTypeId,
+  getScheduleEntryCategoryKey,
+} from "@dubgrid/schedule-core";
+import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "../../../shared/components/AppText";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -8,6 +13,7 @@ import { mobileRadii, mobileSpace, type MobileColors } from "../../../shared/the
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useDayRoster } from "../hooks/useDayRoster";
+import { PaneTitle } from "../../../shared/layout/PaneTitle";
 import { REQUEST_TYPE_LABEL } from "../lib/request-type";
 import { buildRequestResolvers } from "../lib/request-resolvers";
 import { RequestListSection } from "./RequestListSection";
@@ -22,20 +28,18 @@ const askedFormatter = (timeZone: string | null | undefined) =>
   });
 
 /**
- * A whole request: its card with the answers, what answering it does (the
- * web's words, from the request itself) and who works that day. The split
- * view's right pane on an open iPhone Duo.
+ * What the request's card in the list beside it doesn't say: what answering
+ * it does (the web's words, from the request itself), when it was asked, and
+ * who works that day. The split view's right pane on an open iPhone Duo; the
+ * card itself, answers included, stays in the list.
  */
 export function RequestDetail({
   request,
-  card,
   viewerEmpId,
   now,
   timeZone,
 }: {
   request: MobileShiftRequest;
-  /** The list's own card for this request, answers included. */
-  card: ReactNode;
   viewerEmpId: string | null;
   now: Date;
   timeZone: string | null | undefined;
@@ -53,48 +57,88 @@ export function RequestDetail({
       formatAsked: (date) => formatter.format(date),
     });
   }, [request, viewerEmpId, bootstrap, timeZone]);
-  const roster = useDayRoster(request.requesterShiftDate);
+  const days = useMemo(() => requestDays(request), [request]);
 
   return (
     <View style={styles.page}>
-      <View style={styles.heading}>
-        <AppText tone="secondary" variant="meta">
-          Request
-        </AppText>
-        <AppText accessibilityRole="header" variant="screenTitle">
-          {REQUEST_TYPE_LABEL[request.type]}
-        </AppText>
-      </View>
-      {card}
-      {text?.body ? (
+      <PaneTitle title={REQUEST_TYPE_LABEL[request.type]} />
+      {text ? (
         <View style={styles.outcome}>
-          <AppText variant="body">{text.body}</AppText>
+          {text.body ? <AppText variant="body">{text.body}</AppText> : null}
+          <AppText tone="secondary" variant="meta">
+            {text.asked}
+          </AppText>
         </View>
       ) : null}
-      {roster.shifts && roster.shifts.length > 0 ? (
-        <RequestListSection
-          title={`Working ${formatScheduleDayLabel(request.requesterShiftDate, now, timeZone)}`}
-        >
-          <View style={styles.roster}>
-            {roster.shifts.map((shift, index) => (
-              <View
-                key={shift.key}
-                style={[styles.rosterRow, index > 0 && styles.rosterRowDivider]}
-              >
-                <AppText variant="rowTitle">
-                  {[shift.title, shift.focusArea, shift.time].filter(Boolean).join(" · ")}
-                </AppText>
-                {shift.names.map((name, nameIndex) => (
-                  <AppText key={`${name}-${nameIndex}`} tone="secondary" variant="body">
-                    {name}
-                  </AppText>
-                ))}
-              </View>
+      {days.map((day) => (
+        <RosterDay
+          date={day.date}
+          key={day.date}
+          now={now}
+          shifts={day.shifts}
+          timeZone={timeZone}
+        />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Each day the request touches and the shift on it the request is about: the
+ * asker's on their date, the other person's on theirs (both when it's one day).
+ */
+function requestDays(request: MobileShiftRequest): { date: string; shifts: ReadonlySet<string> }[] {
+  const days = new Map<string, Set<string>>();
+  const add = (
+    date: string | null,
+    state: MobileShiftRequest["requesterState"] | null | undefined,
+    presentation: MobileShiftRequest["requesterPresentation"] | null | undefined,
+  ) => {
+    if (!date || !state || !presentation) return;
+    const shifts = days.get(date) ?? new Set<string>();
+    days.set(date, shifts);
+    const cell = { state, presentation } as Parameters<typeof getScheduleEntryCategoryKey>[0];
+    if (getScheduleEntryAbsenceTypeId(cell) == null) shifts.add(getScheduleEntryCategoryKey(cell));
+  };
+  add(request.requesterShiftDate, request.requesterState, request.requesterPresentation);
+  add(request.targetShiftDate, request.targetState, request.targetPresentation);
+  return [...days].map(([date, shifts]) => ({ date, shifts }));
+}
+
+/** The shifts the request is about on one day, with everyone working them now. */
+function RosterDay({
+  date,
+  shifts,
+  now,
+  timeZone,
+}: {
+  date: string;
+  shifts: ReadonlySet<string>;
+  now: Date;
+  timeZone: string | null | undefined;
+}) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const roster = useDayRoster(date, shifts);
+  if (!roster.shifts || roster.shifts.length === 0) return null;
+
+  return (
+    <RequestListSection title={`Working ${formatScheduleDayLabel(date, now, timeZone)}`}>
+      <View style={styles.roster}>
+        {roster.shifts.map((shift, index) => (
+          <View key={shift.key} style={[styles.rosterRow, index > 0 && styles.rosterRowDivider]}>
+            <AppText variant="rowTitle">
+              {[shift.title, shift.focusArea, shift.time].filter(Boolean).join(" · ")}
+            </AppText>
+            {shift.people.map((person, personIndex) => (
+              <AppText key={`${person.employeeId}-${personIndex}`} tone="secondary" variant="body">
+                {person.name}
+              </AppText>
             ))}
           </View>
-        </RequestListSection>
-      ) : null}
-    </View>
+        ))}
+      </View>
+    </RequestListSection>
   );
 }
 
@@ -102,12 +146,9 @@ function createStyles(mobileColors: MobileColors) {
   return StyleSheet.create({
     page: {
       gap: mobileSpace.lg,
-      paddingTop: mobileSpace.lg,
-    },
-    heading: {
-      gap: mobileSpace.xs,
     },
     outcome: {
+      gap: mobileSpace.xs,
       backgroundColor: mobileColors.brandSoft,
       borderRadius: mobileRadii.control,
       padding: mobileSpace.lg,

@@ -1,4 +1,5 @@
 import type { MobileScheduleEntry, MobileScheduleRange } from "@dubgrid/contracts";
+import { PaneBackLink, type PaneBack } from "../../../shared/layout/PaneTitle";
 import { formatScheduleDayLabel } from "@dubgrid/schedule-core";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -48,6 +49,10 @@ export function DayOverview({
   showDate = false,
   showViewerDay,
   showRoster = false,
+  title = "Day overview",
+  titleAccessory,
+  back,
+  children,
 }: {
   date: string;
   range: MobileScheduleRange;
@@ -60,6 +65,13 @@ export function DayOverview({
   showViewerDay?: boolean;
   /** Each shift that day with who works it, as Home's Team view lists it. */
   showRoster?: boolean;
+  title?: string;
+  /** Beside the title, at the pane's trailing edge. */
+  titleAccessory?: ReactNode;
+  /** A link above the title back to the page this pane replaced. */
+  back?: PaneBack;
+  /** The page's own view of the day, after its open shifts and requests; it says when it's empty. */
+  children?: ReactNode;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -142,14 +154,18 @@ export function DayOverview({
     <Screen bottomPaddingMode="tabbed">
       <View style={styles.page}>
         <View style={styles.heading}>
+          {back ? <PaneBackLink back={back} /> : null}
           {showDate ? (
             <AppText tone="secondary" variant="meta">
               {formatScheduleDayLabel(date, now, timeZone)}
             </AppText>
           ) : null}
-          <AppText accessibilityRole="header" variant="screenTitle">
-            Day overview
-          </AppText>
+          <View style={styles.titleRow}>
+            <AppText accessibilityRole="header" style={styles.rowGrow} variant="screenTitle">
+              {title}
+            </AppText>
+            {titleAccessory ? <View style={styles.titleAccessory}>{titleAccessory}</View> : null}
+          </View>
         </View>
         {showsViewerDay && viewerDay ? (
           <View style={styles.viewerDay}>
@@ -259,16 +275,21 @@ export function DayOverview({
                 <AppText variant="rowTitle">
                   {[shift.title, shift.focusArea, shift.time].filter(Boolean).join(" · ")}
                 </AppText>
-                {shift.names.map((name, nameIndex) => (
-                  <AppText key={`${name}-${nameIndex}`} tone="secondary" variant="body">
-                    {name}
+                {shift.people.map((person, personIndex) => (
+                  <AppText
+                    key={`${person.employeeId}-${personIndex}`}
+                    tone="secondary"
+                    variant="body"
+                  >
+                    {person.name}
                   </AppText>
                 ))}
               </View>
             ))}
           </Section>
         ) : null}
-        {isEmpty ? (
+        {children}
+        {isEmpty && children == null ? (
           <AppText tone="secondary" variant="body">
             {showRoster ? "Nobody works this day." : "No open shifts or requests this day."}
           </AppText>
@@ -301,10 +322,19 @@ function createStyles(mobileColors: MobileColors) {
   return StyleSheet.create({
     page: {
       gap: mobileSpace.xl,
-      paddingTop: mobileSpace.lg,
     },
     heading: {
       gap: mobileSpace.xs,
+    },
+    titleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: mobileSpace.md,
+    },
+    // A button taller than the title hangs outside its line, so the title
+    // keeps its place and both centre on it.
+    titleAccessory: {
+      marginVertical: -mobileSpace.sm,
     },
     viewerDay: {
       backgroundColor: mobileColors.surface,

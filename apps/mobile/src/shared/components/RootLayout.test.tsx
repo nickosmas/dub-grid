@@ -255,8 +255,8 @@ describe("RootLayout", () => {
     // The light page is the grouped gray; the navigation theme has to follow
     // it or the bar behind a screen transition flashes the old page.
     expect(navigationThemeValues.at(-1)?.colors).toMatchObject({
-      background: "#F2F2F7",
-      card: "#F2F2F7",
+      background: "#F7F7FA",
+      card: "#F7F7FA",
     });
     expect(fontState.loadedMaps.at(-1)).toEqual({
       Inter_400Regular: "Inter_400Regular",

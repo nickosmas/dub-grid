@@ -71,7 +71,7 @@ describe("buildDayRoster", () => {
       ],
       "2026-11-19",
     );
-    expect(roster.map((shift) => [shift.title, shift.names])).toEqual([
+    expect(roster.map((shift) => [shift.title, shift.people.map((p) => p.name)])).toEqual([
       ["Day Shift", ["Lena Novak", "Priya Patel"]],
       ["Evening Shift", ["Grace Kim"]],
     ]);
@@ -86,10 +86,28 @@ describe("buildDayRoster", () => {
       [entry("Lena Novak", DAY), rehab, entry("Grace Kim", EVENING)],
       "2026-11-19",
     );
-    expect(roster.map((shift) => [shift.title, shift.focusArea, shift.names])).toEqual([
+    expect(
+      roster.map((shift) => [shift.title, shift.focusArea, shift.people.map((p) => p.name)]),
+    ).toEqual([
       ["Day Shift", "Rehab", ["Ana Cruz"]],
       ["Day Shift", "ICU", ["Lena Novak"]],
       ["Evening Shift", null, ["Grace Kim"]],
+    ]);
+  });
+
+  it("keeps only the request's shift, with everyone working it now", () => {
+    const roster = buildDayRoster(
+      [
+        entry("Lena Novak", DAY),
+        entry("Priya Patel", DAY),
+        entry("Grace Kim", EVENING),
+        entry("Grace Kim", DAY, "2026-11-20"),
+      ],
+      "2026-11-19",
+      new Set(["shift:1"]),
+    );
+    expect(roster.map((shift) => [shift.title, shift.people.map((p) => p.name)])).toEqual([
+      ["Day Shift", ["Lena Novak", "Priya Patel"]],
     ]);
   });
 

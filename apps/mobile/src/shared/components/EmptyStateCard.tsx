@@ -7,6 +7,7 @@ import type { EmptySceneKind } from "./empty-scene/scenes";
 import type { EmptySceneDay } from "./empty-scene/day-scene";
 import type { EmptySceneWeek } from "./empty-scene/week-scene";
 import { fillScreenAnchorStyles } from "./fill-screen-anchor";
+import { useSplitLayout } from "../layout/SplitView";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { MAX_FONT_SCALE, mobileText, type MobileColors, mobileSpace } from "../theme/tokens";
 
@@ -54,6 +55,7 @@ export function EmptyStateCard({
   fillScreen?: boolean;
 }) {
   const mobileColors = useMobileColors();
+  const split = useSplitLayout() !== null;
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const compactStyles = useMemo(() => createCompactStyles(mobileColors), [mobileColors]);
   const variant = compact ? compactStyles : styles;
@@ -64,7 +66,11 @@ export function EmptyStateCard({
   const isFilling = !compact && fillScreen;
   return (
     <View style={[variant.card, isFilling ? fillScreenAnchorStyles.fill : null]}>
-      {isFilling ? <View style={fillScreenAnchorStyles.spacerAbove} /> : null}
+      {isFilling ? (
+        <View
+          style={split ? fillScreenAnchorStyles.spacerCentred : fillScreenAnchorStyles.spacerAbove}
+        />
+      ) : null}
       <EmptyScene day={sceneDay} kind={scene} size={compact ? "card" : "page"} week={sceneWeek} />
       <View style={variant.copy}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={variant.title}>
@@ -92,7 +98,11 @@ export function EmptyStateCard({
           )}
         </View>
       ) : null}
-      {isFilling ? <View style={fillScreenAnchorStyles.spacerBelow} /> : null}
+      {isFilling ? (
+        <View
+          style={split ? fillScreenAnchorStyles.spacerCentred : fillScreenAnchorStyles.spacerBelow}
+        />
+      ) : null}
     </View>
   );
 }

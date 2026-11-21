@@ -14,7 +14,7 @@ vi.mock("../../../modules/hinge", () => ({
   },
 }));
 
-const { toHingeStatus, useHingeStatus } = await import("./useHingeStatus");
+const { HINGE_SETTLE_MS, toHingeStatus, useHingeStatus } = await import("./useHingeStatus");
 
 beforeEach(() => {
   native.status = "unknown";
@@ -41,16 +41,33 @@ describe("toHingeStatus", () => {
 });
 
 describe("useHingeStatus", () => {
-  it("starts from the module's status and follows its changes", () => {
+  it("starts from the module's status and follows a change once it holds", () => {
+    vi.useFakeTimers();
     native.status = "fullyOpen";
     const { result, unmount } = renderHook(() => useHingeStatus());
     expect(result.current).toBe("fullyOpen");
 
     act(() => native.emit("partiallyOpen"));
+    expect(result.current).toBe("fullyOpen");
+    act(() => vi.advanceTimersByTime(HINGE_SETTLE_MS));
     expect(result.current).toBe("partiallyOpen");
 
     unmount();
     expect(native.remove).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("ignores a position the hinge only passes through", () => {
+    vi.useFakeTimers();
+    native.status = "partiallyOpen";
+    const { result } = renderHook(() => useHingeStatus());
+
+    act(() => native.emit("fullyOpen"));
+    act(() => vi.advanceTimersByTime(HINGE_SETTLE_MS / 2));
+    act(() => native.emit("partiallyOpen"));
+    act(() => vi.advanceTimersByTime(HINGE_SETTLE_MS));
+    expect(result.current).toBe("partiallyOpen");
+    vi.useRealTimers();
   });
 
   it("is unknown where the module isn't built in", () => {

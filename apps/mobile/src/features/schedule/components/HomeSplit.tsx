@@ -5,6 +5,7 @@ import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/lay
 import { useSplitLayout } from "../../../shared/layout/SplitView";
 import type { SplitLayout } from "../../../shared/layout/split-layout";
 import ShiftDetailScreen from "../screens/ShiftDetailScreen";
+import type { PaneBack } from "../../../shared/layout/PaneTitle";
 import { DayOverview } from "./DayOverview";
 
 /** What My schedule shows beside the list: a shift's page, or a day off's overview. */
@@ -30,6 +31,9 @@ export function useHomeSplit({
 }): {
   split: SplitLayout | null;
   shown: HomePick;
+  /** What was tapped, which opens over Home beside the month; null for Home itself. */
+  picked: HomePick | null;
+  clearPick: () => void;
   highlightedDate: string | null;
   pickShift: (entry: MobileScheduleEntry) => void;
   pickDay: (date: string) => void;
@@ -70,7 +74,9 @@ export function useHomeSplit({
   return {
     split,
     shown,
-    highlightedDate: split ? shown.date : null,
+    picked: split ? livePick : null,
+    clearPick: () => setPick(null),
+    highlightedDate: split && livePick ? livePick.date : null,
     pickShift: (entry) =>
       setPick({ kind: "shift", employeeId: entry.employeeId, date: entry.date }),
     pickDay: (date) => setPick({ kind: "day", date }),
@@ -82,15 +88,18 @@ export function HomeSplitPane({
   shown,
   range,
   now,
+  back,
 }: {
   shown: HomePick;
   range: MobileScheduleRange;
   now: Date;
+  back?: PaneBack;
 }) {
   if (shown.kind === "shift") {
     return (
       <ShiftDetailScreen
         key={`${shown.employeeId}:${shown.date}`}
+        back={back}
         embedded
         shift={{
           employeeId: shown.employeeId,
@@ -110,6 +119,7 @@ export function HomeSplitPane({
       range={range}
       showRoster
       showViewerDay={false}
+      back={back}
     />
   );
 }

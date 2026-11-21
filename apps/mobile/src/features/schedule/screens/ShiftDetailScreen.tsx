@@ -37,7 +37,7 @@ import { SelectionRow, SelectionSection } from "../../../shared/components/Filte
 import { InlineError } from "../../../shared/components/InlineError";
 import { Card, Screen } from "../../../shared/components/Screen";
 import { AppText } from "../../../shared/components/AppText";
-import { PaneTitle } from "../../../shared/layout/PaneTitle";
+import { PaneTitle, type PaneBack } from "../../../shared/layout/PaneTitle";
 import { PUSHED_BY_FOLD_PARAM, shouldReturnToSplit } from "../../../shared/layout/fold-rule";
 import { useSplitLayout } from "../../../shared/layout/SplitView";
 import { SkeletonCardSurface, SkeletonLine } from "../../../shared/components/skeleton";
@@ -266,13 +266,20 @@ export type ShiftDetailTarget = {
  * A shift's page. On its own route it reads the shift from the URL;
  * `embedded` in a split view's detail pane (iPhone Duo open) it takes the
  * shift from the list, which already shows its day; `showDate` puts the day
- * over its title where the list doesn't.
+ * over its title where the list doesn't, and `back` leads back to the pane it
+ * replaced.
  */
 export default function ShiftDetailScreen({
   shift,
   embedded = false,
   showDate = false,
-}: { shift?: ShiftDetailTarget; embedded?: boolean; showDate?: boolean } = {}) {
+  back,
+}: {
+  shift?: ShiftDetailTarget;
+  embedded?: boolean;
+  showDate?: boolean;
+  back?: PaneBack;
+} = {}) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
@@ -1419,6 +1426,7 @@ export default function ShiftDetailScreen({
     >
       {embedded ? (
         <PaneTitle
+          back={back}
           eyebrow={
             showDate && shiftDate
               ? formatScheduleDayLabel(shiftDate, new Date(), timeZone)

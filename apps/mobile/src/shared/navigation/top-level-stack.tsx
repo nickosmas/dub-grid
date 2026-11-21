@@ -137,3 +137,31 @@ export function createDetailStackOptions(
     // native navigation controller behind the header during an interrupted pop.
   };
 }
+
+/**
+ * A list page's own large title in a split view too (People, Requests): the
+ * bar stays clear while split, since it spans both panes and a background it
+ * drew once the page beside scrolled under it would band that page's top.
+ */
+export function createSplitTopLevelStackOptions(
+  mobileColors: MobileColors,
+  title: string,
+  split: boolean,
+): NativeStackNavigationOptions {
+  return {
+    ...createTopLevelStackOptions(mobileColors, title),
+    ...(split ? SPLIT_CLEAR_BAR : null),
+  };
+}
+
+// No fill, blur or hairline in either of the bar's states: iOS may track
+// the detail pane's scroll view, and would draw its "scrolled" bar over that
+// pane alone.
+const SPLIT_CLEAR_BAR = {
+  headerTransparent: true,
+  headerStyle: { backgroundColor: "transparent" },
+  headerBlurEffect: "none",
+  headerShadowVisible: false,
+  headerLargeTitleShadowVisible: false,
+  scrollEdgeEffects: { top: "hidden" },
+} as const satisfies NativeStackNavigationOptions;

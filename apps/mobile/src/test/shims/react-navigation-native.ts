@@ -116,3 +116,8 @@ export function usePreventRemove(
     };
   }, []);
 }
+
+/** No native bar in tests, so no height to clear. */
+export function useHeaderHeight(): number {
+  return 0;
+}

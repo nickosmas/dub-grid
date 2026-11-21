@@ -10,6 +10,7 @@ import { Text } from "../../../shared/components/Text";
 import { compactSameMonthRange } from "../lib/week-range-label";
 import { NARROW_LIST_MAX_WIDTH } from "../../../shared/layout/split-layout";
 import { useSplitLayout } from "../../../shared/layout/SplitView";
+import { useHasSideColumn } from "../../../shared/navigation/useHasSideColumn";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { createStyles } from "../screens/scheduleScreenStyles";
 
@@ -81,7 +82,10 @@ export function WeekNavigatorHeader({
   onPreviousWeek,
   onNextWeek,
   onToday,
+  controls = true,
 }: {
+  /** Off beside a split's month, which steps the weeks, and whose bar holds the bell. */
+  controls?: boolean;
   loading?: boolean;
   selectedDate: string;
   todayDate: string;
@@ -103,6 +107,7 @@ export function WeekNavigatorHeader({
   // In the narrow list of an iPhone Duo held tall, three controls leave the
   // date too little room for one line, so it wraps rather than truncating.
   const split = useSplitLayout();
+  const sideColumn = useHasSideColumn();
   const wraps = split !== null && split.listWidth < NARROW_LIST_MAX_WIDTH;
   const titleFit = wraps
     ? ({ allowFontScaling: false, numberOfLines: 2 } as const)
@@ -138,33 +143,36 @@ export function WeekNavigatorHeader({
           ) : null}
         </View>
       </View>
-      <View style={styles.meWeekNavigatorActions}>
-        <View style={styles.meWeekRangeControlGroup}>
-          <IconControlButton
-            accessibilityLabel="Previous week"
-            iconName="chevron-back"
-            onPress={onPreviousWeek}
-          />
-          <IconControlButton
-            accessibilityLabel="Next week"
-            iconName="chevron-forward"
-            onPress={onNextWeek}
-          />
-        </View>
-        {/* Icon-only, like the chevrons beside it: with the word "Today" this
+      {controls ? (
+        <View style={styles.meWeekNavigatorActions}>
+          <View style={styles.meWeekRangeControlGroup}>
+            <IconControlButton
+              accessibilityLabel="Previous week"
+              iconName="chevron-back"
+              onPress={onPreviousWeek}
+            />
+            <IconControlButton
+              accessibilityLabel="Next week"
+              iconName="chevron-forward"
+              onPress={onNextWeek}
+            />
+          </View>
+          {/* Icon-only, like the chevrons beside it: with the word "Today" this
             row held five controls and the date title was cut to "Sat, Sep…"
             on any week but the current one. A circular arrow, "return to
             today"; a calendar glyph read as a date picker. */}
-        {selectedDate !== todayDate ? (
-          <IconControlButton
-            accessibilityLabel="Today"
-            iconName="refresh-outline"
-            iconStyle={todayIconStyle}
-            onPress={onToday}
-          />
-        ) : null}
-        <AlertsChromeButton unreadCount={unreadCount} />
-      </View>
+          {selectedDate !== todayDate ? (
+            <IconControlButton
+              accessibilityLabel="Today"
+              iconName="refresh-outline"
+              iconStyle={todayIconStyle}
+              onPress={onToday}
+            />
+          ) : null}
+          {/* On an iPhone Duo the bell stands in the side column instead. */}
+          {sideColumn ? null : <AlertsChromeButton unreadCount={unreadCount} />}
+        </View>
+      ) : null}
     </View>
   );
 }
