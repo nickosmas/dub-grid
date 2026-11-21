@@ -5,8 +5,8 @@ import { mobileRadii, type MobileColors } from "../theme/tokens";
 const CARD_INSET = 6;
 
 /**
- * The row a split view's detail pane shows, as People marks a person: a clear
- * blue pill with rounded corners. A row inside a section card passes its own
+ * The row a split view's detail pane shows: a gray pill with rounded corners,
+ * the web sidebar's active item. A row inside a section card passes its own
  * padding: the pill then stands in from the card by the same distance on
  * every side, its corners follow the card's, and the row's text stays where
  * it was. A row that already bleeds past its gutter (People, Schedule) passes
@@ -17,10 +17,10 @@ export function splitSelectedRowStyle(
   rowPadding?: { horizontal: number; vertical: number; minHeight?: number },
 ): ViewStyle {
   if (!rowPadding) {
-    return { backgroundColor: mobileColors.brandBorder, borderRadius: mobileRadii.control };
+    return { backgroundColor: mobileColors.selectedRowBg, borderRadius: mobileRadii.control };
   }
   return {
-    backgroundColor: mobileColors.brandBorder,
+    backgroundColor: mobileColors.selectedRowBg,
     borderRadius: mobileRadii.card - CARD_INSET,
     margin: CARD_INSET,
     paddingHorizontal: rowPadding.horizontal - CARD_INSET,
