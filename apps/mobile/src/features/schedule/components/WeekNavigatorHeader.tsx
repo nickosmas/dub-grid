@@ -104,11 +104,12 @@ export function WeekNavigatorHeader({
   // week, forward from a past one. Ionicons only draws the clockwise arrow,
   // which reads as forward, so the backward one is that glyph mirrored.
   const todayIconStyle = selectedDate > todayDate ? styles.iconControlMirrored : undefined;
-  // In the narrow list of an iPhone Duo held tall, three controls leave the
+  // In a narrow pane of an iPhone Duo held tall, three controls leave the
   // date too little room for one line, so it wraps rather than truncating.
+  // Month pages stack when tall, and then every pane is the screen's width.
   const split = useSplitLayout();
   const sideColumn = useHasSideColumn();
-  const wraps = split !== null && split.listWidth < NARROW_LIST_MAX_WIDTH;
+  const wraps = split !== null && !split.tall && split.listWidth < NARROW_LIST_MAX_WIDTH;
   const titleFit = wraps
     ? ({ allowFontScaling: false, numberOfLines: 2 } as const)
     : ({ fit: "fixed" } as const);
