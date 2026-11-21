@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import { Stack } from "expo-router";
-import { PaneHeader } from "../../../shared/layout/PaneHeader";
-import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
+import { useHeaderHeight } from "expo-router/react-navigation";
+import { PaneSearch } from "../../../shared/layout/PaneSearch";
+import { createSplitDetailStackOptions } from "../../../shared/navigation/top-level-stack";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { AlertPane } from "../components/AlertPane";
@@ -74,12 +75,6 @@ type FilterKey = (typeof FILTERS)[number]["key"];
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 
-const ALERTS_SPLIT_HEADER = {
-  title: "",
-  headerLargeTitle: false,
-  headerSearchBarOptions: undefined,
-} as const;
-
 function chipToParams(filter: FilterKey): Partial<MobileNotificationsListParams> {
   switch (filter) {
     case "unread":
@@ -114,13 +109,19 @@ export default function NotificationsScreen() {
   const foldEntering = useFoldEntering(split !== null);
   const isSplit = split !== null;
   const [pickedId, setPickedId] = useState<string | null>(null);
+  // Split, the bar's own search would span both panes, so the inbox's sits
+  // above its list instead. Options a Stack.Screen sets outlive it, so the
+  // split pose clears the search the other one set.
   const alertsRouteOptions = useMemo(
     () => ({
-      ...createDetailStackOptions(mobileColors, "Alerts", { largeTitle: true }),
-      ...screenSearchRouteOptions(ALERTS_SEARCH_PLACEHOLDER, mobileColors),
+      ...createSplitDetailStackOptions(mobileColors, "Alerts", isSplit),
+      ...(isSplit
+        ? { headerSearchBarOptions: undefined }
+        : screenSearchRouteOptions(ALERTS_SEARCH_PLACEHOLDER, mobileColors)),
     }),
-    [mobileColors],
+    [isSplit, mobileColors],
   );
+  const headerHeight = useHeaderHeight();
   const [debouncedSearch, setDebouncedSearch] = useState("");
   // Searched once typing pauses, not on every keystroke.
   useEffect(() => {
@@ -443,26 +444,9 @@ export default function NotificationsScreen() {
       }}
     >
       <View style={styles.headerArea}>
-        {/* Split, the native bar spans both panes, so the inbox's own title,
-            search and Mark all read sit above the list instead. Options a
-            Stack.Screen sets outlive it, so both poses set theirs. */}
-        <Stack.Screen options={isSplit ? ALERTS_SPLIT_HEADER : alertsRouteOptions} />
+        <Stack.Screen options={alertsRouteOptions} />
         {isSplit ? (
-          <PaneHeader
-            actions={
-              unreadCount > 0
-                ? [
-                    {
-                      label: "Mark all read",
-                      icon: "checkmark-done-circle-outline",
-                      onPress: () => setConfirmingMarkAllRead(true),
-                    },
-                  ]
-                : []
-            }
-            search={{ placeholder: ALERTS_SEARCH_PLACEHOLDER, onChange: setSearchInput }}
-            title="Alerts"
-          />
+          <PaneSearch placeholder={ALERTS_SEARCH_PLACEHOLDER} onChange={setSearchInput} />
         ) : (
           <ScreenSearch placeholder={ALERTS_SEARCH_PLACEHOLDER} onSearchChange={setSearchInput} />
         )}
@@ -489,9 +473,9 @@ export default function NotificationsScreen() {
           enabled={!isSplit && unreadCount > 0}
           title="Alerts"
         />
-        {/* Mark all read is a bar action, as in Mail; how many are unread is
-            already on the Unread filter. */}
-        {unreadCount > 0 && !isSplit ? (
+        {/* Mark all read is a bar action, as in Mail (on an iPhone Duo, in the
+            side column); how many are unread is already on the Unread filter. */}
+        {unreadCount > 0 ? (
           <HeaderBarAction
             disabled={busy}
             label="Mark all read"
@@ -563,6 +547,7 @@ export default function NotificationsScreen() {
 
   return (
     <SplitView
+      detailBarHeight={headerHeight}
       entering={foldEntering}
       layout={split}
       list={page}

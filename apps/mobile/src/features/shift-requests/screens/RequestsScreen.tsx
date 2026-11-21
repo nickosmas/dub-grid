@@ -9,7 +9,16 @@ import {
   isAwaitingRecipient,
   formatShiftRequestNote,
 } from "@dubgrid/domain";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Stack, router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { createSplitTopLevelStackOptions } from "../../../shared/navigation/top-level-stack";
@@ -17,7 +26,8 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { NARROW_LIST_MAX_WIDTH } from "../../../shared/layout/split-layout";
-import { RequestDetail } from "../components/RequestDetail";
+import { PaneTitle } from "../../../shared/layout/PaneTitle";
+import { RequestDetail, ShiftRoster, shiftRosterKey } from "../components/RequestDetail";
 import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
@@ -879,9 +889,23 @@ export default function RequestsScreen() {
     approvalRequests,
     historyRequests,
   ]);
-  const shownRequest =
-    tabRequests.find((request) => request.id === pickedRequestId) ?? tabRequests[0] ?? null;
-  const isShown = (id: string) => split !== null && shownRequest?.id === id;
+  // The Available tab lists open shifts beside requests; either can be picked.
+  const tabItems = useMemo((): PaneItem[] => {
+    if (activeTab !== "available") {
+      return tabRequests.map((request) => ({ kind: "request", request }));
+    }
+    return availableOpenShiftFeed.groups.flatMap((group) =>
+      group.items.map((item): PaneItem =>
+        item.kind === "open_shift"
+          ? { kind: "open_shift", openShift: item.openShift }
+          : { kind: "request", request: item.request },
+      ),
+    );
+  }, [activeTab, availableOpenShiftFeed, tabRequests]);
+  const shownItem =
+    tabItems.find((item) => paneItemId(item) === pickedRequestId) ?? tabItems[0] ?? null;
+  const isShown = (id: string) =>
+    split !== null && shownItem !== null && paneItemId(shownItem) === id;
   // A held-tall list pane is too narrow for the name beside its pill.
   const narrowList = split !== null && split.listWidth < NARROW_LIST_MAX_WIDTH;
   // Folding closed keeps a picked request in view: the closed list shows it
@@ -893,21 +917,50 @@ export default function RequestsScreen() {
     const wasSplit = wasSplitRef.current;
     wasSplitRef.current = split !== null;
     if (!isFocused) return;
-    if (shouldPushPickOnClose({ wasSplit, isSplit: split !== null, pickedId: pickedRequestId })) {
+    // An open shift has no request to point the closed list at.
+    const pickedRequest = tabRequests.some((request) => request.id === pickedRequestId);
+    if (
+      pickedRequest &&
+      shouldPushPickOnClose({ wasSplit, isSplit: split !== null, pickedId: pickedRequestId })
+    ) {
       router.setParams({ requestId: pickedRequestId as string });
     }
-  }, [split, isFocused, pickedRequestId]);
-  const selectable = (request: MobileShiftRequest, card: ReactNode) =>
+  }, [split, isFocused, pickedRequestId, tabRequests]);
+  // Split, each request is a row of one grouped list, as Mail lists mail,
+  // and the whole request opens beside it; closed, each is its own card.
+  const requestItem = (
+    request: MobileShiftRequest,
+    { canApprove: canApproveHere, showDate = true }: { canApprove: boolean; showDate?: boolean },
+  ) => (
+    <RequestCard
+      key={request.id}
+      variant={split ? "row" : "card"}
+      selected={isShown(request.id)}
+      onSelect={() => setPickedRequestId(request.id)}
+      stackHeader={narrowList}
+      now={now}
+      timeZone={timeZone}
+      canApprove={canApproveHere}
+      linkedEmployeeId={linkedEmployeeId}
+      pendingAction={pendingAction}
+      onAction={(body) => runRequestAction(request.id, body)}
+      highlighted={!split && highlightedRequestId === request.id}
+      request={request}
+      showDate={showDate}
+    />
+  );
+  const grouped = (items: ReactNode[]) =>
     split ? (
-      <Pressable
-        key={request.id}
-        accessibilityLabel={`Show ${request.requesterName}'s request`}
-        onPress={() => setPickedRequestId(request.id)}
-      >
-        {card}
-      </Pressable>
+      <View style={styles.rowGroup}>
+        {items.map((item, index) => (
+          <Fragment key={isValidElement(item) && item.key != null ? item.key : index}>
+            {index > 0 ? <View style={styles.rowDivider} /> : null}
+            {item}
+          </Fragment>
+        ))}
+      </View>
     ) : (
-      card
+      items
     );
   // The default is chosen once from the first loaded counts and then held:
   // recomputing it on every change moved the strip out from under a manager
@@ -997,35 +1050,23 @@ export default function RequestsScreen() {
                 title={formatScheduleDayLabel(group.date, now, timeZone)}
               >
                 <View style={styles.groupItems}>
-                  {group.items.map((item) =>
-                    item.kind === "open_shift" ? (
-                      <OpenShiftCard
-                        key={item.key}
-                        linkedEmployeeId={linkedEmployeeId}
-                        pendingAction={pendingAction}
-                        onAction={(body) => runRequestAction(item.openShift.id, body)}
-                        openShift={item.openShift}
-                        showDate={false}
-                      />
-                    ) : (
-                      selectable(
-                        item.request,
-                        <RequestCard
-                          stackHeader={narrowList}
-                          now={now}
-                          timeZone={timeZone}
+                  {grouped(
+                    group.items.map((item) =>
+                      item.kind === "open_shift" ? (
+                        <OpenShiftCard
                           key={item.key}
-                          canApprove={false}
+                          variant={split ? "row" : "card"}
+                          selected={isShown(item.openShift.id)}
+                          onSelect={() => setPickedRequestId(item.openShift.id)}
                           linkedEmployeeId={linkedEmployeeId}
                           pendingAction={pendingAction}
-                          onAction={(body) => runRequestAction(item.request.id, body)}
-                          highlighted={
-                            highlightedRequestId === item.request.id || isShown(item.request.id)
-                          }
-                          request={item.request}
+                          onAction={(body) => runRequestAction(item.openShift.id, body)}
+                          openShift={item.openShift}
                           showDate={false}
-                        />,
-                      )
+                        />
+                      ) : (
+                        requestItem(item.request, { canApprove: false, showDate: false })
+                      ),
                     ),
                   )}
                 </View>
@@ -1043,23 +1084,7 @@ export default function RequestsScreen() {
               title="No active requests"
             />
           ) : (
-            allRequests.map((request) =>
-              selectable(
-                request,
-                <RequestCard
-                  stackHeader={narrowList}
-                  now={now}
-                  timeZone={timeZone}
-                  key={request.id}
-                  canApprove={canApprove}
-                  linkedEmployeeId={linkedEmployeeId}
-                  pendingAction={pendingAction}
-                  onAction={(body) => runRequestAction(request.id, body)}
-                  highlighted={highlightedRequestId === request.id || isShown(request.id)}
-                  request={request}
-                />,
-              ),
-            )
+            grouped(allRequests.map((request) => requestItem(request, { canApprove })))
           )}
         </View>
       ) : activeTab === "mine" ? (
@@ -1071,23 +1096,7 @@ export default function RequestsScreen() {
               hasOwnShifts={hasOwnShifts}
             />
           ) : (
-            myRequests.map((request) =>
-              selectable(
-                request,
-                <RequestCard
-                  stackHeader={narrowList}
-                  now={now}
-                  timeZone={timeZone}
-                  key={request.id}
-                  canApprove={false}
-                  linkedEmployeeId={linkedEmployeeId}
-                  pendingAction={pendingAction}
-                  onAction={(body) => runRequestAction(request.id, body)}
-                  highlighted={highlightedRequestId === request.id || isShown(request.id)}
-                  request={request}
-                />,
-              ),
-            )
+            grouped(myRequests.map((request) => requestItem(request, { canApprove: false })))
           )}
         </View>
       ) : activeTab === "approval" ? (
@@ -1098,23 +1107,7 @@ export default function RequestsScreen() {
             approvalGroups.map((group) => (
               <RequestListSection count={group.requests.length} key={group.key} title={group.label}>
                 <View style={styles.groupItems}>
-                  {group.requests.map((request) =>
-                    selectable(
-                      request,
-                      <RequestCard
-                        stackHeader={narrowList}
-                        now={now}
-                        timeZone={timeZone}
-                        key={request.id}
-                        canApprove={canApprove}
-                        linkedEmployeeId={linkedEmployeeId}
-                        pendingAction={pendingAction}
-                        onAction={(body) => runRequestAction(request.id, body)}
-                        highlighted={highlightedRequestId === request.id || isShown(request.id)}
-                        request={request}
-                      />,
-                    ),
-                  )}
+                  {grouped(group.requests.map((request) => requestItem(request, { canApprove })))}
                 </View>
               </RequestListSection>
             ))
@@ -1146,23 +1139,7 @@ export default function RequestsScreen() {
             />
           ) : (
             <>
-              {historyRequests.map((request) =>
-                selectable(
-                  request,
-                  <RequestCard
-                    stackHeader={narrowList}
-                    now={now}
-                    timeZone={timeZone}
-                    key={request.id}
-                    canApprove={canApprove}
-                    linkedEmployeeId={linkedEmployeeId}
-                    pendingAction={pendingAction}
-                    onAction={(body) => runRequestAction(request.id, body)}
-                    highlighted={highlightedRequestId === request.id || isShown(request.id)}
-                    request={request}
-                  />,
-                ),
-              )}
+              {grouped(historyRequests.map((request) => requestItem(request, { canApprove })))}
               {historyQuery.hasNextPage ? (
                 <RequestListActionRow
                   label="Load more"
@@ -1251,14 +1228,47 @@ export default function RequestsScreen() {
       layout={split}
       list={listScreen}
       detail={
-        shownRequest ? (
-          <Screen bottomPaddingMode="tabbed" key={shownRequest.id}>
-            <RequestDetail
-              now={now}
-              request={shownRequest}
-              timeZone={timeZone}
-              viewerEmpId={linkedEmployeeId}
-            />
+        shownItem ? (
+          <Screen bottomPaddingMode="tabbed" key={paneItemId(shownItem)}>
+            {shownItem.kind === "request" ? (
+              <RequestDetail
+                heading={describeRequestHeading(shownItem.request, linkedEmployeeId)}
+                card={
+                  <RequestCard
+                    variant="detail"
+                    canApprove={
+                      activeTab === "available" || activeTab === "mine" ? false : canApprove
+                    }
+                    highlighted={false}
+                    linkedEmployeeId={linkedEmployeeId}
+                    now={now}
+                    onAction={(body) => runRequestAction(shownItem.request.id, body)}
+                    pendingAction={pendingAction}
+                    request={shownItem.request}
+                    timeZone={timeZone}
+                  />
+                }
+                now={now}
+                request={shownItem.request}
+                timeZone={timeZone}
+                viewerEmpId={linkedEmployeeId}
+              />
+            ) : (
+              <OpenShiftDetail
+                card={
+                  <OpenShiftCard
+                    linkedEmployeeId={linkedEmployeeId}
+                    onAction={(body) => runRequestAction(shownItem.openShift.id, body)}
+                    openShift={shownItem.openShift}
+                    pendingAction={pendingAction}
+                    showDate={false}
+                  />
+                }
+                now={now}
+                openShift={shownItem.openShift}
+                timeZone={timeZone}
+              />
+            )}
           </Screen>
         ) : (
           // With nothing in the tab the pane stays empty; the list's empty
@@ -1267,6 +1277,43 @@ export default function RequestsScreen() {
         )
       }
     />
+  );
+}
+
+type PaneItem =
+  | { kind: "request"; request: MobileShiftRequest }
+  | { kind: "open_shift"; openShift: MobileOpenShift };
+
+function paneItemId(item: PaneItem): string {
+  return item.kind === "request" ? item.request.id : item.openShift.id;
+}
+
+/** An open shift beside the Available list: its card with Claim, and who works that shift. */
+function OpenShiftDetail({
+  openShift,
+  card,
+  now,
+  timeZone,
+}: {
+  openShift: MobileOpenShift;
+  card: ReactNode;
+  now: Date;
+  timeZone: string | null | undefined;
+}) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const key = shiftRosterKey(openShift.state, openShift.presentation);
+  const shifts = useMemo(() => new Set(key ? [key] : []), [key]);
+  return (
+    <View style={styles.detailPage}>
+      <PaneTitle
+        eyebrow={formatScheduleDayLabel(openShift.date, now, timeZone)}
+        title="Open shift"
+      />
+      {card}
+      <ShiftRoster date={openShift.date} now={now} shifts={shifts} timeZone={timeZone} />
+    </View>
   );
 }
 
@@ -1297,8 +1344,19 @@ function RequestCard({
   timeZone,
   showDate = true,
   stackHeader = false,
+  variant = "card",
+  selected = false,
+  onSelect,
 }: {
   request: MobileShiftRequest;
+  /**
+   * "row": one line of a split view's grouped list, picked to show the whole
+   * request beside it. "detail": the card in the pane beside it, whose title
+   * already names who asked and what.
+   */
+  variant?: "card" | "row" | "detail";
+  selected?: boolean;
+  onSelect?: () => void;
   linkedEmployeeId: string | null;
   canApprove: boolean;
   highlighted: boolean;
@@ -1379,25 +1437,91 @@ function RequestCard({
       : []),
   ];
 
-  return (
-    <View style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}>
-      <View style={styles.cardRow}>
+  const statusPill = (
+    <View style={[styles.statusChip, { backgroundColor: pillTone.backgroundColor }]}>
+      <Text fit="compact" style={[styles.statusChipText, { color: pillTone.textColor }]}>
+        {pill.label}
+      </Text>
+    </View>
+  );
+
+  if (variant === "row") {
+    const shiftLines = [
+      describeRequestShiftLine(
+        request.requesterPresentation,
+        request.requesterShiftDate,
+        now,
+        timeZone,
+      ),
+      ...(isSwap
+        ? [
+            describeRequestShiftLine(
+              request.targetPresentation ?? null,
+              request.targetShiftDate,
+              now,
+              timeZone,
+            ),
+          ]
+        : []),
+    ].filter(Boolean);
+    return (
+      <Pressable
+        accessibilityLabel={`Show ${request.requesterName}'s request`}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        onPress={onSelect}
+        style={[styles.requestRow, selected && styles.requestRowSelected]}
+      >
         <View style={[styles.cardHeader, stackHeader && styles.cardHeaderStacked]}>
-          <Text style={[styles.requestTitle, stackHeader && styles.requestTitleStacked]}>
+          <Text
+            numberOfLines={1}
+            style={[styles.requestTitle, stackHeader && styles.requestTitleStacked]}
+          >
             {copy.title}
           </Text>
-          <View style={[styles.statusChip, { backgroundColor: pillTone.backgroundColor }]}>
-            <Text fit="compact" style={[styles.statusChipText, { color: pillTone.textColor }]}>
-              {pill.label}
-            </Text>
-          </View>
+          {statusPill}
         </View>
-        <Text style={styles.metaText}>{copy.subtitle}</Text>
-        {canApprove && awaitingRecipient && request.targetName ? (
-          <Text style={styles.awaitingNote}>{describeAwaitingRecipient(request.targetName)}</Text>
-        ) : null}
-      </View>
-      <View style={styles.cardSeparator} />
+        <Text numberOfLines={1} style={styles.metaText}>
+          {copy.subtitle}
+        </Text>
+        {shiftLines.map((line, index) => (
+          <Text key={index} numberOfLines={1} style={styles.rowShiftText}>
+            {line}
+          </Text>
+        ))}
+      </Pressable>
+    );
+  }
+
+  const awaitingNote =
+    canApprove && awaitingRecipient && request.targetName ? (
+      <Text style={styles.awaitingNote}>{describeAwaitingRecipient(request.targetName)}</Text>
+    ) : null;
+
+  return (
+    <View style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}>
+      {variant === "detail" ? (
+        awaitingNote ? (
+          <>
+            <View style={styles.cardRow}>{awaitingNote}</View>
+            <View style={styles.cardSeparator} />
+          </>
+        ) : null
+      ) : (
+        <>
+          <View style={styles.cardRow}>
+            <View style={[styles.cardHeader, stackHeader && styles.cardHeaderStacked]}>
+              <Text style={[styles.requestTitle, stackHeader && styles.requestTitleStacked]}>
+                {copy.title}
+              </Text>
+              {statusPill}
+            </View>
+            <Text style={styles.metaText}>{copy.subtitle}</Text>
+            {awaitingNote}
+          </View>
+          <View style={styles.cardSeparator} />
+        </>
+      )}
       <View style={styles.cardRow}>
         {isSwap ? (
           // A swap is one card about two shifts: each shift is its own panel,
@@ -1451,6 +1575,31 @@ function RequestCard({
       <RequestCardActions actions={actions} />
     </View>
   );
+}
+
+/** A request's shift on one line, for a split list's row: the shift and its day. */
+function describeRequestShiftLine(
+  presentation: ResolvedSchedulePresentation | null,
+  date: string | null,
+  now: Date,
+  timeZone: string | null | undefined,
+): string {
+  return [
+    getPresentationShiftLabel(presentation),
+    date ? formatScheduleDayLabel(date, now, timeZone) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** The pane's title for a request: who asked and what, its kind and status above. */
+function describeRequestHeading(request: MobileShiftRequest, linkedEmployeeId: string | null) {
+  const copy = describeShiftRequest(request, linkedEmployeeId);
+  return {
+    title: copy.title,
+    eyebrow: describeShiftRequestPill(request.type, request.status).label,
+    subtitle: copy.subtitle,
+  };
 }
 
 /**
@@ -1548,12 +1697,19 @@ export function OpenShiftCard({
   pendingAction,
   onAction,
   showDate = true,
+  variant = "card",
+  selected = false,
+  onSelect,
 }: {
   openShift: MobileOpenShift;
   linkedEmployeeId: string | null;
   pendingAction: PendingRequestAction;
   onAction: (body: RequestActionBody) => void;
   showDate?: boolean;
+  /** "row": one line of a split view's grouped list, as a request's row. */
+  variant?: "card" | "row";
+  selected?: boolean;
+  onSelect?: () => void;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -1581,6 +1737,38 @@ export function OpenShiftCard({
         state: openShift.state,
       }
     : null;
+
+  if (variant === "row") {
+    return (
+      <Pressable
+        accessibilityLabel={`Show the open ${shiftLabel}`}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        onPress={onSelect}
+        style={[styles.requestRow, selected && styles.requestRowSelected]}
+      >
+        <View style={styles.cardHeader}>
+          <Text numberOfLines={1} style={styles.requestTitle}>
+            {shiftLabel}
+          </Text>
+          <View style={[styles.statusChip, { backgroundColor: openShiftChipTone.backgroundColor }]}>
+            <Text
+              fit="compact"
+              style={[styles.statusChipText, { color: openShiftChipTone.textColor }]}
+            >
+              Open shift
+            </Text>
+          </View>
+        </View>
+        <Text numberOfLines={1} style={styles.metaText}>
+          {openShift.needed} teammate{openShift.needed === 1 ? "" : "s"} needed
+        </Text>
+        <Text numberOfLines={1} style={styles.rowShiftText}>
+          {[focusAreaName, timeRange].filter(Boolean).join(" · ")}
+        </Text>
+      </Pressable>
+    );
+  }
 
   return (
     <View style={styles.requestCard}>

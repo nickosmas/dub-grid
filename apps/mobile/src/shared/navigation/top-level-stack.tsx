@@ -154,6 +154,18 @@ export function createSplitTopLevelStackOptions(
   };
 }
 
+/** A pushed list page (Alerts) the same way: its large title, with the bar clear while split. */
+export function createSplitDetailStackOptions(
+  mobileColors: MobileColors,
+  title: string,
+  split: boolean,
+): NativeStackNavigationOptions {
+  return {
+    ...createDetailStackOptions(mobileColors, title, { largeTitle: true }),
+    ...(split ? SPLIT_CLEAR_BAR : null),
+  };
+}
+
 // No fill, blur or hairline in either of the bar's states: iOS may track
 // the detail pane's scroll view, and would draw its "scrolled" bar over that
 // pane alone.
