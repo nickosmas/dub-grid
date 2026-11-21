@@ -1,10 +1,15 @@
-import { router, Stack, useIsFocused } from "expo-router";
+import { router, Stack, useIsFocused, useLocalSearchParams } from "expo-router";
+import { PROFILE_PICK_PARAM } from "../../../shared/layout/useReturnToSplit";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { DISCARD_CONFIRM } from "../../../shared/navigation/EditBarActions";
-import { ProfileSplitPane, type ProfileSplitSection } from "../components/ProfileSplitPane";
+import {
+  isProfileSplitSection,
+  ProfileSplitPane,
+  type ProfileSplitSection,
+} from "../components/ProfileSplitPane";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
@@ -135,6 +140,15 @@ export default function ProfileScreen() {
   const headerHeight = useHeaderHeight();
   const foldEntering = useFoldEntering(split !== null);
   const [pickedSection, setPickedSection] = useState<ProfileSplitSection | null>(null);
+  // A setting's page reached from elsewhere on the open Duo comes back here
+  // with it picked (see `useReturnToSplit`).
+  const routeParams = useLocalSearchParams<{ [PROFILE_PICK_PARAM]?: string }>();
+  const routePick = routeParams[PROFILE_PICK_PARAM];
+  useEffect(() => {
+    if (!routePick || !isProfileSplitSection(routePick)) return;
+    setPickedSection(routePick);
+    router.setParams({ [PROFILE_PICK_PARAM]: undefined });
+  }, [routePick]);
   const isFocused = useIsFocused();
   const wasSplitRef = useRef(split !== null);
   useEffect(() => {
