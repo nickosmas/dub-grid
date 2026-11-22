@@ -121,12 +121,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "flex-end",
       gap: mobileSpace.xs,
     },
-    meWeekTodayButton: {
+    // Today as Calendar writes it: a word in the brand color, shown only
+    // while the page is away from today. Home and the Schedule tab share it.
+    todayTextButton: {
       minHeight: 32,
       justifyContent: "center",
       paddingHorizontal: mobileSpace.xs,
     },
-    meWeekTodayText: {
+    todayText: {
       ...mobileTextWeighted("body", "medium"),
       color: mobileColors.brand,
     },
@@ -876,11 +878,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       minWidth: 0,
     },
-    // `screenTitle`, not `display`: this title shares its row with the Today
-    // button and the alerts bell, and at 28pt "Tomorrow, Sep 18" truncated to
-    // "Tomorrow, Se…" the moment the Today button appeared.
+    // The month, as large as Home's week title. It names only the month, so
+    // it fits beside Today and the bell at this size.
     teamHeaderTitle: {
-      ...mobileText.screenTitle,
+      ...mobileText.display,
       color: mobileColors.textPrimary,
       textAlign: "left",
       flexShrink: 1,
@@ -903,14 +904,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     calendarPlain: {
       paddingTop: mobileSpace.sm,
     },
-    calendarCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.borderSubtle,
-      paddingHorizontal: mobileSpace.sm,
-      paddingTop: mobileSpace.sm,
-      ...mobileElevation("card", isDark),
+    // The calendar sits on the page itself, as Calendar's does: no card.
+    calendarFlat: {
+      paddingTop: mobileSpace.xs,
     },
 
     dateScheduledDot: {
@@ -922,7 +918,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.textSubtle,
     },
     dateScheduledDotSelected: {
-      backgroundColor: mobileColors.brand,
+      backgroundColor: mobileColors.textPrimary,
     },
     // The dates' own slot already ends in the dot's space, so the handle
     // follows the last row with only its own breathing room.
@@ -1004,19 +1000,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       backgroundColor: "transparent",
     },
+    // As Calendar marks them (owner, 2026-11-21): the chosen day a dark
+    // circle, today's date in the brand color, filled once it is also chosen.
     dateHighlightSelected: {
-      backgroundColor: mobileColors.brand,
-      borderColor: mobileColors.brand,
+      backgroundColor: mobileColors.textPrimary,
+      borderColor: mobileColors.textPrimary,
     },
-    // Today is the brand colour, not red (owner, 2026-11-01): a soft tint on
-    // its own, filled once it is also the selected day.
     dateHighlightTodaySelected: {
       backgroundColor: mobileColors.brand,
       borderColor: mobileColors.brand,
-    },
-    dateHighlightToday: {
-      backgroundColor: mobileColors.controlSecondaryBg,
-      borderColor: mobileColors.controlSecondaryBg,
     },
     dateHighlightOutsideMonth: {
       opacity: 0.4,
@@ -1029,7 +1021,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     dateHighlightTextSelected: {
       ...mobileTextWeighted("rowTitle", "semibold"),
-      color: mobileColors.textInverse,
+      color: mobileColors.surface,
     },
     dateHighlightTextToday: {
       ...mobileTextWeighted("rowTitle", "semibold"),
