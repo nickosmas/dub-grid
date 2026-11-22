@@ -128,10 +128,11 @@ const MOBILE_LIGHT = {
   /** The one flat gray every empty-state scene is drawn in: iOS's systemGray3. */
   emptySceneInk: "#C7C7CC",
   /**
-   * A split's sidebar, beside a white content pane: iOS's sidebar gray, as
-   * Calendar's month sits on the open iPhone Duo (owner, 2026-11-22).
+   * A split's sidebar, beside a white content pane, as Calendar's month sits
+   * on the open iPhone Duo: almost off white. iOS's #F2F2F7 and the page's
+   * #F7F7FA both read too gray here (owner, 2026-11-22).
    */
-  sidebarBackground: "#F2F2F7",
+  sidebarBackground: "#FAFAFB",
   /**
    * Neutral control fill — the Filter button, chips, the segmented-control
    * track, and `tone="plain"`.
