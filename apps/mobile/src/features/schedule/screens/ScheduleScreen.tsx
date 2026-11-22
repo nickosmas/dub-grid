@@ -138,7 +138,6 @@ import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./sched
 import { MonthDayCell } from "../components/MonthDayCell";
 import { SideColumnAlertsBar, type SideColumnStepper } from "../components/SideColumnAlertsBar";
 import { getWeekHeading } from "../lib/week-range-label";
-import { MonthCalendarPane } from "../components/MonthCalendarPane";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_EXPAND_TIMING = {
@@ -1348,7 +1347,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   const meStickyHeader = !isTeamScope ? (
     <WeekNavigatorHeader
-      controls={homeSplit.split === null}
       hoursLabel={formatScheduledHours(meWeeklyHours)}
       range={range}
       timeZone={timeZone}
@@ -1652,22 +1650,25 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         <View
           style={[
             styles.mePage,
-            isMeScheduleEmpty && [styles.mePageEmpty, { minHeight: meEmptyPageMinHeight }],
+            isMeScheduleEmpty &&
+              !homeSplit.split && [styles.mePageEmpty, { minHeight: meEmptyPageMinHeight }],
           ]}
         >
-          <MeHeroCard
-            currentDate={todayDate}
-            currentTime={currentTimeValue}
-            featuredItem={meHeroState.item}
-            hasWeekItems={hasScheduledWeekDay}
-            timing={meHeroTiming}
-            weekDays={weekDays}
-            shiftmates={meHeroShiftmates}
-            status={meHeroState.status}
-            onPress={
-              meHeroState.item ? () => handleOpenShiftDetail(meHeroState.item!.entry) : undefined
-            }
-          />
+          {homeSplit.split ? null : (
+            <MeHeroCard
+              currentDate={todayDate}
+              currentTime={currentTimeValue}
+              featuredItem={meHeroState.item}
+              hasWeekItems={hasScheduledWeekDay}
+              timing={meHeroTiming}
+              weekDays={weekDays}
+              shiftmates={meHeroShiftmates}
+              status={meHeroState.status}
+              onPress={
+                meHeroState.item ? () => handleOpenShiftDetail(meHeroState.item!.entry) : undefined
+              }
+            />
+          )}
           {!isMeScheduleEmpty ? (
             <>
               <ShiftCoverRequestsSection
@@ -1724,7 +1725,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               />
             </>
           ) : null}
-          {hasScheduledWeekDay ? (
+          {hasScheduledWeekDay || homeSplit.split ? (
             <UpcomingShiftsSection
               items={meUpcomingItems}
               onPressEntry={handleOpenShiftDetail}
@@ -1846,15 +1847,13 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           onNext: isSplit ? () => stepSplitMonth(1) : null,
           onToday: isSelectedToday ? null : handleGoToToday,
         }
-      : homeSplit.split
-        ? undefined
-        : {
-            previousLabel: "Previous week",
-            nextLabel: "Next week",
-            onPrevious: handlePreviousWeek,
-            onNext: handleNextWeek,
-            onToday: getWeekHeading(range, todayDate, timeZone).isThisWeek ? null : handleGoToToday,
-          };
+      : {
+          previousLabel: "Previous week",
+          nextLabel: "Next week",
+          onPrevious: handlePreviousWeek,
+          onNext: handleNextWeek,
+          onToday: getWeekHeading(range, todayDate, timeZone).isThisWeek ? null : handleGoToToday,
+        };
   const sideColumnBar = (
     <SideColumnAlertsBar
       shown={sideColumn}
@@ -1863,8 +1862,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     />
   );
 
-  // Open on the iPhone Duo, Home sits beside the month, as in Calendar; a
-  // shift or day tapped on it opens over it.
+  // Open on the iPhone Duo, Home is the week beside one day of it.
   if (homeSplit.split) {
     return (
       <>
@@ -1873,28 +1871,17 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           background={pageWash}
           entering={foldEntering}
           layout={homeSplit.split}
-          listCard
           stackWhenTall
-          list={
-            <MonthCalendarPane
-              now={now}
-              selectedDate={selectedDate}
-              timeZone={timeZone}
-              todayDate={todayDate}
-              onSelectDate={(date) => (date ? handleSelectDate(date) : handleGoToToday())}
-            />
-          }
+          list={listScreen}
           detail={
-            homeSplit.picked ? (
-              <HomeSplitPane
-                back={{ label: "Home", onPress: homeSplit.clearPick }}
-                now={now}
-                range={range}
-                shown={homeSplit.picked}
-              />
-            ) : (
-              listScreen
-            )
+            <HomeSplitPane
+              currentTime={currentTimeValue}
+              entries={activeEntries}
+              home={homeSplit}
+              range={range}
+              teamEntries={meTeamScheduleQuery.data?.entries ?? []}
+              todayDate={todayDate}
+            />
           }
         />
       </>

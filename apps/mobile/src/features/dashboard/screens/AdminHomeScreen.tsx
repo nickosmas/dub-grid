@@ -35,7 +35,6 @@ import { MyHomeSections } from "../components/MyHomeSections";
 import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
 import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
-import { MonthCalendarPane } from "../../schedule/components/MonthCalendarPane";
 import { SideColumnAlertsBar } from "../../schedule/components/SideColumnAlertsBar";
 import { getWeekHeading } from "../../schedule/lib/week-range-label";
 import { HomeSplitPane, useHomeSplit } from "../../schedule/components/HomeSplit";
@@ -102,9 +101,10 @@ export function AdminHomeScreen() {
     defaultEntry: homeDefaultEntry,
     defaultDate: selectedDate,
   });
-  // Open on the iPhone Duo, the month fills the left pane, as in Calendar,
-  // and Home sits beside it; a shift or day tapped on Home opens over it.
+  // Open on the iPhone Duo, My schedule is the week beside one day of it;
+  // Team is its analytics across the whole width.
   const splitLayout = useSplitLayout();
+  const inSplit = splitLayout !== null && view === "mine";
   // On an iPhone Duo, open or closed, the bell stands in the side column.
   const sideColumn = useHasSideColumn();
   const foldEntering = useFoldEntering(splitLayout !== null);
@@ -309,15 +309,15 @@ export function AdminHomeScreen() {
   // Home keeps its wash on every platform (owner, 2026-11-04).
   const wash = <HomeWash height={windowHeight} />;
 
-  // Split, the wash runs behind both panes, with the month floating on it.
+  // Split, the wash runs once behind both panes.
   const page = (
     <Screen
       bottomPaddingMode="tabbed"
       scrollViewRef={scrollViewRef}
-      pageBackground={splitLayout ? undefined : wash}
+      pageBackground={inSplit ? undefined : wash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      stickyHeaderBackground={splitLayout ? undefined : wash}
+      stickyHeaderBackground={inSplit ? undefined : wash}
       stickyHeader={header}
     >
       <View style={styles.cards}>
@@ -331,13 +331,12 @@ export function AdminHomeScreen() {
     </Screen>
   );
 
-  // On an iPhone Duo the bell, the week's arrows and Today stand in the side
-  // column; beside a split's month the month steps the weeks.
+  // On an iPhone Duo the bell, the week's arrows and Today stand in the side column.
   const alertsBar = (
     <SideColumnAlertsBar
       shown={sideColumn}
       stepper={
-        sideColumn && !splitLayout
+        sideColumn
           ? {
               previousLabel: "Previous week",
               nextLabel: "Next week",
@@ -352,7 +351,7 @@ export function AdminHomeScreen() {
       unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
     />
   );
-  if (!splitLayout) {
+  if (!inSplit || !splitLayout) {
     return (
       <>
         {alertsBar}
@@ -367,28 +366,17 @@ export function AdminHomeScreen() {
         background={wash}
         entering={foldEntering}
         layout={splitLayout}
-        listCard
         stackWhenTall
-        list={
-          <MonthCalendarPane
-            now={now}
-            selectedDate={selectedDate}
-            timeZone={timeZone}
-            todayDate={todayDate}
-            onSelectDate={setSelectedDateOverride}
-          />
-        }
+        list={page}
         detail={
-          homeSplit.picked ? (
-            <HomeSplitPane
-              back={{ label: "Home", onPress: homeSplit.clearPick }}
-              now={now}
-              range={range}
-              shown={homeSplit.picked}
-            />
-          ) : (
-            page
-          )
+          <HomeSplitPane
+            currentTime={getCurrentTimeValue(now, timeZone)}
+            entries={mine.entries}
+            home={homeSplit}
+            range={range}
+            teamEntries={mine.teamEntries}
+            todayDate={todayDate}
+          />
         }
       />
     </>

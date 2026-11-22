@@ -35,3 +35,14 @@ export function getWeekHeading(
     ? { title: relative, dates, isThisWeek: offset === 0 }
     : { title: dates, dates: null, isThisWeek: false };
 }
+
+/** The day beside Home's week: "Today", or "Wednesday 25"; the week above names the month. */
+export function formatSplitDayTitle(date: string, todayDate: string): string {
+  if (date === todayDate) return "Today";
+  const [year, month, day] = date.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-US", {
+    weekday: "long",
+    timeZone: "UTC",
+  });
+  return `${weekday} ${day}`;
+}
