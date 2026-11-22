@@ -22,6 +22,8 @@ export type SideColumnStepper = {
   onNext: (() => void) | null;
   /** Null while the page already shows today. */
   onToday: (() => void) | null;
+  /** Up and down, for a page that scrolls through months. */
+  vertical?: boolean;
 };
 
 /**
@@ -65,7 +67,7 @@ export function SideColumnAlertsBar({
               accessibilityLabel={stepper.previousLabel}
               onPress={stepper.onPrevious}
             >
-              <Stack.Toolbar.Icon sf="chevron.left" />
+              <Stack.Toolbar.Icon sf={stepper.vertical ? "chevron.up" : "chevron.left"} />
             </Stack.Toolbar.Button>
           ) : null}
           {stepper?.onToday ? (
@@ -76,7 +78,7 @@ export function SideColumnAlertsBar({
           ) : null}
           {stepper?.onNext ? (
             <Stack.Toolbar.Button accessibilityLabel={stepper.nextLabel} onPress={stepper.onNext}>
-              <Stack.Toolbar.Icon sf="chevron.right" />
+              <Stack.Toolbar.Icon sf={stepper.vertical ? "chevron.down" : "chevron.right"} />
             </Stack.Toolbar.Button>
           ) : null}
         </Stack.Toolbar>

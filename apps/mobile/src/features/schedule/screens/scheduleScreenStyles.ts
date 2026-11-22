@@ -940,6 +940,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     calendarStickyShell: {
       paddingBottom: 0,
     },
+    // Room for Home's Month on the open iPhone Duo, which insets itself.
+    homeMonth: {
+      flex: 1,
+    },
     // The handle, then the line under it that parts the calendar from the
     // day's list: one light neutral gray, the line running the page's full
     // width past its gutters (owner, 2026-11-22).

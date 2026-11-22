@@ -53,6 +53,13 @@ import {
 import { SplitShiftBadge } from "../components/SplitShift";
 import { DayOverview } from "../components/DayOverview";
 import { HomeSplitPane, useHomeSplit } from "../components/HomeSplit";
+import {
+  DuoHomeLayout,
+  addMonthsToIso,
+  useHomeMonth,
+  useHomeSpan,
+} from "../components/DuoHomeLayout";
+import { HomeMonthGrid } from "../components/HomeMonthGrid";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useListPaneBottom, useSplitLayout } from "../../../shared/layout/SplitView";
 import { NARROW_LIST_MAX_WIDTH, getStackedListHeight } from "../../../shared/layout/split-layout";
@@ -804,6 +811,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     defaultEntry: meHeroState.item?.entry ?? null,
     defaultDate: selectedDate,
   });
+  // Open on the iPhone Duo, Home's Week | Month and the month it shows.
+  const [homeSpan, setHomeSpan] = useHomeSpan();
+  const homeMonth = useHomeMonth(selectedDate);
+  const homeMonthView = homeSplit.split !== null && homeSpan === "month";
   // The page fades into its new layout when the Duo folds or opens.
   const foldEntering = useFoldEntering((isTeamScope ? split : homeSplit.split) !== null);
   const meHeroTiming = useMemo(
@@ -1827,7 +1838,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
       scrollViewRef={scrollViewRef}
-      stickyHeader={stickyHeader}
+      // Open on the iPhone Duo, Home's header spans both panes, above them.
+      stickyHeader={homeSplit.split ? undefined : stickyHeader}
     >
       <View>
         {split ? null : dayBody}
@@ -1847,13 +1859,25 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           onNext: isSplit ? () => stepSplitMonth(1) : null,
           onToday: isSelectedToday ? null : handleGoToToday,
         }
-      : {
-          previousLabel: "Previous week",
-          nextLabel: "Next week",
-          onPrevious: handlePreviousWeek,
-          onNext: handleNextWeek,
-          onToday: getWeekHeading(range, todayDate, timeZone).isThisWeek ? null : handleGoToToday,
-        };
+      : homeMonthView
+        ? {
+            previousLabel: "Previous month",
+            nextLabel: "Next month",
+            vertical: true,
+            onPrevious: () => homeMonth.goToMonth(addMonthsToIso(homeMonth.visibleMonth, -1)),
+            onNext: () => homeMonth.goToMonth(addMonthsToIso(homeMonth.visibleMonth, 1)),
+            onToday:
+              homeMonth.visibleMonth === getScheduleMonthStartDate(todayDate)
+                ? null
+                : () => homeMonth.goToMonth(getScheduleMonthStartDate(todayDate)),
+          }
+        : {
+            previousLabel: "Previous week",
+            nextLabel: "Next week",
+            onPrevious: handlePreviousWeek,
+            onNext: handleNextWeek,
+            onToday: getWeekHeading(range, todayDate, timeZone).isThisWeek ? null : handleGoToToday,
+          };
   const sideColumnBar = (
     <SideColumnAlertsBar
       shown={sideColumn}
@@ -1862,28 +1886,65 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     />
   );
 
-  // Open on the iPhone Duo, Home is the week beside one day of it.
+  // Open on the iPhone Duo, Home is one header over the week beside a day of
+  // it, or over the month.
   if (homeSplit.split) {
+    const heading = getWeekHeading(range, todayDate, timeZone);
+    const homeTitle = homeMonthView
+      ? formatCalendarMonthTitle(homeMonth.visibleMonth, todayDate)
+      : heading.title;
+    const homeMeta = homeMonthView
+      ? formatScheduledHours(buildWeeklyHoursSummary(homeMonth.entries, 40))
+      : [heading.dates, formatScheduledHours(meWeeklyHours)].filter(Boolean).join(" · ") || null;
     return (
       <>
         {sideColumnBar}
-        <SplitView
-          background={pageWash}
-          entering={foldEntering}
-          layout={homeSplit.split}
-          stackWhenTall
-          list={listScreen}
-          detail={
-            <HomeSplitPane
-              currentTime={currentTimeValue}
-              entries={activeEntries}
-              home={homeSplit}
-              range={range}
-              teamEntries={meTeamScheduleQuery.data?.entries ?? []}
-              todayDate={todayDate}
-            />
-          }
-        />
+        <FoldFade entering={foldEntering}>
+          <DuoHomeLayout
+            background={pageWash}
+            meta={homeMeta}
+            span={{
+              value: homeSpan,
+              onChange: (next) => {
+                if (next === "month") {
+                  homeMonth.goToMonth(getScheduleMonthStartDate(selectedDate));
+                }
+                setHomeSpan(next);
+              },
+            }}
+            tall={homeSplit.split.tall}
+            title={homeTitle}
+          >
+            {homeMonthView ? (
+              <View style={styles.homeMonth}>
+                <HomeMonthGrid
+                  accessToken={accessToken}
+                  enabled={linkedEmployee !== null}
+                  scrollRequest={homeMonth.request}
+                  todayDate={todayDate}
+                  visibleMonth={homeMonth.visibleMonth}
+                  onEntriesChange={homeMonth.setEntries}
+                  onVisibleMonthChange={homeMonth.setVisibleMonth}
+                />
+              </View>
+            ) : (
+              <SplitView
+                layout={homeSplit.split}
+                list={listScreen}
+                detail={
+                  <HomeSplitPane
+                    currentTime={currentTimeValue}
+                    entries={activeEntries}
+                    home={homeSplit}
+                    range={range}
+                    teamEntries={meTeamScheduleQuery.data?.entries ?? []}
+                    todayDate={todayDate}
+                  />
+                }
+              />
+            )}
+          </DuoHomeLayout>
+        </FoldFade>
       </>
     );
   }
