@@ -47,7 +47,7 @@ export function SideColumnAlertsBar({
       <Stack.Screen options={shown ? SPLIT_BAR_OPTIONS : NO_BAR_OPTIONS} />
       {shown ? (
         <Stack.Toolbar placement="right">
-          {/* The bell has its own capsule; the arrows and Today share one. */}
+          {/* The bell, the arrows and Today each have a capsule, the arrows side by side. */}
           <Stack.Toolbar.Button
             accessibilityLabel={
               unreadCount > 0 ? `Open alerts, ${unreadCount} unread` : "Open alerts"
@@ -70,15 +70,19 @@ export function SideColumnAlertsBar({
               <Stack.Toolbar.Icon sf={stepper.vertical ? "chevron.up" : "chevron.left"} />
             </Stack.Toolbar.Button>
           ) : null}
-          {stepper?.onToday ? (
-            // A return arrow, not a calendar: the Schedule tab below is one.
-            <Stack.Toolbar.Button accessibilityLabel="Today" onPress={stepper.onToday}>
-              <Stack.Toolbar.Icon sf="arrow.uturn.backward" />
-            </Stack.Toolbar.Button>
-          ) : null}
           {stepper?.onNext ? (
             <Stack.Toolbar.Button accessibilityLabel={stepper.nextLabel} onPress={stepper.onNext}>
               <Stack.Toolbar.Icon sf={stepper.vertical ? "chevron.down" : "chevron.right"} />
+            </Stack.Toolbar.Button>
+          ) : null}
+          {stepper?.onToday ? (
+            // A return arrow, not a calendar: the Schedule tab below is one.
+            <Stack.Toolbar.Button
+              accessibilityLabel="Today"
+              onPress={stepper.onToday}
+              separateBackground
+            >
+              <Stack.Toolbar.Icon sf="arrow.uturn.backward" />
             </Stack.Toolbar.Button>
           ) : null}
         </Stack.Toolbar>
