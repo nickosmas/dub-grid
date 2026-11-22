@@ -522,6 +522,16 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: 0,
       paddingVertical: mobileSpace.xs,
     },
+    // Calendar's hairlines on the open iPhone Duo's month: under the weekdays
+    // and between weeks, the days' width.
+    calendarLineUnder: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: mobileColors.borderSubtle,
+    },
+    calendarLineOver: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+    },
     upcomingShiftCopySplit: {
       gap: mobileSpace.xs,
     },

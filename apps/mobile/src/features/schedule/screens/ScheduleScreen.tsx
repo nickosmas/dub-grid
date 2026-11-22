@@ -1484,7 +1484,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
       <View style={isSplit ? styles.calendarPlain : styles.calendarFlat}>
         {/* Weekday labels: always visible, fixed in place — never move. */}
-        <View style={styles.monthCalendarWeekdays}>
+        <View style={[styles.monthCalendarWeekdays, isSplit && styles.calendarLineUnder]}>
           {MONTH_WEEKDAY_LABELS.map((label, index) => (
             <Text key={index} fit="fixed" style={styles.monthCalendarWeekdayLabel}>
               {label}
@@ -1523,7 +1523,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                         ? (event) => setWeekStripRowHeight(event.nativeEvent.layout.height)
                         : undefined
                     }
-                    style={styles.monthCalendarWeek}
+                    style={[styles.monthCalendarWeek, weekIndex > 0 && styles.calendarLineOver]}
                   >
                     {week.map((day) => (
                       <MonthDayCell
