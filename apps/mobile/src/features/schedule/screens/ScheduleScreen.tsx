@@ -93,7 +93,7 @@ import {
   buildWeeklyHoursSummary,
   filterScheduleEntriesByDate,
   filterTeamScheduleEntriesByFocusArea,
-  formatCalendarMonthTitle,
+  getCalendarMonthTitleParts,
   formatScheduleDayLabel,
   formatScheduleTimeRange,
   getCalendarDotRanges,
@@ -143,6 +143,7 @@ import {
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
 import { MonthDayCell } from "../components/MonthDayCell";
+import { MonthTitle } from "../components/MonthTitle";
 import { SideColumnAlertsBar, type SideColumnStepper } from "../components/SideColumnAlertsBar";
 import { getWeekHeading } from "../lib/week-range-label";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
@@ -614,7 +615,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // strip once a swipe passed the month's edge.
   const visibleCalendarMonth =
     (isCalendarOpen && calendarMonthAnchor) || getScheduleMonthStartDate(selectedDate);
-  const teamHeaderTitle = formatCalendarMonthTitle(visibleCalendarMonth, todayDate);
   const isSelectedToday = selectedDate === todayDate;
   // The Today control's arrow points the way today lies: back from a future
   // week, forward from a past one. Ionicons only draws the clockwise arrow,
@@ -1445,9 +1445,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     <View style={styles.stickyControlsSection}>
       <View style={styles.teamHeaderUtilityRow}>
         <View style={styles.teamHeaderTitleArea}>
-          <Text accessibilityRole="header" fit="fixed" style={styles.teamHeaderTitle}>
-            {teamHeaderTitle}
-          </Text>
+          <MonthTitle monthStart={visibleCalendarMonth} style={styles.teamHeaderTitle} />
         </View>
         <View style={styles.teamHeaderActions}>
           {/* Split, the month steps with chevrons too, as Home's does. */}
@@ -1888,9 +1886,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // it, or over the month.
   if (homeSplit.split) {
     const heading = getWeekHeading(range, todayDate, timeZone);
-    const homeTitle = homeMonthView
-      ? formatCalendarMonthTitle(homeMonth.visibleMonth, todayDate)
-      : heading.title;
+    const homeMonthTitle = getCalendarMonthTitleParts(homeMonth.visibleMonth);
+    const homeTitle = homeMonthView ? homeMonthTitle.month : heading.title;
     const homeMeta = homeMonthView
       ? formatScheduledHours(buildWeeklyHoursSummary(homeMonth.entries, 40))
       : [heading.dates, formatScheduledHours(meWeeklyHours)].filter(Boolean).join(" · ") || null;
@@ -1899,7 +1896,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         {sideColumnBar}
         <FoldFade entering={foldEntering}>
           <DuoHomeLayout
-            background={pageWash}
+            background={homeMonthView ? undefined : pageWash}
             meta={homeMeta}
             span={{
               value: homeSpan,
@@ -1912,6 +1909,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             }}
             tall={homeSplit.split.tall}
             title={homeTitle}
+            titleYear={homeMonthView ? homeMonthTitle.year : undefined}
           >
             {homeMonthView ? (
               <View style={styles.homeMonth}>

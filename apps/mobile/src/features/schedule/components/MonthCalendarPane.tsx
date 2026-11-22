@@ -15,7 +15,6 @@ import {
   addDaysToIsoDate,
   addMonthsToIsoDate,
   buildScheduleMonthDays,
-  formatCalendarMonthTitle,
   formatScheduleDayLabel,
   getCalendarDotRanges,
   getScheduleMonthStartDate,
@@ -27,6 +26,7 @@ import {
   createStyles,
 } from "../screens/scheduleScreenStyles";
 import { MonthDayCell } from "./MonthDayCell";
+import { MonthTitle } from "./MonthTitle";
 import { IconControlButton } from "./WeekNavigatorHeader";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -103,9 +103,7 @@ export function MonthCalendarPane({
     <View style={styles.stickyControlsSection}>
       <View style={styles.teamHeaderUtilityRow}>
         <View style={styles.teamHeaderTitleArea}>
-          <Text accessibilityRole="header" fit="fixed" style={styles.teamHeaderTitle}>
-            {formatCalendarMonthTitle(month, todayDate)}
-          </Text>
+          <MonthTitle monthStart={month} style={styles.teamHeaderTitle} />
         </View>
         <View style={styles.teamHeaderActions}>
           <IconControlButton

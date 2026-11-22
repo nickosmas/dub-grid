@@ -64,6 +64,7 @@ export function addMonthsToIso(monthStart: string, months: number): string {
 export function DuoHomeLayout({
   background,
   title,
+  titleYear,
   meta,
   loading = false,
   tall,
@@ -73,6 +74,8 @@ export function DuoHomeLayout({
 }: {
   background?: ReactNode;
   title: string;
+  /** Month's year after its name, lighter, as in Calendar. */
+  titleYear?: string;
   meta: string | null;
   loading?: boolean;
   /** Held tall: the switches narrow. */
@@ -94,7 +97,7 @@ export function DuoHomeLayout({
   const bodyInsets = useMemo(() => ({ ...insets, top: 0 }), [insets]);
 
   return (
-    <View style={styles.page}>
+    <View style={[styles.page, background == null && styles.plainPage]}>
       {background ? (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           {background}
@@ -113,6 +116,11 @@ export function DuoHomeLayout({
         <View style={styles.heading}>
           <Text accessibilityRole="header" fit="fixed" numberOfLines={1} style={styles.title}>
             {title}
+            {titleYear ? (
+              <Text fit="fixed" style={styles.titleYear}>
+                {` ${titleYear}`}
+              </Text>
+            ) : null}
           </Text>
           <View style={styles.metaRow}>
             {meta ? (
@@ -167,6 +175,10 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
       backgroundColor: mobileColors.background,
     },
+    // Month sits on a plain page, as Calendar's does.
+    plainPage: {
+      backgroundColor: mobileColors.surface,
+    },
     header: {
       flexDirection: "row",
       alignItems: "center",
@@ -181,6 +193,10 @@ const createStyles = (mobileColors: MobileColors) =>
     title: {
       ...mobileText.display,
       color: mobileColors.textPrimary,
+    },
+    // The theme's lightest ink, as Calendar's year is.
+    titleYear: {
+      color: mobileColors.placeholderText,
     },
     metaRow: {
       flexDirection: "row",

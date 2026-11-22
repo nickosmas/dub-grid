@@ -19,13 +19,12 @@ import {
 } from "@dubgrid/schedule-core";
 import { FitText } from "../../../shared/components/FitText";
 import { Text } from "../../../shared/components/Text";
-import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { getMySchedule } from "../../../shared/lib/api";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
-  mobileRadii,
   mobileSpace,
+  mobileText,
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
@@ -37,7 +36,7 @@ import {
   restOfDayAbsenceTimeLabel,
 } from "../lib/scheduleScreenChips";
 
-const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"] as const;
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const SHORT_MONTHS = [
   "Jan",
   "Feb",
@@ -114,9 +113,8 @@ export function HomeMonthGrid({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  // Clear of the side column and the screen's edge, at the page's gutter.
+  // Edge to edge, clear of the side column, as Calendar's month runs.
   const insets = useSafeAreaInsets();
-  const gutter = getScreenGutter();
 
   const todayMonth = getScheduleMonthStartDate(todayDate);
   const weeks = useMemo(() => {
@@ -198,21 +196,25 @@ export function HomeMonthGrid({
       style={[
         styles.grid,
         {
-          marginLeft: insets.left + gutter,
-          marginRight: insets.right + gutter,
-          marginBottom: insets.bottom + mobileSpace.lg,
+          marginLeft: insets.left,
+          marginRight: insets.right,
         },
       ]}
     >
       <View style={styles.weekdayRow}>
         {WEEKDAY_LABELS.map((label, index) => (
-          <Text key={index} fit="fixed" style={styles.weekdayLabel}>
+          <Text
+            key={index}
+            fit="fixed"
+            style={[styles.weekdayLabel, (index === 0 || index === 6) && styles.weekend]}
+          >
             {label}
           </Text>
         ))}
       </View>
       <ScrollView
         ref={scrollRef}
+        contentContainerStyle={{ paddingBottom: insets.bottom + mobileSpace.lg }}
         scrollEventThrottle={32}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {
@@ -243,11 +245,7 @@ export function HomeMonthGrid({
                 <View
                   key={date}
                   accessibilityLabel={`${date}${cards.length ? `, ${cards.map((card) => card.name).join(", ")}` : ""}`}
-                  style={[
-                    styles.cell,
-                    offset > 0 && styles.cellDivider,
-                    !inView && styles.cellOutside,
-                  ]}
+                  style={styles.cell}
                 >
                   <View
                     style={[styles.number, first && styles.numberFirst, isToday && styles.today]}
@@ -257,8 +255,8 @@ export function HomeMonthGrid({
                       style={[
                         styles.numberText,
                         first && styles.numberTextFirst,
+                        (offset === 0 || offset === 6) && styles.weekend,
                         !inView && styles.numberOutside,
-                        inView && date < todayDate && styles.numberPast,
                         isToday && styles.todayText,
                       ]}
                     >
@@ -348,19 +346,15 @@ function buildCardsByDate(entries: readonly MobileScheduleEntry[]): Map<string, 
   return byDate;
 }
 
-const NUMBER_SIZE = 24;
+const NUMBER_SIZE = 32;
 
+// Calendar's month: no outline, card or column lines, only a hairline under
+// the weekdays and between weeks, on the page itself.
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     grid: {
       flex: 1,
       minHeight: 0,
-      overflow: "hidden",
-      borderRadius: mobileRadii.control,
-      borderCurve: "continuous",
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
     },
     weekdayRow: {
       flexDirection: "row",
@@ -369,10 +363,13 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: mobileSpace.sm,
     },
     weekdayLabel: {
-      ...mobileTextWeighted("meta", "semibold"),
+      ...mobileText.body,
       flex: 1,
       textAlign: "center",
-      color: mobileColors.textSecondary,
+      color: mobileColors.textPrimary,
+    },
+    weekend: {
+      color: mobileColors.textSubtle,
     },
     week: {
       flexDirection: "row",
@@ -386,17 +383,12 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
       minWidth: 0,
       gap: mobileSpace.xs,
-      padding: mobileSpace.xs,
-    },
-    cellDivider: {
-      borderLeftWidth: StyleSheet.hairlineWidth,
-      borderLeftColor: mobileColors.borderSubtle,
-    },
-    cellOutside: {
-      backgroundColor: mobileColors.background,
+      paddingHorizontal: mobileSpace.xs,
+      paddingTop: mobileSpace.sm,
+      paddingBottom: mobileSpace.xs,
     },
     number: {
-      alignSelf: "flex-start",
+      alignSelf: "center",
       minWidth: NUMBER_SIZE,
       height: NUMBER_SIZE,
       borderRadius: NUMBER_SIZE / 2,
@@ -411,17 +403,15 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.brand,
     },
     numberText: {
-      ...mobileTextWeighted("meta", "semibold"),
+      ...mobileTextWeighted("title", "semibold"),
       color: mobileColors.textPrimary,
     },
     numberTextFirst: {
-      ...mobileTextWeighted("meta", "bold"),
+      ...mobileTextWeighted("title", "bold"),
     },
-    numberPast: {
-      color: mobileColors.textSecondary,
-    },
+    // Lighter than a weekend: another month's days only frame this one.
     numberOutside: {
-      color: mobileColors.textSubtle,
+      color: mobileColors.placeholderText,
     },
     todayText: {
       color: mobileColors.onBrandText,

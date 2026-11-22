@@ -29,7 +29,7 @@ import {
   useHomeSpan,
 } from "../../schedule/components/DuoHomeLayout";
 import { HomeMonthGrid } from "../../schedule/components/HomeMonthGrid";
-import { formatCalendarMonthTitle } from "../../schedule/lib/schedule";
+import { getCalendarMonthTitleParts } from "../../schedule/lib/schedule";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { mobileSpace, mobileSpacing } from "../../../shared/theme/tokens";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
@@ -384,9 +384,8 @@ export function AdminHomeScreen() {
     );
   }
   const heading = getWeekHeading(range, todayDate, timeZone);
-  const duoTitle = monthView
-    ? formatCalendarMonthTitle(month.visibleMonth, todayDate)
-    : heading.title;
+  const monthTitle = getCalendarMonthTitleParts(month.visibleMonth);
+  const duoTitle = monthView ? monthTitle.month : heading.title;
   const duoMeta = monthView
     ? formatScheduledHours(buildWeeklyHoursSummary(month.entries, 40))
     : [heading.dates, view === "mine" ? formatScheduledHours(weeklyHours) : null]
@@ -397,7 +396,7 @@ export function AdminHomeScreen() {
       {alertsBar}
       <FoldFade entering={foldEntering}>
         <DuoHomeLayout
-          background={wash}
+          background={monthView ? undefined : wash}
           loading={isRefetching}
           meta={duoMeta}
           span={
@@ -413,6 +412,7 @@ export function AdminHomeScreen() {
           }
           tall={splitLayout.tall}
           title={duoTitle}
+          titleYear={monthView ? monthTitle.year : undefined}
           view={
             hasOwnView
               ? { value: view, options: HOME_VIEW_OPTIONS, onChange: chooseView }

@@ -182,14 +182,12 @@ export function getSplitShiftSegmentLabel(index: number, count: number): string 
   return count > 1 ? `Shift ${index + 1}` : "Shift";
 }
 
-/** The calendar's month title: "November", with the year only outside the current one. */
-export function formatCalendarMonthTitle(monthStart: string, todayDate: string): string {
-  const showYear = monthStart.slice(0, 4) !== todayDate.slice(0, 4);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    ...(showYear ? { year: "numeric" } : null),
-    timeZone: "UTC",
-  }).format(new Date(`${monthStart}T00:00:00.000Z`));
+/** A calendar's month title, "November" and "2026": the year always follows, lighter, as in Calendar. */
+export function getCalendarMonthTitleParts(monthStart: string): { month: string; year: string } {
+  const month = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" }).format(
+    new Date(`${monthStart}T00:00:00.000Z`),
+  );
+  return { month, year: monthStart.slice(0, 4) };
 }
 
 /** The dates the person works a shift, which the calendar marks with a dot; an absence alone isn't one. */
