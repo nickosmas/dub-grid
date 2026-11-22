@@ -907,11 +907,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const emptyStateDateLabel = /^(Today|Yesterday|Tomorrow),/.test(rawEmptyStateDateLabel)
     ? rawEmptyStateDateLabel.charAt(0).toLowerCase() + rawEmptyStateDateLabel.slice(1)
     : rawEmptyStateDateLabel;
-  // On the phone the calendar's circled day already says which day it is.
+  // The calendar's circled day, or the split pane's title, already names the day.
   const emptyStateTitle = isTeamScope
-    ? isSplit
-      ? `No shifts published for ${emptyStateDateLabel}`
-      : "No shifts published"
+    ? "No shifts published"
     : `No shifts for ${emptyStateDateLabel}`;
   const emptyStateBody =
     isTeamScope && activeTeamFocusAreaTab
@@ -1962,11 +1960,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   return (
     <>
       {sideColumnBar}
+      {/* The month sits flat on the page, as on the phone: no floating card (owner, 2026-11-22). */}
       <SplitView
-        background={pageWash}
         entering={foldEntering}
         layout={split}
-        listCard
         stackWhenTall
         list={listScreen}
         detail={
