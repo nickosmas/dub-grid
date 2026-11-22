@@ -930,25 +930,22 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       paddingTop: mobileSpace.sm,
     },
-    // The line through the handle already ends the header, so the header
+    // The line under the handle already ends the header, so the header
     // adds no space of its own under it; the page's own gap follows.
     calendarStickyShell: {
       paddingBottom: 0,
     },
-    // The handle and the line through its middle that parts the calendar
-    // from the day's list: one light neutral gray, the line running the
-    // page's full width past its gutters (owner, 2026-11-21).
+    // The handle, then the line under it that parts the calendar from the
+    // day's list: one light neutral gray, the line running the page's full
+    // width past its gutters (owner, 2026-11-22).
     calendarDragHandleTrack: {
       alignSelf: "stretch",
-      height: DRAG_HANDLE_BAR_HEIGHT,
       alignItems: "center",
-      justifyContent: "center",
+      gap: mobileSpace.sm,
     },
     calendarDragHandleRule: {
-      position: "absolute",
-      left: -getScreenGutter(),
-      right: -getScreenGutter(),
-      top: (DRAG_HANDLE_BAR_HEIGHT - DRAG_HANDLE_RULE_HEIGHT) / 2,
+      alignSelf: "stretch",
+      marginHorizontal: -getScreenGutter(),
       height: DRAG_HANDLE_RULE_HEIGHT,
       backgroundColor: mobileColors.controlNeutralBg,
     },
