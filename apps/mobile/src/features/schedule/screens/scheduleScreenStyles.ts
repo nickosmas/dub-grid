@@ -28,7 +28,7 @@ const PRESSABLE_INSET = mobileSpace.sm;
 
 /** A rounded press highlight that reaches past the content on both sides. */
 /** How far a picked day's pill stands in from the card's edges, as a picked row's does. */
-const UPCOMING_PICK_INSET = 6;
+const UPCOMING_SPLIT_ROW_RADIUS = 14;
 
 const pressableBleed = {
   borderRadius: mobileRadii.control,
@@ -484,18 +484,50 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       marginHorizontal: -20,
       paddingHorizontal: 20,
     },
-    // The day beside Home's list on an open iPhone Duo: a picked row's gray
-    // pill, standing in from the card's edges and the dividers alike, its
-    // corners following the card's.
+    // Home's week beside the day on an open iPhone Duo: compact rows, the
+    // picked day a gray row of its own inside the card's padding.
     upcomingDateGroupPicked: {
       position: "absolute",
-      top: UPCOMING_PICK_INSET,
-      bottom: UPCOMING_PICK_INSET,
-      left: UPCOMING_PICK_INSET,
-      right: UPCOMING_PICK_INSET,
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
       backgroundColor: mobileColors.selectedRowBg,
-      borderRadius: mobileRadii.card - UPCOMING_PICK_INSET,
+      borderRadius: UPCOMING_SPLIT_ROW_RADIUS,
       borderCurve: "continuous",
+    },
+    upcomingShiftsCardSplit: {
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
+    },
+    upcomingDateGroupSplit: {
+      alignItems: "center",
+      marginHorizontal: 0,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.md,
+    },
+    upcomingDateColumnSplit: {
+      minWidth: 44,
+      paddingVertical: 0,
+    },
+    upcomingUnscheduledRowSplit: {
+      minHeight: 0,
+      paddingVertical: 0,
+    },
+    upcomingShiftRowSplit: {
+      minHeight: 0,
+      marginVertical: 0,
+      marginLeft: 0,
+      marginRight: 0,
+      paddingHorizontal: 0,
+      paddingVertical: mobileSpace.xs,
+    },
+    upcomingShiftCopySplit: {
+      gap: mobileSpace.xs,
+    },
+    upcomingDaySeparatorSplit: {
+      left: mobileSpace.sm,
+      right: mobileSpace.sm,
     },
     upcomingDateColumn: {
       // minWidth, not width: at a raised OS text size the weekday and day

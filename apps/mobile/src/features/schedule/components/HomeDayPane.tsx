@@ -117,11 +117,11 @@ export function HomeDayPane({
     <Screen bottomPaddingMode="tabbed">
       <View style={styles.page}>
         <View style={styles.heading}>
-          <Text accessibilityRole="header" fit="fixed" style={styles.title}>
+          <Text accessibilityRole="header" fit="fixed" numberOfLines={1} style={styles.title}>
             {formatSplitDayTitle(date, todayDate)}
           </Text>
-          <Text style={styles.unscheduled}>Unscheduled</Text>
         </View>
+        <Text style={styles.unscheduled}>Unscheduled</Text>
         {offDayPeople.length > 0 ? (
           <PeopleList people={offDayPeople} styles={styles} title="Working that day" />
         ) : null}
@@ -227,36 +227,44 @@ const AVATAR_SIZE = 40;
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    // In from the pane's edges as far as a shift card stands, so a day off
+    // and a worked day line up.
     page: {
-      gap: mobileSpace.xl,
+      gap: mobileSpace.lg,
+      paddingHorizontal: mobileSpace.md,
     },
     // The card's glow blurs 20pt, as wide as the page's gutter, so the pane's
     // edge cut it in a straight line; this room lets it fade out first.
     cards: {
       gap: mobileSpace["2xl"],
       paddingHorizontal: mobileSpace.md,
-      paddingTop: mobileSpace.sm,
     },
     // A shift's card, then who works it with you.
     shift: {
       gap: mobileSpace.xl,
     },
+    // The day's name on a row of its own over a hairline, as the week's
+    // header sits over the list.
     heading: {
-      gap: mobileSpace.xs,
+      height: 40,
+      justifyContent: "center",
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: mobileColors.borderSubtle,
     },
     title: {
-      ...mobileText.screenTitle,
+      ...mobileTextWeighted("title", "bold"),
       color: mobileColors.textPrimary,
     },
     unscheduled: {
-      ...mobileTextWeighted("rowTitle", "semibold"),
+      ...mobileTextWeighted("cardTitle", "semibold"),
       color: mobileColors.textSecondary,
     },
     section: {
       gap: mobileSpace.sm,
     },
     sectionTitle: {
-      ...mobileTextWeighted("rowTitle", "semibold"),
+      ...mobileTextWeighted("sectionTitle", "semibold"),
+      paddingHorizontal: mobileSpace.sm,
       color: mobileColors.textPrimary,
     },
     peopleCard: {

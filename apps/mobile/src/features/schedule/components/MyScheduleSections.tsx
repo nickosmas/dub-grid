@@ -1008,22 +1008,35 @@ export function UpcomingShiftsSection({
     // No heading: Home's title already names the week, and its hours sit
     // under that title.
     <View accessibilityLabel="Your week" style={styles.upcomingSectionBlock}>
-      <View style={styles.upcomingShiftsCard}>
+      <View style={[styles.upcomingShiftsCard, inSplit && styles.upcomingShiftsCardSplit]}>
         {groupedItems.map((group, groupIndex) => {
           const isToday = group.date === todayDate;
-          const groupStyle = [
-            styles.upcomingDateGroup,
-            isToday && styles.upcomingShiftRowToday,
-            isToday && groupIndex === 0 && styles.upcomingShiftRowTodayFirst,
-            isToday && groupIndex === groupedItems.length - 1 && styles.upcomingShiftRowTodayLast,
-          ];
+          // Beside the day on an open iPhone Duo the rows are compact, and the
+          // picked day's gray, not a tint, marks where you are.
+          const groupStyle = inSplit
+            ? [styles.upcomingDateGroup, styles.upcomingDateGroupSplit]
+            : [
+                styles.upcomingDateGroup,
+                isToday && styles.upcomingShiftRowToday,
+                isToday && groupIndex === 0 && styles.upcomingShiftRowTodayFirst,
+                isToday &&
+                  groupIndex === groupedItems.length - 1 &&
+                  styles.upcomingShiftRowTodayLast,
+              ];
+          const besidePick =
+            group.date === highlightedDate ||
+            groupedItems[groupIndex - 1]?.date === highlightedDate;
           const content = (pressed: boolean) => (
             <>
               {group.date === highlightedDate || pressed ? (
                 <View pointerEvents="none" style={styles.upcomingDateGroupPicked} />
               ) : null}
-              {groupIndex > 0 ? <View style={styles.upcomingDaySeparator} /> : null}
-              <View style={styles.upcomingDateColumn}>
+              {groupIndex > 0 && !(inSplit && besidePick) ? (
+                <View
+                  style={[styles.upcomingDaySeparator, inSplit && styles.upcomingDaySeparatorSplit]}
+                />
+              ) : null}
+              <View style={[styles.upcomingDateColumn, inSplit && styles.upcomingDateColumnSplit]}>
                 <WeekDayLabel
                   date={group.date}
                   isPast={group.date < todayDate}
@@ -1037,7 +1050,10 @@ export function UpcomingShiftsSection({
                 {group.items.length === 0 ? (
                   <View
                     accessibilityLabel={`Unscheduled ${formatCompactScheduleDate(group.date)}`}
-                    style={styles.upcomingUnscheduledRow}
+                    style={[
+                      styles.upcomingUnscheduledRow,
+                      inSplit && styles.upcomingUnscheduledRowSplit,
+                    ]}
                     testID={`upcoming-unscheduled-row-${group.date}`}
                   >
                     <Text
@@ -1065,10 +1081,16 @@ export function UpcomingShiftsSection({
                         <Fragment key={`${entry.employeeId}:${entry.date}:arrived-late`}>
                           <PressableRow
                             onPress={() => onPressEntry(entry)}
-                            style={styles.upcomingShiftRow}
+                            style={[
+                              styles.upcomingShiftRow,
+                              inSplit && styles.upcomingShiftRowSplit,
+                            ]}
                           >
                             <View
-                              style={styles.upcomingShiftCopy}
+                              style={[
+                                styles.upcomingShiftCopy,
+                                inSplit && styles.upcomingShiftCopySplit,
+                              ]}
                               testID={`upcoming-rest-of-day-row-${group.date}`}
                             >
                               <MeTypePill chip={restOfDayChip} compact />
@@ -1106,9 +1128,17 @@ export function UpcomingShiftsSection({
                           {itemIndex > 0 ? <UpcomingShiftDivider /> : null}
                           <PressableRow
                             onPress={() => onPressEntry(item.entry)}
-                            style={styles.upcomingShiftRow}
+                            style={[
+                              styles.upcomingShiftRow,
+                              inSplit && styles.upcomingShiftRowSplit,
+                            ]}
                           >
-                            <View style={styles.upcomingShiftCopy}>
+                            <View
+                              style={[
+                                styles.upcomingShiftCopy,
+                                inSplit && styles.upcomingShiftCopySplit,
+                              ]}
+                            >
                               {/* Title and time stack rather than sitting in two
                               columns. Side by side, the time never gave width
                               back, so at a raised OS text size the name was
@@ -1193,10 +1223,16 @@ export function UpcomingShiftsSection({
                           <UpcomingShiftDivider />
                           <PressableRow
                             onPress={() => onPressEntry(entry)}
-                            style={styles.upcomingShiftRow}
+                            style={[
+                              styles.upcomingShiftRow,
+                              inSplit && styles.upcomingShiftRowSplit,
+                            ]}
                           >
                             <View
-                              style={styles.upcomingShiftCopy}
+                              style={[
+                                styles.upcomingShiftCopy,
+                                inSplit && styles.upcomingShiftCopySplit,
+                              ]}
                               testID={`upcoming-rest-of-day-row-${group.date}`}
                             >
                               <MeTypePill chip={restOfDayChip} compact />
