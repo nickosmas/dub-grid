@@ -1020,10 +1020,12 @@ export function UpcomingShiftsSection({
                 isToday &&
                   groupIndex === groupedItems.length - 1 &&
                   styles.upcomingShiftRowTodayLast,
-                group.date === highlightedDate && styles.upcomingDateGroupPicked,
               ]}
               testID={isToday ? `upcoming-today-row-${group.date}` : undefined}
             >
+              {group.date === highlightedDate ? (
+                <View pointerEvents="none" style={styles.upcomingDateGroupPicked} />
+              ) : null}
               {groupIndex > 0 ? <View style={styles.upcomingDaySeparator} /> : null}
               <View style={styles.upcomingDateColumn}>
                 <WeekDayLabel

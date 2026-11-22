@@ -485,12 +485,17 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingHorizontal: 20,
     },
     // The day beside Home's list on an open iPhone Duo: a picked row's gray
-    // pill, standing in from the card's edges.
+    // pill, standing in from the card's edges and the dividers alike, its
+    // corners following the card's.
     upcomingDateGroupPicked: {
+      position: "absolute",
+      top: UPCOMING_PICK_INSET,
+      bottom: UPCOMING_PICK_INSET,
+      left: UPCOMING_PICK_INSET,
+      right: UPCOMING_PICK_INSET,
       backgroundColor: mobileColors.selectedRowBg,
       borderRadius: mobileRadii.card - UPCOMING_PICK_INSET,
-      marginHorizontal: -20 + UPCOMING_PICK_INSET,
-      paddingHorizontal: 20 - UPCOMING_PICK_INSET,
+      borderCurve: "continuous",
     },
     upcomingDateColumn: {
       // minWidth, not width: at a raised OS text size the weekday and day

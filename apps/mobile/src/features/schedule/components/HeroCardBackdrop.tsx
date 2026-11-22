@@ -35,7 +35,10 @@ export function HeroCardBackdrop({ isDark }: { isDark: boolean }) {
       testID="me-hero-backdrop"
     >
       {size ? (
-        <Svg height={size.height} width={size.width}>
+        // Keyed by size: a resized Svg kept the frame it first drew in, so a
+        // card that widened as the iPhone Duo's pane slid open showed the art
+        // stop in a hard edge with flat colour beyond it.
+        <Svg height={size.height} key={`${size.width}x${size.height}`} width={size.width}>
           <Defs>
             {mesh.pools.map((pool, index) => (
               <RadialGradient

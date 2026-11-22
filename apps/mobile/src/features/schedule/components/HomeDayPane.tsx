@@ -230,8 +230,12 @@ const createStyles = (mobileColors: MobileColors) =>
     page: {
       gap: mobileSpace.xl,
     },
+    // The card's glow blurs 20pt, as wide as the page's gutter, so the pane's
+    // edge cut it in a straight line; this room lets it fade out first.
     cards: {
       gap: mobileSpace["2xl"],
+      paddingHorizontal: mobileSpace.md,
+      paddingTop: mobileSpace.sm,
     },
     // A shift's card, then who works it with you.
     shift: {

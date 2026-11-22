@@ -1327,7 +1327,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:8df9f49dbc1cf3a0f1aadb93d4735a88449d2cabfd8faa3e71763508daee7752"
+      "evidenceFingerprint": "sha256:6cab391e8eab1520ab313ed41f7feb79d338008a0cdb7411a5a7d0891d61d410"
     },
     {
       "id": "alerts",
@@ -2107,7 +2107,7 @@
           ]
         }
       ],
-      "evidenceFingerprint": "sha256:dd293baf692e1ca10e7b8a42daf8138faf11142edd47e88a4f7b7f0994485b8f"
+      "evidenceFingerprint": "sha256:4d9f841a2f7c5280b8b7af8fc8e5e29bc9c1173e9c7f23a4b3b8f717085096ae"
     },
     {
       "id": "integrations-exports",
