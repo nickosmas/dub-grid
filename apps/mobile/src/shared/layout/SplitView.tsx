@@ -16,7 +16,7 @@ import {
   DetailPaneContext,
   PaneTopInsetContext,
 } from "./DetailPaneContext";
-import { TransparentPaneContext } from "./TransparentPaneContext";
+import { TransparentPaneContext, useTransparentPane } from "./TransparentPaneContext";
 import { useHingeStatus } from "./useHingeStatus";
 import { PaneEdge, hingeModule } from "../../../modules/hinge";
 import { FOLD_FADE_MS, type useFoldEntering } from "./FoldFade";
@@ -78,6 +78,9 @@ export function SplitView({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const insets = useSafeAreaInsets();
+  // A page that already paints one background behind the split (Home's wash
+  // under its full-width header on the iPhone Duo) keeps its panes clear.
+  const inheritedTransparent = useTransparentPane();
   const { height } = useWindowDimensions();
   const stacked = stackWhenTall && layout.tall;
   const listInsets = useMemo(
@@ -107,7 +110,7 @@ export function SplitView({
 
   return (
     <WindowInsetsContext.Provider value={insets}>
-      <TransparentPaneContext.Provider value={background != null}>
+      <TransparentPaneContext.Provider value={background != null || inheritedTransparent}>
         {background != null ? (
           <View
             style={[

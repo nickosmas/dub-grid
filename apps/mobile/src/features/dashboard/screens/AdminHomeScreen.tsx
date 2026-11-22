@@ -19,8 +19,17 @@ import {
   buildWeeklyHoursSummary,
   getFeaturedMeScheduleSegment,
   getIsoDateInTimeZone,
+  getScheduleMonthStartDate,
   getScheduleRangeForDate,
 } from "@dubgrid/schedule-core";
+import {
+  DuoHomeLayout,
+  addMonthsToIso,
+  useHomeMonth,
+  useHomeSpan,
+} from "../../schedule/components/DuoHomeLayout";
+import { HomeMonthGrid } from "../../schedule/components/HomeMonthGrid";
+import { getCalendarMonthTitleParts } from "../../schedule/lib/schedule";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { mobileSpace, mobileSpacing } from "../../../shared/theme/tokens";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
@@ -35,7 +44,6 @@ import { MyHomeSections } from "../components/MyHomeSections";
 import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
 import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
-import { MonthCalendarPane } from "../../schedule/components/MonthCalendarPane";
 import { SideColumnAlertsBar } from "../../schedule/components/SideColumnAlertsBar";
 import { getWeekHeading } from "../../schedule/lib/week-range-label";
 import { HomeSplitPane, useHomeSplit } from "../../schedule/components/HomeSplit";
@@ -102,9 +110,14 @@ export function AdminHomeScreen() {
     defaultEntry: homeDefaultEntry,
     defaultDate: selectedDate,
   });
-  // Open on the iPhone Duo, the month fills the left pane, as in Calendar,
-  // and Home sits beside it; a shift or day tapped on Home opens over it.
+  // Open on the iPhone Duo, My schedule is the week beside one day of it;
+  // Team is its analytics across the whole width.
   const splitLayout = useSplitLayout();
+  const inSplit = splitLayout !== null;
+  // Week | Month, and the month the grid shows, for My schedule.
+  const [span, setSpan] = useHomeSpan();
+  const monthView = inSplit && view === "mine" && span === "month";
+  const month = useHomeMonth(selectedDate);
   // On an iPhone Duo, open or closed, the bell stands in the side column.
   const sideColumn = useHasSideColumn();
   const foldEntering = useFoldEntering(splitLayout !== null);
@@ -309,16 +322,16 @@ export function AdminHomeScreen() {
   // Home keeps its wash on every platform (owner, 2026-11-04).
   const wash = <HomeWash height={windowHeight} />;
 
-  // Split, the wash runs behind both panes, with the month floating on it.
+  // Split, the wash runs once behind both panes.
   const page = (
     <Screen
       bottomPaddingMode="tabbed"
       scrollViewRef={scrollViewRef}
-      pageBackground={splitLayout ? undefined : wash}
+      pageBackground={inSplit ? undefined : wash}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      stickyHeaderBackground={splitLayout ? undefined : wash}
-      stickyHeader={header}
+      stickyHeaderBackground={inSplit ? undefined : wash}
+      stickyHeader={inSplit ? undefined : header}
     >
       <View style={styles.cards}>
         {sections.map((section, index) => (
@@ -331,28 +344,38 @@ export function AdminHomeScreen() {
     </Screen>
   );
 
-  // On an iPhone Duo the bell, the week's arrows and Today stand in the side
-  // column; beside a split's month the month steps the weeks.
+  // On an iPhone Duo the bell, the arrows and Today stand in the side column;
+  // in Month they scroll the grid a month up or down.
+  const todayMonth = getScheduleMonthStartDate(todayDate);
   const alertsBar = (
     <SideColumnAlertsBar
       shown={sideColumn}
       stepper={
-        sideColumn && !splitLayout
+        monthView
           ? {
-              previousLabel: "Previous week",
-              nextLabel: "Next week",
-              onPrevious: () => setSelectedDateOverride(addDaysToIsoDate(selectedDate, -7)),
-              onNext: () => setSelectedDateOverride(addDaysToIsoDate(selectedDate, 7)),
-              onToday: getWeekHeading(range, todayDate, timeZone).isThisWeek
-                ? null
-                : () => setSelectedDateOverride(null),
+              previousLabel: "Previous month",
+              nextLabel: "Next month",
+              vertical: true,
+              onPrevious: () => month.goToMonth(addMonthsToIso(month.visibleMonth, -1)),
+              onNext: () => month.goToMonth(addMonthsToIso(month.visibleMonth, 1)),
+              onToday: month.visibleMonth === todayMonth ? null : () => month.goToMonth(todayMonth),
             }
-          : undefined
+          : sideColumn
+            ? {
+                previousLabel: "Previous week",
+                nextLabel: "Next week",
+                onPrevious: () => setSelectedDateOverride(addDaysToIsoDate(selectedDate, -7)),
+                onNext: () => setSelectedDateOverride(addDaysToIsoDate(selectedDate, 7)),
+                onToday: getWeekHeading(range, todayDate, timeZone).isThisWeek
+                  ? null
+                  : () => setSelectedDateOverride(null),
+              }
+            : undefined
       }
       unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
     />
   );
-  if (!splitLayout) {
+  if (!inSplit || !splitLayout) {
     return (
       <>
         {alertsBar}
@@ -360,37 +383,74 @@ export function AdminHomeScreen() {
       </>
     );
   }
+  const heading = getWeekHeading(range, todayDate, timeZone);
+  const monthTitle = getCalendarMonthTitleParts(month.visibleMonth);
+  const duoTitle = monthView ? monthTitle.month : heading.title;
+  const duoMeta = monthView
+    ? formatScheduledHours(buildWeeklyHoursSummary(month.entries, 40))
+    : [heading.dates, view === "mine" ? formatScheduledHours(weeklyHours) : null]
+        .filter(Boolean)
+        .join(" · ") || null;
   return (
     <>
       {alertsBar}
-      <SplitView
-        background={wash}
-        entering={foldEntering}
-        layout={splitLayout}
-        listCard
-        stackWhenTall
-        list={
-          <MonthCalendarPane
-            now={now}
-            selectedDate={selectedDate}
-            timeZone={timeZone}
-            todayDate={todayDate}
-            onSelectDate={setSelectedDateOverride}
-          />
-        }
-        detail={
-          homeSplit.picked ? (
-            <HomeSplitPane
-              back={{ label: "Home", onPress: homeSplit.clearPick }}
-              now={now}
-              range={range}
-              shown={homeSplit.picked}
-            />
-          ) : (
+      <FoldFade entering={foldEntering}>
+        <DuoHomeLayout
+          background={monthView ? undefined : wash}
+          loading={isRefetching}
+          meta={duoMeta}
+          span={
+            view === "mine"
+              ? {
+                  value: span,
+                  onChange: (next) => {
+                    if (next === "month") month.goToMonth(getScheduleMonthStartDate(selectedDate));
+                    setSpan(next);
+                  },
+                }
+              : undefined
+          }
+          tall={splitLayout.tall}
+          title={duoTitle}
+          titleYear={monthView ? monthTitle.year : undefined}
+          view={
+            hasOwnView
+              ? { value: view, options: HOME_VIEW_OPTIONS, onChange: chooseView }
+              : undefined
+          }
+        >
+          {view === "team" ? (
             page
-          )
-        }
-      />
+          ) : monthView ? (
+            <View style={styles.month}>
+              <HomeMonthGrid
+                accessToken={accessToken}
+                enabled={!managementOnly}
+                scrollRequest={month.request}
+                todayDate={todayDate}
+                visibleMonth={month.visibleMonth}
+                onEntriesChange={month.setEntries}
+                onVisibleMonthChange={month.setVisibleMonth}
+              />
+            </View>
+          ) : (
+            <SplitView
+              layout={splitLayout}
+              list={page}
+              detail={
+                <HomeSplitPane
+                  currentTime={getCurrentTimeValue(now, timeZone)}
+                  entries={mine.entries}
+                  home={homeSplit}
+                  range={range}
+                  teamEntries={mine.teamEntries}
+                  todayDate={todayDate}
+                />
+              }
+            />
+          )}
+        </DuoHomeLayout>
+      </FoldFade>
     </>
   );
 }
@@ -402,5 +462,9 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: mobileSpace.md,
+  },
+  // Room for the month grid, which insets itself from the edges.
+  month: {
+    flex: 1,
   },
 });

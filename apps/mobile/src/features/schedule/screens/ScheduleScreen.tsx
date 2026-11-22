@@ -53,6 +53,13 @@ import {
 import { SplitShiftBadge } from "../components/SplitShift";
 import { DayOverview } from "../components/DayOverview";
 import { HomeSplitPane, useHomeSplit } from "../components/HomeSplit";
+import {
+  DuoHomeLayout,
+  addMonthsToIso,
+  useHomeMonth,
+  useHomeSpan,
+} from "../components/DuoHomeLayout";
+import { HomeMonthGrid } from "../components/HomeMonthGrid";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useListPaneBottom, useSplitLayout } from "../../../shared/layout/SplitView";
 import { NARROW_LIST_MAX_WIDTH, getStackedListHeight } from "../../../shared/layout/split-layout";
@@ -86,7 +93,7 @@ import {
   buildWeeklyHoursSummary,
   filterScheduleEntriesByDate,
   filterTeamScheduleEntriesByFocusArea,
-  formatCalendarMonthTitle,
+  getCalendarMonthTitleParts,
   formatScheduleDayLabel,
   formatScheduleTimeRange,
   getCalendarDotRanges,
@@ -136,9 +143,9 @@ import {
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
 import { MonthDayCell } from "../components/MonthDayCell";
+import { MonthTitle } from "../components/MonthTitle";
 import { SideColumnAlertsBar, type SideColumnStepper } from "../components/SideColumnAlertsBar";
 import { getWeekHeading } from "../lib/week-range-label";
-import { MonthCalendarPane } from "../components/MonthCalendarPane";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_EXPAND_TIMING = {
@@ -608,7 +615,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // strip once a swipe passed the month's edge.
   const visibleCalendarMonth =
     (isCalendarOpen && calendarMonthAnchor) || getScheduleMonthStartDate(selectedDate);
-  const teamHeaderTitle = formatCalendarMonthTitle(visibleCalendarMonth, todayDate);
   const isSelectedToday = selectedDate === todayDate;
   // The Today control's arrow points the way today lies: back from a future
   // week, forward from a past one. Ionicons only draws the clockwise arrow,
@@ -805,6 +811,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     defaultEntry: meHeroState.item?.entry ?? null,
     defaultDate: selectedDate,
   });
+  // Open on the iPhone Duo, Home's Week | Month and the month it shows.
+  const [homeSpan, setHomeSpan] = useHomeSpan();
+  const homeMonth = useHomeMonth(selectedDate);
+  const homeMonthView = homeSplit.split !== null && homeSpan === "month";
   // The page fades into its new layout when the Duo folds or opens.
   const foldEntering = useFoldEntering((isTeamScope ? split : homeSplit.split) !== null);
   const meHeroTiming = useMemo(
@@ -897,11 +907,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const emptyStateDateLabel = /^(Today|Yesterday|Tomorrow),/.test(rawEmptyStateDateLabel)
     ? rawEmptyStateDateLabel.charAt(0).toLowerCase() + rawEmptyStateDateLabel.slice(1)
     : rawEmptyStateDateLabel;
-  // On the phone the calendar's circled day already says which day it is.
+  // The calendar's circled day, or the split pane's title, already names the day.
   const emptyStateTitle = isTeamScope
-    ? isSplit
-      ? `No shifts published for ${emptyStateDateLabel}`
-      : "No shifts published"
+    ? "No shifts published"
     : `No shifts for ${emptyStateDateLabel}`;
   const emptyStateBody =
     isTeamScope && activeTeamFocusAreaTab
@@ -1348,7 +1356,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   const meStickyHeader = !isTeamScope ? (
     <WeekNavigatorHeader
-      controls={homeSplit.split === null}
       hoursLabel={formatScheduledHours(meWeeklyHours)}
       range={range}
       timeZone={timeZone}
@@ -1438,9 +1445,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     <View style={styles.stickyControlsSection}>
       <View style={styles.teamHeaderUtilityRow}>
         <View style={styles.teamHeaderTitleArea}>
-          <Text accessibilityRole="header" fit="fixed" style={styles.teamHeaderTitle}>
-            {teamHeaderTitle}
-          </Text>
+          <MonthTitle monthStart={visibleCalendarMonth} style={styles.teamHeaderTitle} />
         </View>
         <View style={styles.teamHeaderActions}>
           {/* Split, the month steps with chevrons too, as Home's does. */}
@@ -1479,7 +1484,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
       <View style={isSplit ? styles.calendarPlain : styles.calendarFlat}>
         {/* Weekday labels: always visible, fixed in place — never move. */}
-        <View style={styles.monthCalendarWeekdays}>
+        <View style={[styles.monthCalendarWeekdays, isSplit && styles.calendarLineUnder]}>
           {MONTH_WEEKDAY_LABELS.map((label, index) => (
             <Text key={index} fit="fixed" style={styles.monthCalendarWeekdayLabel}>
               {label}
@@ -1518,7 +1523,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                         ? (event) => setWeekStripRowHeight(event.nativeEvent.layout.height)
                         : undefined
                     }
-                    style={styles.monthCalendarWeek}
+                    style={[styles.monthCalendarWeek, weekIndex > 0 && styles.calendarLineOver]}
                   >
                     {week.map((day) => (
                       <MonthDayCell
@@ -1652,22 +1657,25 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         <View
           style={[
             styles.mePage,
-            isMeScheduleEmpty && [styles.mePageEmpty, { minHeight: meEmptyPageMinHeight }],
+            isMeScheduleEmpty &&
+              !homeSplit.split && [styles.mePageEmpty, { minHeight: meEmptyPageMinHeight }],
           ]}
         >
-          <MeHeroCard
-            currentDate={todayDate}
-            currentTime={currentTimeValue}
-            featuredItem={meHeroState.item}
-            hasWeekItems={hasScheduledWeekDay}
-            timing={meHeroTiming}
-            weekDays={weekDays}
-            shiftmates={meHeroShiftmates}
-            status={meHeroState.status}
-            onPress={
-              meHeroState.item ? () => handleOpenShiftDetail(meHeroState.item!.entry) : undefined
-            }
-          />
+          {homeSplit.split ? null : (
+            <MeHeroCard
+              currentDate={todayDate}
+              currentTime={currentTimeValue}
+              featuredItem={meHeroState.item}
+              hasWeekItems={hasScheduledWeekDay}
+              timing={meHeroTiming}
+              weekDays={weekDays}
+              shiftmates={meHeroShiftmates}
+              status={meHeroState.status}
+              onPress={
+                meHeroState.item ? () => handleOpenShiftDetail(meHeroState.item!.entry) : undefined
+              }
+            />
+          )}
           {!isMeScheduleEmpty ? (
             <>
               <ShiftCoverRequestsSection
@@ -1724,7 +1732,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               />
             </>
           ) : null}
-          {hasScheduledWeekDay ? (
+          {hasScheduledWeekDay || homeSplit.split ? (
             <UpcomingShiftsSection
               items={meUpcomingItems}
               onPressEntry={handleOpenShiftDetail}
@@ -1826,7 +1834,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       // state real space to centre in without leaving scroll mode.
       scrollEnabled={contentState.kind !== "loading"}
       scrollViewRef={scrollViewRef}
-      stickyHeader={stickyHeader}
+      // Open on the iPhone Duo, Home's header spans both panes, above them.
+      stickyHeader={homeSplit.split ? undefined : stickyHeader}
     >
       <View>
         {split ? null : dayBody}
@@ -1846,8 +1855,18 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           onNext: isSplit ? () => stepSplitMonth(1) : null,
           onToday: isSelectedToday ? null : handleGoToToday,
         }
-      : homeSplit.split
-        ? undefined
+      : homeMonthView
+        ? {
+            previousLabel: "Previous month",
+            nextLabel: "Next month",
+            vertical: true,
+            onPrevious: () => homeMonth.goToMonth(addMonthsToIso(homeMonth.visibleMonth, -1)),
+            onNext: () => homeMonth.goToMonth(addMonthsToIso(homeMonth.visibleMonth, 1)),
+            onToday:
+              homeMonth.visibleMonth === getScheduleMonthStartDate(todayDate)
+                ? null
+                : () => homeMonth.goToMonth(getScheduleMonthStartDate(todayDate)),
+          }
         : {
             previousLabel: "Previous week",
             nextLabel: "Next week",
@@ -1863,40 +1882,65 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     />
   );
 
-  // Open on the iPhone Duo, Home sits beside the month, as in Calendar; a
-  // shift or day tapped on it opens over it.
+  // Open on the iPhone Duo, Home is one header over the week beside a day of
+  // it, or over the month.
   if (homeSplit.split) {
+    const heading = getWeekHeading(range, todayDate, timeZone);
+    const homeMonthTitle = getCalendarMonthTitleParts(homeMonth.visibleMonth);
+    const homeTitle = homeMonthView ? homeMonthTitle.month : heading.title;
+    const homeMeta = homeMonthView
+      ? formatScheduledHours(buildWeeklyHoursSummary(homeMonth.entries, 40))
+      : [heading.dates, formatScheduledHours(meWeeklyHours)].filter(Boolean).join(" · ") || null;
     return (
       <>
         {sideColumnBar}
-        <SplitView
-          background={pageWash}
-          entering={foldEntering}
-          layout={homeSplit.split}
-          listCard
-          stackWhenTall
-          list={
-            <MonthCalendarPane
-              now={now}
-              selectedDate={selectedDate}
-              timeZone={timeZone}
-              todayDate={todayDate}
-              onSelectDate={(date) => (date ? handleSelectDate(date) : handleGoToToday())}
-            />
-          }
-          detail={
-            homeSplit.picked ? (
-              <HomeSplitPane
-                back={{ label: "Home", onPress: homeSplit.clearPick }}
-                now={now}
-                range={range}
-                shown={homeSplit.picked}
-              />
+        <FoldFade entering={foldEntering}>
+          <DuoHomeLayout
+            background={homeMonthView ? undefined : pageWash}
+            meta={homeMeta}
+            span={{
+              value: homeSpan,
+              onChange: (next) => {
+                if (next === "month") {
+                  homeMonth.goToMonth(getScheduleMonthStartDate(selectedDate));
+                }
+                setHomeSpan(next);
+              },
+            }}
+            tall={homeSplit.split.tall}
+            title={homeTitle}
+            titleYear={homeMonthView ? homeMonthTitle.year : undefined}
+          >
+            {homeMonthView ? (
+              <View style={styles.homeMonth}>
+                <HomeMonthGrid
+                  accessToken={accessToken}
+                  enabled={linkedEmployee !== null}
+                  scrollRequest={homeMonth.request}
+                  todayDate={todayDate}
+                  visibleMonth={homeMonth.visibleMonth}
+                  onEntriesChange={homeMonth.setEntries}
+                  onVisibleMonthChange={homeMonth.setVisibleMonth}
+                />
+              </View>
             ) : (
-              listScreen
-            )
-          }
-        />
+              <SplitView
+                layout={homeSplit.split}
+                list={listScreen}
+                detail={
+                  <HomeSplitPane
+                    currentTime={currentTimeValue}
+                    entries={activeEntries}
+                    home={homeSplit}
+                    range={range}
+                    teamEntries={meTeamScheduleQuery.data?.entries ?? []}
+                    todayDate={todayDate}
+                  />
+                }
+              />
+            )}
+          </DuoHomeLayout>
+        </FoldFade>
       </>
     );
   }
@@ -1914,11 +1958,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   return (
     <>
       {sideColumnBar}
+      {/* The month sits flat on the page, as on the phone: no floating card (owner, 2026-11-22). */}
       <SplitView
-        background={pageWash}
         entering={foldEntering}
         layout={split}
-        listCard
         stackWhenTall
         list={listScreen}
         detail={

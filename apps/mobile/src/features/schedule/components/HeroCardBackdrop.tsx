@@ -10,10 +10,12 @@ type Size = { width: number; height: number };
  * card paints with CSS. Each pool's radius is a fraction of the card's width
  * and height (the gradient's default bounding-box units), as on web.
  *
- * The drawing is sized from the card's own layout in pixels. An absolutely
- * positioned `Svg` with no size of its own keeps the frame it first drew in,
- * so when the card grew (the Working with block or a second shift arriving
- * after the first layout) the new bottom showed the flat fallback colour.
+ * The drawing is laid out in the card's last measured size and stretched to
+ * the card's live size through its viewBox. Measured alone, the card grew
+ * ahead of the drawing: the Working with block arriving, or the iPhone Duo's
+ * pane widening as it opened, showed flat colour past the drawing's old edge
+ * until the next layout caught up. Stretched, it fills every frame, and the
+ * next layout redraws it at the new size so the dots stay round.
  */
 export function HeroCardBackdrop({ isDark }: { isDark: boolean }) {
   const [size, setSize] = useState<Size | null>(null);
@@ -35,7 +37,13 @@ export function HeroCardBackdrop({ isDark }: { isDark: boolean }) {
       testID="me-hero-backdrop"
     >
       {size ? (
-        <Svg height={size.height} width={size.width}>
+        <Svg
+          height="100%"
+          preserveAspectRatio="none"
+          style={StyleSheet.absoluteFill}
+          viewBox={`0 0 ${size.width} ${size.height}`}
+          width="100%"
+        >
           <Defs>
             {mesh.pools.map((pool, index) => (
               <RadialGradient
