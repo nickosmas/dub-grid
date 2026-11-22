@@ -997,6 +997,7 @@ export function UpcomingShiftsSection({
     dateItems.push(item);
     itemsByDate.set(item.date, dateItems);
   });
+  const inSplit = onPressDay !== undefined;
   const groupedItems = weekDays.map((day) => ({
     date: day.date,
     items: itemsByDate.get(day.date) ?? [],
@@ -1010,20 +1011,15 @@ export function UpcomingShiftsSection({
       <View style={styles.upcomingShiftsCard}>
         {groupedItems.map((group, groupIndex) => {
           const isToday = group.date === todayDate;
-          return (
-            <View
-              key={group.date}
-              style={[
-                styles.upcomingDateGroup,
-                isToday && styles.upcomingShiftRowToday,
-                isToday && groupIndex === 0 && styles.upcomingShiftRowTodayFirst,
-                isToday &&
-                  groupIndex === groupedItems.length - 1 &&
-                  styles.upcomingShiftRowTodayLast,
-              ]}
-              testID={isToday ? `upcoming-today-row-${group.date}` : undefined}
-            >
-              {group.date === highlightedDate ? (
+          const groupStyle = [
+            styles.upcomingDateGroup,
+            isToday && styles.upcomingShiftRowToday,
+            isToday && groupIndex === 0 && styles.upcomingShiftRowTodayFirst,
+            isToday && groupIndex === groupedItems.length - 1 && styles.upcomingShiftRowTodayLast,
+          ];
+          const content = (pressed: boolean) => (
+            <>
+              {group.date === highlightedDate || pressed ? (
                 <View pointerEvents="none" style={styles.upcomingDateGroupPicked} />
               ) : null}
               {groupIndex > 0 ? <View style={styles.upcomingDaySeparator} /> : null}
@@ -1036,29 +1032,9 @@ export function UpcomingShiftsSection({
                 />
               </View>
 
-              <View style={styles.upcomingDateShiftStack}>
-                {group.items.length === 0 && onPressDay ? (
-                  <PressableRow
-                    accessibilityLabel={`Unscheduled ${formatCompactScheduleDate(group.date)}`}
-                    onPress={() => onPressDay(group.date)}
-                    style={styles.upcomingUnscheduledRow}
-                  >
-                    <Text
-                      maxFontSizeMultiplier={MAX_FONT_SCALE}
-                      style={styles.upcomingUnscheduledTitle}
-                    >
-                      Unscheduled
-                    </Text>
-                    {group.deletedEntries.map((entry) => (
-                      <PreviousChange
-                        key={`${entry.employeeId}:${entry.date}`}
-                        entry={entry}
-                        change={entry.change}
-                        firstOfDay
-                      />
-                    ))}
-                  </PressableRow>
-                ) : group.items.length === 0 ? (
+              {/* In a split the day's own press takes every touch on it. */}
+              <View pointerEvents={inSplit ? "none" : "auto"} style={styles.upcomingDateShiftStack}>
+                {group.items.length === 0 ? (
                   <View
                     accessibilityLabel={`Unscheduled ${formatCompactScheduleDate(group.date)}`}
                     style={styles.upcomingUnscheduledRow}
@@ -1246,6 +1222,28 @@ export function UpcomingShiftsSection({
                   </>
                 )}
               </View>
+            </>
+          );
+          // In a split the whole day, its date included, is one tap target.
+          return inSplit && onPressDay ? (
+            <Pressable
+              key={group.date}
+              accessibilityLabel={formatCompactScheduleDate(group.date)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: group.date === highlightedDate }}
+              onPress={() => onPressDay(group.date)}
+              style={groupStyle}
+              testID={isToday ? `upcoming-today-row-${group.date}` : undefined}
+            >
+              {({ pressed }) => content(pressed)}
+            </Pressable>
+          ) : (
+            <View
+              key={group.date}
+              style={groupStyle}
+              testID={isToday ? `upcoming-today-row-${group.date}` : undefined}
+            >
+              {content(false)}
             </View>
           );
         })}
