@@ -613,7 +613,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // The Today control's arrow points the way today lies: back from a future
   // week, forward from a past one. Ionicons only draws the clockwise arrow,
   // which reads as forward, so the backward one is that glyph mirrored.
-  const todayIconStyle = selectedDate > todayDate ? styles.iconControlMirrored : undefined;
   const previousWeekDate = addDaysToIsoDate(selectedDate, -7);
   const nextWeekDate = addDaysToIsoDate(selectedDate, 7);
   const previousWeekDays = useMemo(
@@ -898,8 +897,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const emptyStateDateLabel = /^(Today|Yesterday|Tomorrow),/.test(rawEmptyStateDateLabel)
     ? rawEmptyStateDateLabel.charAt(0).toLowerCase() + rawEmptyStateDateLabel.slice(1)
     : rawEmptyStateDateLabel;
+  // On the phone the calendar's circled day already says which day it is.
   const emptyStateTitle = isTeamScope
-    ? `No shifts published for ${emptyStateDateLabel}`
+    ? isSplit
+      ? `No shifts published for ${emptyStateDateLabel}`
+      : "No shifts published"
     : `No shifts for ${emptyStateDateLabel}`;
   const emptyStateBody =
     isTeamScope && activeTeamFocusAreaTab
@@ -1458,19 +1460,24 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           ) : null}
           {/* The same control as Home's, so the two headers read as one set. */}
           {!isSelectedToday && !sideColumn ? (
-            <IconControlButton
+            <Pressable
               accessibilityLabel="Today"
-              iconName="refresh-outline"
-              iconStyle={todayIconStyle}
+              accessibilityRole="button"
+              hitSlop={8}
               onPress={handleGoToToday}
-            />
+              style={styles.todayTextButton}
+            >
+              <Text fit="compact" style={styles.todayText}>
+                Today
+              </Text>
+            </Pressable>
           ) : null}
           {/* Split, alerts stand in the side column. */}
           {sideColumn ? null : <AlertsChromeButton unreadCount={unreadNotificationCount} />}
         </View>
       </View>
 
-      <View style={isSplit ? styles.calendarPlain : styles.calendarCard}>
+      <View style={isSplit ? styles.calendarPlain : styles.calendarFlat}>
         {/* Weekday labels: always visible, fixed in place — never move. */}
         <View style={styles.monthCalendarWeekdays}>
           {MONTH_WEEKDAY_LABELS.map((label, index) => (
@@ -1565,7 +1572,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               }}
               style={styles.calendarDragHandleRow}
             >
-              <View style={styles.calendarDragHandleBar} />
+              <View style={styles.calendarDragHandleTrack}>
+                <View pointerEvents="none" style={styles.calendarDragHandleRule} />
+                <View style={styles.calendarDragHandleBar} />
+              </View>
             </View>
           </GestureDetector>
         )}
@@ -1575,9 +1585,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
-  // Home and the team schedule both carry Home's wash, the same blue the admin
-  // Home shows at normal coverage (owner, 2026-11-04; the schedule's, 2026-11-20).
-  const pageWash = <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />;
+  // Only Home carries the wash, the same blue the admin Home shows at normal
+  // coverage (owner, 2026-11-04); the Schedule tab is a plain page (2026-11-21).
+  const pageWash = isTeamScope ? undefined : (
+    <PageWash colors={buildHomeWash(isDark)} height={viewportHeight} />
+  );
 
   // The day under the strip, or, split, in the pane beside the month.
   const dayBody = (
@@ -1805,6 +1817,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       // Split, the wash runs behind both panes, with the month floating on it.
       pageBackground={isSplit || homeSplit.split ? undefined : pageWash}
       stickyHeaderBackground={isSplit || homeSplit.split ? undefined : pageWash}
+      stickyHeaderShellStyle={isTeamScope && !isSplit ? styles.calendarStickyShell : undefined}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there

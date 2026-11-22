@@ -59,7 +59,6 @@ export function MonthDayCell({
           styles.dateHighlightCircle,
           day.isSelected && !day.isToday && styles.dateHighlightSelected,
           day.isSelected && day.isToday && styles.dateHighlightTodaySelected,
-          day.isToday && !day.isSelected && styles.dateHighlightToday,
           day.isCurrentMonth === false && styles.dateHighlightOutsideMonth,
         ]}
       >
