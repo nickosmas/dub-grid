@@ -104,12 +104,31 @@ export function WeekNavigatorHeader({
   const heading = getWeekHeading(range, todayDate, timeZone);
   const meta = [heading.dates, hoursLabel].filter(Boolean).join(" · ");
 
+  // The title and its line sit together in one column, so the buttons'
+  // height beside them never pushes the line away from the title.
   return (
     <View style={styles.meWeekHeader}>
-      <View style={styles.meWeekHeaderRow}>
+      <View style={styles.meWeekHeading}>
         <Text accessibilityRole="header" fit="fixed" style={styles.meWeekNavigatorTitle}>
           {heading.title}
         </Text>
+        <View style={styles.meWeekNavigatorRangeRow}>
+          {meta ? (
+            <Text fit="fixed" style={styles.meWeekNavigatorRangeLabel}>
+              {meta}
+            </Text>
+          ) : null}
+          {loading ? (
+            <ActivityIndicator
+              accessibilityLabel="Loading week"
+              color={mobileColors.textSecondary}
+              size="small"
+              testID="period-loading"
+            />
+          ) : null}
+        </View>
+      </View>
+      <View style={styles.meWeekHeaderActions}>
         {steps ? (
           <View style={styles.meWeekNavigatorActions}>
             <View style={styles.meWeekRangeControlGroup}>
@@ -127,23 +146,6 @@ export function WeekNavigatorHeader({
             <AlertsChromeButton unreadCount={unreadCount} />
           </View>
         ) : null}
-      </View>
-      <View style={styles.meWeekHeaderRow}>
-        <View style={styles.meWeekNavigatorRangeRow}>
-          {meta ? (
-            <Text fit="fixed" style={styles.meWeekNavigatorRangeLabel}>
-              {meta}
-            </Text>
-          ) : null}
-          {loading ? (
-            <ActivityIndicator
-              accessibilityLabel="Loading week"
-              color={mobileColors.textSecondary}
-              size="small"
-              testID="period-loading"
-            />
-          ) : null}
-        </View>
         {steps && !heading.isThisWeek ? (
           <Pressable
             accessibilityLabel="Today"

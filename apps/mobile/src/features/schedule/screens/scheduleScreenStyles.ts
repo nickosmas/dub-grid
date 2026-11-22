@@ -107,14 +107,19 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingTop: 0,
     },
     meWeekHeader: {
-      gap: mobileSpace.xs,
-    },
-    meWeekHeaderRow: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       justifyContent: "space-between",
       gap: mobileSpace.md,
-      minHeight: 32,
+    },
+    // The page's one headline and the line under it, set close.
+    meWeekHeading: {
+      flex: 1,
+      minWidth: 0,
+    },
+    meWeekHeaderActions: {
+      alignItems: "flex-end",
+      gap: mobileSpace.xs,
     },
     meWeekTodayButton: {
       minHeight: 32,
@@ -126,8 +131,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.brand,
     },
     meWeekNavigatorTitle: {
-      ...mobileText.screenTitle,
-      flexShrink: 1,
+      ...mobileText.display,
       color: mobileColors.textPrimary,
     },
     meWeekNavigatorRangeLabel: {
