@@ -111,6 +111,7 @@ import {
 } from "../lib/schedule";
 import {
   WEEK_SWIPE_FALLBACK_WIDTH,
+  formatScheduledHours,
   getCurrentTimeValue,
   getSegmentStartTime,
   getSegmentEndTime,
@@ -1345,9 +1346,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const meStickyHeader = !isTeamScope ? (
     <WeekNavigatorHeader
       controls={homeSplit.split === null}
-      now={now}
+      hoursLabel={formatScheduledHours(meWeeklyHours)}
       range={range}
-      selectedDate={selectedDate}
       timeZone={timeZone}
       todayDate={todayDate}
       unreadCount={unreadNotificationCount}
@@ -1717,7 +1717,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               onPressEntry={handleOpenShiftDetail}
               onPressDay={homeSplit.split ? homeSplit.pickDay : undefined}
               highlightedDate={homeSplit.highlightedDate}
-              summary={meWeeklyHours}
               todayDate={todayDate}
               weekDays={weekDays}
             />

@@ -106,26 +106,32 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       paddingTop: 0,
     },
-    meWeekNavigator: {
+    meWeekHeader: {
+      gap: mobileSpace.xs,
+    },
+    meWeekHeaderRow: {
       flexDirection: "row",
-      alignItems: "flex-start",
+      alignItems: "center",
       justifyContent: "space-between",
       gap: mobileSpace.md,
+      minHeight: 32,
     },
-    meWeekNavigatorCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 4,
+    meWeekTodayButton: {
+      minHeight: 32,
+      justifyContent: "center",
+      paddingHorizontal: mobileSpace.xs,
+    },
+    meWeekTodayText: {
+      ...mobileTextWeighted("body", "medium"),
+      color: mobileColors.brand,
     },
     meWeekNavigatorTitle: {
       ...mobileText.screenTitle,
+      flexShrink: 1,
       color: mobileColors.textPrimary,
     },
-    meWeekNavigatorRangeLabelNarrow: {
-      ...mobileText.meta,
-    },
     meWeekNavigatorRangeLabel: {
-      ...mobileText.bodyStrong,
+      ...mobileText.body,
       color: mobileColors.textSecondary,
     },
     meWeekNavigatorRangeRow: {

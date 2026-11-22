@@ -558,11 +558,12 @@ describe("AdminHomeScreen", () => {
       (24 * 60 * 60 * 1000);
     expect(new Date(`${thisWeek.startDate}T00:00:00Z`).getUTCDay()).toBe(0);
     expect(days(thisWeek.startDate, thisWeek.endDate)).toBe(6);
-    expect(screen.getByText(/^Today, /)).toBeInTheDocument();
+    expect(screen.getByText("This week")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Today" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Next week" }));
     expect(days(thisWeek.startDate, rangeNow().startDate)).toBe(7);
+    expect(screen.getByText("Next week")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
     fireEvent.click(screen.getByRole("button", { name: "Previous week" }));

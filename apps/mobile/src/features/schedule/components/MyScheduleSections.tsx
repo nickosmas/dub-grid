@@ -14,7 +14,7 @@ import { NumericBadge } from "../../../shared/components/NumericBadge";
 import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { CardActionRows } from "./CardActionRows";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ScheduleDateTile } from "./ScheduleDateTile";
+import { WeekDayLabel } from "./WeekDayLabel";
 import type {
   PendingRequestAction,
   RequestActionBody,
@@ -42,7 +42,6 @@ import {
   type AvailableShiftFeedItem,
   type FeaturedMeScheduleSegment,
   type MobileScheduleWeekDay,
-  type WeeklyHoursSummary,
 } from "../lib/schedule";
 import {
   HERO_CARD_BACKGROUND_DARK,
@@ -57,7 +56,6 @@ import {
   getSegmentStartTime,
   getSegmentEndTime,
   getHeroTiming,
-  formatHoursValue,
   type HeroTiming,
 } from "../lib/scheduleScreenHelpers";
 import {
@@ -962,7 +960,6 @@ export function UpcomingShiftsSection({
   onPressEntry,
   onPressDay,
   highlightedDate,
-  summary,
   todayDate,
   weekDays,
 }: {
@@ -972,7 +969,6 @@ export function UpcomingShiftsSection({
   onPressDay?: (date: string) => void;
   /** The day shown beside the list in a split view. */
   highlightedDate?: string | null;
-  summary: WeeklyHoursSummary | null;
   todayDate: string;
   weekDays: MobileScheduleWeekDay[];
 }) {
@@ -984,10 +980,6 @@ export function UpcomingShiftsSection({
     return null;
   }
 
-  const hoursLabel =
-    summary && summary.scheduledHours > 0
-      ? `${formatHoursValue(summary.scheduledHours)}h this week`
-      : null;
   const itemsByDate = new Map<string, Array<NonNullable<FeaturedMeScheduleSegment["item"]>>>();
   const deletedEntriesByDate = new Map<string, MobileScheduleEntry[]>();
   items.forEach((item) => {
@@ -1012,16 +1004,9 @@ export function UpcomingShiftsSection({
   }));
 
   return (
-    <View style={styles.upcomingSectionBlock}>
-      <View style={styles.upcomingSectionHeader}>
-        <Text style={styles.upcomingSectionTitle}>Your week</Text>
-        {hoursLabel ? (
-          <Text fit="compact" style={styles.upcomingHoursText}>
-            {hoursLabel}
-          </Text>
-        ) : null}
-      </View>
-
+    // No heading: Home's title already names the week, and its hours sit
+    // under that title.
+    <View accessibilityLabel="Your week" style={styles.upcomingSectionBlock}>
       <View style={styles.upcomingShiftsCard}>
         {groupedItems.map((group, groupIndex) => {
           const isToday = group.date === todayDate;
@@ -1041,8 +1026,9 @@ export function UpcomingShiftsSection({
             >
               {groupIndex > 0 ? <View style={styles.upcomingDaySeparator} /> : null}
               <View style={styles.upcomingDateColumn}>
-                <ScheduleDateTile
+                <WeekDayLabel
                   date={group.date}
+                  isPast={group.date < todayDate}
                   isToday={isToday}
                   todayTestID={`upcoming-today-date-${group.date}`}
                 />

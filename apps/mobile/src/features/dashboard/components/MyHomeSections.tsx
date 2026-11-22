@@ -6,7 +6,6 @@ import {
   buildMeShiftRequestSections,
   buildScheduleWeekDays,
   buildUpcomingMeScheduleItems,
-  buildWeeklyHoursSummary,
   getFeaturedMeScheduleSegment,
   getIsoDateInTimeZone,
   getScheduleEntryEndTime,
@@ -102,7 +101,6 @@ export function MyHomeSections({
     () => buildUpcomingMeScheduleItems({ entries, featuredItem: hero.item, selectedDate }),
     [entries, hero.item, selectedDate],
   );
-  const weeklyHours = useMemo(() => buildWeeklyHoursSummary(entries, 40), [entries]);
   const hasScheduledDay = entries.some((entry) => !isDeletedScheduleHistory(entry));
 
   const openShiftDetail = (entry: MobileScheduleEntry) => {
@@ -184,7 +182,6 @@ export function MyHomeSections({
       {hasScheduledDay ? (
         <UpcomingShiftsSection
           items={upcomingItems}
-          summary={weeklyHours}
           todayDate={todayDate}
           weekDays={weekDays}
           onPressEntry={openShiftDetail}

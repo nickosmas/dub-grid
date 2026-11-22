@@ -16,6 +16,7 @@ import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { isManagementOnly } from "../../auth/hooks/employmentStatus";
 import {
   addDaysToIsoDate,
+  buildWeeklyHoursSummary,
   getFeaturedMeScheduleSegment,
   getIsoDateInTimeZone,
   getScheduleRangeForDate,
@@ -37,7 +38,10 @@ import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { MonthCalendarPane } from "../../schedule/components/MonthCalendarPane";
 import { SideColumnAlertsBar } from "../../schedule/components/SideColumnAlertsBar";
 import { HomeSplitPane, useHomeSplit } from "../../schedule/components/HomeSplit";
-import { getCurrentTimeValue } from "../../schedule/lib/scheduleScreenHelpers";
+import {
+  formatScheduledHours,
+  getCurrentTimeValue,
+} from "../../schedule/lib/scheduleScreenHelpers";
 import { StaffHoursCard } from "../components/StaffHoursCard";
 
 type HomeView = "mine" | "team";
@@ -145,14 +149,14 @@ export function AdminHomeScreen() {
   // The web build keeps the login page's aurora in the period's coverage
   // colour behind everything; on device the page is the plain grouped gray.
   const { height: windowHeight } = useWindowDimensions();
+  const weeklyHours = useMemo(() => buildWeeklyHoursSummary(mine.entries, 40), [mine.entries]);
   const header = (
     <View style={styles.header}>
       <WeekNavigatorHeader
         controls={splitLayout === null}
         loading={isRefetching}
-        now={now}
+        hoursLabel={view === "mine" ? formatScheduledHours(weeklyHours) : null}
         range={range}
-        selectedDate={selectedDate}
         timeZone={timeZone}
         todayDate={todayDate}
         unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
