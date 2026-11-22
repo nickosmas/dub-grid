@@ -1572,7 +1572,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               }}
               style={styles.calendarDragHandleRow}
             >
-              <View style={styles.calendarDragHandleBar} />
+              <View style={styles.calendarDragHandleTrack}>
+                <View pointerEvents="none" style={styles.calendarDragHandleRule} />
+                <View style={styles.calendarDragHandleBar} />
+              </View>
             </View>
           </GestureDetector>
         )}

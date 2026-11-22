@@ -67,6 +67,9 @@ export const HEADER_CONTROL_HEIGHT = 44;
 // Fallback single-row height, used until the real row is measured. Matches
 // monthCalendarDaySlot's minHeight in styles below.
 export const WEEK_STRIP_ROW_HEIGHT = 50;
+const DRAG_HANDLE_BAR_WIDTH = 80;
+const DRAG_HANDLE_BAR_HEIGHT = 5;
+const DRAG_HANDLE_RULE_HEIGHT = 1;
 // Fixed size for the circular date highlight, shared by every week/month row.
 export const DATE_HIGHLIGHT_SIZE = 36;
 // The worked-day dot sits in its own space under the date circle, never on its
@@ -928,14 +931,29 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.xs,
     },
-    // Wider and lighter than a sheet's grabber, so it reads as the card's own
-    // handle rather than a divider (owner, 2026-11-02).
+    // The handle and the line through its middle that parts the calendar
+    // from the day's list: one light neutral gray, the line running the
+    // page's full width past its gutters (owner, 2026-11-21).
+    calendarDragHandleTrack: {
+      alignSelf: "stretch",
+      height: DRAG_HANDLE_BAR_HEIGHT,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    calendarDragHandleRule: {
+      position: "absolute",
+      left: -getScreenGutter(),
+      right: -getScreenGutter(),
+      top: (DRAG_HANDLE_BAR_HEIGHT - DRAG_HANDLE_RULE_HEIGHT) / 2,
+      height: DRAG_HANDLE_RULE_HEIGHT,
+      backgroundColor: mobileColors.controlNeutralBg,
+    },
+    // Wider than a sheet's grabber, so it reads as the calendar's own handle.
     calendarDragHandleBar: {
-      width: 48,
-      height: 5,
+      width: DRAG_HANDLE_BAR_WIDTH,
+      height: DRAG_HANDLE_BAR_HEIGHT,
       borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.textSubtle,
-      opacity: 0.35,
+      backgroundColor: mobileColors.controlNeutralBg,
     },
     weekSwipeRowClip: {
       overflow: "hidden",
