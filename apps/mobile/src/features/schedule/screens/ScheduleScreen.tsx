@@ -1962,6 +1962,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       <SplitView
         entering={foldEntering}
         layout={split}
+        sidebar
         stackWhenTall
         list={listScreen}
         detail={
