@@ -1817,6 +1817,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       // Split, the wash runs behind both panes, with the month floating on it.
       pageBackground={isSplit || homeSplit.split ? undefined : pageWash}
       stickyHeaderBackground={isSplit || homeSplit.split ? undefined : pageWash}
+      stickyHeaderShellStyle={isTeamScope && !isSplit ? styles.calendarStickyShell : undefined}
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
       // A skeleton is a placeholder, not content: it must not scroll, and there

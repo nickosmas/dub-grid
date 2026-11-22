@@ -929,7 +929,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       justifyContent: "center",
       paddingTop: mobileSpace.sm,
-      paddingBottom: mobileSpace.xs,
+    },
+    // The line through the handle already ends the header, so the header
+    // adds no space of its own under it; the page's own gap follows.
+    calendarStickyShell: {
+      paddingBottom: 0,
     },
     // The handle and the line through its middle that parts the calendar
     // from the day's list: one light neutral gray, the line running the
