@@ -152,9 +152,9 @@ export function WeekNavigatorHeader({
             accessibilityRole="button"
             hitSlop={8}
             onPress={onToday}
-            style={styles.meWeekTodayButton}
+            style={styles.todayTextButton}
           >
-            <Text fit="compact" style={styles.meWeekTodayText}>
+            <Text fit="compact" style={styles.todayText}>
               Today
             </Text>
           </Pressable>

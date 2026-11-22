@@ -67,6 +67,9 @@ export const HEADER_CONTROL_HEIGHT = 44;
 // Fallback single-row height, used until the real row is measured. Matches
 // monthCalendarDaySlot's minHeight in styles below.
 export const WEEK_STRIP_ROW_HEIGHT = 50;
+const DRAG_HANDLE_BAR_WIDTH = 80;
+const DRAG_HANDLE_BAR_HEIGHT = 5;
+const DRAG_HANDLE_RULE_HEIGHT = 1;
 // Fixed size for the circular date highlight, shared by every week/month row.
 export const DATE_HIGHLIGHT_SIZE = 36;
 // The worked-day dot sits in its own space under the date circle, never on its
@@ -121,12 +124,14 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "flex-end",
       gap: mobileSpace.xs,
     },
-    meWeekTodayButton: {
+    // Today as Calendar writes it: a word in the brand color, shown only
+    // while the page is away from today. Home and the Schedule tab share it.
+    todayTextButton: {
       minHeight: 32,
       justifyContent: "center",
       paddingHorizontal: mobileSpace.xs,
     },
-    meWeekTodayText: {
+    todayText: {
       ...mobileTextWeighted("body", "medium"),
       color: mobileColors.brand,
     },
@@ -876,11 +881,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       flex: 1,
       minWidth: 0,
     },
-    // `screenTitle`, not `display`: this title shares its row with the Today
-    // button and the alerts bell, and at 28pt "Tomorrow, Sep 18" truncated to
-    // "Tomorrow, Se…" the moment the Today button appeared.
+    // The month, as large as Home's week title. It names only the month, so
+    // it fits beside Today and the bell at this size.
     teamHeaderTitle: {
-      ...mobileText.screenTitle,
+      ...mobileText.display,
       color: mobileColors.textPrimary,
       textAlign: "left",
       flexShrink: 1,
@@ -903,14 +907,9 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     calendarPlain: {
       paddingTop: mobileSpace.sm,
     },
-    calendarCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.borderSubtle,
-      paddingHorizontal: mobileSpace.sm,
-      paddingTop: mobileSpace.sm,
-      ...mobileElevation("card", isDark),
+    // The calendar sits on the page itself, as Calendar's does: no card.
+    calendarFlat: {
+      paddingTop: mobileSpace.xs,
     },
 
     dateScheduledDot: {
@@ -922,7 +921,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.textSubtle,
     },
     dateScheduledDotSelected: {
-      backgroundColor: mobileColors.brand,
+      backgroundColor: mobileColors.textPrimary,
     },
     // The dates' own slot already ends in the dot's space, so the handle
     // follows the last row with only its own breathing room.
@@ -930,16 +929,35 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       alignItems: "center",
       justifyContent: "center",
       paddingTop: mobileSpace.sm,
-      paddingBottom: mobileSpace.xs,
     },
-    // Wider and lighter than a sheet's grabber, so it reads as the card's own
-    // handle rather than a divider (owner, 2026-11-02).
+    // The line through the handle already ends the header, so the header
+    // adds no space of its own under it; the page's own gap follows.
+    calendarStickyShell: {
+      paddingBottom: 0,
+    },
+    // The handle and the line through its middle that parts the calendar
+    // from the day's list: one light neutral gray, the line running the
+    // page's full width past its gutters (owner, 2026-11-21).
+    calendarDragHandleTrack: {
+      alignSelf: "stretch",
+      height: DRAG_HANDLE_BAR_HEIGHT,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    calendarDragHandleRule: {
+      position: "absolute",
+      left: -getScreenGutter(),
+      right: -getScreenGutter(),
+      top: (DRAG_HANDLE_BAR_HEIGHT - DRAG_HANDLE_RULE_HEIGHT) / 2,
+      height: DRAG_HANDLE_RULE_HEIGHT,
+      backgroundColor: mobileColors.controlNeutralBg,
+    },
+    // Wider than a sheet's grabber, so it reads as the calendar's own handle.
     calendarDragHandleBar: {
-      width: 48,
-      height: 5,
+      width: DRAG_HANDLE_BAR_WIDTH,
+      height: DRAG_HANDLE_BAR_HEIGHT,
       borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.textSubtle,
-      opacity: 0.35,
+      backgroundColor: mobileColors.controlNeutralBg,
     },
     weekSwipeRowClip: {
       overflow: "hidden",
@@ -1004,19 +1022,15 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       justifyContent: "center",
       backgroundColor: "transparent",
     },
+    // As Calendar marks them (owner, 2026-11-21): the chosen day a dark
+    // circle, today's date in the brand color, filled once it is also chosen.
     dateHighlightSelected: {
-      backgroundColor: mobileColors.brand,
-      borderColor: mobileColors.brand,
+      backgroundColor: mobileColors.textPrimary,
+      borderColor: mobileColors.textPrimary,
     },
-    // Today is the brand colour, not red (owner, 2026-11-01): a soft tint on
-    // its own, filled once it is also the selected day.
     dateHighlightTodaySelected: {
       backgroundColor: mobileColors.brand,
       borderColor: mobileColors.brand,
-    },
-    dateHighlightToday: {
-      backgroundColor: mobileColors.controlSecondaryBg,
-      borderColor: mobileColors.controlSecondaryBg,
     },
     dateHighlightOutsideMonth: {
       opacity: 0.4,
@@ -1029,7 +1043,7 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     dateHighlightTextSelected: {
       ...mobileTextWeighted("rowTitle", "semibold"),
-      color: mobileColors.textInverse,
+      color: mobileColors.surface,
     },
     dateHighlightTextToday: {
       ...mobileTextWeighted("rowTitle", "semibold"),
