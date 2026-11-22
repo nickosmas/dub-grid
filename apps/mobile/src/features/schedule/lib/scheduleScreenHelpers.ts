@@ -1,5 +1,6 @@
 import type { GestureResponderEvent } from "react-native";
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
+import type { WeeklyHoursSummary } from "@dubgrid/schedule-core";
 
 export const WEEK_SWIPE_FALLBACK_WIDTH = 360;
 export const WEEK_SWIPE_MIN_THRESHOLD = 96;
@@ -215,6 +216,13 @@ export function getHeroTiming(
 
 export function formatHoursValue(value: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+}
+
+/** The week's hours as Home's header puts them, "32h scheduled", or null with none. */
+export function formatScheduledHours(summary: WeeklyHoursSummary | null): string | null {
+  return summary && summary.scheduledHours > 0
+    ? `${formatHoursValue(summary.scheduledHours)}h scheduled`
+    : null;
 }
 
 export function getSwipeEventX(event: GestureResponderEvent): number | null {
