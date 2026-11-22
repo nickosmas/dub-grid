@@ -19,6 +19,7 @@ import {
 } from "@dubgrid/schedule-core";
 import { FitText } from "../../../shared/components/FitText";
 import { Text } from "../../../shared/components/Text";
+import { getScreenGutter } from "../../../shared/components/screen-layout";
 import { getMySchedule } from "../../../shared/lib/api";
 import { mobileQueryKeys } from "../../../shared/lib/mobile-query-keys";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -113,7 +114,10 @@ export function HomeMonthGrid({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  // Edge to edge, clear of the side column, as Calendar's month runs.
+  // The hairlines run edge to edge, as Calendar's do; the days stand in at
+  // the page's gutter, under the title.
+  const gutter = getScreenGutter();
+  const inset = { paddingLeft: gutter - mobileSpace.xs, paddingRight: gutter - mobileSpace.xs };
   const insets = useSafeAreaInsets();
 
   const todayMonth = getScheduleMonthStartDate(todayDate);
@@ -201,7 +205,7 @@ export function HomeMonthGrid({
         },
       ]}
     >
-      <View style={styles.weekdayRow}>
+      <View style={[styles.weekdayRow, inset]}>
         {WEEKDAY_LABELS.map((label, index) => (
           <Text
             key={index}
@@ -232,7 +236,7 @@ export function HomeMonthGrid({
               rowOffsets.current.set(start, event.nativeEvent.layout.y);
               if (weekIndex === weeks.length - 1 && !laidOut) setLaidOut(true);
             }}
-            style={[styles.week, weekIndex > 0 && styles.weekDivider]}
+            style={[styles.week, inset, weekIndex > 0 && styles.weekDivider]}
           >
             {[0, 1, 2, 3, 4, 5, 6].map((offset) => {
               const date = addDaysToIsoDate(start, offset);
