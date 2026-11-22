@@ -3,13 +3,11 @@ import { ActivityIndicator, View, type StyleProp, type TextStyle } from "react-n
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import type { MobileScheduleRange } from "@dubgrid/contracts";
-import { formatScheduleDayLabel, formatScheduleRange } from "@dubgrid/schedule-core";
 import { NumericBadge } from "../../../shared/components/NumericBadge";
 import { ChromeIconButton } from "../../../shared/components/ChromeIconButton";
 import { Text } from "../../../shared/components/Text";
-import { compactSameMonthRange } from "../lib/week-range-label";
-import { NARROW_LIST_MAX_WIDTH } from "../../../shared/layout/split-layout";
-import { useSplitLayout } from "../../../shared/layout/SplitView";
+import { getWeekHeading } from "../lib/week-range-label";
+import { Pressable } from "../../../shared/components/Pressable";
 import { useHasSideColumn } from "../../../shared/navigation/useHasSideColumn";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { createStyles } from "../screens/scheduleScreenStyles";
@@ -67,17 +65,17 @@ export function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
 }
 
 /**
- * Home's header on both homes: the chosen day, its week, the week stepper and
- * the alerts bell. `loading` puts the system's small spinner beside the week
+ * Home's header on both homes: the week's name and the week stepper beside
+ * the alerts bell, then the week's dates and hours, with Today once the week
+ * is not this one. `loading` puts the system's small spinner beside the dates
  * while another week loads, with the page left as it was underneath.
  */
 export function WeekNavigatorHeader({
   loading = false,
-  selectedDate,
   todayDate,
   range,
-  now,
   timeZone,
+  hoursLabel = null,
   unreadCount,
   onPreviousWeek,
   onNextWeek,
@@ -87,11 +85,11 @@ export function WeekNavigatorHeader({
   /** Off beside a split's month, which steps the weeks, and whose bar holds the bell. */
   controls?: boolean;
   loading?: boolean;
-  selectedDate: string;
   todayDate: string;
   range: MobileScheduleRange;
-  now: Date;
   timeZone?: string | null;
+  /** The week's scheduled hours, "32h scheduled", when there are any. */
+  hoursLabel?: string | null;
   unreadCount: number;
   onPreviousWeek: () => void;
   onNextWeek: () => void;
@@ -100,40 +98,26 @@ export function WeekNavigatorHeader({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
-  // The Today control's arrow points the way today lies: back from a future
-  // week, forward from a past one. Ionicons only draws the clockwise arrow,
-  // which reads as forward, so the backward one is that glyph mirrored.
-  const todayIconStyle = selectedDate > todayDate ? styles.iconControlMirrored : undefined;
-  // In a narrow pane of an iPhone Duo held tall, three controls leave the
-  // date too little room for one line, so it wraps rather than truncating.
-  // Month pages stack when tall, and then every pane is the screen's width.
-  const split = useSplitLayout();
+  // On an iPhone Duo the arrows, Today and the bell stand in the side column.
   const sideColumn = useHasSideColumn();
-  const wraps = split !== null && !split.tall && split.listWidth < NARROW_LIST_MAX_WIDTH;
-  const titleFit = wraps
-    ? ({ allowFontScaling: false, numberOfLines: 2 } as const)
-    : ({ fit: "fixed" } as const);
+  const steps = controls && !sideColumn;
+  const heading = getWeekHeading(range, todayDate, timeZone);
+  const meta = [heading.dates, hoursLabel].filter(Boolean).join(" · ");
 
+  // The title and its line sit together in one column, so the buttons'
+  // height beside them never pushes the line away from the title.
   return (
-    <View style={styles.meWeekNavigator}>
-      <View style={styles.meWeekNavigatorCopy}>
-        {/* Both shrink rather than wrap or truncate: a header is one row,
-            and a date is bounded text that fits at the default size. */}
-        <Text {...titleFit} style={styles.meWeekNavigatorTitle}>
-          {formatScheduleDayLabel(selectedDate, now, timeZone)}
+    <View style={styles.meWeekHeader}>
+      <View style={styles.meWeekHeading}>
+        <Text accessibilityRole="header" fit="fixed" style={styles.meWeekNavigatorTitle}>
+          {heading.title}
         </Text>
         <View style={styles.meWeekNavigatorRangeRow}>
-          <Text
-            fit="fixed"
-            style={[
-              styles.meWeekNavigatorRangeLabel,
-              wraps && styles.meWeekNavigatorRangeLabelNarrow,
-            ]}
-          >
-            {wraps
-              ? compactSameMonthRange(formatScheduleRange(range, timeZone))
-              : formatScheduleRange(range, timeZone)}
-          </Text>
+          {meta ? (
+            <Text fit="fixed" style={styles.meWeekNavigatorRangeLabel}>
+              {meta}
+            </Text>
+          ) : null}
           {loading ? (
             <ActivityIndicator
               accessibilityLabel="Loading week"
@@ -144,36 +128,38 @@ export function WeekNavigatorHeader({
           ) : null}
         </View>
       </View>
-      {controls ? (
-        <View style={styles.meWeekNavigatorActions}>
-          <View style={styles.meWeekRangeControlGroup}>
-            <IconControlButton
-              accessibilityLabel="Previous week"
-              iconName="chevron-back"
-              onPress={onPreviousWeek}
-            />
-            <IconControlButton
-              accessibilityLabel="Next week"
-              iconName="chevron-forward"
-              onPress={onNextWeek}
-            />
+      <View style={styles.meWeekHeaderActions}>
+        {steps ? (
+          <View style={styles.meWeekNavigatorActions}>
+            <View style={styles.meWeekRangeControlGroup}>
+              <IconControlButton
+                accessibilityLabel="Previous week"
+                iconName="chevron-back"
+                onPress={onPreviousWeek}
+              />
+              <IconControlButton
+                accessibilityLabel="Next week"
+                iconName="chevron-forward"
+                onPress={onNextWeek}
+              />
+            </View>
+            <AlertsChromeButton unreadCount={unreadCount} />
           </View>
-          {/* Icon-only, like the chevrons beside it: with the word "Today" this
-            row held five controls and the date title was cut to "Sat, Sep…"
-            on any week but the current one. A circular arrow, "return to
-            today"; a calendar glyph read as a date picker. */}
-          {selectedDate !== todayDate ? (
-            <IconControlButton
-              accessibilityLabel="Today"
-              iconName="refresh-outline"
-              iconStyle={todayIconStyle}
-              onPress={onToday}
-            />
-          ) : null}
-          {/* On an iPhone Duo the bell stands in the side column instead. */}
-          {sideColumn ? null : <AlertsChromeButton unreadCount={unreadCount} />}
-        </View>
-      ) : null}
+        ) : null}
+        {steps && !heading.isThisWeek ? (
+          <Pressable
+            accessibilityLabel="Today"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onToday}
+            style={styles.meWeekTodayButton}
+          >
+            <Text fit="compact" style={styles.meWeekTodayText}>
+              Today
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }

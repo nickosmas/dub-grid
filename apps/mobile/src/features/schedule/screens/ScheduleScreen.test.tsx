@@ -589,8 +589,10 @@ describe("ScheduleScreen", () => {
       openShiftCarouselText.indexOf("Skilled Nursing"),
     );
 
-    expect(screen.getByText("Your week")).toBeInTheDocument();
-    expect(screen.getByText("24h this week")).toBeInTheDocument();
+    // No "Your week" heading: the header names the week, with its dates and hours.
+    expect(screen.getByLabelText("Your week")).toBeInTheDocument();
+    expect(screen.getByText("This week")).toBeInTheDocument();
+    expect(screen.getByText(/· 24h scheduled$/)).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-date-2026-04-16")).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-row-2026-04-16")).toBeInTheDocument();
     expect(screen.getByText("FRI")).toBeInTheDocument();

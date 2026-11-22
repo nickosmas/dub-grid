@@ -165,8 +165,9 @@ describe("MyHomeSections", () => {
       />,
     );
 
-    expect(screen.getByText("Your week")).toBeInTheDocument();
-    expect(screen.getByText("16h this week")).toBeInTheDocument();
+    // The week is the list itself, with no heading; its hours sit in Home's header.
+    expect(screen.getByLabelText("Your week")).toBeInTheDocument();
+    expect(screen.queryByText("Your week")).not.toBeInTheDocument();
     // Seven days: two with a shift, five Unscheduled.
     expect(screen.getAllByText("Unscheduled")).toHaveLength(5);
     expect(screen.queryByText("Needs your response")).not.toBeInTheDocument();

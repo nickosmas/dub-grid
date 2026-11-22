@@ -16,6 +16,7 @@ import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { isManagementOnly } from "../../auth/hooks/employmentStatus";
 import {
   addDaysToIsoDate,
+  buildWeeklyHoursSummary,
   getFeaturedMeScheduleSegment,
   getIsoDateInTimeZone,
   getScheduleRangeForDate,
@@ -36,8 +37,12 @@ import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { MonthCalendarPane } from "../../schedule/components/MonthCalendarPane";
 import { SideColumnAlertsBar } from "../../schedule/components/SideColumnAlertsBar";
+import { getWeekHeading } from "../../schedule/lib/week-range-label";
 import { HomeSplitPane, useHomeSplit } from "../../schedule/components/HomeSplit";
-import { getCurrentTimeValue } from "../../schedule/lib/scheduleScreenHelpers";
+import {
+  formatScheduledHours,
+  getCurrentTimeValue,
+} from "../../schedule/lib/scheduleScreenHelpers";
 import { StaffHoursCard } from "../components/StaffHoursCard";
 
 type HomeView = "mine" | "team";
@@ -145,14 +150,14 @@ export function AdminHomeScreen() {
   // The web build keeps the login page's aurora in the period's coverage
   // colour behind everything; on device the page is the plain grouped gray.
   const { height: windowHeight } = useWindowDimensions();
+  const weeklyHours = useMemo(() => buildWeeklyHoursSummary(mine.entries, 40), [mine.entries]);
   const header = (
     <View style={styles.header}>
       <WeekNavigatorHeader
         controls={splitLayout === null}
         loading={isRefetching}
-        now={now}
+        hoursLabel={view === "mine" ? formatScheduledHours(weeklyHours) : null}
         range={range}
-        selectedDate={selectedDate}
         timeZone={timeZone}
         todayDate={todayDate}
         unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
@@ -326,9 +331,24 @@ export function AdminHomeScreen() {
     </Screen>
   );
 
+  // On an iPhone Duo the bell, the week's arrows and Today stand in the side
+  // column; beside a split's month the month steps the weeks.
   const alertsBar = (
     <SideColumnAlertsBar
       shown={sideColumn}
+      stepper={
+        sideColumn && !splitLayout
+          ? {
+              previousLabel: "Previous week",
+              nextLabel: "Next week",
+              onPrevious: () => setSelectedDateOverride(addDaysToIsoDate(selectedDate, -7)),
+              onNext: () => setSelectedDateOverride(addDaysToIsoDate(selectedDate, 7)),
+              onToday: getWeekHeading(range, todayDate, timeZone).isThisWeek
+                ? null
+                : () => setSelectedDateOverride(null),
+            }
+          : undefined
+      }
       unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
     />
   );

@@ -111,6 +111,7 @@ import {
 } from "../lib/schedule";
 import {
   WEEK_SWIPE_FALLBACK_WIDTH,
+  formatScheduledHours,
   getCurrentTimeValue,
   getSegmentStartTime,
   getSegmentEndTime,
@@ -135,7 +136,8 @@ import {
 import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./scheduleScreenStyles";
 import { MonthDayCell } from "../components/MonthDayCell";
-import { SideColumnAlertsBar } from "../components/SideColumnAlertsBar";
+import { SideColumnAlertsBar, type SideColumnStepper } from "../components/SideColumnAlertsBar";
+import { getWeekHeading } from "../lib/week-range-label";
 import { MonthCalendarPane } from "../components/MonthCalendarPane";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -1345,9 +1347,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const meStickyHeader = !isTeamScope ? (
     <WeekNavigatorHeader
       controls={homeSplit.split === null}
-      now={now}
+      hoursLabel={formatScheduledHours(meWeeklyHours)}
       range={range}
-      selectedDate={selectedDate}
       timeZone={timeZone}
       todayDate={todayDate}
       unreadCount={unreadNotificationCount}
@@ -1441,7 +1442,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         </View>
         <View style={styles.teamHeaderActions}>
           {/* Split, the month steps with chevrons too, as Home's does. */}
-          {isSplit ? (
+          {isSplit && !sideColumn ? (
             <>
               <IconControlButton
                 accessibilityLabel="Previous month"
@@ -1456,7 +1457,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             </>
           ) : null}
           {/* The same control as Home's, so the two headers read as one set. */}
-          {!isSelectedToday ? (
+          {!isSelectedToday && !sideColumn ? (
             <IconControlButton
               accessibilityLabel="Today"
               iconName="refresh-outline"
@@ -1717,7 +1718,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               onPressEntry={handleOpenShiftDetail}
               onPressDay={homeSplit.split ? homeSplit.pickDay : undefined}
               highlightedDate={homeSplit.highlightedDate}
-              summary={meWeeklyHours}
               todayDate={todayDate}
               weekDays={weekDays}
             />
@@ -1822,9 +1822,32 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     </Screen>
   );
 
-  // Either page's bell stands in the side column while it is split.
+  // On an iPhone Duo the bell, the arrows and Today stand in the side column.
+  const sideColumnStepper: SideColumnStepper | undefined = !sideColumn
+    ? undefined
+    : isTeamScope
+      ? {
+          previousLabel: "Previous month",
+          nextLabel: "Next month",
+          onPrevious: isSplit ? () => stepSplitMonth(-1) : null,
+          onNext: isSplit ? () => stepSplitMonth(1) : null,
+          onToday: isSelectedToday ? null : handleGoToToday,
+        }
+      : homeSplit.split
+        ? undefined
+        : {
+            previousLabel: "Previous week",
+            nextLabel: "Next week",
+            onPrevious: handlePreviousWeek,
+            onNext: handleNextWeek,
+            onToday: getWeekHeading(range, todayDate, timeZone).isThisWeek ? null : handleGoToToday,
+          };
   const sideColumnBar = (
-    <SideColumnAlertsBar shown={sideColumn} unreadCount={unreadNotificationCount} />
+    <SideColumnAlertsBar
+      shown={sideColumn}
+      stepper={sideColumnStepper}
+      unreadCount={unreadNotificationCount}
+    />
   );
 
   // Open on the iPhone Duo, Home sits beside the month, as in Calendar; a
