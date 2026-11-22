@@ -37,6 +37,7 @@ import { ActivityFeedCard } from "../components/ActivityFeedCard";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { MonthCalendarPane } from "../../schedule/components/MonthCalendarPane";
 import { SideColumnAlertsBar } from "../../schedule/components/SideColumnAlertsBar";
+import { getWeekHeading } from "../../schedule/lib/week-range-label";
 import { HomeSplitPane, useHomeSplit } from "../../schedule/components/HomeSplit";
 import {
   formatScheduledHours,
@@ -330,9 +331,24 @@ export function AdminHomeScreen() {
     </Screen>
   );
 
+  // On an iPhone Duo the bell, the week's arrows and Today stand in the side
+  // column; beside a split's month the month steps the weeks.
   const alertsBar = (
     <SideColumnAlertsBar
       shown={sideColumn}
+      stepper={
+        sideColumn && !splitLayout
+          ? {
+              previousLabel: "Previous week",
+              nextLabel: "Next week",
+              onPrevious: () => setSelectedDateOverride(addDaysToIsoDate(selectedDate, -7)),
+              onNext: () => setSelectedDateOverride(addDaysToIsoDate(selectedDate, 7)),
+              onToday: getWeekHeading(range, todayDate, timeZone).isThisWeek
+                ? null
+                : () => setSelectedDateOverride(null),
+            }
+          : undefined
+      }
       unreadCount={bootstrapQuery.data?.unreadNotificationCount ?? 0}
     />
   );

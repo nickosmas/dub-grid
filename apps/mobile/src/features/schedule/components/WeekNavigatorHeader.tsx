@@ -98,7 +98,9 @@ export function WeekNavigatorHeader({
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  // On an iPhone Duo the arrows, Today and the bell stand in the side column.
   const sideColumn = useHasSideColumn();
+  const steps = controls && !sideColumn;
   const heading = getWeekHeading(range, todayDate, timeZone);
   const meta = [heading.dates, hoursLabel].filter(Boolean).join(" · ");
 
@@ -108,7 +110,7 @@ export function WeekNavigatorHeader({
         <Text accessibilityRole="header" fit="fixed" style={styles.meWeekNavigatorTitle}>
           {heading.title}
         </Text>
-        {controls ? (
+        {steps ? (
           <View style={styles.meWeekNavigatorActions}>
             <View style={styles.meWeekRangeControlGroup}>
               <IconControlButton
@@ -122,8 +124,7 @@ export function WeekNavigatorHeader({
                 onPress={onNextWeek}
               />
             </View>
-            {/* On an iPhone Duo the bell stands in the side column instead. */}
-            {sideColumn ? null : <AlertsChromeButton unreadCount={unreadCount} />}
+            <AlertsChromeButton unreadCount={unreadCount} />
           </View>
         ) : null}
       </View>
@@ -143,7 +144,7 @@ export function WeekNavigatorHeader({
             />
           ) : null}
         </View>
-        {controls && !heading.isThisWeek ? (
+        {steps && !heading.isThisWeek ? (
           <Pressable
             accessibilityLabel="Today"
             accessibilityRole="button"
