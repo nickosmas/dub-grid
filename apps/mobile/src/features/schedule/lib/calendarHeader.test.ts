@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { MobileScheduleEntry } from "@dubgrid/contracts";
-import { formatCalendarMonthTitle, getCalendarDotRanges, getScheduledDates } from "./schedule";
+import { getCalendarDotRanges, getCalendarMonthTitleParts, getScheduledDates } from "./schedule";
 
-describe("formatCalendarMonthTitle", () => {
-  it("leaves the year off in the current year", () => {
-    expect(formatCalendarMonthTitle("2026-11-01", "2026-11-02")).toBe("November");
-  });
-
-  it("spells the year out in any other year", () => {
-    expect(formatCalendarMonthTitle("2027-01-01", "2026-11-02")).toBe("January 2027");
-    expect(formatCalendarMonthTitle("2025-12-01", "2026-01-05")).toBe("December 2025");
+describe("getCalendarMonthTitleParts", () => {
+  it("names the month and always its year", () => {
+    expect(getCalendarMonthTitleParts("2026-11-01")).toEqual({ month: "November", year: "2026" });
+    expect(getCalendarMonthTitleParts("2027-01-01")).toEqual({ month: "January", year: "2027" });
   });
 });
 

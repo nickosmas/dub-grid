@@ -29,15 +29,22 @@ vi.mock("react-native-svg", () => {
   const Svg = ({
     children,
     height,
+    viewBox,
     width,
   }: {
     children?: ReactNode;
-    height?: number;
-    width?: number;
+    height?: number | string;
+    viewBox?: string;
+    width?: number | string;
   }) =>
     createElement(
       "svg",
-      { "data-height": height, "data-testid": "svg", "data-width": width },
+      {
+        "data-height": height,
+        "data-testid": "svg",
+        "data-view-box": viewBox,
+        "data-width": width,
+      },
       children,
     );
   return {
@@ -65,15 +72,17 @@ describe("HeroCardBackdrop", () => {
     expect(screen.queryByTestId("svg")).toBeNull();
   });
 
-  it("redraws at the new size when the card grows", () => {
+  it("fills the card and redraws at the new size when the card grows", () => {
     render(createElement(HeroCardBackdrop, { isDark: false }));
     layOut(358, 300);
-    expect(screen.getByTestId("svg")).toHaveAttribute("data-height", "300");
+    const first = screen.getByTestId("svg");
+    // Stretched to the card's live size, so a growing card never shows past it.
+    expect(first).toHaveAttribute("data-width", "100%");
+    expect(first).toHaveAttribute("data-height", "100%");
+    expect(first).toHaveAttribute("data-view-box", "0 0 358 300");
 
     // The Working with block arrives after the first layout and the card grows.
     layOut(358, 412);
-    const svg = screen.getByTestId("svg");
-    expect(svg).toHaveAttribute("data-height", "412");
-    expect(svg).toHaveAttribute("data-width", "358");
+    expect(screen.getByTestId("svg")).toHaveAttribute("data-view-box", "0 0 358 412");
   });
 });

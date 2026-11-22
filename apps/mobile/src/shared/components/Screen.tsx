@@ -3,6 +3,7 @@ import {
   useDetailBarClearance,
   useInDetailPane,
   usePaneTopInset,
+  useHeaderAbovePanes,
 } from "../layout/DetailPaneContext";
 import {
   useCallback,
@@ -292,9 +293,11 @@ export function Screen<T = never>({
   // A detail pane opens on its title, which centres on the camera like the
   // list's top row beside it.
   const barClearance = useDetailBarClearance();
+  const headerAbovePanes = useHeaderAbovePanes();
   // Under a native bar the pane's page starts below it and scrolls up under it.
-  const paneTopPadding =
-    barClearance > 0
+  const paneTopPadding = headerAbovePanes
+    ? 0
+    : barClearance > 0
       ? // Clear of the soft edge iOS fades below the bar's own height.
         barClearance + mobileSpace.xl
       : Math.max(insets.top, 8) + getSideColumnTopOffset(windowInsets, PANE_TITLE_ROW_CENTRE);

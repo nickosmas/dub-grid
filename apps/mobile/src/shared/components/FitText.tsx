@@ -53,6 +53,8 @@ type FitTextProps = Omit<TextProps, "style" | "numberOfLines" | "children"> & {
   style?: StyleProp<TextStyle>;
   /** The enclosing control's width; growth past the width at the last shrink re-measures. */
   containerWidth?: number;
+  /** Where the label sits in a wider slot: centred, as on a button, or at the start, as a line of a card. */
+  align?: "center" | "start";
 };
 
 export function FitText(props: FitTextProps) {
@@ -64,7 +66,7 @@ export function FitText(props: FitTextProps) {
   return <FittedText key={`${props.children}|${readFontSize(props.style) ?? ""}`} {...props} />;
 }
 
-function FittedText({ style, containerWidth, children, ...props }: FitTextProps) {
+function FittedText({ style, containerWidth, align, children, ...props }: FitTextProps) {
   const [scale, setScale] = useState(1);
   const naturalWidth = useRef<number | null>(null);
   const slotWidth = useRef<number | null>(null);
@@ -131,7 +133,7 @@ function FittedText({ style, containerWidth, children, ...props }: FitTextProps)
       : null;
 
   return (
-    <View onLayout={onSlotLayout} style={styles.slot}>
+    <View onLayout={onSlotLayout} style={[styles.slot, align === "start" && styles.slotStart]}>
       <Text {...props} fit={props.fit ?? "compact"} style={[style, scaledStyle]}>
         {children}
       </Text>
@@ -155,6 +157,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
     alignItems: "center",
+  },
+  slotStart: {
+    alignItems: "flex-start",
   },
   // Wide enough that the copy inside never truncates, invisible, and out of
   // the slot's own layout so it cannot hold the slot open.

@@ -28,7 +28,7 @@ const PRESSABLE_INSET = mobileSpace.sm;
 
 /** A rounded press highlight that reaches past the content on both sides. */
 /** How far a picked day's pill stands in from the card's edges, as a picked row's does. */
-const UPCOMING_PICK_INSET = 6;
+const UPCOMING_SPLIT_ROW_RADIUS = 14;
 
 const pressableBleed = {
   borderRadius: mobileRadii.control,
@@ -484,13 +484,60 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       marginHorizontal: -20,
       paddingHorizontal: 20,
     },
-    // The day beside Home's list on an open iPhone Duo: a picked row's gray
-    // pill, standing in from the card's edges.
+    // Home's week beside the day on an open iPhone Duo: compact rows, the
+    // picked day a gray row of its own inside the card's padding.
     upcomingDateGroupPicked: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
       backgroundColor: mobileColors.selectedRowBg,
-      borderRadius: mobileRadii.card - UPCOMING_PICK_INSET,
-      marginHorizontal: -20 + UPCOMING_PICK_INSET,
-      paddingHorizontal: 20 - UPCOMING_PICK_INSET,
+      borderRadius: UPCOMING_SPLIT_ROW_RADIUS,
+      borderCurve: "continuous",
+    },
+    upcomingShiftsCardSplit: {
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.xs,
+    },
+    upcomingDateGroupSplit: {
+      alignItems: "center",
+      marginHorizontal: 0,
+      paddingHorizontal: mobileSpace.sm,
+      paddingVertical: mobileSpace.md,
+    },
+    upcomingDateColumnSplit: {
+      minWidth: 44,
+      paddingVertical: 0,
+    },
+    upcomingUnscheduledRowSplit: {
+      minHeight: 0,
+      paddingVertical: 0,
+    },
+    upcomingShiftRowSplit: {
+      minHeight: 0,
+      marginVertical: 0,
+      marginLeft: 0,
+      marginRight: 0,
+      paddingHorizontal: 0,
+      paddingVertical: mobileSpace.xs,
+    },
+    // Calendar's hairlines on the open iPhone Duo's month: under the weekdays
+    // and between weeks, the days' width.
+    calendarLineUnder: {
+      borderBottomWidth: 1,
+      borderBottomColor: mobileColors.border,
+    },
+    calendarLineOver: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.border,
+    },
+    upcomingShiftCopySplit: {
+      gap: mobileSpace.xs,
+    },
+    upcomingDaySeparatorSplit: {
+      left: mobileSpace.sm,
+      right: mobileSpace.sm,
     },
     upcomingDateColumn: {
       // minWidth, not width: at a raised OS text size the weekday and day
@@ -934,6 +981,10 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // adds no space of its own under it; the page's own gap follows.
     calendarStickyShell: {
       paddingBottom: 0,
+    },
+    // Room for Home's Month on the open iPhone Duo, which insets itself.
+    homeMonth: {
+      flex: 1,
     },
     // The handle, then the line under it that parts the calendar from the
     // day's list: one light neutral gray, the line running the page's full

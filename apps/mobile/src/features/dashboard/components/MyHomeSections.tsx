@@ -46,7 +46,7 @@ export function MyHomeSections({
   range: MobileScheduleRange;
   /** The header stepper's day; the hero reads the week from it, as on the staff Home. */
   selectedDate: string;
-  /** Set in a split view: a tapped shift or day shows beside the list instead of opening. */
+  /** Set in a split view: a tapped day shows beside the list, which then needs no hero card. */
   split?: {
     pickShift: (entry: MobileScheduleEntry) => void;
     pickDay: (date: string) => void;
@@ -130,17 +130,19 @@ export function MyHomeSections({
 
   return (
     <View style={styles.sections}>
-      <MeHeroCard
-        currentDate={todayDate}
-        currentTime={currentTime}
-        featuredItem={hero.item}
-        hasWeekItems={hasScheduledDay}
-        shiftmates={shiftmates}
-        weekDays={weekDays}
-        status={hero.status}
-        timing={heroTiming}
-        onPress={hero.item ? () => openShiftDetail(hero.item!.entry) : undefined}
-      />
+      {split ? null : (
+        <MeHeroCard
+          currentDate={todayDate}
+          currentTime={currentTime}
+          featuredItem={hero.item}
+          hasWeekItems={hasScheduledDay}
+          shiftmates={shiftmates}
+          weekDays={weekDays}
+          status={hero.status}
+          timing={heroTiming}
+          onPress={hero.item ? () => openShiftDetail(hero.item!.entry) : undefined}
+        />
+      )}
       <ShiftCoverRequestsSection
         linkedEmployeeId={linkedEmployeeId}
         pendingAction={data.pendingAction}
@@ -179,7 +181,7 @@ export function MyHomeSections({
       />
       {/* A week with nothing in it is the empty state above alone, not that
           and seven Unscheduled days, as the Schedule tab already does. */}
-      {hasScheduledDay ? (
+      {hasScheduledDay || split ? (
         <UpcomingShiftsSection
           items={upcomingItems}
           todayDate={todayDate}

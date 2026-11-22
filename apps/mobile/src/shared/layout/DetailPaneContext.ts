@@ -32,3 +32,14 @@ export const DetailBarClearanceContext = createContext(0);
 export function useDetailBarClearance(): number {
   return useContext(DetailBarClearanceContext);
 }
+
+/**
+ * True under a page's own header that spans both panes (Home on the open
+ * iPhone Duo): the panes start right under it, so the detail pane's top row
+ * no longer lines up with the camera in the side column.
+ */
+export const HeaderAbovePanesContext = createContext(false);
+
+export function useHeaderAbovePanes(): boolean {
+  return useContext(HeaderAbovePanesContext);
+}
