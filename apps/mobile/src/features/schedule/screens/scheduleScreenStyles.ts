@@ -526,11 +526,11 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     // and between weeks, the days' width.
     calendarLineUnder: {
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomColor: mobileColors.border,
     },
     calendarLineOver: {
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: mobileColors.borderSubtle,
+      borderTopColor: mobileColors.border,
     },
     upcomingShiftCopySplit: {
       gap: mobileSpace.xs,

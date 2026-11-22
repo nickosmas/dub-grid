@@ -363,7 +363,7 @@ const createStyles = (mobileColors: MobileColors) =>
     weekdayRow: {
       flexDirection: "row",
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomColor: mobileColors.border,
       paddingVertical: mobileSpace.sm,
     },
     weekdayLabel: {
@@ -381,7 +381,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     weekDivider: {
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: mobileColors.borderSubtle,
+      borderTopColor: mobileColors.border,
     },
     cell: {
       flex: 1,
