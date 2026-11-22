@@ -13,6 +13,10 @@ import { mobileSpace, mobileText, type MobileColors } from "../../../shared/them
 
 export type HomeSpan = "week" | "month";
 
+// Open, the Duo puts its status bar in the side column and leaves no top
+// inset, so the title would sit in the screen's rounded corner.
+const CORNER_CLEARANCE = mobileSpace["2xl"];
+
 const SPAN_OPTIONS = [
   { value: "week", label: "Week" },
   { value: "month", label: "Month" },
@@ -100,7 +104,7 @@ export function DuoHomeLayout({
         style={[
           styles.header,
           {
-            paddingTop: insets.top + mobileSpace.sm,
+            paddingTop: Math.max(insets.top + mobileSpace.sm, CORNER_CLEARANCE),
             paddingLeft: insets.left + gutter,
             paddingRight: insets.right + gutter,
           },
