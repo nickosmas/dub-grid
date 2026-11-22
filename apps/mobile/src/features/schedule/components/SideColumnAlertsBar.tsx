@@ -45,11 +45,13 @@ export function SideColumnAlertsBar({
       <Stack.Screen options={shown ? SPLIT_BAR_OPTIONS : NO_BAR_OPTIONS} />
       {shown ? (
         <Stack.Toolbar placement="right">
+          {/* The bell has its own capsule; the arrows and Today share one. */}
           <Stack.Toolbar.Button
             accessibilityLabel={
               unreadCount > 0 ? `Open alerts, ${unreadCount} unread` : "Open alerts"
             }
             onPress={() => router.push("/alerts")}
+            separateBackground={stepper !== undefined}
           >
             <Stack.Toolbar.Icon sf="bell" />
             {unreadCount > 0 ? (
@@ -58,7 +60,6 @@ export function SideColumnAlertsBar({
               </Stack.Toolbar.Badge>
             ) : null}
           </Stack.Toolbar.Button>
-          {stepper ? <Stack.Toolbar.Spacer width={12} /> : null}
           {stepper?.onPrevious ? (
             <Stack.Toolbar.Button
               accessibilityLabel={stepper.previousLabel}
