@@ -269,6 +269,7 @@ export default function PersonDetailScreen({
   personId: personIdProp,
   embedded = false,
   onUnsavedChange,
+  onEditingChange,
 }: {
   personId?: string;
   embedded?: boolean;
@@ -277,6 +278,11 @@ export default function PersonDetailScreen({
    * route's discard guard never runs; this tells the list to ask instead.
    */
   onUnsavedChange?: (unsaved: boolean) => void;
+  /**
+   * Embedded, the editor's X and checkmark take the list's bar, so the list
+   * puts its own buttons away while this is editing.
+   */
+  onEditingChange?: (editing: boolean) => void;
 } = {}) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -807,6 +813,10 @@ export default function PersonDetailScreen({
   useEffect(() => {
     onUnsavedChange?.(unsaved);
   }, [onUnsavedChange, unsaved]);
+  useEffect(() => {
+    onEditingChange?.(editing);
+  }, [onEditingChange, editing]);
+  useEffect(() => () => onEditingChange?.(false), [onEditingChange]);
   // `editing && hasChanges`, not just `editing`: on iOS the whole screen is a
   // back-swipe target, so a guard that fired for an untouched open panel would
   // put a confirmation in front of an ordinary swipe back.

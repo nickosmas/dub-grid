@@ -54,14 +54,17 @@ export function EditBarActions({
   // Android tints the icon itself, dimming it while disabled.
   const saveSymbol = useToolbarIcon("checkmark", save.label.startsWith("Send") ? "send" : "check");
   const saveImage = useIosToolbarImage("checkmark", mobileColors.onBrandText);
-  // Until the drawn checkmark exists, the system's symbol: a bar item with no
-  // icon is laid out as a wide empty capsule, which iOS animated into from the
-  // last screen's Edit and then shrank to the round checkmark.
-  const saveIcon = IS_IOS ? (saveImage ?? saveSymbol) : saveSymbol;
   // A save is a checkmark; Send or Finish keep their words. Android's toolbar
   // draws only icons, so there a send is its arrow and the rest a checkmark.
   // In an iPhone Duo's side column words don't fit, so Send is its paper plane.
   const sideColumn = useHasSideColumn();
+  // Until the drawn checkmark exists, the system's symbol: a bar item with no
+  // icon is laid out as a wide empty capsule, which iOS animated into from the
+  // last screen's Edit and then shrank to the round checkmark. The side column
+  // takes only symbols: a drawn image left the checkmark off it, at the top
+  // of the page or nowhere.
+  const drawnCheckmark = IS_IOS && !sideColumn && saveImage != null;
+  const saveIcon = drawnCheckmark ? saveImage : saveSymbol;
   const sendSymbol = useToolbarIcon("paperplane", "send");
   const sendInColumn = IS_IOS && sideColumn && !barActionIsCheckmark(save.label);
   const saveAsCheckmark = !IS_IOS || barActionIsCheckmark(save.label) || sendInColumn;
@@ -101,7 +104,7 @@ export function EditBarActions({
             accessibilityLabel={save.accessibilityLabel ?? save.label}
             disabled={Boolean(save.disabled || save.loading)}
             icon={sendInColumn ? sendSymbol : saveIcon}
-            iconRenderingMode={IS_IOS && !sendInColumn ? "original" : undefined}
+            iconRenderingMode={drawnCheckmark && !sendInColumn ? "original" : undefined}
             onPress={save.onPress}
             tintColor={mobileColors.brand}
             variant="prominent"

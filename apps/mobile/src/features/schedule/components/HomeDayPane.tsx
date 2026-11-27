@@ -173,11 +173,15 @@ function PeopleList({
                   {getInitials(entry.employeeName)}
                 </Text>
               </View>
-              <Text numberOfLines={1} style={styles.personName}>
-                {entry.employeeName}
-              </Text>
-              <View style={styles.personJob}>
-                <JobPill chip={chip} compact />
+              {/* The pill drops under the name when both don't fit, so a long
+                  job never cuts the name short. */}
+              <View style={styles.personCopy}>
+                <Text numberOfLines={2} style={styles.personName}>
+                  {entry.employeeName}
+                </Text>
+                <View style={styles.personJob}>
+                  <JobPill chip={chip} compact />
+                </View>
               </View>
             </View>
           );
@@ -299,13 +303,23 @@ const createStyles = (mobileColors: MobileColors) =>
     avatarText: {
       ...mobileTextWeighted("body", "medium"),
     },
-    personName: {
-      ...mobileTextWeighted("rowTitle", "semibold"),
+    personCopy: {
       flex: 1,
       minWidth: 0,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      justifyContent: "space-between",
+      columnGap: mobileSpace.md,
+      rowGap: mobileSpace.xs,
+    },
+    personName: {
+      ...mobileTextWeighted("rowTitle", "semibold"),
+      flexShrink: 1,
       color: mobileColors.textPrimary,
     },
     personJob: {
       justifyContent: "center",
+      flexShrink: 0,
     },
   });
