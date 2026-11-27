@@ -1353,3 +1353,19 @@
         week (their shift each day); staff see "Working with you this week"
         first and no contact details. Every pose and phone. Removed
         2026-11-18 (owner): a person's page on mobile shows no schedule.
+- [ ] 60. **Work-limit warnings** - when someone is scheduled by hand or a
+      request is approved, DubGrid warns, without blocking, when it gives a
+      person more than 5 days in a row (counted across weeks and periods,
+      the period before and after included), more than 5 days in a
+      Sunday-to-Saturday week, or more than 40 hours in that week. The
+      counts are Auto-build's own. Warnings are on screen only: no alert,
+      push or email is sent. Owner decisions, 2026-11-27.
+  - [x] 60a. **Shift editor** - once a pick goes over a limit, one warning
+        banner under the shift, as item 58's ("This makes 6 days in a row
+        for Aisha."), naming each limit it crosses.
+  - [ ] 60b. **Publish** - the publish confirmation lists everyone the
+        publish leaves over a limit, with the limit and the days, and
+        Publish stays available.
+  - [ ] 60c. **Request approval** - the approval panel on web and the
+        approval in the mobile app warn when approving a pickup or swap
+        would put the person who gets the shift over a limit.

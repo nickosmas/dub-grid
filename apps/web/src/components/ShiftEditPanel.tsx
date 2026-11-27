@@ -47,6 +47,7 @@ import ShiftPicker from "./ShiftPicker";
 import {
   PreferenceWarnings,
   preferenceWarnings,
+  workLimitWarnings,
   type ShiftEditorPreferences,
 } from "@/components/schedule/shift-preference-notes";
 import {
@@ -137,6 +138,7 @@ import {
   describeShiftChangeItem,
   formatShiftChangeHours,
   shiftChangeItemMinutes,
+  type WorkLimitBreak,
 } from "@dubgrid/schedule-core";
 import { noteShiftOf } from "@/app/(app)/schedule/_lib/editor-session";
 import {
@@ -259,6 +261,8 @@ interface ShiftEditPanelProps {
   orgRoles?: NamedItem[];
   /** The person's shift and job preferences: shown in the picker, warned about under a shift. */
   preferences?: ShiftEditorPreferences;
+  /** The work limits the cell's day crosses (60a): warned about under the shift, never blocking. */
+  workLimitBreaks?: WorkLimitBreak[];
   /** Audit metadata — only populated for admin+ users. */
   auditInfo?: {
     createdByName: string | null;
@@ -535,6 +539,7 @@ export default function ShiftEditPanel({
   certifications = [],
   orgRoles = [],
   preferences,
+  workLimitBreaks = [],
   auditInfo,
   isOwnShift = false,
   hasActiveRequest = false,
@@ -3373,13 +3378,16 @@ export default function ShiftEditPanel({
   function renderCurrentShiftWithPreferences() {
     const warnings = isAbsence
       ? []
-      : currentSegments.flatMap((segment) =>
-          preferenceWarnings(
-            preferences,
-            { shiftId: segment.shiftId ?? null, jobId: segment.jobId ?? null },
-            { shiftCategories, focusAreas, jobs },
+      : [
+          ...currentSegments.flatMap((segment) =>
+            preferenceWarnings(
+              preferences,
+              { shiftId: segment.shiftId ?? null, jobId: segment.jobId ?? null },
+              { shiftCategories, focusAreas, jobs },
+            ),
           ),
-        );
+          ...workLimitWarnings(workLimitBreaks, preferences?.firstName || modal.empName),
+        ];
     return (
       <>
         {renderCurrentShiftPill()}

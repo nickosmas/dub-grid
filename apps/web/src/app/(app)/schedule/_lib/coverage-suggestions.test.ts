@@ -27,6 +27,7 @@ import {
   publishedDayFromShifts,
   weekDaysWithPlanned,
   weekHoursWithPlanned,
+  workLimitBreaksInDraft,
   workLimitWith,
 } from "./coverage-suggestions";
 import { scheduleCellSnapshotToInput } from "@/lib/schedule-cells";
@@ -585,6 +586,26 @@ describe("days in a row", () => {
       absenceTypeId: null,
       restOfDayAbsenceTypeId: null,
     },
+  });
+
+  it("names the work limits a day crosses in the draft (60a)", () => {
+    const sunday = { ...fiveDays, "ana_2026-10-25": worked([DAY]) };
+    expect(workLimitBreaksInDraft({ ...input, shifts: sunday }, "ana", "2026-10-25")).toEqual([
+      { limit: "row", days: 6, start: "2026-10-20", end: "2026-10-25" },
+    ]);
+    // Five days and 40 hours in the week cross nothing.
+    expect(workLimitBreaksInDraft(input, "ana", "2026-10-24")).toEqual([]);
+    const monday = { ...fiveDays, "ana_2026-10-19": worked([DAY]) };
+    expect(workLimitBreaksInDraft({ ...input, shifts: monday }, "ana", "2026-10-19")).toEqual([
+      { limit: "row", days: 6, start: "2026-10-19", end: "2026-10-24" },
+      { limit: "week", days: 6, start: "2026-10-18", end: "2026-10-24" },
+      { limit: "hours", hours: 48, start: "2026-10-18", end: "2026-10-24" },
+    ]);
+  });
+
+  it("leaves out a day the draft deletes", () => {
+    const deleted = { ...fiveDays, "ana_2026-10-25": { ...worked([DAY]), isDelete: true } };
+    expect(workLimitBreaksInDraft({ ...input, shifts: deleted }, "ana", "2026-10-25")).toEqual([]);
   });
 
   it("counts the days worked on both sides", () => {
