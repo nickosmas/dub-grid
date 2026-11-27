@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import type { MobileScheduleEntry } from "@dubgrid/contracts";
 import { getScheduleMonthStartDate } from "@dubgrid/schedule-core";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
+import { DropdownPicker } from "../../../shared/components/DropdownPicker";
 import { SegmentedSwitch } from "../../../shared/components/SegmentedSwitch";
 import { Text } from "../../../shared/components/Text";
 import { getScreenGutter } from "../../../shared/components/screen-layout";
@@ -145,15 +146,16 @@ export function DuoHomeLayout({
               style={{ width: tall ? 196 : 240 }}
               value={view.value}
               onChange={view.onChange}
+              size="large"
             />
           ) : null}
           {span ? (
-            <SegmentedSwitch
+            <DropdownPicker
               accessibilityLabel="View"
               options={SPAN_OPTIONS}
-              style={{ width: tall ? 140 : 170 }}
               value={span.value}
               onChange={span.onChange}
+              size="large"
             />
           ) : null}
         </View>

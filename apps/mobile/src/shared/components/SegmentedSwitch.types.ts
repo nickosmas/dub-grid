@@ -16,4 +16,6 @@ export type SegmentedSwitchProps<Value extends string> = {
   onChange: (value: Value) => void;
   accessibilityLabel: string;
   style?: StyleProp<ViewStyle>;
+  /** iOS's control size, so controls side by side match in height; iOS only. */
+  size?: "regular" | "large";
 };

@@ -159,6 +159,15 @@ export function HomeMonthGrid({
   const rowOffsets = useRef(new Map<string, number>());
   const scrollRef = useRef<ScrollView>(null);
   const [laidOut, setLaidOut] = useState(false);
+  // Each month's first week, where a scroll comes to rest.
+  const [snapOffsets, setSnapOffsets] = useState<number[]>([]);
+  const refreshSnapOffsets = useCallback(() => {
+    const next = weeks
+      .filter((start, index) => index === 0 || weekMonthOf(start) !== weekMonthOf(weeks[index - 1]))
+      .map((start) => rowOffsets.current.get(start))
+      .filter((offset): offset is number => offset !== undefined);
+    setSnapOffsets((current) => (current.join() === next.join() ? current : next));
+  }, [weeks]);
   // Turning the phone widens the days, so a shrunk time can grow back.
   const [gridWidth, setGridWidth] = useState<number | undefined>(undefined);
   // The month held under the weekday row until the person drags: rows above
@@ -221,7 +230,10 @@ export function HomeMonthGrid({
         contentContainerStyle={{ paddingBottom: insets.bottom + mobileSpace.lg }}
         scrollEventThrottle={32}
         showsVerticalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToOffsets={snapOffsets}
         onContentSizeChange={() => {
+          refreshSnapOffsets();
           if (laidOut && anchorMonth.current) scrollToMonth(anchorMonth.current, false);
         }}
         onScroll={handleScroll}
@@ -234,6 +246,7 @@ export function HomeMonthGrid({
             key={start}
             onLayout={(event: LayoutChangeEvent) => {
               rowOffsets.current.set(start, event.nativeEvent.layout.y);
+              refreshSnapOffsets();
               if (weekIndex === weeks.length - 1 && !laidOut) setLaidOut(true);
             }}
             style={[styles.week, inset, weekIndex > 0 && styles.weekDivider]}
