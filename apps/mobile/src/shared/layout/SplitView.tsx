@@ -57,6 +57,7 @@ export function SplitView({
   entering,
   detailBarHeight = 0,
   stackWhenTall = false,
+  sidebar = false,
 }: {
   layout: SplitLayout;
   list: ReactNode;
@@ -74,6 +75,8 @@ export function SplitView({
   entering?: ReturnType<typeof useFoldEntering>;
   /** Held tall, the list sits over the detail, above the fold, as Calendar puts its month. */
   stackWhenTall?: boolean;
+  /** Calendar's panes: the list on a sidebar gray, the detail on the content color. */
+  sidebar?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -110,7 +113,9 @@ export function SplitView({
 
   return (
     <WindowInsetsContext.Provider value={insets}>
-      <TransparentPaneContext.Provider value={background != null || inheritedTransparent}>
+      <TransparentPaneContext.Provider
+        value={background != null || inheritedTransparent || sidebar}
+      >
         {background != null ? (
           <View
             style={[
@@ -123,7 +128,9 @@ export function SplitView({
           </View>
         ) : null}
         <Animated.View entering={entering} style={stacked ? styles.column : styles.row}>
-          <Animated.View style={listSizeStyle}>
+          <Animated.View
+            style={[listSizeStyle, sidebar && { backgroundColor: mobileColors.sidebarBackground }]}
+          >
             <SafeAreaInsetsContext.Provider value={listInsets}>
               {listCard ? (
                 <View
@@ -156,7 +163,14 @@ export function SplitView({
               ]}
             />
           )}
-          <View style={styles.detail}>
+          <View
+            style={[
+              styles.detail,
+              sidebar && {
+                backgroundColor: isDark ? mobileColors.background : mobileColors.surface,
+              },
+            ]}
+          >
             <SafeAreaInsetsContext.Provider value={detailInsets}>
               <DetailBarClearanceContext.Provider value={detailBarHeight}>
                 <DetailPaneContext.Provider value={true}>

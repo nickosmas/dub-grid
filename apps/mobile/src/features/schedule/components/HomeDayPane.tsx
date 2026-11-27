@@ -38,7 +38,7 @@ type HeroStatus = "active" | "upcoming" | "scheduled" | "away";
 /**
  * The day beside Home's week on an open iPhone Duo. A day you work shows each
  * shift as Home's own shift card, which carries its date and who works with
- * you; a day off is named, says Unscheduled, and lists who works it.
+ * you; a day off lists who works it, or, when nobody does, says Unscheduled.
  */
 export function HomeDayPane({
   date,
@@ -116,15 +116,20 @@ export function HomeDayPane({
   return (
     <Screen bottomPaddingMode="tabbed">
       <View style={styles.page}>
-        <View style={styles.heading}>
-          <Text accessibilityRole="header" fit="fixed" numberOfLines={1} style={styles.title}>
-            {formatSplitDayTitle(date, todayDate)}
-          </Text>
-        </View>
-        <Text style={styles.unscheduled}>Unscheduled</Text>
+        {/* The week beside it already says Unscheduled, so a day others work
+            opens on who works it; a day nobody works still names itself. */}
         {offDayPeople.length > 0 ? (
           <PeopleList people={offDayPeople} styles={styles} title="Working that day" />
-        ) : null}
+        ) : (
+          <>
+            <View style={styles.heading}>
+              <Text accessibilityRole="header" fit="fixed" numberOfLines={1} style={styles.title}>
+                {formatSplitDayTitle(date, todayDate)}
+              </Text>
+            </View>
+            <Text style={styles.unscheduled}>Unscheduled</Text>
+          </>
+        )}
       </View>
     </Screen>
   );

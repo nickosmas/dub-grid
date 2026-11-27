@@ -1294,9 +1294,14 @@ export default function RequestsScreen({ page = false }: { page?: boolean }) {
   );
 
   if (page) return pageScreen;
-  // With nothing in the tab, the list's own empty state says so once; a
-  // second one beside it would only repeat it.
-  if (!split) return listScreen;
+  // A tab with nothing in it takes the whole page: its empty state says so
+  // once, with no blank pane beside it. Still loading, it keeps the split so
+  // the page doesn't jump when its items arrive.
+  const tabLoading =
+    activeTab === "history"
+      ? historyContentState.kind === "loading"
+      : contentState.kind === "loading";
+  if (!split || (shownItem === null && !tabLoading)) return listScreen;
 
   return (
     <SplitView
