@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { compactSameMonthRange, formatSplitDayTitle, getWeekHeading } from "./week-range-label";
+import {
+  compactSameMonthRange,
+  formatSplitDayTitle,
+  formatWeekdayDayTitle,
+  getWeekHeading,
+} from "./week-range-label";
 
 describe("compactSameMonthRange", () => {
   it("names a month once when the week stays inside it", () => {
@@ -40,5 +45,12 @@ describe("formatSplitDayTitle", () => {
 
   it("names any other day by its weekday and date", () => {
     expect(formatSplitDayTitle("2026-11-25", "2026-11-22")).toBe("Wednesday 25");
+  });
+});
+
+describe("formatWeekdayDayTitle", () => {
+  it("names the weekday and the day, leaving the month to the calendar beside it", () => {
+    expect(formatWeekdayDayTitle("2026-11-22")).toBe("Sunday, 22");
+    expect(formatWeekdayDayTitle("2026-10-05")).toBe("Monday, 5");
   });
 });

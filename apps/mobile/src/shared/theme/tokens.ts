@@ -128,6 +128,12 @@ const MOBILE_LIGHT = {
   /** The one flat gray every empty-state scene is drawn in: iOS's systemGray3. */
   emptySceneInk: "#C7C7CC",
   /**
+   * A split's sidebar, beside a white content pane, as Calendar's month sits
+   * on the open iPhone Duo: almost off white. iOS's #F2F2F7 and the page's
+   * #F7F7FA both read too gray here (owner, 2026-11-22).
+   */
+  sidebarBackground: "#FAFAFB",
+  /**
    * Neutral control fill — the Filter button, chips, the segmented-control
    * track, and `tone="plain"`.
    *
@@ -213,6 +219,8 @@ const MOBILE_DARK = {
   background: "#000000",
   surface: "#1C1C1E",
   emptySceneInk: "#48484A",
+  /** The dark sidebar: iOS's secondary system background beside a black pane. */
+  sidebarBackground: "#1C1C1E",
   controlNeutralBg: "#26262B",
   /**
    * Dark counterpart, softened alongside the light one. A dark hairline needs

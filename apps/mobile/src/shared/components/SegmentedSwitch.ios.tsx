@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
 import { Host, Picker, Text } from "@expo/ui/swift-ui";
-import { environment, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
+import { controlSize, environment, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
 import { useThemeMode } from "../providers/ThemeModeProvider";
 import type { SegmentedSwitchProps } from "./SegmentedSwitch.types";
 
@@ -13,6 +13,7 @@ export function SegmentedSwitch<Value extends string>({
   onChange,
   accessibilityLabel,
   style,
+  size = "regular",
 }: SegmentedSwitchProps<Value>) {
   const { resolvedTheme } = useThemeMode();
 
@@ -22,7 +23,11 @@ export function SegmentedSwitch<Value extends string>({
         label={accessibilityLabel}
         selection={value}
         onSelectionChange={(next) => onChange(next as Value)}
-        modifiers={[pickerStyle("segmented"), environment("colorScheme", resolvedTheme)]}
+        modifiers={[
+          pickerStyle("segmented"),
+          controlSize(size),
+          environment("colorScheme", resolvedTheme),
+        ]}
       >
         {options.map((option) => (
           <Text key={option.value} modifiers={[tag(option.value)]}>
