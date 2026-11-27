@@ -4,6 +4,7 @@ import {
   buttonStyle,
   controlSize,
   environment,
+  font,
   frame,
   imageScale,
   tag,
@@ -36,7 +37,11 @@ export function DropdownPicker<Value extends string>({
             modifiers={size === "large" ? [frame({ height: LARGE_LABEL_HEIGHT })] : []}
             spacing={6}
           >
-            <Text>{chosen}</Text>
+            {/* A large segmented control's own label: 16pt medium. SwiftUI's
+                segmented picker takes no font, so this side follows it. */}
+            <Text modifiers={size === "large" ? [font({ size: 16, weight: "medium" })] : []}>
+              {chosen}
+            </Text>
             <Image modifiers={[imageScale("small")]} systemName="chevron.up.chevron.down" />
           </HStack>
         }
