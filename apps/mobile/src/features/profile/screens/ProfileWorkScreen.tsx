@@ -573,9 +573,10 @@ export default function ProfileWorkScreen({
   // and the tests keep them along the bottom. They join the bar once the push
   // has finished: during it, iOS morphed Profile's Edit into a long pill on
   // the way to this checkmark.
-  // Embedded beside Profile on an open iPhone Duo, the bar is the list's, so
-  // the actions stay along the bottom of the pane.
-  const actionsInBar = IS_NATIVE_LIST && !embedded;
+  // Embedded beside Profile on an open iPhone Duo, the bar is the list's: the
+  // actions join it once there is an edit, in place of its pen, so editing
+  // reads the same as on the phone.
+  const actionsInBar = IS_NATIVE_LIST && (!embedded || hasChanges);
   const barActions =
     actionsInBar && pushSettled ? (
       <EditBarActions

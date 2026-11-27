@@ -705,6 +705,7 @@ export default function PeopleScreen() {
   const handleDetailUnsavedChange = useCallback((unsaved: boolean) => {
     detailUnsavedRef.current = unsaved;
   }, []);
+  const [detailEditing, setDetailEditing] = useState(false);
   const openPerson = (id: string) => {
     if (split) {
       if (!detailUnsavedRef.current || id === shownPersonId) {
@@ -1045,12 +1046,16 @@ export default function PeopleScreen() {
           stands the buttons in the side column, and the search sits above the
           list, since the bar's own search would span both panes. */}
       <Stack.Screen options={peopleStackOptions} />
-      <PeopleHeaderActions
-        activeFilterCount={activeFilterCount}
-        onAddPerson={canAddScheduled || canAddManagement ? openAddPerson : undefined}
-        onOpenFilters={() => setIsFilterModalVisible(true)}
-        split={split !== null}
-      />
+      {/* While the person beside the list is being edited, the bar is the
+          editor's X and checkmark alone, as on the phone. */}
+      {split && detailEditing ? null : (
+        <PeopleHeaderActions
+          activeFilterCount={activeFilterCount}
+          onAddPerson={canAddScheduled || canAddManagement ? openAddPerson : undefined}
+          onOpenFilters={() => setIsFilterModalVisible(true)}
+          split={split !== null}
+        />
+      )}
       {split ? (
         <View style={styles.paneSearch}>
           <PaneSearch placeholder={searchPlaceholder} onChange={setSearchValue} />
@@ -1265,6 +1270,7 @@ export default function PeopleScreen() {
           <PersonDetailScreen
             key={shownPersonId}
             embedded
+            onEditingChange={setDetailEditing}
             onUnsavedChange={handleDetailUnsavedChange}
             personId={shownPersonId}
           />

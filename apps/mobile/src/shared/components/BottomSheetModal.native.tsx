@@ -201,7 +201,10 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
               resizable && styles.sheetFill,
             ]}
           >
-            <View onLayout={(event) => measure("header", event.nativeEvent.layout.height)}>
+            <View
+              onLayout={(event) => measure("header", event.nativeEvent.layout.height)}
+              style={styles.measured}
+            >
               {header ?? (IS_IOS || lifted.primary ? <SheetHeader title="" /> : null)}
             </View>
             {scrollable ? (
@@ -226,7 +229,7 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
             ) : (
               <View
                 onLayout={(event) => measure("content", event.nativeEvent.layout.height)}
-                style={styles.body}
+                style={[styles.body, styles.measured]}
               >
                 {children}
               </View>
@@ -234,7 +237,11 @@ export function BottomSheetModal(props: BottomSheetModalProps) {
             {barFooter ? (
               <View
                 onLayout={(event) => measure("footer", event.nativeEvent.layout.height)}
-                style={[styles.footer, { borderTopColor: mobileColors.borderSubtle }]}
+                style={[
+                  styles.footer,
+                  styles.measured,
+                  { borderTopColor: mobileColors.borderSubtle },
+                ]}
               >
                 {barFooter}
               </View>
@@ -390,6 +397,13 @@ const styles = StyleSheet.create({
   },
   scrollFill: {
     flex: 1,
+  },
+  // A wide screen's sheet opens at a set height before its parts are
+  // measured, and there they were squeezed to nothing: the title measured 0
+  // and the sheet opened as a strip. Each part keeps its own height, which is
+  // the height the sheet then takes.
+  measured: {
+    flexShrink: 0,
   },
   // Equal leading and trailing columns keep the title on the sheet's centre
   // line whatever the two sides hold.
