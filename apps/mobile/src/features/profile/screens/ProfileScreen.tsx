@@ -166,8 +166,12 @@ export default function ProfileScreen() {
   // Swapping the setting beside the list isn't navigation, so the editor's
   // own discard guard can't catch it: ask here before dropping its edits.
   const detailUnsavedRef = useRef(false);
+  // While it has edits, the editor beside the list puts its own save and
+  // discard in the bar, so the pen steps aside for them.
+  const [detailEditing, setDetailEditing] = useState(false);
   const handleDetailUnsavedChange = useCallback((unsaved: boolean) => {
     detailUnsavedRef.current = unsaved;
+    setDetailEditing(unsaved);
   }, []);
   const openSection = (section: ProfileSplitSection) => {
     if (split) {
@@ -182,6 +186,7 @@ export default function ProfileScreen() {
           style: "destructive",
           onPress: () => {
             detailUnsavedRef.current = false;
+            setDetailEditing(false);
             setPickedSection(section);
           },
         },
@@ -545,15 +550,17 @@ export default function ProfileScreen() {
           {/* The same bar action the person page has. It opens "Profile
               details", which is this profile's editor; the Settings row of
               that name below stays as the list's way in. */}
-          <HeaderTextBarAction
-            action={{
-              label: "Edit",
-              symbol: EDIT_SYMBOL,
-              accessibilityHint: "Opens your profile details",
-              // Split, Profile details shows beside the list instead.
-              onPress: () => openSection("work"),
-            }}
-          />
+          {split && detailEditing ? null : (
+            <HeaderTextBarAction
+              action={{
+                label: "Edit",
+                symbol: EDIT_SYMBOL,
+                accessibilityHint: "Opens your profile details",
+                // Split, Profile details shows beside the list instead.
+                onPress: () => openSection("work"),
+              }}
+            />
+          )}
           {/* Centered, the same way both person pages are: this page's subject is
               a person, and a left-aligned 64pt avatar reads as a settings row
               rather than as the heading it is. */}
