@@ -145,7 +145,7 @@ import { MONTH_GRID_ROW_GAP, WEEK_STRIP_ROW_HEIGHT, createStyles } from "./sched
 import { MonthDayCell } from "../components/MonthDayCell";
 import { MonthTitle } from "../components/MonthTitle";
 import { SideColumnAlertsBar, type SideColumnStepper } from "../components/SideColumnAlertsBar";
-import { getWeekHeading } from "../lib/week-range-label";
+import { formatWeekdayDayTitle, getWeekHeading } from "../lib/week-range-label";
 import { DEFAULT_ORGANIZATION_LABELS } from "@dubgrid/domain";
 const MONTH_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_EXPAND_TIMING = {
@@ -1953,7 +1953,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       </>
     );
 
-  const selectedDayTitle = formatLongDayTitle(selectedDate);
+  const selectedDayTitle = formatWeekdayDayTitle(selectedDate);
 
   return (
     <>
@@ -1994,16 +1994,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       />
     </>
   );
-}
-
-/** "Friday, Nov 20": the day the Schedule split shows beside its month. */
-function formatLongDayTitle(isoDate: string): string {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function combineScheduledDates(

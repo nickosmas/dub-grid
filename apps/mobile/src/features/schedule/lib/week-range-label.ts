@@ -46,3 +46,13 @@ export function formatSplitDayTitle(date: string, todayDate: string): string {
   });
   return `${weekday} ${day}`;
 }
+
+/**
+ * "Sunday, 22": the day the Schedule split shows beside its month, which
+ * already names the month.
+ */
+export function formatWeekdayDayTitle(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const weekday = new Date(year, month - 1, day).toLocaleDateString("en-US", { weekday: "long" });
+  return `${weekday}, ${day}`;
+}
