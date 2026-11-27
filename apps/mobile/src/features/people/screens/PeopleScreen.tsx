@@ -1380,14 +1380,18 @@ function PersonRow({
           </Text>
         </View>
         <View style={styles.personCopy}>
+          {/* A status that doesn't fit beside the name takes the next line,
+              so neither is cut short. */}
           <View style={styles.personNameRow}>
-            <Text numberOfLines={1} style={styles.personName}>
-              {name}
-            </Text>
-            {/* The star alone names an Admin or Super Admin, leaving the row's
-                room for their status (owner, 2026-10-31). */}
-            <AccessInsignia orgRole={orgRole} />
-            {staffStatus ? <StatusMarkIcon person={staffStatus} /> : null}
+            <View style={styles.personNameGroup}>
+              <Text numberOfLines={2} style={styles.personName}>
+                {name}
+              </Text>
+              {/* The star alone names an Admin or Super Admin, leaving the row's
+                  room for their status (owner, 2026-10-31). */}
+              <AccessInsignia orgRole={orgRole} />
+              {staffStatus ? <StatusMarkIcon person={staffStatus} /> : null}
+            </View>
             {statusPill ? (
               <View style={statusPill.containerStyle}>
                 <Text fit="compact" style={statusPill.textStyle}>
@@ -1396,12 +1400,12 @@ function PersonRow({
               </View>
             ) : null}
             {plannedLabel ? (
-              <Text fit="compact" numberOfLines={1} style={styles.personPlanned}>
+              <Text fit="compact" numberOfLines={2} style={styles.personPlanned}>
                 {plannedLabel}
               </Text>
             ) : null}
           </View>
-          <Text numberOfLines={1} style={styles.personSubtitle}>
+          <Text numberOfLines={2} style={styles.personSubtitle}>
             {subtitle}
           </Text>
         </View>
@@ -1497,6 +1501,15 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     personNameRow: {
       alignItems: "center",
       flexDirection: "row",
+      flexWrap: "wrap",
+      columnGap: 8,
+      rowGap: mobileSpace.xs,
+      minWidth: 0,
+    },
+    personNameGroup: {
+      alignItems: "center",
+      flexDirection: "row",
+      flexShrink: 1,
       gap: 8,
       minWidth: 0,
     },

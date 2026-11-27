@@ -1563,18 +1563,18 @@ function RequestCard({
       >
         <View style={[styles.cardHeader, stackHeader && styles.cardHeaderStacked]}>
           <Text
-            numberOfLines={1}
+            numberOfLines={2}
             style={[styles.requestTitle, stackHeader && styles.requestTitleStacked]}
           >
             {copy.title}
           </Text>
           {statusPill}
         </View>
-        <Text numberOfLines={1} style={styles.metaText}>
+        <Text numberOfLines={2} style={styles.metaText}>
           {copy.subtitle}
         </Text>
         {shiftLines.map((line, index) => (
-          <Text key={index} numberOfLines={1} style={styles.rowShiftText}>
+          <Text key={index} numberOfLines={2} style={styles.rowShiftText}>
             {line}
           </Text>
         ))}
@@ -1846,7 +1846,7 @@ export function OpenShiftCard({
         style={[styles.requestRow, selected && styles.requestRowSelected]}
       >
         <View style={styles.cardHeader}>
-          <Text numberOfLines={1} style={styles.requestTitle}>
+          <Text numberOfLines={2} style={styles.requestTitle}>
             {shiftLabel}
           </Text>
           <View style={[styles.statusChip, { backgroundColor: openShiftChipTone.backgroundColor }]}>
@@ -1858,10 +1858,10 @@ export function OpenShiftCard({
             </Text>
           </View>
         </View>
-        <Text numberOfLines={1} style={styles.metaText}>
+        <Text numberOfLines={2} style={styles.metaText}>
           {openShift.needed} teammate{openShift.needed === 1 ? "" : "s"} needed
         </Text>
-        <Text numberOfLines={1} style={styles.rowShiftText}>
+        <Text numberOfLines={2} style={styles.rowShiftText}>
           {[focusAreaName, timeRange].filter(Boolean).join(" · ")}
         </Text>
       </Pressable>
