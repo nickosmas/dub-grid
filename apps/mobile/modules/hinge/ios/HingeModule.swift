@@ -17,6 +17,7 @@ public class HingeModule: Module {
   private weak var host: UIWindow?
   private var sentinel: SizeSentinel?
   private var cover: UIView?
+  private var keyWindowObserver: NSObjectProtocol?
 
   public func definition() -> ModuleDefinition {
     Name("Hinge")
@@ -46,8 +47,19 @@ public class HingeModule: Module {
     }
   }
 
+  // JavaScript subscribes while the app launches, often before any window is
+  // key, and a dev build's launcher window is key before the app's own. The
+  // module then watched no window, or a window that went away, and missed
+  // every fold until a reload: partly folded, the panes kept the open split.
+  // So it follows whichever window becomes key.
   private func attach() {
-    guard host == nil, let window = keyWindow() else { return }
+    if keyWindowObserver == nil {
+      keyWindowObserver = NotificationCenter.default.addObserver(
+        forName: UIWindow.didBecomeKeyNotification, object: nil, queue: .main
+      ) { [weak self] _ in self?.attach() }
+    }
+    guard let window = keyWindow(), window !== host else { return }
+    detachFromHost()
     host = window
 
     let sentinel = SizeSentinel(frame: window.bounds)
@@ -66,6 +78,14 @@ public class HingeModule: Module {
   }
 
   private func detach() {
+    if let keyWindowObserver {
+      NotificationCenter.default.removeObserver(keyWindowObserver)
+    }
+    keyWindowObserver = nil
+    detachFromHost()
+  }
+
+  private func detachFromHost() {
     if let interaction, let host {
       host.removeInteraction(interaction)
     }
