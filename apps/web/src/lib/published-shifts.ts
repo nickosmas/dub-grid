@@ -1,4 +1,8 @@
-import { joinAbsenceBesideShifts } from "@dubgrid/schedule-core";
+import {
+  getShiftRangeMinutes,
+  joinAbsenceBesideShifts,
+  type ShiftDay,
+} from "@dubgrid/schedule-core";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
 import { FOCUS_AREA_COLS, JOB_COLS, SHIFT_CATEGORY_COLS, fetchAllRows } from "@/lib/db/shared";
 import { rowToFocusArea, rowToJobDefinition, rowToShiftCategory } from "@/lib/db/mappers";
@@ -365,14 +369,12 @@ function resolveShiftLabel(
   return assignmentIds.map((id) => assignmentById.get(id)?.label ?? "?").join("/");
 }
 
-function durationFromTimes(startTime: string | null, endTime: string | null): number {
-  if (!startTime || !endTime) return 0;
-  const [startHour = 0, startMinute = 0] = startTime.split(":").map(Number);
-  const [endHour = 0, endMinute = 0] = endTime.split(":").map(Number);
-  const start = startHour * 60 + startMinute;
-  let end = endHour * 60 + endMinute;
-  if (end <= start) end += 24 * 60;
-  return Math.max(0, (end - start) / 60);
+function durationFromTimes(
+  startTime: string | null,
+  endTime: string | null,
+  day?: ShiftDay,
+): number {
+  return Math.max(0, getShiftRangeMinutes(startTime, endTime, day) / 60);
 }
 
 function splitPipeTimes(value: string | null | undefined): string[] {
@@ -384,6 +386,7 @@ function resolveSegmentDurationHours(
   index: number,
   customStarts: string[],
   customEnds: string[],
+  day: ShiftDay,
 ): number {
   const hasCustomStart = customStarts.length > 0;
   const hasCustomEnd = customEnds.length > 0;
@@ -393,7 +396,10 @@ function resolveSegmentDurationHours(
   const endTime = customEnd || segment.endTime;
 
   if (startTime && endTime) {
-    return Math.max(0, durationFromTimes(startTime, endTime) - (segment.breakMinutes ?? 0) / 60);
+    return Math.max(
+      0,
+      durationFromTimes(startTime, endTime, day) - (segment.breakMinutes ?? 0) / 60,
+    );
   }
 
   return segment.durationHours ?? 0;
@@ -445,6 +451,7 @@ export function resolvePublishedScheduleEntry(
   row: PublishedShiftRow,
   assignmentById: Map<number, PublishedAssignmentDefinition>,
   absenceTypeById: Map<number, string> = new Map(),
+  timeZone?: string | null,
 ): PublishedScheduleEntry | null {
   const assignmentIds = row.resolvedAssignmentIds ?? [];
   const segments = row.resolvedSegments ?? [];
@@ -483,9 +490,11 @@ export function resolvePublishedScheduleEntry(
     segments.length > 0
       ? segments.map((segment) => segment.label || "?").join("/")
       : resolveShiftLabel(assignmentIds, assignmentById);
+  // The day the shift starts, so a night across a DST change counts real time.
+  const day: ShiftDay = { date: row.date, timeZone };
   const segmentDurationHours = segments.reduce(
     (sum, segment, index) =>
-      sum + resolveSegmentDurationHours(segment, index, customStarts, customEnds),
+      sum + resolveSegmentDurationHours(segment, index, customStarts, customEnds, day),
     0,
   );
   const durationHours =
@@ -497,8 +506,10 @@ export function resolvePublishedScheduleEntry(
             assignmentById as Map<number, AssignmentDefinition>,
             row.published_custom_start_time ?? null,
             row.published_custom_end_time ?? null,
+            undefined,
+            day,
           )
-        : durationFromTimes(startTime, endTime);
+        : durationFromTimes(startTime, endTime, day);
 
   return {
     kind: "shift",

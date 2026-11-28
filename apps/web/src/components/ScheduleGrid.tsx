@@ -33,6 +33,8 @@ import { formatReturnDate, shiftDisplayName, type StatusMarkKind } from "@dubgri
 import { StatusMarkIcon } from "@/components/staff-detail/StatusMarkIcon";
 import {
   formatShiftChangeHours,
+  formatShiftClockChange,
+  getShiftClockChange,
   isNewShiftChange,
   isPastDateKey,
   shiftChangeItemMinutes,
@@ -248,6 +250,8 @@ interface LegacyScheduleGridProps {
     trigger?: "click" | "keyboard",
   ) => void;
   todayKey: string;
+  /** The organization's zone: a shift across a DST change shows its real hours and a note. */
+  timeZone?: string | null;
   awayRanges?: ReadonlyMap<string, AwayRange>;
   corrections?: ReadonlyMap<string, CorrectionMark>;
   /** The organization's day off absence, which alone never makes someone away (54). */
@@ -363,6 +367,8 @@ interface SectionBlockProps {
   renderedRows?: number;
   weekDates: Date[];
   todayKey: string;
+  /** The organization's zone: a shift across a DST change shows its real hours and a note. */
+  timeZone?: string | null;
   awayRanges?: ReadonlyMap<string, AwayRange>;
   corrections?: ReadonlyMap<string, CorrectionMark>;
   /** Why each person away for the whole period is, by employee id (item 54). */
@@ -1240,6 +1246,7 @@ const SectionBlock = memo(function SectionBlock({
   renderedRows,
   weekDates,
   todayKey,
+  timeZone = null,
   awayRanges,
   corrections,
   awayAllPeriod,
@@ -1835,7 +1842,7 @@ const SectionBlock = memo(function SectionBlock({
         kind: draftKind,
         view:
           draftKind === "new" || before
-            ? describeCellStateChange(before, current, dateKey, shiftChangeResolvers)
+            ? describeCellStateChange(before, current, dateKey, shiftChangeResolvers, timeZone)
             : null,
       };
     }
@@ -1850,6 +1857,7 @@ const SectionBlock = memo(function SectionBlock({
                 publishDiff.toState,
                 dateKey,
                 shiftChangeResolvers,
+                timeZone,
               )
             : null,
         }
@@ -2783,6 +2791,7 @@ const SectionBlock = memo(function SectionBlock({
                                 publishDiff.toState,
                                 dateKey,
                                 shiftChangeResolvers,
+                                timeZone,
                               )
                             : null;
                         // A changed or deleted draft needs its published cell to compare
@@ -2810,6 +2819,7 @@ const SectionBlock = memo(function SectionBlock({
                                     }),
                                 dateKey,
                                 shiftChangeResolvers,
+                                timeZone,
                               )
                             : null;
                         const publishChangeText = publishChangeView
@@ -2892,19 +2902,26 @@ const SectionBlock = memo(function SectionBlock({
                                 null;
                               const minutes =
                                 start && end
-                                  ? shiftChangeItemMinutes({
-                                      kind: "shift",
-                                      key: String(entryIndex),
-                                      shiftName: null,
-                                      jobName: "",
-                                      focusAreaName: null,
-                                      start,
-                                      end,
-                                      breakMinutes: category?.breakMinutes ?? null,
-                                    })
+                                  ? shiftChangeItemMinutes(
+                                      {
+                                        kind: "shift",
+                                        key: String(entryIndex),
+                                        shiftName: null,
+                                        jobName: "",
+                                        focusAreaName: null,
+                                        start,
+                                        end,
+                                        breakMinutes: category?.breakMinutes ?? null,
+                                      },
+                                      { date: dateKey, timeZone },
+                                    )
                                   : null;
                               const hours =
                                 minutes != null ? formatShiftChangeHours(minutes) : null;
+                              const clockChange = getShiftClockChange(start, end, {
+                                date: dateKey,
+                                timeZone,
+                              });
                               const focusArea =
                                 assignment?.focusAreaId != null
                                   ? (focusAreas.find((area) => area.id === assignment.focusAreaId)
@@ -2937,6 +2954,9 @@ const SectionBlock = memo(function SectionBlock({
                                     ? [
                                         `${fmt12h(start)} - ${fmt12h(end)}`,
                                         hours && restOfDayAbsenceName ? `${hours} worked` : hours,
+                                        clockChange != null
+                                          ? formatShiftClockChange(clockChange)
+                                          : null,
                                       ]
                                         .filter(Boolean)
                                         .join(" · ")
@@ -2998,6 +3018,7 @@ const SectionBlock = memo(function SectionBlock({
                                 correction.after,
                                 dateKey,
                                 shiftChangeResolvers,
+                                timeZone,
                               )
                             : null;
                         const correctionNotes = correction
@@ -5437,6 +5458,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   getShiftStyle,
   handleCellClick,
   todayKey,
+  timeZone = null,
   awayRanges,
   corrections,
   dayOffAbsenceTypeId = null,
@@ -5896,6 +5918,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     renderedRows={mount === "full" ? undefined : mount.rows}
                     weekDates={allDates}
                     todayKey={todayKey}
+                    timeZone={timeZone}
                     awayRanges={awayRanges}
                     corrections={corrections}
                     shiftForKey={shiftForKey}
@@ -6145,6 +6168,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           getShiftStyle={model.accessors.getShiftStyle}
           handleCellClick={handleLegacyCellClick}
           todayKey={model.todayKey}
+          timeZone={model.timeZone}
           awayRanges={model.awayRanges}
           corrections={model.corrections}
           dayOffAbsenceTypeId={model.dayOffAbsenceTypeId}

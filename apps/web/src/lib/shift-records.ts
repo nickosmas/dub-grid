@@ -69,6 +69,8 @@ export function buildShiftRecords(
     corrections?: ReadonlyMap<string, ShiftRecordCorrection>;
     /** Schedule notes per date. */
     noteCounts?: ReadonlyMap<string, number>;
+    /** The organization's zone, so a night across a DST change counts real time. */
+    timeZone?: string | null;
   } = {},
 ): ShiftRecord[] {
   const records: ShiftRecord[] = [];
@@ -118,6 +120,7 @@ export function buildShiftRecords(
             entry.customStartTime,
             entry.customEndTime,
             lookups.shiftById,
+            { date, timeZone: extras.timeZone },
           ),
       state: draftKind ? "draft" : correction ? "corrected" : "published",
       draftKind,

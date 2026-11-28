@@ -1544,6 +1544,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     employee={employee}
                     periodShifts={periodShiftsQuery.data}
                     range={period.range}
+                    timeZone={org?.timezone ?? null}
                     periodPhrase={periodRange.phrase}
                     assignments={assignments}
                     shiftCategories={shiftCategories}
@@ -1570,6 +1571,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                       shifts={periodShiftsQuery.data}
                       loading={periodShiftsQuery.isPending}
                       range={period.range}
+                      timeZone={org?.timezone ?? null}
                       today={today}
                       periodPhrase={periodRange.phrase}
                       lookups={shiftRecordLookups}

@@ -128,6 +128,8 @@ export interface ScheduleGridModel {
   spanWeeks: 1 | 2;
   activeFocusArea: number | null;
   todayKey: string;
+  /** The organization's zone: a shift across a DST change shows its real hours and a note. */
+  timeZone?: string | null;
   /** Each away person's range, dated in the organization's timezone. */
   awayRanges?: ReadonlyMap<string, AwayRange>;
   /** Corrected past days by `${empId}_${dateKey}` (53c). */
@@ -219,6 +221,8 @@ export interface BuildScheduleGridModelInput {
    * here, since a device-local Date passed through UTC formatting can land
    * on the wrong side of midnight (see schedule-core's dates.ts comment). */
   todayKey: string;
+  /** The organization's zone: a shift across a DST change shows its real hours and a note. */
+  timeZone?: string | null;
   /** Each away person's range, as the page counts coverage with it. */
   awayRanges?: ReadonlyMap<string, AwayRange>;
   /** Corrected past days by `${empId}_${dateKey}` (53c). */
@@ -266,6 +270,7 @@ export function buildScheduleGridModel({
   week2,
   spanWeeks,
   todayKey,
+  timeZone = null,
   awayRanges,
   corrections,
   dayOffAbsenceTypeId = null,
@@ -486,6 +491,7 @@ export function buildScheduleGridModel({
     spanWeeks,
     activeFocusArea,
     todayKey,
+    timeZone,
     awayRanges,
     corrections,
     dayOffAbsenceTypeId,

@@ -1,5 +1,6 @@
 import { formatScheduleTimeRange } from "@dubgrid/schedule-core";
 import { useState, useEffect } from "react";
+import { formatShiftClockChange, getShiftClockChange, type ShiftDay } from "@dubgrid/schedule-core";
 import { calcTimeDuration } from "@/lib/utils";
 import { Button } from "@/components/Button";
 import CustomSelect from "./CustomSelect";
@@ -55,6 +56,18 @@ const periodOptions = [
   { value: "PM", label: "PM" },
 ];
 
+/** A shift's length, with how far the clocks move when its day crosses a DST change. */
+function durationText(
+  start: string | null | undefined,
+  end: string | null | undefined,
+  shiftDay: ShiftDay | undefined,
+): string | null {
+  const length = calcTimeDuration(start, end, shiftDay);
+  if (!length || !shiftDay) return length;
+  const change = getShiftClockChange(start, end, shiftDay);
+  return change != null ? `${length} · ${formatShiftClockChange(change)}` : length;
+}
+
 export function PillTimeEditor({
   customStart,
   customEnd,
@@ -63,6 +76,7 @@ export function PillTimeEditor({
   minTime,
   maxTime,
   customLabel = "Custom time",
+  shiftDay,
   onSave,
   onRemove,
 }: {
@@ -76,6 +90,8 @@ export function PillTimeEditor({
   maxTime?: string | null;
   /** What the set times are called, such as "Time worked" beside an absence. */
   customLabel?: string;
+  /** The cell's day and the organization's zone, so a night across a DST change reads its real length. */
+  shiftDay?: ShiftDay;
   onSave: (start: string | null, end: string | null) => void;
   onRemove: () => void;
 }) {
@@ -169,7 +185,7 @@ export function PillTimeEditor({
     ]
       .filter(Boolean)
       .join(" - ");
-    const defaultDuration = calcTimeDuration(defaultStart, defaultEnd);
+    const defaultDuration = durationText(defaultStart, defaultEnd, shiftDay);
     return (
       <div
         data-standard-time
@@ -217,7 +233,7 @@ export function PillTimeEditor({
 
   // State 2: Custom time is set and not editing — show formatted text with Edit and a reset
   if (hasCustomTime && !editing) {
-    const duration = calcTimeDuration(customStart ?? null, customEnd ?? null);
+    const duration = durationText(customStart, customEnd, shiftDay);
     return (
       <div
         style={{
@@ -465,7 +481,7 @@ export function PillTimeEditor({
       </div>
 
       {/* Duration display */}
-      {calcTimeDuration(localStart, localEnd) && !hasTimeError && (
+      {durationText(localStart, localEnd, shiftDay) && !hasTimeError && (
         <div
           style={{
             fontSize: "var(--dg-fs-badge)",
@@ -476,7 +492,7 @@ export function PillTimeEditor({
         >
           Duration:{" "}
           <span style={{ color: "var(--dg-color-text-secondary)" }}>
-            {calcTimeDuration(localStart, localEnd)}
+            {durationText(localStart, localEnd, shiftDay)}
           </span>
         </div>
       )}

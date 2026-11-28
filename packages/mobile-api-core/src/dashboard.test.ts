@@ -263,6 +263,30 @@ describe("computeStaffHoursForPeriod", () => {
     ]);
   });
 
+  it("counts the fall-back night's repeated hour toward overtime", () => {
+    const nights = new Map<number, DashboardShiftCategoryRow>([
+      [10, { id: 10, start_time: "19:00", end_time: "07:00", break_minutes: null }],
+    ]);
+    const week = { startDate: "2026-10-25", endDate: "2026-10-31" };
+    const rows = ["2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31"].map((date) =>
+      makeRow({ date }),
+    );
+    const hours = (timeZone: string | null) =>
+      computeStaffHoursForPeriod(
+        rows,
+        nights,
+        focusAreaNameById,
+        week,
+        undefined,
+        undefined,
+        undefined,
+        timeZone,
+      )[0];
+
+    expect(hours("America/Los_Angeles")).toMatchObject({ totalHours: 49, overtimeHours: 9 });
+    expect(hours(null)).toMatchObject({ totalHours: 48, overtimeHours: 8 });
+  });
+
   it("omits employees who stay under the threshold", () => {
     const rows = [makeRow({ date: "2026-05-11" }), makeRow({ date: "2026-05-12" })]; // 24h
 

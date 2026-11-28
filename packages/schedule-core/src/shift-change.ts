@@ -3,6 +3,8 @@ import {
   formatHoursLabel,
   getMinutesSinceMidnight,
   getRangeDurationMinutes,
+  getShiftRangeMinutes,
+  type ShiftDay,
   subtractBreakMinutes,
   toHoursValue,
 } from "./schedule-time";
@@ -152,9 +154,13 @@ function joinText(parts: ShiftChangeTextPart[]): string {
   return parts.map((p) => p.text).join("");
 }
 
-export function shiftChangeItemMinutes(item: ShiftChangeItemInput): number | null {
+/** A shift's worked minutes; pass its day so a night across a DST change counts real time. */
+export function shiftChangeItemMinutes(
+  item: ShiftChangeItemInput,
+  day?: ShiftDay | null,
+): number | null {
   if (item.kind !== "shift" || !item.start || !item.end) return null;
-  const range = getRangeDurationMinutes(item.start, item.end);
+  const range = getShiftRangeMinutes(item.start, item.end, day);
   if (range <= 0) return null;
   return subtractBreakMinutes(range, item.breakMinutes);
 }
@@ -168,6 +174,7 @@ function describeShift(
   item: ShiftChangeShiftInput,
   date: string,
   marks: ShiftChangeMarks,
+  timeZone?: string | null,
 ): DescribedShiftChangeItem {
   const all = marks.all;
   const titleParts: ShiftChangeTextPart[] = [];
@@ -179,7 +186,7 @@ function describeShift(
   }
   titleParts.push(part(withArchived(item.jobName, item.jobArchived), all || marks.job));
 
-  const minutes = shiftChangeItemMinutes(item);
+  const minutes = shiftChangeItemMinutes(item, { date, timeZone });
   const detailParts: ShiftChangeTextPart[] = [];
   const detailSeparators = new Set<number>();
   // Shift, job, then focus area, then time: one order everywhere.
@@ -269,11 +276,11 @@ function describeAbsence(
 /** Formats one shift or absence; `date` ("YYYY-MM-DD") names the weekdays of an overnight shift. */
 export function describeShiftChangeItem(
   item: ShiftChangeItemInput,
-  options: { date: string; marks?: ShiftChangeMarks },
+  options: { date: string; marks?: ShiftChangeMarks; timeZone?: string | null },
 ): DescribedShiftChangeItem {
   const marks = options.marks ?? {};
   return item.kind === "shift"
-    ? describeShift(item, options.date, marks)
+    ? describeShift(item, options.date, marks, options.timeZone)
     : describeAbsence(item, options.date, marks);
 }
 
@@ -494,10 +501,11 @@ function buildSide(
   date: string,
   multi: boolean,
   breaks: Array<ShiftChangeBreak | null>,
+  timeZone?: string | null,
 ): ShiftChangeSide {
   const labels = multi ? labelsFor(paired.map((p) => p.input)) : paired.map(() => null);
   const items = paired.map(({ input, status, marks }, index) => ({
-    ...describeShiftChangeItem(input, { date, marks }),
+    ...describeShiftChangeItem(input, { date, marks, timeZone }),
     label: labels[index],
     status,
     breakBefore: breaks[index],
@@ -555,11 +563,11 @@ function applyBar(
 export function describeShiftChange(
   beforeDay: ShiftChangeDayInput,
   afterDay: ShiftChangeDayInput,
-  options: { date: string },
+  options: { date: string; timeZone?: string | null },
 ): ShiftChange {
   const before = [...inTimeOrder(beforeDay.items)];
   const after = [...inTimeOrder(afterDay.items)];
-  const { date } = options;
+  const { date, timeZone } = options;
   if (sameDay(before, after)) {
     return {
       kind: "none",
@@ -569,12 +577,14 @@ export function describeShiftChange(
         date,
         false,
         [],
+        timeZone,
       ),
       after: buildSide(
         after.map((input) => ({ input, status: "same", marks: {} })),
         date,
         false,
         [],
+        timeZone,
       ),
       barScale: null,
     };
@@ -585,8 +595,20 @@ export function describeShiftChange(
   markNextDay(before, beforeIntervals);
   markNextDay(after, afterIntervals);
   const paired = multi ? pairDay(before, after) : pairSingle(before, after);
-  const beforeSide = buildSide(paired.before, date, multi, breaksFor(before, beforeIntervals));
-  const afterSide = buildSide(paired.after, date, multi, breaksFor(after, afterIntervals));
+  const beforeSide = buildSide(
+    paired.before,
+    date,
+    multi,
+    breaksFor(before, beforeIntervals),
+    timeZone,
+  );
+  const afterSide = buildSide(
+    paired.after,
+    date,
+    multi,
+    breaksFor(after, afterIntervals),
+    timeZone,
+  );
   const barScale = multi
     ? applyBar([
         { side: beforeSide, intervals: beforeIntervals },

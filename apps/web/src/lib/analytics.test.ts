@@ -1,17 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fetchPublishedShiftRows = vi.fn();
+const resolvedWithZone = vi.fn();
+const organizationRow = { data: { timezone: "America/Los_Angeles" }, error: null };
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/supabase-service", () => ({ getServiceClient: () => ({}) }));
+vi.mock("@/lib/supabase-service", () => ({
+  getServiceClient: () => ({
+    from: () => ({
+      select: () => ({ eq: () => ({ single: async () => organizationRow }) }),
+    }),
+  }),
+}));
 vi.mock("@/lib/published-shifts", () => ({
   fetchPublishedShiftRows: (...args: unknown[]) => fetchPublishedShiftRows(...args),
   // Every row is one eight-hour shift on its own date.
-  resolvePublishedScheduleEntry: (row: { date: string }) => ({
-    kind: "shift",
-    date: row.date,
-    durationHours: 8,
-  }),
+  resolvePublishedScheduleEntry: (
+    row: { date: string },
+    _assignments: unknown,
+    _absences: unknown,
+    timeZone: string | null,
+  ) => {
+    resolvedWithZone(timeZone);
+    return { kind: "shift", date: row.date, durationHours: 8 };
+  },
 }));
 
 import { fetchEmployeeUtilization, fetchWeeklyShiftHours } from "./analytics";
@@ -33,6 +45,13 @@ describe("dashboard analytics", () => {
 
     const [everyone] = await fetchWeeklyShiftHours("org-1", 1);
     expect(everyone).toEqual(expect.objectContaining({ totalHours: 16, shiftCount: 2 }));
+  });
+
+  it("counts hours in the organization's zone", async () => {
+    await fetchWeeklyShiftHours("org-1", 1);
+    await fetchEmployeeUtilization("org-1", 1);
+    expect(resolvedWithZone).toHaveBeenCalledWith("America/Los_Angeles");
+    expect(resolvedWithZone).not.toHaveBeenCalledWith(undefined);
   });
 
   it("never lists hidden staff in utilization", async () => {

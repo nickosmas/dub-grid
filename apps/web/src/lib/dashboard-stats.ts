@@ -23,6 +23,7 @@ import {
   assembleDashboardCoverage,
   classifyOpenShiftUrgency,
   computeShiftSegmentHours,
+  type ShiftDay,
   hasShiftStartedAtTimeRanges,
   type CoverageTotals,
 } from "@dubgrid/schedule-core";
@@ -186,6 +187,7 @@ export function computeShiftDurationHours(
   customStartTime?: string | null,
   customEndTime?: string | null,
   categoryById?: Map<number, ShiftCategory>,
+  day?: ShiftDay,
 ): number {
   return computeShiftSegmentHours(
     assignmentIds,
@@ -193,6 +195,7 @@ export function computeShiftDurationHours(
     customStartTime,
     customEndTime,
     categoryById ?? new Map(),
+    day,
   );
 }
 
@@ -203,6 +206,7 @@ export function computeEmployeeWeeklyHours(
   assignmentById: Map<number, AssignmentDefinition>,
   otThreshold = 40,
   categoryById?: Map<number, ShiftCategory>,
+  timeZone?: string | null,
 ): EmployeeHours {
   const dailyHours: Record<string, number> = {};
   let totalHours = 0;
@@ -219,6 +223,7 @@ export function computeEmployeeWeeklyHours(
       entry.customStartTime,
       entry.customEndTime,
       categoryById,
+      { date: dateKey, timeZone },
     );
     dailyHours[dateKey] = hours;
     totalHours += hours;
@@ -255,6 +260,7 @@ export function computeAllEmployeeHours(
   assignmentById: Map<number, AssignmentDefinition>,
   otThreshold = 40,
   categoryById?: Map<number, ShiftCategory>,
+  timeZone?: string | null,
 ): EmployeeHours[] {
   return employees.map((emp) =>
     computeEmployeeWeeklyHours(
@@ -264,6 +270,7 @@ export function computeAllEmployeeHours(
       assignmentById,
       otThreshold,
       categoryById,
+      timeZone,
     ),
   );
 }

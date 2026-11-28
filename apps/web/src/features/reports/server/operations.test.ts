@@ -175,6 +175,42 @@ function buildSource(
 }
 
 describe("operations reports", () => {
+  it("counts the real hours of a night across the fall-back change", () => {
+    const night = {
+      emp_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      date: "2026-10-31",
+      focus_area_id: 10,
+      published_absence_type_id: null,
+      published_custom_start_time: null,
+      published_custom_end_time: null,
+      resolvedAssignmentIds: [],
+      resolvedSegments: [
+        {
+          shiftId: 60,
+          jobId: 70,
+          label: "NOC Caregiver",
+          startTime: "23:00",
+          endTime: "07:00",
+          durationHours: 8,
+        },
+      ],
+    };
+    const source = buildSource({ publishedRows: [night], shiftRequests: [], scheduleNotes: [] });
+    const range = { startDate: "2026-10-31", endDate: "2026-10-31" };
+
+    const payload = buildOperationsReportPayload(source, range);
+    expect(payload.reports.staffHours[0]).toMatchObject({ scheduledHours: 9 });
+
+    const filtered = buildOperationsReportPayload(source, range, { jobIds: [70] });
+    expect(filtered.reports.staffHours[0]).toMatchObject({ scheduledHours: 9 });
+
+    const noZone = buildOperationsReportPayload(
+      { ...source, org: { ...source.org, timezone: null } },
+      range,
+    );
+    expect(noZone.reports.staffHours[0]).toMatchObject({ scheduledHours: 8 });
+  });
+
   it("resolves published segmented durations without counting gaps as worked hours", () => {
     const entry = resolvePublishedScheduleEntry(
       {

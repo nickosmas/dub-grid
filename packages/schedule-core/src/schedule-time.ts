@@ -11,6 +11,7 @@ import {
 import {
   addDaysToIsoDate,
   formatDate,
+  getElapsedShiftMinutes,
   getCurrentTimeValueInTimeZone,
   getDaysBetweenIsoDates,
   getIsoDateInTimeZone,
@@ -197,6 +198,53 @@ export function getRangeDurationMinutes(start: string | null, end: string | null
   );
 }
 
+/** The day a shift starts and its organization's zone, so its length counts DST. */
+export interface ShiftDay {
+  date: string;
+  timeZone?: string | null;
+}
+
+/**
+ * A shift's length in minutes. Given the day it starts on, this is the real
+ * time elapsed in the organization's zone (`getElapsedShiftMinutes`), so a
+ * night that crosses a DST change counts 7 or 9 hours; without one it is the
+ * clock length, which is right for a template that has no date.
+ */
+export function getShiftRangeMinutes(
+  start: string | null | undefined,
+  end: string | null | undefined,
+  day?: ShiftDay | null,
+): number {
+  if (!start || !end) return 0;
+  if (!day) return getRangeDurationMinutes(start, end);
+  return getElapsedShiftMinutes(day.date, start, end, day.timeZone);
+}
+
+/**
+ * How far the clocks move during a shift on its day in the organization's
+ * zone: 60 when they go back an hour (a longer shift), -60 when they go
+ * forward, null when they don't move or the shift has no times.
+ */
+export function getShiftClockChange(
+  start: string | null | undefined,
+  end: string | null | undefined,
+  day: ShiftDay,
+): number | null {
+  if (!start || !end) return null;
+  const change = getShiftRangeMinutes(start, end, day) - getRangeDurationMinutes(start, end);
+  return change === 0 ? null : change;
+}
+
+/** "clocks go back 1 hour", "clocks go forward 30 minutes": for a shift's time line. */
+export function formatShiftClockChange(minutes: number): string {
+  const amount = Math.abs(minutes);
+  const size =
+    amount % 60 === 0
+      ? `${amount / 60} ${amount === 60 ? "hour" : "hours"}`
+      : `${amount} ${amount === 1 ? "minute" : "minutes"}`;
+  return `clocks go ${minutes > 0 ? "back" : "forward"} ${size}`;
+}
+
 export function normalizeTimeValue(value: string | null | undefined): string | null {
   const normalized = value?.trim().slice(0, 5) ?? null;
   if (!normalized) return null;
@@ -377,10 +425,12 @@ export function getSegmentScheduledMinutes(
   segment: MobileScheduleEntrySegment,
   startOverride?: string | null,
   endOverride?: string | null,
+  timeZone?: string | null,
 ): number {
-  const rangeMinutes = getRangeDurationMinutes(
+  const rangeMinutes = getShiftRangeMinutes(
     startOverride ?? segment.startTime ?? getScheduleEntryStartTime(entry),
     endOverride ?? segment.endTime ?? getScheduleEntryEndTime(entry),
+    { date: entry.date, timeZone },
   );
   const minutes = rangeMinutes > 0 ? rangeMinutes : getDurationFieldMinutes(segment);
 

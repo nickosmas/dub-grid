@@ -250,6 +250,51 @@ export function getZonedMidnightUtc(isoDate: string, timeZone?: string | null): 
 }
 
 /**
+ * The UTC instant a clock time ("HH:MM") on a calendar day names in the zone.
+ *
+ * Resolved the way calendar apps and Temporal's "compatible" option do: a time
+ * inside a spring-forward gap moves forward by the gap (2:30 becomes 3:30),
+ * and a time the fall-back hour repeats takes its first occurrence.
+ */
+export function getZonedInstant(isoDate: string, time: string, timeZone?: string | null): Date {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const wallClock = Date.UTC(year, month - 1, day, 0, minutesOf(time));
+  const dayMs = 24 * 60 * 60000;
+
+  // A day either side always straddles at most one transition, so the two
+  // offsets are the only ones this clock time can carry.
+  const offsetBefore = getTimeZoneOffsetMinutes(new Date(wallClock - dayMs), timeZone);
+  const offsetAfter = getTimeZoneOffsetMinutes(new Date(wallClock + dayMs), timeZone);
+  const valid = [offsetBefore, offsetAfter]
+    .filter(
+      (offset) =>
+        getTimeZoneOffsetMinutes(new Date(wallClock - offset * 60000), timeZone) === offset,
+    )
+    .map((offset) => wallClock - offset * 60000);
+
+  if (valid.length > 0) return new Date(Math.min(...valid));
+  return new Date(wallClock - offsetBefore * 60000);
+}
+
+/**
+ * Minutes actually elapsed between a shift's start on `isoDate` and its end,
+ * which falls on the next day when it is not after the start. Across a DST
+ * change this is the real time worked (7 or 9 hours for 11 PM - 7 AM), so use
+ * it for any shift that has a date. With no zone it is plain clock arithmetic.
+ */
+export function getElapsedShiftMinutes(
+  isoDate: string,
+  start: string,
+  end: string,
+  timeZone?: string | null,
+): number {
+  const endDate = minutesOf(end) <= minutesOf(start) ? addDaysToIsoDate(isoDate, 1) : isoDate;
+  const startAt = getZonedInstant(isoDate, start, timeZone).getTime();
+  const endAt = getZonedInstant(endDate, end, timeZone).getTime();
+  return Math.round((endAt - startAt) / 60000);
+}
+
+/**
  * UTC bounds covering whole calendar days in the org's zone, for a query whose
  * upper bound is inclusive. Consecutive ranges are contiguous to the
  * millisecond, so no event can fall between two of them.

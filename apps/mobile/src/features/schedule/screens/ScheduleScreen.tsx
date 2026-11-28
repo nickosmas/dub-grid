@@ -881,8 +881,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   );
   const meOpenShifts = !isTeamScope ? (requestsQuery.data?.openShifts ?? []) : [];
   const meWeeklyHours = useMemo(
-    () => (!isTeamScope ? buildWeeklyHoursSummary(activeEntries, 40) : null),
-    [activeEntries, isTeamScope],
+    () => (!isTeamScope ? buildWeeklyHoursSummary(activeEntries, 40, timeZone) : null),
+    [activeEntries, isTeamScope, timeZone],
   );
   const shiftGroups = useMemo(
     () => buildTeamScheduleShiftGroupsForView(selectedEntries),
@@ -1905,7 +1905,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     const homeMonthTitle = getCalendarMonthTitleParts(homeMonth.visibleMonth);
     const homeTitle = homeMonthView ? homeMonthTitle.month : heading.title;
     const homeMeta = homeMonthView
-      ? formatScheduledHours(buildWeeklyHoursSummary(homeMonth.entries, 40))
+      ? formatScheduledHours(buildWeeklyHoursSummary(homeMonth.entries, 40, timeZone))
       : [heading.dates, formatScheduledHours(meWeeklyHours)].filter(Boolean).join(" · ") || null;
     return (
       <>

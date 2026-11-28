@@ -34,6 +34,7 @@ export function computeEmployeeHoursHistory(
   otThreshold: number = 40,
   categoryById?: Map<number, ShiftCategory>,
   overviewStartDate?: string,
+  timeZone?: string | null,
 ): WeeklyHoursSummary[] {
   const now = new Date();
   const results: WeeklyHoursSummary[] = [];
@@ -59,6 +60,7 @@ export function computeEmployeeHoursHistory(
         entry.customStartTime,
         entry.customEndTime,
         categoryById,
+        { date: dateKey, timeZone },
       );
       totalHours += hours;
       if (entry.assignmentIds.length > 0) {
@@ -331,6 +333,7 @@ export function computePeriodHours(
   range: { startDate: string; endDate: string },
   categoryById?: Map<number, ShiftCategory>,
   otThreshold: number = 40,
+  timeZone?: string | null,
 ): PeriodHoursSummary {
   const weekHours = new Map<string, number>();
   let hours = 0;
@@ -346,6 +349,7 @@ export function computePeriodHours(
       entry.customStartTime,
       entry.customEndTime,
       categoryById,
+      { date: day, timeZone },
     );
     hours += dayHours;
     shiftCount++;

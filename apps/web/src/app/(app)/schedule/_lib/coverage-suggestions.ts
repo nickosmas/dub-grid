@@ -478,7 +478,10 @@ export function availabilityWithPlanned(
 type DraftHoursInput = Pick<
   CoverageSuggestionAdapterInput,
   "shifts" | "assignments" | "shiftCategories"
->;
+> & {
+  /** The organization's zone, so a night across a DST change counts real hours. */
+  timeZone?: string | null;
+};
 
 /**
  * A person's draft days with the planned days written: each date's work and
@@ -513,6 +516,7 @@ function draftDaysWithPlanned(input: DraftHoursInput) {
         keepsTimes ? entry?.customStartTime : null,
         keepsTimes ? entry?.customEndTime : null,
         categoryById,
+        { date: dateKey, timeZone: input.timeZone },
       );
       return [{ dateKey, assignmentIds, hours }];
     });
