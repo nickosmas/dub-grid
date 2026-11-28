@@ -3,6 +3,7 @@ import {
   describeShiftChange,
   isNewShiftChange,
   describeShiftChangeItem,
+  shiftChangeItemMinutes,
   type ShiftChangeShiftInput,
 } from "./shift-change";
 
@@ -471,5 +472,29 @@ describe("describeShiftChange, an absence with its own time (item 50)", () => {
     const absence = change.after.items[1];
     expect(absence.status).toBe("changed");
     expect(absence.detail[0]).toEqual({ text: "12:00 PM", changed: true });
+  });
+});
+
+describe("shift change hours across a DST change", () => {
+  const night = shift({ shiftName: "Night Shift", start: "23:00", end: "07:00" });
+
+  it("counts a night's real length when given the organization's zone", () => {
+    expect(
+      shiftChangeItemMinutes(night, { date: "2026-10-31", timeZone: "America/New_York" }),
+    ).toBe(9 * 60);
+    expect(
+      describeShiftChangeItem(night, { date: "2026-03-07", timeZone: "America/New_York" }).minutes,
+    ).toBe(7 * 60);
+    expect(
+      describeShiftChange(
+        { items: [] },
+        { items: [night] },
+        { date: "2026-10-31", timeZone: "America/New_York" },
+      ).after.items[0].minutes,
+    ).toBe(9 * 60);
+  });
+
+  it("keeps clock length without a zone", () => {
+    expect(describeShiftChangeItem(night, { date: "2026-10-31" }).minutes).toBe(8 * 60);
   });
 });

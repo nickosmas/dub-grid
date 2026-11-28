@@ -164,7 +164,10 @@ export function AdminHomeScreen() {
   // The web build keeps the login page's aurora in the period's coverage
   // colour behind everything; on device the page is the plain grouped gray.
   const { height: windowHeight } = useWindowDimensions();
-  const weeklyHours = useMemo(() => buildWeeklyHoursSummary(mine.entries, 40), [mine.entries]);
+  const weeklyHours = useMemo(
+    () => buildWeeklyHoursSummary(mine.entries, 40, timeZone),
+    [mine.entries, timeZone],
+  );
   const header = (
     <View style={styles.header}>
       <WeekNavigatorHeader
@@ -388,7 +391,7 @@ export function AdminHomeScreen() {
   const monthTitle = getCalendarMonthTitleParts(month.visibleMonth);
   const duoTitle = monthView ? monthTitle.month : heading.title;
   const duoMeta = monthView
-    ? formatScheduledHours(buildWeeklyHoursSummary(month.entries, 40))
+    ? formatScheduledHours(buildWeeklyHoursSummary(month.entries, 40, timeZone))
     : [heading.dates, view === "mine" ? formatScheduledHours(weeklyHours) : null]
         .filter(Boolean)
         .join(" · ") || null;

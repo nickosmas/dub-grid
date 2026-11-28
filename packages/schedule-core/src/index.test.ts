@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildWeeklyHoursSummary,
+  formatShiftClockChange,
+  getShiftClockChange,
   getFeaturedMeScheduleSegment,
+  getSegmentScheduledMinutes,
   getScheduleMonthWeekIndexForDate,
   hasShiftStartedAtTimeRanges,
 } from "./index";
@@ -253,5 +257,52 @@ describe("getScheduleMonthWeekIndexForDate", () => {
   it("returns the correct row for a date later in the month", () => {
     // 2026-05-14 falls in the grid row starting 2026-05-10 (row index 2).
     expect(getScheduleMonthWeekIndexForDate("2026-05-01", "2026-05-14")).toBe(2);
+  });
+});
+
+describe("hours across a DST change", () => {
+  const NEW_YORK = "America/New_York";
+  const night = (overrides: Partial<ScheduleEntryLike> = {}): ScheduleEntryLike => ({
+    employeeId: "emp-1",
+    employeeName: "Jordan Lee",
+    date: "2026-10-31",
+    shiftName: "Night Shift",
+    startTime: "23:00",
+    endTime: "07:00",
+    absenceTypeId: null,
+    ...overrides,
+  });
+
+  it("counts the fall-back night's repeated hour in a segment", () => {
+    const segment = { startTime: "23:00", endTime: "07:00" };
+    expect(getSegmentScheduledMinutes(night(), segment, null, null, NEW_YORK)).toBe(9 * 60);
+    expect(getSegmentScheduledMinutes(night(), segment)).toBe(8 * 60);
+  });
+
+  it("totals a week with the real hours of a night across the change", () => {
+    const entries = [night({ customStartTime: "23:00", customEndTime: "07:00", segments: [] })];
+    expect(buildWeeklyHoursSummary(entries, 40, NEW_YORK).scheduledHours).toBe(9);
+    expect(buildWeeklyHoursSummary(entries, 40).scheduledHours).toBe(8);
+  });
+});
+
+describe("getShiftClockChange", () => {
+  const LA = "America/Los_Angeles";
+
+  it("names the hour the clocks move during a night across a change", () => {
+    expect(getShiftClockChange("23:00", "07:00", { date: "2026-10-31", timeZone: LA })).toBe(60);
+    expect(getShiftClockChange("23:00", "07:00", { date: "2026-03-07", timeZone: LA })).toBe(-60);
+    expect(formatShiftClockChange(60)).toBe("clocks go back 1 hour");
+    expect(formatShiftClockChange(-60)).toBe("clocks go forward 1 hour");
+    expect(formatShiftClockChange(30)).toBe("clocks go back 30 minutes");
+  });
+
+  it("is null when the clocks don't move or the shift has no times", () => {
+    expect(getShiftClockChange("07:00", "15:00", { date: "2026-11-01", timeZone: LA })).toBeNull();
+    expect(getShiftClockChange("23:00", "07:00", { date: "2026-06-13", timeZone: LA })).toBeNull();
+    expect(
+      getShiftClockChange("23:00", "07:00", { date: "2026-10-31", timeZone: null }),
+    ).toBeNull();
+    expect(getShiftClockChange(null, "07:00", { date: "2026-10-31", timeZone: LA })).toBeNull();
   });
 });

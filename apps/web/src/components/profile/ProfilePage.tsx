@@ -291,6 +291,7 @@ export function ProfilePage() {
                   employee={employee}
                   periodShifts={periodShiftsQuery.data}
                   range={period.range}
+                  timeZone={org?.timezone ?? null}
                   periodPhrase={periodPhrase}
                   assignments={assignments}
                   shiftCategories={shiftCategories}
@@ -312,6 +313,7 @@ export function ProfilePage() {
                     shifts={periodShiftsQuery.data}
                     loading={periodShiftsQuery.isPending}
                     range={period.range}
+                    timeZone={org?.timezone ?? null}
                     today={today}
                     periodPhrase={periodPhrase}
                     lookups={lookups}

@@ -5,7 +5,7 @@ import {
   DEFAULT_ORGANIZATION_LABELS,
   readShiftRequestNote,
 } from "@dubgrid/domain";
-import { absenceSideOf } from "@dubgrid/schedule-core";
+import { absenceSideOf, getShiftRangeMinutes, type ShiftDay } from "@dubgrid/schedule-core";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -636,10 +636,11 @@ function buildMap(rows: NamedRow[]): Map<number, string> {
 function resolveEntries(
   rows: PublishedShiftReportRow[],
   absenceTypeById: Map<number, string>,
+  timeZone: string | null,
 ): ResolvedEntry[] {
   return rows
     .map((source) => {
-      const entry = resolvePublishedScheduleEntry(source, new Map(), absenceTypeById);
+      const entry = resolvePublishedScheduleEntry(source, new Map(), absenceTypeById, timeZone);
       return entry ? { entry, source } : null;
     })
     .filter((item): item is ResolvedEntry => item != null);
@@ -697,15 +698,16 @@ function segmentMatchesJobs(segment: PublishedScheduleSegment, jobIdSet: Set<num
   return jobIdSet.size === 0 || jobIdSet.has(segment.jobId);
 }
 
-function getSegmentDurationHours(segment: PublishedScheduleSegment): number {
-  if (segment.durationHours != null) return segment.durationHours;
-  if (!segment.startTime || !segment.endTime) return 0;
-  const [startHour = 0, startMinute = 0] = segment.startTime.split(":").map(Number);
-  const [endHour = 0, endMinute = 0] = segment.endTime.split(":").map(Number);
-  const start = startHour * 60 + startMinute;
-  let end = endHour * 60 + endMinute;
-  if (end <= start) end += 24 * 60;
-  return Math.max(0, (end - start - (segment.breakMinutes ?? 0)) / 60);
+function getSegmentDurationHours(segment: PublishedScheduleSegment, day: ShiftDay): number {
+  if (!segment.startTime || !segment.endTime) return segment.durationHours ?? 0;
+  const clockMinutes = getShiftRangeMinutes(segment.startTime, segment.endTime);
+  const elapsedMinutes = getShiftRangeMinutes(segment.startTime, segment.endTime, day);
+  // Only the clock change is added to a stored duration, so a day without one
+  // reads exactly as it always has.
+  if (segment.durationHours != null) {
+    return Math.max(0, segment.durationHours + (elapsedMinutes - clockMinutes) / 60);
+  }
+  return Math.max(0, (elapsedMinutes - (segment.breakMinutes ?? 0)) / 60);
 }
 
 function getReportEntryDurationHours(
@@ -714,6 +716,7 @@ function getReportEntryDurationHours(
   focusAreaIdSet: Set<number>,
   shiftCategoryIdSet: Set<number>,
   jobIdSet: Set<number>,
+  timeZone: string | null,
 ): number {
   if (
     (focusAreaIdSet.size === 0 && shiftCategoryIdSet.size === 0 && jobIdSet.size === 0) ||
@@ -737,7 +740,10 @@ function getReportEntryDurationHours(
         segmentMatchesShiftCategories(segment, shiftCategoryIdSet) &&
         segmentMatchesJobs(segment, jobIdSet),
     )
-    .reduce((sum, segment) => sum + getSegmentDurationHours(segment), 0);
+    .reduce(
+      (sum, segment) => sum + getSegmentDurationHours(segment, { date: item.entry.date, timeZone }),
+      0,
+    );
 }
 
 function hasAnyNumber(values: number[] | null | undefined, selected: Set<number>): boolean {
@@ -914,9 +920,11 @@ export function buildOperationsReportPayload(
     return hasAnyNumber(employee.focus_area_ids, focusAreaIdSet);
   });
   const currentEmployeeIdSet = new Set(source.employees.map((employee) => employee.id));
-  const historicalPublishedEntries = resolveEntries(source.publishedRows, absenceTypeById).filter(
-    (item) => reportDateSet.has(item.entry.date),
-  );
+  const historicalPublishedEntries = resolveEntries(
+    source.publishedRows,
+    absenceTypeById,
+    source.org.timezone,
+  ).filter((item) => reportDateSet.has(item.entry.date));
   // A removed employee appears only beside records in the requested historical
   // range. They remain excluded from current-roster lists and filter options.
   const removedEmployeesWithHistoricalEntries = source.historicalEmployees.filter((employee) => {
@@ -1090,6 +1098,7 @@ export function buildOperationsReportPayload(
             focusAreaIdSet,
             shiftCategoryIdSet,
             jobIdSet,
+            source.org.timezone,
           ),
         0,
       ),
@@ -1105,7 +1114,10 @@ export function buildOperationsReportPayload(
         ) {
           continue;
         }
-        const hours = getSegmentDurationHours(segment);
+        const hours = getSegmentDurationHours(segment, {
+          date: item.entry.date,
+          timeZone: source.org.timezone,
+        });
         addToBreakdown(
           shiftBreakdownValues,
           segment.shiftId == null ? "general" : `shift:${segment.shiftId}`,
@@ -1169,7 +1181,9 @@ export function buildOperationsReportPayload(
             job: jobById.get(segment.jobId) ?? "Unknown job",
             startTime: segment.startTime ? formatScheduleTimeValue(segment.startTime) : "",
             endTime: segment.endTime ? formatScheduleTimeValue(segment.endTime) : "",
-            mentoringHours: roundHours(getSegmentDurationHours(segment)),
+            mentoringHours: roundHours(
+              getSegmentDurationHours(segment, { date: entry.date, timeZone: source.org.timezone }),
+            ),
           },
         ];
       }),

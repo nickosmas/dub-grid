@@ -89,6 +89,22 @@ describe("computeShiftSegmentHours", () => {
   });
 });
 
+describe("computeShiftSegmentHours across a DST change", () => {
+  const night = new Map([
+    [1, makeAssignment({ id: 1, defaultStartTime: "23:00", defaultEndTime: "07:00" })],
+  ]);
+
+  it("counts the hour the fall-back night repeats", () => {
+    const day = { date: "2026-10-31", timeZone: "America/New_York" };
+    expect(computeShiftSegmentHours([1], night, null, null, new Map(), day)).toBe(9);
+    expect(computeShiftSegmentHours([1], night, "23:00", "07:00", new Map(), day)).toBe(9);
+  });
+
+  it("keeps clock hours when no day is given", () => {
+    expect(computeShiftSegmentHours([1], night, null, null, new Map())).toBe(8);
+  });
+});
+
 describe("scheduleStateHours", () => {
   const shiftCategoriesById = new Map([[1, { id: 1, startTime: "07:00", endTime: "15:30" }]]);
   const assignmentById = new Map([[5, { id: 5, categoryId: 1, defaultDurationHours: 4 }]]);
@@ -109,5 +125,15 @@ describe("scheduleStateHours", () => {
 
   it("counts an absence as no hours", () => {
     expect(scheduleStateHours({ kind: "absence", segments: [] }, lookups)).toBe(0);
+  });
+
+  it("counts a night across the fall-back change as the time worked", () => {
+    const nights = new Map([[2, { id: 2, startTime: "23:00", endTime: "07:00" }]]);
+    const state = { kind: "worked", segments: [{ shiftId: 2, jobId: 99 }] };
+    const night = { ...lookups, shiftCategoriesById: nights };
+    expect(
+      scheduleStateHours(state, night, { date: "2026-10-31", timeZone: "America/New_York" }),
+    ).toBe(9);
+    expect(scheduleStateHours(state, night)).toBe(8);
   });
 });

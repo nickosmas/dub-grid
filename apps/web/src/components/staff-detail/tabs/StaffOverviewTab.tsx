@@ -19,6 +19,8 @@ interface StaffOverviewTabProps {
   /** The period's shifts; undefined while they load. */
   periodShifts: ShiftMap | undefined;
   range: { startDate: string; endDate: string };
+  /** The organization's zone, so a night across a DST change counts real hours. */
+  timeZone: string | null;
   /** "this pay period", "between Sep 1 and Oct 15". */
   periodPhrase: string;
   assignments: AssignmentDefinition[];
@@ -63,6 +65,7 @@ export function StaffOverviewTab({
   nextDaysCopy,
   aboutTitle = "About",
   mixTitle,
+  timeZone,
 }: StaffOverviewTabProps) {
   const assignmentById = useMemo(() => new Map(assignments.map((a) => [a.id, a])), [assignments]);
   const absenceTypeById = useMemo(
@@ -82,9 +85,17 @@ export function StaffOverviewTab({
   const summary = useMemo(
     () =>
       periodShifts
-        ? computePeriodHours(employee.id, periodShifts, assignmentById, range, shiftById)
+        ? computePeriodHours(
+            employee.id,
+            periodShifts,
+            assignmentById,
+            range,
+            shiftById,
+            undefined,
+            timeZone,
+          )
         : null,
-    [assignmentById, employee.id, periodShifts, range, shiftById],
+    [assignmentById, employee.id, periodShifts, range, shiftById, timeZone],
   );
   const mix = useMemo(
     () =>

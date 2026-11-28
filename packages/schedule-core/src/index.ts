@@ -79,7 +79,7 @@ import {
   sortScheduleEntries,
   expandTimeRange,
   isTimeWithinRange,
-  getRangeDurationMinutes,
+  getShiftRangeMinutes,
   toShiftTimeRange,
   hasShiftStartedAtTimeRanges,
   hasShiftRequestStarted,
@@ -386,6 +386,7 @@ export function buildMeShiftRequestSections(input: {
 export function buildWeeklyHoursSummary(
   entries: ReadonlyArray<ScheduleEntryLike>,
   targetHours = 40,
+  timeZone?: string | null,
 ): WeeklyHoursSummary {
   const scheduledMinutes = entries.reduce((total, entry) => {
     if (isDeletedScheduleHistory(entry) || getScheduleEntryAbsenceTypeId(entry) != null) {
@@ -405,7 +406,7 @@ export function buildWeeklyHoursSummary(
       return (
         total +
         subtractBreakMinutes(
-          getRangeDurationMinutes(customStartTime, customEndTime),
+          getShiftRangeMinutes(customStartTime, customEndTime, { date: entry.date, timeZone }),
           segments[0]?.breakMinutes,
         )
       );
@@ -424,6 +425,7 @@ export function buildWeeklyHoursSummary(
             segment,
             customStartTimes[index] ?? null,
             customEndTimes[index] ?? null,
+            timeZone,
           ),
         0,
       )

@@ -48,6 +48,8 @@ interface ScheduleTabProps {
   shifts: ShiftMap | undefined;
   loading: boolean;
   range: { startDate: string; endDate: string };
+  /** The organization's zone, so a night across a DST change counts real hours. */
+  timeZone: string | null;
   today: string;
   periodPhrase: string;
   lookups: ShiftRecordLookups;
@@ -92,6 +94,7 @@ export function ScheduleTab({
   recurringSchedule,
   afterRecurringSchedule,
   loadMonth,
+  timeZone,
 }: ScheduleTabProps) {
   // The month grid comes first for every period; the list is a click away.
   const [asList, setAsList] = useState(false);
@@ -102,9 +105,13 @@ export function ScheduleTab({
   const records = useMemo(
     () =>
       shifts
-        ? buildShiftRecords(employee.id, shifts, range, lookups, { corrections, noteCounts })
+        ? buildShiftRecords(employee.id, shifts, range, lookups, {
+            corrections,
+            noteCounts,
+            timeZone,
+          })
         : [],
-    [corrections, employee.id, lookups, noteCounts, range, shifts],
+    [corrections, employee.id, lookups, noteCounts, range, shifts, timeZone],
   );
   const timeOff = useMemo(
     () =>

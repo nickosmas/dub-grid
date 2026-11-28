@@ -124,11 +124,12 @@ export function describeCellStateChange(
   after: ScheduleCellState | null | undefined,
   date: string,
   resolvers: ShiftChangeResolvers,
+  timeZone?: string | null,
 ): ShiftChange {
   return describeShiftChange(
     cellStateToChangeDay(before, resolvers),
     cellStateToChangeDay(after, resolvers),
-    { date },
+    { date, timeZone },
   );
 }
 

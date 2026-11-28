@@ -3,8 +3,10 @@ import {
   addDaysToIsoDate,
   formatLocalDateKey,
   getIsoDateInTimeZone,
+  getElapsedShiftMinutes,
   getTimeZoneOffsetMinutes,
   getZonedDayRangeUtc,
+  getZonedInstant,
   getZonedMidnightUtc,
   isPastDateKey,
   parseLocalDateKey,
@@ -175,5 +177,57 @@ describe("isPastDateKey", () => {
     expect(isPastDateKey("2026-10-28", "2026-10-28")).toBe(false);
     expect(isPastDateKey("2026-10-29", "2026-10-28")).toBe(false);
     expect(isPastDateKey("2025-12-31", "2026-01-01")).toBe(true);
+  });
+});
+
+describe("getZonedInstant", () => {
+  it("names the instant a clock time means on an ordinary day", () => {
+    expect(getZonedInstant("2026-06-15", "07:00", NEW_YORK).toISOString()).toBe(
+      "2026-06-15T11:00:00.000Z",
+    );
+  });
+
+  it("moves a time inside the spring-forward gap forward by the gap", () => {
+    expect(getZonedInstant("2026-03-08", "02:30", NEW_YORK).toISOString()).toBe(
+      "2026-03-08T07:30:00.000Z",
+    );
+  });
+
+  it("takes the first occurrence of a time the fall-back hour repeats", () => {
+    expect(getZonedInstant("2026-11-01", "01:30", NEW_YORK).toISOString()).toBe(
+      "2026-11-01T05:30:00.000Z",
+    );
+  });
+
+  it("resolves a skipped midnight forward", () => {
+    expect(getZonedInstant("2026-09-06", "00:00", "America/Santiago").toISOString()).toBe(
+      "2026-09-06T04:00:00.000Z",
+    );
+  });
+});
+
+describe("getElapsedShiftMinutes", () => {
+  it("counts a night shift as the time actually worked across a DST change", () => {
+    expect(getElapsedShiftMinutes("2026-03-07", "23:00", "07:00", NEW_YORK)).toBe(7 * 60);
+    expect(getElapsedShiftMinutes("2026-10-31", "23:00", "07:00", NEW_YORK)).toBe(9 * 60);
+    expect(getElapsedShiftMinutes("2026-06-13", "23:00", "07:00", NEW_YORK)).toBe(8 * 60);
+  });
+
+  it("leaves a day shift on a change day at its clock length", () => {
+    expect(getElapsedShiftMinutes("2026-03-08", "07:00", "15:00", NEW_YORK)).toBe(8 * 60);
+    expect(getElapsedShiftMinutes("2026-11-01", "07:00", "15:00", NEW_YORK)).toBe(8 * 60);
+  });
+
+  it("counts a start inside the gap from the moment it resolves to", () => {
+    expect(getElapsedShiftMinutes("2026-03-08", "02:30", "07:00", NEW_YORK)).toBe(210);
+  });
+
+  it("runs a shift whose end equals its start for a full day", () => {
+    expect(getElapsedShiftMinutes("2026-06-13", "07:00", "07:00", NEW_YORK)).toBe(24 * 60);
+  });
+
+  it("is clock arithmetic when the organization has no timezone", () => {
+    expect(getElapsedShiftMinutes("2026-10-31", "23:00", "07:00", null)).toBe(8 * 60);
+    expect(getElapsedShiftMinutes("2026-10-31", "07:30", "15:00", undefined)).toBe(450);
   });
 });
