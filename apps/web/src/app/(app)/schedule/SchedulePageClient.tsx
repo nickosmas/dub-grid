@@ -7623,7 +7623,12 @@ function SchedulerContent({
       ({ dateKey }) => dateKey,
     );
     return workLimitBreaksAfterPublish(
-      { shifts, assignments: Array.from(assignmentById.values()), shiftCategories },
+      {
+        shifts,
+        assignments: Array.from(assignmentById.values()),
+        shiftCategories,
+        timeZone: orgTimeZone,
+      },
       windowDateKeys,
     );
   }, [
@@ -7634,6 +7639,7 @@ function SchedulerContent({
     shifts,
     assignmentById,
     shiftCategories,
+    orgTimeZone,
   ]);
   const publishPoints = publishSummaryPoints({
     editorRows: publishEditorRows,
