@@ -10,6 +10,8 @@ import {
   type MeScheduleSegmentItem,
 } from "@dubgrid/schedule-core";
 import { getAvatarTone } from "@dubgrid/design-tokens";
+import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { emptySceneDayFromIso } from "../../../shared/components/empty-scene/day-scene";
 import { Screen } from "../../../shared/components/Screen";
 import { Text } from "../../../shared/components/Text";
 import { workingThatDay } from "../lib/home-day";
@@ -39,7 +41,7 @@ type HeroStatus = "active" | "upcoming" | "scheduled" | "away";
 /**
  * The day beside Home's week on an open iPhone Duo. A day you work shows each
  * shift as Home's own shift card, which carries its date and who works with
- * you; a day off lists who works it, or, when nobody does, says Unscheduled.
+ * you; a day off lists who works it, or, when nobody does, is an empty day.
  */
 export function HomeDayPane({
   date,
@@ -114,23 +116,26 @@ export function HomeDayPane({
     );
   }
 
+  // The week beside it already says Unscheduled, so a day others work opens
+  // on who works it, and a day nobody works is the empty day, named.
+  if (offDayPeople.length === 0) {
+    const day = formatSplitDayTitle(date, todayDate);
+    return (
+      <Screen bottomPaddingMode="tabbed">
+        <EmptyStateCard
+          fillScreen
+          scene="team-day-empty"
+          sceneDay={emptySceneDayFromIso(date)}
+          title={`Nobody's working ${date === todayDate ? "today" : day}`}
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen bottomPaddingMode="tabbed">
       <View style={styles.page}>
-        {/* The week beside it already says Unscheduled, so a day others work
-            opens on who works it; a day nobody works still names itself. */}
-        {offDayPeople.length > 0 ? (
-          <PeopleList people={offDayPeople} styles={styles} title="Working that day" />
-        ) : (
-          <>
-            <View style={styles.heading}>
-              <Text accessibilityRole="header" fit="fixed" numberOfLines={1} style={styles.title}>
-                {formatSplitDayTitle(date, todayDate)}
-              </Text>
-            </View>
-            <Text style={styles.unscheduled}>Unscheduled</Text>
-          </>
-        )}
+        <PeopleList people={offDayPeople} styles={styles} title="Working that day" />
       </View>
     </Screen>
   );
@@ -233,22 +238,6 @@ const createStyles = (mobileColors: MobileColors) =>
     // A shift's card, then who works it with you.
     shift: {
       gap: mobileSpace.xl,
-    },
-    // The day's name on a row of its own over a hairline, as the week's
-    // header sits over the list.
-    heading: {
-      height: 40,
-      justifyContent: "center",
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: mobileColors.borderSubtle,
-    },
-    title: {
-      ...mobileTextWeighted("title", "bold"),
-      color: mobileColors.textPrimary,
-    },
-    unscheduled: {
-      ...mobileTextWeighted("cardTitle", "semibold"),
-      color: mobileColors.textSecondary,
     },
     section: {
       gap: mobileSpace.sm,
