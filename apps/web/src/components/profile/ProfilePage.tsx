@@ -18,10 +18,6 @@ import { usePersonPeriod } from "@/hooks/usePersonPeriod";
 import { fetchSelfPeriodShifts } from "@/features/account/client";
 import { formatPersonPeriodPhrase } from "@/lib/person-period";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  getProfileOverviewCurrentWeekDateKeys,
-  getProfileOverviewDateRange,
-} from "@/features/account/shared/profile-schedule";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import type { OrganizationRole } from "@/types";
 import { ProfilePanel } from "@/components/account/ProfilePanel";
@@ -46,11 +42,6 @@ const TAB_LABELS: Record<ProfileTab, string> = {
   alerts: "Alerts",
   security: "Security",
   privacy: "Privacy",
-};
-
-const toLocalDate = (iso: string) => {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(year, month - 1, day);
 };
 
 /** A settings card, its title in the header bar, its parts ruled apart. */
@@ -110,7 +101,6 @@ export function ProfilePage() {
     isOrgMember,
     employee,
     managementDepartmentIds,
-    shifts,
     recurringShifts,
     isLoading: profileLoading,
     error: profileError,
@@ -171,18 +161,7 @@ export function ProfilePage() {
     enabled: Boolean(orgId && user && isOnSchedule) && activeTab === "schedule",
     staleTime: 60_000,
   });
-  // Looking at another period, this week would be off the subject.
-  const periodIncludesToday =
-    period.range.startDate <= periodToday && periodToday <= period.range.endDate;
-
   const today = useMemo(() => getIsoDateInTimeZone(new Date(), org?.timezone), [org?.timezone]);
-  const thisWeek = useMemo(
-    () =>
-      getProfileOverviewCurrentWeekDateKeys(
-        getProfileOverviewDateRange(new Date(), org?.timezone),
-      ).map(toLocalDate),
-    [org?.timezone],
-  );
   const lookups = useMemo(
     () => ({
       assignmentById: new Map(assignments.map((item) => [item.id, item])),
@@ -298,13 +277,7 @@ export function ProfilePage() {
                   jobs={jobs}
                   absenceTypes={absenceTypes}
                   focusAreas={focusAreas}
-                  nextDays={periodIncludesToday ? { dates: thisWeek, shifts } : null}
-                  nextDaysCopy={{
-                    title: "This week",
-                    periodLabel: "Your published shifts",
-                    emptyTitle: "You're not scheduled this week",
-                    emptyDescription: "When your shifts get published, they'll show up right here.",
-                  }}
+                  nextDays={null}
                   mixTitle="What you work"
                 />
                 <div className="mt-6">
