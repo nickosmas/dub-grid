@@ -6156,7 +6156,12 @@ function SchedulerContent({
     if (panelShiftEntry) draft[editSessionCellKey] = panelShiftEntry;
     else delete draft[editSessionCellKey];
     return workLimitBreaksInDraft(
-      { shifts: draft, assignments: Array.from(assignmentById.values()), shiftCategories },
+      {
+        shifts: draft,
+        assignments: Array.from(assignmentById.values()),
+        shiftCategories,
+        timeZone: orgTimeZone,
+      },
       editPanel.empId,
       editPanelDateKey,
     );
@@ -6169,6 +6174,7 @@ function SchedulerContent({
     panelShiftEntry,
     assignmentById,
     shiftCategories,
+    orgTimeZone,
   ]);
   const correctionWindowStart = addDaysToIsoDate(todayKey, -CORRECTION_ADMIN_WINDOW_DAYS);
   const canCorrectPanelDay =
