@@ -27,8 +27,10 @@ import { SCHEDULE_DATE_TILE_MIN_WIDTH } from "../components/ScheduleDateTile";
 const PRESSABLE_INSET = mobileSpace.sm;
 
 /** A rounded press highlight that reaches past the content on both sides. */
-/** How far a picked day's pill stands in from the card's edges, as a picked row's does. */
-const UPCOMING_SPLIT_ROW_RADIUS = 14;
+/** How far a picked day stands in from the week card's edges, the same on every side. */
+const UPCOMING_SPLIT_INSET = mobileSpace.sm;
+/** Concentric with the card's corners at that inset. */
+const UPCOMING_SPLIT_ROW_RADIUS = mobileRadii.card - UPCOMING_SPLIT_INSET;
 
 const pressableBleed = {
   borderRadius: mobileRadii.control,
@@ -497,8 +499,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       borderCurve: "continuous",
     },
     upcomingShiftsCardSplit: {
-      paddingHorizontal: mobileSpace.sm,
-      paddingVertical: mobileSpace.xs,
+      paddingHorizontal: UPCOMING_SPLIT_INSET,
+      paddingVertical: UPCOMING_SPLIT_INSET,
     },
     upcomingDateGroupSplit: {
       alignItems: "center",
