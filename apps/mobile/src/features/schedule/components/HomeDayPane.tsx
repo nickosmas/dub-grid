@@ -12,6 +12,7 @@ import {
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import { Screen } from "../../../shared/components/Screen";
 import { Text } from "../../../shared/components/Text";
+import { workingThatDay } from "../lib/home-day";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import {
   mobileRadii,
@@ -127,7 +128,7 @@ export function HomeDayPane({
                 {formatSplitDayTitle(date, todayDate)}
               </Text>
             </View>
-            <Text style={styles.unscheduled}>No shifts</Text>
+            <Text style={styles.unscheduled}>Unscheduled</Text>
           </>
         )}
       </View>
@@ -201,25 +202,6 @@ function heroStatus(item: MeScheduleSegmentItem, todayDate: string, now: string)
   if (start && now < start) return "upcoming";
   if (start && end && (end <= start || now < end)) return "active";
   return "scheduled";
-}
-
-/** Everyone working that day but the viewer, once each. */
-function workingThatDay(
-  teamEntries: MobileScheduleEntry[],
-  date: string,
-  viewerId: string | undefined,
-): MobileScheduleEntry[] {
-  const seen = new Set<string>();
-  return teamEntries.filter((entry) => {
-    if (entry.date !== date || entry.employeeId === viewerId || seen.has(entry.employeeId)) {
-      return false;
-    }
-    if (isDeletedScheduleHistory(entry) || getScheduleEntryAbsenceTypeId(entry) != null) {
-      return false;
-    }
-    seen.add(entry.employeeId);
-    return true;
-  });
 }
 
 function firstItemOf(entry: MobileScheduleEntry): MeScheduleSegmentItem | null {
