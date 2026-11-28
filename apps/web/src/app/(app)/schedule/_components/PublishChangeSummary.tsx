@@ -1,12 +1,8 @@
 "use client";
 
-import { parseLocalDateKey, type WorkLimitBreak } from "@dubgrid/schedule-core";
+import { describeWorkLimit, type WorkLimitBreak } from "@dubgrid/schedule-core";
 import DraftReviewSummary from "@/components/DraftReviewSummary";
 import { Banner } from "@/components/ui/Banner";
-import {
-  formatCoverageNumber,
-  formatShortDate,
-} from "@/components/coverage-check/coverage-check-text";
 import { UNATTRIBUTED_EDITOR_ID, type EditorDraftBreakdown } from "@/lib/publish-attribution";
 
 export interface PublishEditorRow extends EditorDraftBreakdown {
@@ -63,19 +59,8 @@ export interface PublishWorkLimitPerson {
   breaks: WorkLimitBreak[];
 }
 
-function shortDate(dateKey: string): string {
-  return formatShortDate(parseLocalDateKey(dateKey));
-}
-
 /** "6 days in a row, Wed, Nov 25 to Mon, Nov 30", "42.5 hours in the week of Sun, Nov 29". */
-export function workLimitText(limit: WorkLimitBreak): string {
-  if (limit.limit === "row") {
-    return `${limit.days} days in a row, ${shortDate(limit.start)} to ${shortDate(limit.end)}`;
-  }
-  const amount =
-    limit.limit === "week" ? `${limit.days} days` : `${formatCoverageNumber(limit.hours)} hours`;
-  return `${amount} in the week of ${shortDate(limit.start)}`;
-}
+export const workLimitText = describeWorkLimit;
 
 /** One line per limit, in the order given: "Laura Marshall: 6 days in a row, ...". */
 export function publishWorkLimitLines(

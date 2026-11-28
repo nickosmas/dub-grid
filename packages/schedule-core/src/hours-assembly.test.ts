@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeShiftSegmentHours,
+  scheduleStateHours,
   type HoursAssignmentLike,
   type HoursShiftCategoryLike,
 } from "./hours-assembly";
@@ -85,5 +86,28 @@ describe("computeShiftSegmentHours", () => {
   it("returns 0 for an unresolved assignment id", () => {
     const hours = computeShiftSegmentHours([999], new Map(), null, null, new Map());
     expect(hours).toBe(0);
+  });
+});
+
+describe("scheduleStateHours", () => {
+  const shiftCategoriesById = new Map([[1, { id: 1, startTime: "07:00", endTime: "15:30" }]]);
+  const assignmentById = new Map([[5, { id: 5, categoryId: 1, defaultDurationHours: 4 }]]);
+  const assignmentIdByPair = new Map([["1:10", 5]]);
+  const lookups = { assignmentById, assignmentIdByPair, shiftCategoriesById };
+
+  it("reads a segment's assignment", () => {
+    const state = { kind: "worked", segments: [{ shiftId: 1, jobId: 10 }] };
+    expect(scheduleStateHours(state, lookups)).toBe(
+      computeShiftSegmentHours([5], assignmentById, null, null, shiftCategoriesById),
+    );
+  });
+
+  it("falls back to the shift's own times when no assignment matches", () => {
+    const state = { kind: "worked", segments: [{ shiftId: 1, jobId: 99 }] };
+    expect(scheduleStateHours(state, lookups)).toBe(8.5);
+  });
+
+  it("counts an absence as no hours", () => {
+    expect(scheduleStateHours({ kind: "absence", segments: [] }, lookups)).toBe(0);
   });
 });

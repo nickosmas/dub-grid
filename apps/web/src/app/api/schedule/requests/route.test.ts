@@ -50,6 +50,11 @@ vi.mock("@dubgrid/data-access", async (importOriginal) => ({
     settleShiftRequestAfterTransition(...args),
 }));
 
+const loadRequestWorkLimits = vi.fn();
+vi.mock("@/features/schedule/server/request-work-limits", () => ({
+  loadRequestWorkLimits: (...args: unknown[]) => loadRequestWorkLimits(...args),
+}));
+
 import { POST } from "./route";
 
 describe("POST /api/schedule/requests", () => {
@@ -330,6 +335,59 @@ describe("POST /api/schedule/requests", () => {
         previousTargetEmpId: CLAIMANT_EMP_ID,
       }),
     );
+  });
+
+  describe("reading the work limits an approval would cross (60c)", () => {
+    const REQUEST_ID = "33333333-3333-4333-8333-333333333333";
+    const workLimitsRequest = () =>
+      new NextRequest("http://localhost/api/schedule/requests", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "fetchShiftRequestWorkLimits",
+          orgId: ORG_ID,
+          requestId: REQUEST_ID,
+        }),
+      });
+
+    it("returns who the approval puts over, for an approver only", async () => {
+      const serviceClient = { from: vi.fn() };
+      requireOrgPermissions.mockImplementation(async () => ({
+        serviceClient,
+        actor: { id: "admin-user" },
+        orgId: ORG_ID,
+        permissions: { canApproveShiftRequests: true },
+      }));
+      const workLimits = [
+        {
+          employeeId: "emp-2",
+          name: "Bob Jones",
+          breaks: [{ limit: "row", days: 6, start: "2026-11-24", end: "2026-11-29" }],
+        },
+      ];
+      loadRequestWorkLimits.mockResolvedValueOnce(workLimits);
+
+      const response = await POST(workLimitsRequest());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ success: true, workLimits });
+      expect(loadRequestWorkLimits).toHaveBeenCalledWith(serviceClient, ORG_ID, REQUEST_ID);
+      const allows = requireOrgPermissions.mock.calls.at(-1)![2] as (p: object) => boolean;
+      expect(allows({ canApproveShiftRequests: true })).toBe(true);
+      expect(allows({ canApproveShiftRequests: false, canEditShifts: true })).toBe(false);
+    });
+
+    it("refuses a caller who cannot approve requests", async () => {
+      requireOrgPermissions.mockImplementation(async () => ({
+        response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      }));
+      loadRequestWorkLimits.mockClear();
+
+      const response = await POST(workLimitsRequest());
+
+      expect(response.status).toBe(403);
+      expect(loadRequestWorkLimits).not.toHaveBeenCalled();
+    });
   });
 
   describe("reading the days an approval would replace", () => {

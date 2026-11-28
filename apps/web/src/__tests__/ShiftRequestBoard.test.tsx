@@ -3,16 +3,21 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { ShiftRequestDraftCell } from "@dubgrid/domain";
+import type { NamedRequestWorkLimitPerson } from "@dubgrid/schedule-core";
 import ShiftRequestBoard from "@/components/ShiftRequestBoard";
 import type { ShiftRequest } from "@/types";
 
 const fetchShiftRequestDraftCells = vi.fn(
   async (..._args: unknown[]): Promise<ShiftRequestDraftCell[] | null> => [],
 );
+const fetchShiftRequestWorkLimits = vi.fn(
+  async (..._args: unknown[]): Promise<NamedRequestWorkLimitPerson[] | null> => [],
+);
 const fetchShiftRequests = vi.fn(async (..._args: unknown[]): Promise<ShiftRequest[]> => []);
 vi.mock("@/features/schedule/client/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/schedule/client/api")>()),
   fetchShiftRequestDraftCells: (...args: unknown[]) => fetchShiftRequestDraftCells(...args),
+  fetchShiftRequestWorkLimits: (...args: unknown[]) => fetchShiftRequestWorkLimits(...args),
   fetchShiftRequests: (...args: unknown[]) => fetchShiftRequests(...args),
 }));
 
@@ -331,6 +336,25 @@ describe("ShiftRequestBoard", () => {
       expect(note).toHaveTextContent("Approving publishes this request now and replaces them.");
       expect(onResolve).not.toHaveBeenCalled();
 
+      await confirmDialogAction(user, "Approve");
+      expect(onResolve).toHaveBeenCalledWith("approve-2", true, undefined);
+    });
+
+    it("names a work limit the approval crosses, and still approves on confirm (60c)", async () => {
+      fetchShiftRequestDraftCells.mockResolvedValueOnce([]);
+      fetchShiftRequestWorkLimits.mockResolvedValueOnce([
+        {
+          employeeId: "emp-2",
+          name: "Bob Jones",
+          breaks: [{ limit: "row", days: 6, start: "2026-04-11", end: "2026-04-16" }],
+        },
+      ]);
+      const { user, onResolve } = await openApprove();
+
+      expect(fetchShiftRequestWorkLimits).toHaveBeenCalledWith("approve-2", "org-1");
+      expect(screen.getByRole("note")).toHaveTextContent(
+        "Approving gives Bob Jones 6 days in a row, Sat, Apr 11 to Thu, Apr 16.",
+      );
       await confirmDialogAction(user, "Approve");
       expect(onResolve).toHaveBeenCalledWith("approve-2", true, undefined);
     });
