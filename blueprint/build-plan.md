@@ -1363,7 +1363,7 @@
   - [x] 60a. **Shift editor** - once a pick goes over a limit, one warning
         banner under the shift, as item 58's ("This makes 6 days in a row
         for Aisha."), naming each limit it crosses.
-  - [ ] 60b. **Publish** - the publish confirmation lists everyone the
+  - [x] 60b. **Publish** - the publish confirmation lists everyone the
         publish leaves over a limit, with the limit and the days, and
         Publish stays available.
   - [ ] 60c. **Request approval** - the approval panel on web and the

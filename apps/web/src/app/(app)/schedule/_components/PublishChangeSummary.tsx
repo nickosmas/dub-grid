@@ -1,6 +1,12 @@
 "use client";
 
+import { parseLocalDateKey, type WorkLimitBreak } from "@dubgrid/schedule-core";
 import DraftReviewSummary from "@/components/DraftReviewSummary";
+import { Banner } from "@/components/ui/Banner";
+import {
+  formatCoverageNumber,
+  formatShortDate,
+} from "@/components/coverage-check/coverage-check-text";
 import { UNATTRIBUTED_EDITOR_ID, type EditorDraftBreakdown } from "@/lib/publish-attribution";
 
 export interface PublishEditorRow extends EditorDraftBreakdown {
@@ -51,6 +57,64 @@ export function publishCoverageChangeText(change: PublishCoverageChange): string
   return `This publish ${opens} and ${closes}${where}.`;
 }
 
+/** Everyone a publish leaves over a work limit (60b). */
+export interface PublishWorkLimitPerson {
+  employeeId: string;
+  breaks: WorkLimitBreak[];
+}
+
+function shortDate(dateKey: string): string {
+  return formatShortDate(parseLocalDateKey(dateKey));
+}
+
+/** "6 days in a row, Wed, Nov 25 to Mon, Nov 30", "42.5 hours in the week of Sun, Nov 29". */
+export function workLimitText(limit: WorkLimitBreak): string {
+  if (limit.limit === "row") {
+    return `${limit.days} days in a row, ${shortDate(limit.start)} to ${shortDate(limit.end)}`;
+  }
+  const amount =
+    limit.limit === "week" ? `${limit.days} days` : `${formatCoverageNumber(limit.hours)} hours`;
+  return `${amount} in the week of ${shortDate(limit.start)}`;
+}
+
+/** One line per limit, in the order given: "Laura Marshall: 6 days in a row, ...". */
+export function publishWorkLimitLines(
+  people: ReadonlyArray<PublishWorkLimitPerson>,
+  nameOf: (employeeId: string) => string,
+): string[] {
+  return people.flatMap(({ employeeId, breaks }) =>
+    breaks.map((limit) => `${nameOf(employeeId)}: ${workLimitText(limit)}`),
+  );
+}
+
+export function publishWorkLimitHeading(count: number): string {
+  return count === 1
+    ? "1 person will be over a work limit:"
+    : `${count} people will be over a work limit:`;
+}
+
+export function PublishWorkLimits({
+  people,
+  nameOf,
+}: {
+  people: ReadonlyArray<PublishWorkLimitPerson>;
+  nameOf: (employeeId: string) => string;
+}) {
+  if (people.length === 0) return null;
+  return (
+    <Banner
+      tone="warning"
+      role="status"
+      aria-label="Work limits"
+      title={publishWorkLimitHeading(people.length)}
+    >
+      {publishWorkLimitLines(people, nameOf).map((line) => (
+        <span key={line}>{line}</span>
+      ))}
+    </Banner>
+  );
+}
+
 /**
  * What publishing does. Two or more go in the dialog's summary box; a single
  * one reads as a sentence in the summary's message instead.
@@ -93,10 +157,15 @@ export function publishSummaryPoints({
 export function PublishChangeSummary({
   editorRows,
   points = [],
+  workLimits = [],
+  nameOf = () => "Someone",
 }: {
   editorRows: PublishEditorRow[];
   /** From `publishSummaryPoints`; only a lone point is written into the message. */
   points?: string[];
+  /** Everyone the publish leaves over a work limit; listed, never blocking. */
+  workLimits?: ReadonlyArray<PublishWorkLimitPerson>;
+  nameOf?: (employeeId: string) => string;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -112,6 +181,8 @@ export function PublishChangeSummary({
           {points[0]}
         </p>
       ) : null}
+
+      <PublishWorkLimits people={workLimits} nameOf={nameOf} />
 
       {editorRows.length > 0 && (
         <div
