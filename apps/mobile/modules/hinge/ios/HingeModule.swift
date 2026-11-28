@@ -186,13 +186,61 @@ private final class SizeSentinel: UIView {
   }
 }
 
-/// Wraps a split view's detail pane and gives each scroll view in it the soft
-/// top edge effect. It stops at a scroll view rather than searching inside one.
+/// Wraps a split view's pane. It names the pane's page scroll view to the
+/// screen it sits in, so that screen's own navigation bar folds its large
+/// title and draws its scroll edge as that page scrolls: UIKit's own guess
+/// follows only the first subview of each view, which a pane's page doesn't
+/// always sit on. It also gives each scroll view the soft top edge effect,
+/// stopping at a scroll view rather than searching inside one.
 final class PaneEdgeView: ExpoView {
+  private weak var registeredScrollView: UIScrollView?
+
   override func layoutSubviews() {
     super.layoutSubviews()
-    guard #available(iOS 26.0, *) else { return }
-    softenTopEdges(in: self)
+    if #available(iOS 26.0, *) {
+      softenTopEdges(in: self)
+    }
+    registerContentScrollView()
+  }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    registeredScrollView = nil
+    setNeedsLayout()
+  }
+
+  private func registerContentScrollView() {
+    guard let scrollView = pageScrollView(), scrollView !== registeredScrollView,
+      let controller = owningViewController()
+    else { return }
+    controller.setContentScrollView(scrollView, for: .top)
+    registeredScrollView = scrollView
+  }
+
+  /// The page's own scroll view: the first one at least half the pane's
+  /// height, so a strip of chips above the page doesn't take its place.
+  private func pageScrollView() -> UIScrollView? {
+    var fallback: UIScrollView?
+    var queue: [UIView] = subviews
+    while !queue.isEmpty {
+      let view = queue.removeFirst()
+      if let scrollView = view as? UIScrollView {
+        if scrollView.bounds.height >= bounds.height / 2 { return scrollView }
+        if fallback == nil { fallback = scrollView }
+        continue
+      }
+      queue.append(contentsOf: view.subviews)
+    }
+    return fallback
+  }
+
+  private func owningViewController() -> UIViewController? {
+    var responder: UIResponder? = next
+    while let current = responder {
+      if let controller = current as? UIViewController { return controller }
+      responder = current.next
+    }
+    return nil
   }
 
   @available(iOS 26.0, *)

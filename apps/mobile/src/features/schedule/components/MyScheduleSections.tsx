@@ -15,6 +15,7 @@ import { IS_NATIVE_LIST } from "../../../shared/lib/native-list";
 import { CardActionRows } from "./CardActionRows";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { WeekDayLabel } from "./WeekDayLabel";
+import { groupFreeDays, type WeekRow } from "../lib/free-days";
 import type {
   PendingRequestAction,
   RequestActionBody,
@@ -1003,13 +1004,31 @@ export function UpcomingShiftsSection({
     items: itemsByDate.get(day.date) ?? [],
     deletedEntries: deletedEntriesByDate.get(day.date) ?? [],
   }));
+  // On the phone free days in a row read as one row. Beside the day on an open
+  // iPhone Duo each day stays its own row, since it's what you tap to see it.
+  const rows: WeekRow[] = inSplit
+    ? groupedItems.map((group) => ({ kind: "day", date: group.date }))
+    : groupFreeDays(
+        groupedItems.map((group) => ({
+          date: group.date,
+          free: group.items.length === 0,
+          changed: group.deletedEntries.length > 0,
+        })),
+        todayDate,
+      );
+  const groupsByDate = new Map(groupedItems.map((group) => [group.date, group]));
 
   return (
     // No heading: Home's title already names the week, and its hours sit
     // under that title.
     <View accessibilityLabel="Your week" style={styles.upcomingSectionBlock}>
       <View style={[styles.upcomingShiftsCard, inSplit && styles.upcomingShiftsCardSplit]}>
-        {groupedItems.map((group, groupIndex) => {
+        {rows.map((row, groupIndex) => {
+          if (row.kind !== "day") {
+            return <FreeDaysRow key={row.from} first={groupIndex === 0} row={row} />;
+          }
+          const group = groupsByDate.get(row.date);
+          if (!group) return null;
           const isToday = group.date === todayDate;
           // Beside the day on an open iPhone Duo the rows are compact, and the
           // picked day's gray, not a tint, marks where you are.
@@ -1019,9 +1038,7 @@ export function UpcomingShiftsSection({
                 styles.upcomingDateGroup,
                 isToday && styles.upcomingShiftRowToday,
                 isToday && groupIndex === 0 && styles.upcomingShiftRowTodayFirst,
-                isToday &&
-                  groupIndex === groupedItems.length - 1 &&
-                  styles.upcomingShiftRowTodayLast,
+                isToday && groupIndex === rows.length - 1 && styles.upcomingShiftRowTodayLast,
               ];
           const besidePick =
             group.date === highlightedDate ||
@@ -1041,6 +1058,7 @@ export function UpcomingShiftsSection({
                   date={group.date}
                   isPast={group.date < todayDate}
                   isToday={isToday}
+                  muted={inSplit && group.items.length === 0 && group.deletedEntries.length === 0}
                   todayTestID={`upcoming-today-date-${group.date}`}
                 />
               </View>
@@ -1049,19 +1067,22 @@ export function UpcomingShiftsSection({
               <View pointerEvents={inSplit ? "none" : "auto"} style={styles.upcomingDateShiftStack}>
                 {group.items.length === 0 ? (
                   <View
-                    accessibilityLabel={`Unscheduled ${formatCompactScheduleDate(group.date)}`}
+                    accessibilityLabel={`No shifts ${formatCompactScheduleDate(group.date)}`}
                     style={[
                       styles.upcomingUnscheduledRow,
                       inSplit && styles.upcomingUnscheduledRowSplit,
                     ]}
                     testID={`upcoming-unscheduled-row-${group.date}`}
                   >
-                    <Text
-                      maxFontSizeMultiplier={MAX_FONT_SCALE}
-                      style={styles.upcomingUnscheduledTitle}
-                    >
-                      Unscheduled
-                    </Text>
+                    {/* Beside the day, the day itself says what's on it. */}
+                    {inSplit ? null : (
+                      <Text
+                        maxFontSizeMultiplier={MAX_FONT_SCALE}
+                        style={styles.upcomingUnscheduledTitle}
+                      >
+                        No shifts
+                      </Text>
+                    )}
                     {group.deletedEntries.map((entry) => (
                       <PreviousChange
                         key={`${entry.employeeId}:${entry.date}`}
@@ -1283,6 +1304,35 @@ export function UpcomingShiftsSection({
             </View>
           );
         })}
+      </View>
+    </View>
+  );
+}
+
+/** Free days in a row as one row. */
+function FreeDaysRow({ row, first }: { row: Extract<WeekRow, { kind: "free" }>; first: boolean }) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+
+  return (
+    <View
+      accessibilityLabel={`No shifts ${formatCompactScheduleDate(row.from)} to ${formatCompactScheduleDate(row.to)}`}
+      style={styles.upcomingDateGroup}
+      testID={`upcoming-free-days-${row.from}`}
+    >
+      {first ? null : <View style={styles.upcomingDaySeparator} />}
+      <View style={[styles.upcomingDateColumn, styles.upcomingFreeRangeDates]}>
+        <WeekDayLabel date={row.from} />
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.upcomingFreeRangeDash}>
+          -
+        </Text>
+        <WeekDayLabel date={row.to} />
+      </View>
+      <View style={styles.upcomingFreeRangeCopy}>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.upcomingUnscheduledTitle}>
+          No shifts
+        </Text>
       </View>
     </View>
   );

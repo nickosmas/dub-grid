@@ -14,7 +14,6 @@ import { Text } from "../../../shared/components/Text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Stack, router, useIsFocused } from "expo-router";
-import { useHeaderHeight } from "expo-router/react-navigation";
 import { createSplitTopLevelStackOptions } from "../../../shared/navigation/top-level-stack";
 import { PaneSearch } from "../../../shared/layout/PaneSearch";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -661,9 +660,6 @@ export default function PeopleScreen() {
   // pick it shows the first person in the list other than you, since your
   // own page is the Profile tab.
   const split = useSplitLayout();
-  // The native bar's height, with People's large title: split, the person's
-  // page starts below it.
-  const headerHeight = useHeaderHeight();
   const peopleStackOptions = useMemo(
     () => createSplitTopLevelStackOptions(mobileColors, "People", split !== null),
     [mobileColors, split],
@@ -1261,9 +1257,10 @@ export default function PeopleScreen() {
 
   return (
     <SplitView
-      detailBarHeight={headerHeight}
+      detailBar
       entering={foldEntering}
       layout={split}
+      listTitle="People"
       list={listScreen}
       detail={
         shownPersonId ? (

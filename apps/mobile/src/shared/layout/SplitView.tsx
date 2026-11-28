@@ -5,7 +5,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileElevation, mobileRadii, mobileSpace } from "../theme/tokens";
@@ -20,6 +20,9 @@ import { TransparentPaneContext, useTransparentPane } from "./TransparentPaneCon
 import { useHingeStatus } from "./useHingeStatus";
 import { PaneEdge, hingeModule } from "../../../modules/hinge";
 import { FOLD_FADE_MS, type useFoldEntering } from "./FoldFade";
+import { PaneStack } from "./PaneStack";
+
+const IS_IOS = Platform.OS === "ios";
 
 /** The current split, or null when the screen shows one page at a time. */
 export function useSplitLayout(): SplitLayout | null {
@@ -58,6 +61,9 @@ export function SplitView({
   detailBarHeight = 0,
   stackWhenTall = false,
   sidebar = false,
+  listTitle,
+  listLargeTitle = true,
+  detailBar = false,
 }: {
   layout: SplitLayout;
   list: ReactNode;
@@ -77,6 +83,16 @@ export function SplitView({
   stackWhenTall?: boolean;
   /** Calendar's panes: the list on a sidebar gray, the detail on the content color. */
   sidebar?: boolean;
+  /**
+   * The list page's title, as the large title of the list pane's own native
+   * bar. One bar across both panes can't fold a title into itself, so each
+   * pane has its own, as each column of Mail does.
+   */
+  listTitle?: string;
+  /** False for a list page whose bar title is compact, as Profile's name is. */
+  listLargeTitle?: boolean;
+  /** The detail pane gets its own native bar too, named by the page's `PaneTitle`. */
+  detailBar?: boolean;
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
@@ -150,6 +166,10 @@ export function SplitView({
                     </TransparentPaneContext.Provider>
                   </View>
                 </View>
+              ) : listTitle != null && IS_IOS ? (
+                <PaneStack id="split-list" largeTitle={listLargeTitle} title={listTitle}>
+                  {list}
+                </PaneStack>
               ) : (
                 list
               )}
@@ -172,11 +192,17 @@ export function SplitView({
             ]}
           >
             <SafeAreaInsetsContext.Provider value={detailInsets}>
-              <DetailBarClearanceContext.Provider value={detailBarHeight}>
-                <DetailPaneContext.Provider value={true}>
-                  {PaneEdge ? <PaneEdge style={styles.detail}>{detail}</PaneEdge> : detail}
-                </DetailPaneContext.Provider>
-              </DetailBarClearanceContext.Provider>
+              {detailBar && IS_IOS ? (
+                <PaneStack collapsedTitle={false} id="split-detail">
+                  {detail}
+                </PaneStack>
+              ) : (
+                <DetailBarClearanceContext.Provider value={detailBarHeight}>
+                  <DetailPaneContext.Provider value={true}>
+                    {PaneEdge ? <PaneEdge style={styles.detail}>{detail}</PaneEdge> : detail}
+                  </DetailPaneContext.Provider>
+                </DetailBarClearanceContext.Provider>
+              )}
             </SafeAreaInsetsContext.Provider>
           </View>
         </Animated.View>

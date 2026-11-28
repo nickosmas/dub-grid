@@ -16,11 +16,14 @@ export function WeekDayLabel({
   date,
   isToday = false,
   isPast = false,
+  muted = false,
   todayTestID,
 }: {
   date: string;
   isToday?: boolean;
   isPast?: boolean;
+  /** A day with nothing on it, lighter than one with shifts. */
+  muted?: boolean;
   todayTestID?: string;
 }) {
   const mobileColors = useMobileColors();
@@ -29,13 +32,21 @@ export function WeekDayLabel({
 
   return (
     <View style={styles.label} testID={isToday ? todayTestID : undefined}>
-      <Text fit="fixed" style={[styles.weekday, isToday && styles.weekdayToday]}>
+      <Text
+        fit="fixed"
+        style={[styles.weekday, muted && styles.weekdayMuted, isToday && styles.weekdayToday]}
+      >
         {parts.weekdayLabel}
       </Text>
       <View style={[styles.circle, isToday && styles.circleToday]}>
         <Text
           fit="fixed"
-          style={[styles.day, isPast && styles.dayPast, isToday && styles.dayToday]}
+          style={[
+            styles.day,
+            isPast && styles.dayPast,
+            muted && styles.dayMuted,
+            isToday && styles.dayToday,
+          ]}
         >
           {parts.dayLabel}
         </Text>
@@ -56,6 +67,9 @@ const createStyles = (mobileColors: MobileColors) =>
       letterSpacing: 0.3,
       color: mobileColors.textSecondary,
     },
+    weekdayMuted: {
+      color: mobileColors.textSubtle,
+    },
     weekdayToday: {
       color: mobileColors.brand,
     },
@@ -75,6 +89,9 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     dayPast: {
       color: mobileColors.textSecondary,
+    },
+    dayMuted: {
+      color: mobileColors.textSubtle,
     },
     dayToday: {
       color: mobileColors.onBrandText,

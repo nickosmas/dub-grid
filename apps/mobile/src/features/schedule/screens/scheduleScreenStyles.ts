@@ -583,6 +583,23 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     upcomingDeletedHistoryRow: {
       paddingVertical: mobileSpace.md,
     },
+    // Free days in a row: the first and last date side by side.
+    upcomingFreeRangeDates: {
+      flexDirection: "row",
+      gap: mobileSpace.xs,
+    },
+    // Level with the day numbers, below the weekdays.
+    upcomingFreeRangeDash: {
+      ...mobileText.body,
+      alignSelf: "flex-end",
+      marginBottom: mobileSpace.sm,
+      color: mobileColors.textSubtle,
+    },
+    upcomingFreeRangeCopy: {
+      flex: 1,
+      justifyContent: "center",
+      paddingVertical: mobileSpace.lg,
+    },
     upcomingUnscheduledTitle: {
       ...mobileTextWeighted("cardTitle", "bold"),
       color: mobileColors.textSecondary,
