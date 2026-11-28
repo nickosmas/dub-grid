@@ -130,7 +130,9 @@ export function MyHomeSections({
 
   return (
     <View style={styles.sections}>
-      {split ? null : (
+      {/* Open, the week beside the day stands in for the card, unless it's a
+          week with no shifts at all: then the empty state, not seven bare days. */}
+      {split && hasScheduledDay ? null : (
         <MeHeroCard
           currentDate={todayDate}
           currentTime={currentTime}
@@ -181,7 +183,7 @@ export function MyHomeSections({
       />
       {/* A week with nothing in it is the empty state above alone, not that
           and seven Unscheduled days, as the Schedule tab already does. */}
-      {hasScheduledDay || split ? (
+      {hasScheduledDay ? (
         <UpcomingShiftsSection
           items={upcomingItems}
           todayDate={todayDate}
