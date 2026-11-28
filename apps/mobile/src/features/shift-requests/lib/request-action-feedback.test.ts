@@ -128,6 +128,28 @@ describe("getMobileRequestActionFeedback", () => {
       }
     });
 
+    it("names a work limit the approval crosses, after the changed days (60c)", () => {
+      const feedback = getMobileRequestActionFeedback({
+        requestId: "r1",
+        body: approve,
+        request: {
+          ...pickup,
+          draftCells: [],
+          workLimits: [
+            {
+              employeeId: "emp-2",
+              name: "Jane Morgan",
+              breaks: [{ limit: "row", days: 6, start: "2026-11-24", end: "2026-11-29" }],
+            },
+          ],
+        },
+      });
+
+      expect(feedback.warning).toEqual([
+        "Approving gives Jane Morgan 6 days in a row, Tue, Nov 24 to Sun, Nov 29.",
+      ]);
+    });
+
     it("never warns on a rejection", () => {
       const feedback = getMobileRequestActionFeedback({
         requestId: "r1",
