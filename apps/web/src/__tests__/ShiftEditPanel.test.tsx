@@ -1975,6 +1975,7 @@ describe("ShiftEditPanel", () => {
 
       await user.click(screen.getByRole("button", { name: "Correct this day" }));
       expect(screen.getByRole("dialog", { name: "Correct this day" })).toBeInTheDocument();
+      expect(document.querySelector(".dg-overlay-eyebrow")).toBeNull();
       expect(screen.getByRole("button", { name: "Save correction" })).toBeDisabled();
 
       await user.click(screen.getByRole("button", { name: "Cancel" }));

@@ -4737,7 +4737,6 @@ export default function ShiftEditPanel({
           )}
           <PersonAvatar person={avatarPerson} name={modal.empName} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            {correctingDay && <div className="dg-overlay-eyebrow">Correct this day</div>}
             <div className="dg-overlay-title">{modal.empName}</div>
             <div className="dg-overlay-subtitle">
               {formatDate(modal.date)}
