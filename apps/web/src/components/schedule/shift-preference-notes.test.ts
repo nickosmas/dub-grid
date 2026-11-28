@@ -4,6 +4,7 @@ import {
   preferenceLines,
   preferenceWarnings,
   shiftGroupTag,
+  workLimitWarnings,
   type PreferenceLookups,
 } from "./shift-preference-notes";
 
@@ -97,5 +98,47 @@ describe("preferenceWarnings", () => {
     ).toEqual([
       { lead: "Outside Aisha's preference.", label: "Job preference", value: "Only CNA" },
     ]);
+  });
+});
+
+describe("workLimitWarnings", () => {
+  it("names the run with its dates, across a month end", () => {
+    expect(
+      workLimitWarnings([{ limit: "row", days: 6, start: "2026-11-25", end: "2026-11-30" }], "Ana"),
+    ).toEqual([
+      {
+        lead: "This makes 6 days in a row for Ana.",
+        label: "Days in a row",
+        value: "Wed, Nov 25 to Mon, Nov 30",
+      },
+    ]);
+  });
+
+  it("names the week's days and hours, with a half hour", () => {
+    const week = { start: "2026-11-29", end: "2026-12-05" };
+    expect(
+      workLimitWarnings(
+        [
+          { limit: "week", days: 6, ...week },
+          { limit: "hours", hours: 42.5, ...week },
+        ],
+        "Ana",
+      ),
+    ).toEqual([
+      {
+        lead: "This makes 6 days in Ana's week.",
+        label: "Week",
+        value: "Sun, Nov 29 to Sat, Dec 5",
+      },
+      {
+        lead: "This makes 42.5 hours in Ana's week.",
+        label: "Week",
+        value: "Sun, Nov 29 to Sat, Dec 5",
+      },
+    ]);
+  });
+
+  it("names nothing when no limit is crossed", () => {
+    expect(workLimitWarnings([], "Ana")).toEqual([]);
   });
 });

@@ -190,6 +190,11 @@ Shipped capabilities and active roadmap (see `build-plan.md` for status):
   the shift editor shows that person's shift and job preferences and warns,
   without blocking, when a choice goes outside an Only preference. Anyone
   who can edit shifts sees them. Web only (owner, 2026-11-15).
+- Work-limit warnings: scheduling by hand, publishing and approving a
+  request (web and mobile) warn, without blocking, when someone would work
+  more than 5 days in a row (across weeks and periods), more than 5 days in
+  a Sunday-to-Saturday week, or more than 40 hours in that week. On screen
+  only (owner, 2026-11-27).
 - Platform and access rules (owner, 2026-11-08 and 2026-11-13): the mobile
   app stays signed in until the person signs out, while web sessions end
   after 35 minutes idle; suspending or offboarding someone ends only their
