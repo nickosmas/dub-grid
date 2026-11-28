@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash a6ef405649c757d6f13e1775aab05adbfa8405b0cd5a839ac21238911f350cbd -->
+<!-- blueprint:source-hash 4567250abbbab8177159dbb51201bb4a84da5ac7a1fe8709ba15db36da4252d4 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Every item has shipped except 40, which is
-in progress, and 57, which is in progress (57a shipped).
+in progress, 57, which is in progress (57a shipped), and 60, which is in progress (60a shipped).
 
 - **1** - Multi-tenant organizations with subdomain isolation and organization-specific settings.
 - **2** - Four-tier RBAC with per-person Admin permissions.
@@ -92,6 +92,7 @@ in progress, and 57, which is in progress (57a shipped).
 - **57** (in progress) - Every day a shift request touches is marked on the web grid while it waits and after approval; approvals count as changes in Highlight changes.
 - **58** - The shift picker shows a person's shift and job preferences and warns, without blocking, when a choice goes outside an Only preference.
 - **59** - On the iPhone Duo open or partly folded, every app page is a split view: the page as a list on the left and a useful detail on the right.
+- **60** (in progress) - Scheduling by hand, publishing and approving a request warn, without blocking, when someone goes past 5 days in a row, 5 days in a week or 40 hours.
 
 Each item's parts, what each part shipped and its migration live in
 `blueprint/build-plan.md` (the checklist) and `blueprint/history/` (the
@@ -189,6 +190,16 @@ one it names.
   Absences and shiftless work never warn. Anyone who can edit shifts sees
   them. Not on the grid, the open-shift picker or the Staffing check
   (2026-11-15). Design: "Shift preferences in the picker" canvas.
+
+### Work limits (item 60)
+
+- Scheduling by hand, publishing, and approving a pickup or swap on web or
+  mobile warn, never block, when someone would work more than 5 days in a
+  row (counted across weeks and periods, the period before and after
+  included), more than 5 days in a Sunday-to-Saturday week, or more than 40
+  hours in that week. The counts are Auto-build's own; a worked day is a day
+  with a shift. Warnings are on screen only: no alert, push or email
+  (2026-11-27). "Allow a sixth day in a row" stays an Auto-build option.
 
 ### Staff status (item 51)
 

@@ -4,7 +4,11 @@ import {
   MAX_DAYS_IN_A_ROW,
   MAX_DAYS_IN_A_WEEK,
   computeShiftSegmentHours,
+  daysInARowWith,
+  daysInWeekWith,
   getScheduleWeekStartDate,
+  workLimitBreaks,
+  type WorkLimitBreak,
   onlyPreferenceBreaks,
   parseLocalDateKey,
   type CoverageAvailability,
@@ -45,6 +49,8 @@ import {
   getStaffingStateTimeRanges,
   staffingStateFromEntry,
 } from "./open-shift-staffing";
+
+export { daysInARowWith, daysInWeekWith };
 
 const EMPTY_DAY: CoverageSuggestionDay = {
   assignmentIds: [],
@@ -188,40 +194,6 @@ function workedWith(
     const entry = shifts[`${employeeId}_${dateKey}`];
     return entry != null && !entry.isDelete && entry.assignmentIds.length > 0;
   };
-}
-
-/** How many days in a row the person works with this day worked, counted both ways. */
-export function daysInARowWith(worked: (dateKey: string) => boolean, dateKey: string): number {
-  const date = parseLocalDateKey(dateKey);
-  const reach = MAX_DAYS_IN_A_ROW * 2;
-  let days = 1;
-  for (
-    let offset = -1;
-    offset >= -reach && worked(formatDateKey(addDays(date, offset)));
-    offset -= 1
-  ) {
-    days += 1;
-  }
-  for (
-    let offset = 1;
-    offset <= reach && worked(formatDateKey(addDays(date, offset)));
-    offset += 1
-  ) {
-    days += 1;
-  }
-  return days;
-}
-
-/** How many days the person works in the Sunday-to-Saturday week holding a date, with that date worked. */
-export function daysInWeekWith(worked: (dateKey: string) => boolean, dateKey: string): number {
-  const date = parseLocalDateKey(dateKey);
-  const sunday = addDays(date, -date.getDay());
-  let days = 0;
-  for (let offset = 0; offset < 7; offset += 1) {
-    const key = formatDateKey(addDays(sunday, offset));
-    if (key === dateKey || worked(key)) days += 1;
-  }
-  return days;
 }
 
 /** The limits on a person's work a build or suggestion must keep. */
@@ -560,6 +532,19 @@ export function weekHoursWithPlanned(input: DraftHoursInput): CoverageOvertimeRu
     const week = Array.from({ length: 7 }, (_, offset) => formatDateKey(addDays(sunday, offset)));
     return roundHours(daysOf(employeeId, week, planned).reduce((sum, day) => sum + day.hours, 0));
   };
+}
+
+/** The work limits a person's day crosses in the draft, counted as Auto-build counts (60a). */
+export function workLimitBreaksInDraft(
+  input: DraftHoursInput,
+  employeeId: string,
+  dateKey: string,
+): WorkLimitBreak[] {
+  return workLimitBreaks({
+    worked: workedWith(input.shifts, [], employeeId),
+    weekHours: weekHoursWithPlanned(input)(employeeId, dateKey, []),
+    dateKey,
+  });
 }
 
 /**
