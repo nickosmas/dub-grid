@@ -3,9 +3,15 @@
 import { shiftDisplayName } from "@dubgrid/domain";
 import {
   onlyPreferenceBreaks,
+  parseLocalDateKey,
   type CoverageJobPreference,
   type CoverageShiftPreference,
+  type WorkLimitBreak,
 } from "@dubgrid/schedule-core";
+import {
+  formatCoverageNumber,
+  formatShortDate,
+} from "@/components/coverage-check/coverage-check-text";
 import { Banner } from "@/components/ui/Banner";
 import { describePreference } from "@/components/staff/PreferencesModal";
 import { isDefaultShiftSystemJob } from "@/lib/system-jobs";
@@ -115,6 +121,30 @@ export function preferenceWarnings(
     warnings.push(warning(named, "Job preference", value));
   }
   return warnings;
+}
+
+function dateSpan(start: string, end: string): string {
+  return `${formatShortDate(parseLocalDateKey(start))} to ${formatShortDate(parseLocalDateKey(end))}`;
+}
+
+/** "This makes 6 days in a row for Ana." then "Days in a row: Wed, Nov 25 to Mon, Nov 30" (60a). */
+export function workLimitWarnings(
+  breaks: ReadonlyArray<WorkLimitBreak>,
+  firstName: string,
+): PreferenceWarning[] {
+  return breaks.map((limit) => {
+    const value = dateSpan(limit.start, limit.end);
+    if (limit.limit === "row") {
+      return {
+        lead: `This makes ${limit.days} days in a row for ${firstName}.`,
+        label: "Days in a row",
+        value,
+      };
+    }
+    const amount =
+      limit.limit === "week" ? `${limit.days} days` : `${formatCoverageNumber(limit.hours)} hours`;
+    return { lead: `This makes ${amount} in ${firstName}'s week.`, label: "Week", value };
+  });
 }
 
 export function PreferenceBanner({
