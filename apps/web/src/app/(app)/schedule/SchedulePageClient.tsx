@@ -10195,6 +10195,7 @@ function SchedulerContent({
                   ? { onSave: handleSaveCorrection, saving: isSavingCorrection }
                   : null
               }
+              pastDay={editPanelIsPast && canEditShifts}
               pastDayNotice={pastDayNotice}
               correctedLabel={editPanelCorrectedLabel}
               correctedChange={editPanelCorrection ?? null}

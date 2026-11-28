@@ -245,6 +245,11 @@ interface ShiftEditPanelProps {
     onSave: (reason: string) => void;
     saving?: boolean;
   } | null;
+  /**
+   * A day before today, for someone who can edit shifts: it opens on what the
+   * day holds, with Correct this day when `correction` is set.
+   */
+  pastDay?: boolean;
   /** Why a past day opens read-only for this person (53b). */
   pastDayNotice?: string | null;
   /** A corrected past day (53c): when, by whom and why. */
@@ -532,6 +537,7 @@ export default function ShiftEditPanel({
   loadRequestApprovalWarning,
   onConfirmDraft,
   correction = null,
+  pastDay = false,
   pastDayNotice = null,
   correctedLabel = null,
   correctedChange = null,
@@ -619,15 +625,16 @@ export default function ShiftEditPanel({
     status: "loading" | "failed" | "ready";
     pattern: ShiftSeriesPattern | null;
   } | null>(null);
-  // A repeating item opens on what it holds and its series; Edit moves to the
-  // day editor. Every other item opens straight in the editor.
+  // A past day and a repeating item open on what they hold; Correct this day
+  // or Edit moves to the day editor. Every other item opens straight in it.
   const [viewing, setViewing] = useState(
     () =>
-      allowShiftEdits &&
-      !modal.requestMode &&
-      !!seriesId &&
-      !!currentShift &&
-      currentShift !== "OFF",
+      pastDay ||
+      (allowShiftEdits &&
+        !modal.requestMode &&
+        !!seriesId &&
+        !!currentShift &&
+        currentShift !== "OFF"),
   );
   // Remove changes the draft, then saves it once the panel sees the change.
   const [pendingCommitScope, setPendingCommitScope] = useState<SeriesScope | null>(null);
@@ -4473,7 +4480,8 @@ export default function ShiftEditPanel({
 
   const holdsSeveralItems = currentSegments.length > 1 || hasRestOfDayAbsence;
   const initialHadContent = !!initialShift && initialShift !== "OFF";
-  const canReturnToView = allowShiftEdits && !!seriesId && initialHadContent;
+  const canReturnToView =
+    (allowShiftEdits && !!seriesId && initialHadContent) || (pastDay && !!correction);
   const seriesOccurrenceDates = seriesSummary?.pattern?.occurrenceDates ?? null;
   const scopeOptions = seriesScopeOptions(seriesOccurrenceDates, dateKey, todayKey);
   const pastSeriesDaysNote = seriesHasPastDays(seriesOccurrenceDates, todayKey)
@@ -4490,7 +4498,8 @@ export default function ShiftEditPanel({
       : hasRestOfDayAbsence
         ? "A shift with an absence beside it can't repeat. Remove the absence to make it repeating."
         : null;
-  const inViewMode = viewing && hasActiveShift && allowShiftEdits;
+  const inViewMode = viewing && (pastDay || (hasActiveShift && allowShiftEdits));
+  const correctingDay = !!correction && !inViewMode;
 
   function returnToView() {
     handleUndo();
@@ -4687,7 +4696,11 @@ export default function ShiftEditPanel({
         role="dialog"
         aria-modal="true"
         aria-label={
-          correction ? "Correct this day" : allowShiftEdits ? "Edit shift" : "Shift details"
+          correctingDay
+            ? "Correct this day"
+            : allowShiftEdits && !pastDay
+              ? "Edit shift"
+              : "Shift details"
         }
       >
         {/* Panel Header */}
@@ -4724,7 +4737,7 @@ export default function ShiftEditPanel({
           )}
           <PersonAvatar person={avatarPerson} name={modal.empName} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            {correction && <div className="dg-overlay-eyebrow">Correct this day</div>}
+            {correctingDay && <div className="dg-overlay-eyebrow">Correct this day</div>}
             <div className="dg-overlay-title">{modal.empName}</div>
             <div className="dg-overlay-subtitle">
               {formatDate(modal.date)}
@@ -4748,7 +4761,7 @@ export default function ShiftEditPanel({
             padding: isMobile ? "16px" : "20px 24px",
           }}
         >
-          {correctedLabel && (
+          {correctedLabel && !correctingDay && (
             <CorrectedDayCard
               change={correctedView}
               notes={correctedNotes}
@@ -4886,11 +4899,46 @@ export default function ShiftEditPanel({
             />
           ) : inViewMode ? (
             <ShiftPanelView
-              header={renderCurrentShiftWithPreferences()}
-              details={buildViewDetails()}
+              header={
+                !pastDay ? (
+                  renderCurrentShiftWithPreferences()
+                ) : hasActiveShift ? (
+                  renderCurrentShiftPill()
+                ) : (
+                  <div
+                    data-past-day-empty
+                    style={{
+                      border: "1px dashed var(--dg-color-border-strong)",
+                      borderRadius: "var(--dg-radius-lg)",
+                      padding: "24px 16px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-label)",
+                        fontWeight: 600,
+                        color: "var(--dg-color-text-primary)",
+                      }}
+                    >
+                      Nothing scheduled
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                        marginTop: 4,
+                      }}
+                    >
+                      No shift or absence on this day.
+                    </div>
+                  </div>
+                )
+              }
+              details={hasActiveShift ? buildViewDetails() : []}
               status={buildViewStatus()}
               series={
-                seriesId ? (
+                seriesId && !pastDay ? (
                   <SeriesSummaryCard
                     date={dateKey}
                     pattern={seriesSummary?.pattern ?? null}
@@ -4901,7 +4949,7 @@ export default function ShiftEditPanel({
                   />
                 ) : null
               }
-              lastChange={describeLastChange()}
+              lastChange={pastDay && correctedLabel ? null : describeLastChange()}
             />
           ) : inDetailMode ? (
             // ── Detail mode ──────────────────────────────────────────────────
@@ -5420,7 +5468,22 @@ export default function ShiftEditPanel({
           </div>
         )}
 
-        {inViewMode && !repeatFormOpen && (
+        {inViewMode && !repeatFormOpen && pastDay && correction && (
+          <div className="dg-footer-bar">
+            <Button
+              onClick={() => {
+                setSeriesScope("this");
+                setViewing(false);
+              }}
+              className="dg-btn dg-btn-primary"
+              style={{ width: "100%", fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
+            >
+              Correct this day
+            </Button>
+          </div>
+        )}
+
+        {inViewMode && !repeatFormOpen && !pastDay && (
           <div
             className="dg-footer-bar"
             style={{

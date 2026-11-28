@@ -299,6 +299,9 @@ function renderPanel(
     onResolveRequest?: (requestId: string, approved: boolean, note?: string) => Promise<boolean>;
     loadRequestApprovalWarning?: (requestId: string) => Promise<string[]>;
     resolvePublisherName?: (userId: string) => string | null;
+    correction?: { onSave: (reason: string) => void } | null;
+    pastDay?: boolean;
+    pastDayNotice?: string | null;
     correctedLabel?: string | null;
     correctedChange?: {
       before: ScheduleCellState | null;
@@ -325,6 +328,9 @@ function panelElement(
 ) {
   return (
     <ShiftEditPanel
+      correction={overrides.correction}
+      pastDay={overrides.pastDay}
+      pastDayNotice={overrides.pastDayNotice}
       correctedLabel={overrides.correctedLabel}
       correctedChange={overrides.correctedChange}
       publishChange={overrides.publishChange}
@@ -1938,6 +1944,116 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByText(/To change times or notes, edit this day only/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Custom time/ })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    });
+  });
+
+  describe("A past day", () => {
+    const pastShift = {
+      currentShift: "D",
+      currentAssignmentIds: [1],
+      allowShiftEdits: true,
+      pastDay: true,
+      correction: { onSave: vi.fn() },
+    };
+
+    it("opens read only with Correct this day as its one action", () => {
+      renderPanel(pastShift);
+
+      expect(screen.getByRole("dialog", { name: "Shift details" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Correct this day" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Save correction" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+      expect(
+        screen.queryByText("Correct this day", { selector: ".dg-overlay-eyebrow" }),
+      ).toBeNull();
+    });
+
+    it("opens the correction editor and returns to the view on Cancel", async () => {
+      const user = userEvent.setup();
+      renderPanel(pastShift);
+
+      await user.click(screen.getByRole("button", { name: "Correct this day" }));
+      expect(screen.getByRole("dialog", { name: "Correct this day" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save correction" })).toBeDisabled();
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.getByRole("dialog", { name: "Shift details" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Correct this day" })).toBeInTheDocument();
+    });
+
+    it("returns to the view from Back too", async () => {
+      const user = userEvent.setup();
+      renderPanel(pastShift);
+
+      await user.click(screen.getByRole("button", { name: "Correct this day" }));
+      await user.click(screen.getByRole("button", { name: "Back" }));
+      expect(screen.getByRole("button", { name: "Correct this day" })).toBeInTheDocument();
+    });
+
+    it("says an empty day has nothing scheduled and still offers the correction", () => {
+      renderPanel({ ...pastShift, currentShift: null, currentAssignmentIds: [] });
+
+      expect(screen.getByText("Nothing scheduled")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Correct this day" })).toBeInTheDocument();
+    });
+
+    it("gives the reason instead of the button to someone who may not correct it", () => {
+      renderPanel({
+        ...pastShift,
+        allowShiftEdits: false,
+        correction: null,
+        pastDayNotice: "Correcting a past day needs Publish schedule.",
+      });
+
+      expect(screen.getByText("Correcting a past day needs Publish schedule.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Correct this day" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Save correction" })).toBeNull();
+    });
+
+    it("leaves a repeating shift's series and its Remove and Edit out", () => {
+      renderPanel({ ...pastShift, seriesId: "series-1" });
+
+      expect(screen.getByRole("button", { name: "Correct this day" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    });
+
+    it("says who added a shift that never changed", () => {
+      renderPanel({
+        ...pastShift,
+        auditInfo: {
+          createdByName: "Dana Lee",
+          updatedByName: null,
+          createdAt: "2026-11-01T12:00:00Z",
+          updatedAt: null,
+        },
+      });
+
+      expect(screen.getByText(/^Added by Dana Lee/)).toBeInTheDocument();
+      expect(screen.queryByText(/Last changed by/)).toBeNull();
+    });
+
+    it("shows a correction in the view only, with no last-change line under it", async () => {
+      const user = userEvent.setup();
+      renderPanel({
+        ...pastShift,
+        correctedLabel: "Corrected Nov 25 by Dana Lee.\nReason: Stayed late",
+        auditInfo: {
+          createdByName: "Sam Ortiz",
+          updatedByName: "Dana Lee",
+          createdAt: "2026-11-01T12:00:00Z",
+          updatedAt: "2026-11-25T12:00:00Z",
+        },
+      });
+
+      expect(document.querySelector("[data-corrected-day]")).toHaveTextContent(
+        "Corrected Nov 25 by Dana Lee.",
+      );
+      expect(screen.queryByText(/Last changed by|Added by/)).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Correct this day" }));
+      expect(document.querySelector("[data-corrected-day]")).toBeNull();
     });
   });
 

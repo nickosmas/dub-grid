@@ -136,8 +136,9 @@ one it names.
   the grid" board.
 - Days before today get a light wash, with shifts and absences at full color,
   and drag, paste, bulk delete, Auto-build and recurring fills never touch
-  them. A past cell opens Correct this day: shift and absence, an optional
-  typed reason, and Before and After. A correction changes the published day
+  them. A past cell opens read only, showing the day as it stands, with one
+  Correct this day button (2026-11-28) that opens the correction: shift and
+  absence, an optional typed reason, and Before and After. A correction changes the published day
   at once, sends staff no alert, logs the reason and marks the cell Corrected;
   hours and reports use it. It needs Edit shifts and Publish schedule. Admins
   correct the last 14 days, older days need a Super Admin, and a day someone
