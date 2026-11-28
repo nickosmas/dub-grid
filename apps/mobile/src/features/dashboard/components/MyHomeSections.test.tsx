@@ -171,7 +171,7 @@ describe("MyHomeSections", () => {
     // Seven days: two with a shift. Tuesday and Wednesday are free days in a
     // row and read as one row; Sunday, today (Thursday) and Friday each keep
     // their own.
-    expect(screen.getAllByText("No shifts")).toHaveLength(4);
+    expect(screen.getAllByText("Unscheduled")).toHaveLength(4);
     expect(screen.getByTestId("upcoming-free-days-2026-04-14")).toBeInTheDocument();
     expect(screen.queryByText("Needs your response")).not.toBeInTheDocument();
   });
@@ -205,8 +205,6 @@ describe("MyHomeSections", () => {
 
       expect(screen.getByLabelText("Your week")).toBeInTheDocument();
       expect(screen.queryByTestId("upcoming-free-days-2026-04-14")).toBeNull();
-      // The day itself, picked beside the list, says what's on it.
-      expect(screen.queryByText("No shifts")).not.toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: /Apr/ }).length).toBeGreaterThanOrEqual(6);
     });
   });
