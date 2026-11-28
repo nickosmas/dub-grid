@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeShiftSegmentHours,
+  scheduleStateHours,
   type HoursAssignmentLike,
   type HoursShiftCategoryLike,
 } from "./hours-assembly";
@@ -101,5 +102,38 @@ describe("computeShiftSegmentHours across a DST change", () => {
 
   it("keeps clock hours when no day is given", () => {
     expect(computeShiftSegmentHours([1], night, null, null, new Map())).toBe(8);
+  });
+});
+
+describe("scheduleStateHours", () => {
+  const shiftCategoriesById = new Map([[1, { id: 1, startTime: "07:00", endTime: "15:30" }]]);
+  const assignmentById = new Map([[5, { id: 5, categoryId: 1, defaultDurationHours: 4 }]]);
+  const assignmentIdByPair = new Map([["1:10", 5]]);
+  const lookups = { assignmentById, assignmentIdByPair, shiftCategoriesById };
+
+  it("reads a segment's assignment", () => {
+    const state = { kind: "worked", segments: [{ shiftId: 1, jobId: 10 }] };
+    expect(scheduleStateHours(state, lookups)).toBe(
+      computeShiftSegmentHours([5], assignmentById, null, null, shiftCategoriesById),
+    );
+  });
+
+  it("falls back to the shift's own times when no assignment matches", () => {
+    const state = { kind: "worked", segments: [{ shiftId: 1, jobId: 99 }] };
+    expect(scheduleStateHours(state, lookups)).toBe(8.5);
+  });
+
+  it("counts an absence as no hours", () => {
+    expect(scheduleStateHours({ kind: "absence", segments: [] }, lookups)).toBe(0);
+  });
+
+  it("counts a night across the fall-back change as the time worked", () => {
+    const nights = new Map([[2, { id: 2, startTime: "23:00", endTime: "07:00" }]]);
+    const state = { kind: "worked", segments: [{ shiftId: 2, jobId: 99 }] };
+    const night = { ...lookups, shiftCategoriesById: nights };
+    expect(
+      scheduleStateHours(state, night, { date: "2026-10-31", timeZone: "America/New_York" }),
+    ).toBe(9);
+    expect(scheduleStateHours(state, night)).toBe(8);
   });
 });
