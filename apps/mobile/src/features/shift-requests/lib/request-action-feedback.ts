@@ -7,6 +7,10 @@ import {
   SHIFT_REQUEST_DECLINE_MESSAGE,
   type ShiftRequestDraftCell,
 } from "@dubgrid/domain";
+import {
+  describeApprovalWorkLimits,
+  type NamedRequestWorkLimitPerson,
+} from "@dubgrid/schedule-core";
 
 export type MobileRequestActionBody = {
   action: string;
@@ -26,6 +30,8 @@ export type MobileRequestActionSubject = {
   parentRequestId?: string | null;
   /** Absent when not checked; null when the check failed. */
   draftCells?: ShiftRequestDraftCell[] | null;
+  /** Who approving would put over a work limit (60c); absent or null warns about nothing. */
+  workLimits?: NamedRequestWorkLimitPerson[] | null;
 };
 
 export type MobileRequestActionFeedback = {
@@ -40,16 +46,23 @@ export type MobileRequestActionFeedback = {
 };
 
 function approvalWarning(request: MobileRequestActionSubject | undefined): string[] {
-  if (!request || request.draftCells === undefined || !request.requesterEmpId) return [];
-  return describeApprovalDraftWarning(
-    {
-      requesterEmpId: request.requesterEmpId,
-      requesterName: request.requesterName ?? "",
-      targetEmpId: request.targetEmpId,
-      targetName: request.targetName,
-    },
-    request.draftCells,
-  );
+  if (!request || !request.requesterEmpId) return [];
+  const people = request.workLimits ?? [];
+  const names = new Map(people.map((person) => [person.employeeId, person.name]));
+  return [
+    ...(request.draftCells === undefined
+      ? []
+      : describeApprovalDraftWarning(
+          {
+            requesterEmpId: request.requesterEmpId,
+            requesterName: request.requesterName ?? "",
+            targetEmpId: request.targetEmpId,
+            targetName: request.targetName,
+          },
+          request.draftCells,
+        )),
+    ...describeApprovalWorkLimits(people, (id) => names.get(id) ?? "Someone"),
+  ];
 }
 
 export type MobileRequestActionSuccessToast = {

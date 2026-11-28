@@ -11,6 +11,7 @@ import {
 } from "@dubgrid/contracts";
 import { settleShiftRequestAfterTransition } from "@dubgrid/data-access";
 import { createMobileShiftRequest, loadMobileShiftRequestsPayload } from "@dubgrid/mobile-api-core";
+import { loadRequestsWorkLimits } from "@/features/schedule/server/request-work-limits";
 import { dispatchNotificationEventAfterResponse } from "@/features/notifications/server";
 import {
   fetchLinkedEmployeeForUser,
@@ -69,6 +70,7 @@ export async function GET(req: NextRequest) {
         hiddenUserIds: await hiddenUserIds(),
         absenceViewer: mobileAbsenceViewer(auth),
       }),
+    loadRequestsWorkLimits,
   });
 
   return NextResponse.json(mobileShiftRequestsResponseSchema.parse(payload));

@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash a1a8b44891eb3e1adbc2dbfaec3a6362be4956301951816e33b74dc2c45d7781 -->
+<!-- blueprint:source-hash d1409fcd111f2f8fbb97aae43140e190d680865f813bba63144a41e75549076a -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Every item has shipped except 40, which is
-in progress, 57, which is in progress (57a shipped), and 60, which is in progress (60a, 60b and 60c1 shipped).
+in progress, and 57, which is in progress (57a shipped).
 
 - **1** - Multi-tenant organizations with subdomain isolation and organization-specific settings.
 - **2** - Four-tier RBAC with per-person Admin permissions.
@@ -92,7 +92,7 @@ in progress, 57, which is in progress (57a shipped), and 60, which is in progres
 - **57** (in progress) - Every day a shift request touches is marked on the web grid while it waits and after approval; approvals count as changes in Highlight changes.
 - **58** - The shift picker shows a person's shift and job preferences and warns, without blocking, when a choice goes outside an Only preference.
 - **59** - On the iPhone Duo open or partly folded, every app page is a split view: the page as a list on the left and a useful detail on the right.
-- **60** (in progress) - Scheduling by hand, publishing and approving a request warn, without blocking, when someone goes past 5 days in a row, 5 days in a week or 40 hours.
+- **60** - Scheduling by hand, publishing and approving a request warn, without blocking, when someone goes past 5 days in a row, 5 days in a week or 40 hours.
 
 Each item's parts, what each part shipped and its migration live in
 `blueprint/build-plan.md` (the checklist) and `blueprint/history/` (the
@@ -194,7 +194,7 @@ one it names.
 ### Work limits (item 60)
 
 - Scheduling by hand, publishing, and approving a pickup or swap on web or
-  mobile (60c2) warn, never block, when someone would work more than 5 days in a
+  mobile warn, never block, when someone would work more than 5 days in a
   row (counted across weeks and periods, the period before and after
   included), more than 5 days in a Sunday-to-Saturday week, or more than 40
   hours in that week. The counts are Auto-build's own; a worked day is a day
