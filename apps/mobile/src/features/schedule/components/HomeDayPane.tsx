@@ -127,7 +127,7 @@ export function HomeDayPane({
                 {formatSplitDayTitle(date, todayDate)}
               </Text>
             </View>
-            <Text style={styles.unscheduled}>Unscheduled</Text>
+            <Text style={styles.unscheduled}>No shifts</Text>
           </>
         )}
       </View>

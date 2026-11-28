@@ -1661,7 +1661,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               !homeSplit.split && [styles.mePageEmpty, { minHeight: meEmptyPageMinHeight }],
           ]}
         >
-          {homeSplit.split ? null : (
+          {homeSplit.split && hasScheduledWeekDay ? null : (
             <MeHeroCard
               currentDate={todayDate}
               currentTime={currentTimeValue}
@@ -1732,7 +1732,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               />
             </>
           ) : null}
-          {hasScheduledWeekDay || homeSplit.split ? (
+          {hasScheduledWeekDay ? (
             <UpcomingShiftsSection
               items={meUpcomingItems}
               onPressEntry={handleOpenShiftDetail}
