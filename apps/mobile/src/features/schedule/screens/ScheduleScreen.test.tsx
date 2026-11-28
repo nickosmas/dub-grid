@@ -1578,7 +1578,7 @@ describe("ScheduleScreen", () => {
     expect(screen.getByTestId("me-hero-card")).toBeInTheDocument();
     expect(screen.queryByTestId("me-empty-schedule-state")).toBeNull();
     const todayRow = screen.getByTestId("upcoming-today-row-2026-04-16");
-    expect(within(todayRow).getByText("No shifts")).toBeInTheDocument();
+    expect(within(todayRow).getByText("Unscheduled")).toBeInTheDocument();
     expect(within(todayRow).queryByLabelText("Shift deleted")).toBeNull();
     expect(
       within(screen.getByTestId("upcoming-today-row-2026-04-16")).getByLabelText(
@@ -1626,7 +1626,7 @@ describe("ScheduleScreen", () => {
     render(<HomeScheduleScreen />);
 
     const todayRow = screen.getByTestId("upcoming-today-row-2026-04-16");
-    expect(within(todayRow).getByText("No shifts")).toBeInTheDocument();
+    expect(within(todayRow).getByText("Unscheduled")).toBeInTheDocument();
     expect(within(todayRow).queryByLabelText("Shift deleted")).toBeNull();
     expect(
       within(todayRow).getByLabelText(
@@ -1721,7 +1721,7 @@ describe("ScheduleScreen", () => {
     render(<HomeScheduleScreen />);
 
     const todayRow = screen.getByTestId("upcoming-today-row-2026-04-16");
-    expect(within(todayRow).getByText("No shifts")).toBeInTheDocument();
+    expect(within(todayRow).getByText("Unscheduled")).toBeInTheDocument();
     expect(within(todayRow).queryByLabelText("Shift deleted")).toBeNull();
     expect(within(todayRow).getByLabelText("Previous shift: Paid Time Off")).toHaveTextContent(
       "Was Paid Time Off",
@@ -1852,20 +1852,20 @@ describe("ScheduleScreen", () => {
 
     // Sunday to Wednesday are free days in a row: one row from the first to
     // the last. Friday, alone, keeps a row of its own.
-    expect(screen.getByTestId("upcoming-free-days-2026-04-12")).toHaveTextContent("No shifts");
-    expect(screen.getByLabelText(/^No shifts .* to /)).toBeInTheDocument();
+    expect(screen.getByTestId("upcoming-free-days-2026-04-12")).toHaveTextContent("Unscheduled");
+    expect(screen.getByLabelText(/^Unscheduled .* to /)).toBeInTheDocument();
     ["2026-04-13", "2026-04-14", "2026-04-15"].forEach((date) => {
       expect(screen.queryByTestId(`upcoming-unscheduled-row-${date}`)).toBeNull();
     });
     expect(screen.getByTestId("upcoming-unscheduled-row-2026-04-17")).toHaveTextContent(
-      "No shifts",
+      "Unscheduled",
     );
     expect(screen.queryByText("No shift scheduled")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("upcoming-today-row-2026-04-16")).getByLabelText("Shift edited"),
     ).toHaveTextContent("Edited");
     const deletedDay = screen.getByTestId("upcoming-unscheduled-row-2026-04-18");
-    expect(within(deletedDay).getByText("No shifts")).toBeInTheDocument();
+    expect(within(deletedDay).getByText("Unscheduled")).toBeInTheDocument();
     expect(within(deletedDay).queryByLabelText("Shift deleted")).toBeNull();
     expect(
       within(deletedDay).getByLabelText(

@@ -1067,22 +1067,19 @@ export function UpcomingShiftsSection({
               <View pointerEvents={inSplit ? "none" : "auto"} style={styles.upcomingDateShiftStack}>
                 {group.items.length === 0 ? (
                   <View
-                    accessibilityLabel={`No shifts ${formatCompactScheduleDate(group.date)}`}
+                    accessibilityLabel={`Unscheduled ${formatCompactScheduleDate(group.date)}`}
                     style={[
                       styles.upcomingUnscheduledRow,
                       inSplit && styles.upcomingUnscheduledRowSplit,
                     ]}
                     testID={`upcoming-unscheduled-row-${group.date}`}
                   >
-                    {/* Beside the day, the day itself says what's on it. */}
-                    {inSplit ? null : (
-                      <Text
-                        maxFontSizeMultiplier={MAX_FONT_SCALE}
-                        style={styles.upcomingUnscheduledTitle}
-                      >
-                        No shifts
-                      </Text>
-                    )}
+                    <Text
+                      maxFontSizeMultiplier={MAX_FONT_SCALE}
+                      style={styles.upcomingUnscheduledTitle}
+                    >
+                      Unscheduled
+                    </Text>
                     {group.deletedEntries.map((entry) => (
                       <PreviousChange
                         key={`${entry.employeeId}:${entry.date}`}
@@ -1317,7 +1314,7 @@ function FreeDaysRow({ row, first }: { row: Extract<WeekRow, { kind: "free" }>; 
 
   return (
     <View
-      accessibilityLabel={`No shifts ${formatCompactScheduleDate(row.from)} to ${formatCompactScheduleDate(row.to)}`}
+      accessibilityLabel={`Unscheduled ${formatCompactScheduleDate(row.from)} to ${formatCompactScheduleDate(row.to)}`}
       style={styles.upcomingDateGroup}
       testID={`upcoming-free-days-${row.from}`}
     >
@@ -1331,7 +1328,7 @@ function FreeDaysRow({ row, first }: { row: Extract<WeekRow, { kind: "free" }>; 
       </View>
       <View style={styles.upcomingFreeRangeCopy}>
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={styles.upcomingUnscheduledTitle}>
-          No shifts
+          Unscheduled
         </Text>
       </View>
     </View>
