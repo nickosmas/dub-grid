@@ -53,6 +53,7 @@ import {
 import { SplitShiftBadge } from "../components/SplitShift";
 import { DayOverview } from "../components/DayOverview";
 import { HomeSplitPane, useHomeSplit } from "../components/HomeSplit";
+import { isHomeWeekEmpty } from "../lib/home-day";
 import {
   DuoHomeLayout,
   addMonthsToIso,
@@ -1884,6 +1885,21 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   // Open on the iPhone Duo, Home is one header over the week beside a day of
   // it, or over the month.
+  // Nothing in the week and nobody on the day beside it: one empty state
+  // across the page, not an empty week beside an empty day.
+  const homeWeekEmpty =
+    homeSplit.split !== null &&
+    scheduleQuery.data !== undefined &&
+    (!canLoadMeTeamSchedule ||
+      meTeamScheduleQuery.data !== undefined ||
+      Boolean(meTeamScheduleQuery.error)) &&
+    isHomeWeekEmpty({
+      entries: activeEntries,
+      teamEntries: meTeamScheduleQuery.data?.entries ?? [],
+      day: homeSplit.day,
+      viewerId: linkedEmployee?.id ?? null,
+    });
+
   if (homeSplit.split) {
     const heading = getWeekHeading(range, todayDate, timeZone);
     const homeMonthTitle = getCalendarMonthTitleParts(homeMonth.visibleMonth);
@@ -1923,6 +1939,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                   onVisibleMonthChange={homeMonth.setVisibleMonth}
                 />
               </View>
+            ) : homeWeekEmpty ? (
+              listScreen
             ) : (
               <SplitView
                 layout={homeSplit.split}

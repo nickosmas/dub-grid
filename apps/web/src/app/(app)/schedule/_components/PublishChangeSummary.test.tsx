@@ -5,6 +5,8 @@ import {
   PublishChangeSummary,
   publishCoverageChangeText,
   publishSummaryPoints,
+  publishWorkLimitHeading,
+  publishWorkLimitLines,
   type PublishActiveEditor,
   type PublishEditorRow,
 } from "./PublishChangeSummary";
@@ -210,5 +212,40 @@ describe("publishCoverageChangeText", () => {
     expect(
       publishSummaryPoints({ editorRows: rows, coverageGapCount: 0, coverageChange: null }),
     ).toEqual([]);
+  });
+});
+
+describe("work limits (60b)", () => {
+  const laura = {
+    employeeId: "laura",
+    breaks: [
+      { limit: "row" as const, days: 6, start: "2026-11-25", end: "2026-11-30" },
+      { limit: "week" as const, days: 6, start: "2026-11-29", end: "2026-12-05" },
+      { limit: "hours" as const, hours: 42.5, start: "2026-11-29", end: "2026-12-05" },
+    ],
+  };
+  const nameOf = (id: string) => (id === "laura" ? "Laura Marshall" : "Ben Ortiz");
+
+  it("writes one line per limit, naming the person", () => {
+    expect(publishWorkLimitLines([laura], nameOf)).toEqual([
+      "Laura Marshall: 6 days in a row, Wed, Nov 25 to Mon, Nov 30",
+      "Laura Marshall: 6 days in the week of Sun, Nov 29",
+      "Laura Marshall: 42.5 hours in the week of Sun, Nov 29",
+    ]);
+  });
+
+  it("counts people, not limits, in the heading", () => {
+    expect(publishWorkLimitHeading(1)).toBe("1 person will be over a work limit:");
+    expect(publishWorkLimitHeading(2)).toBe("2 people will be over a work limit:");
+  });
+
+  it("shows the banner only when someone is over", () => {
+    const { rerender } = render(
+      <PublishChangeSummary editorRows={[]} workLimits={[laura]} nameOf={nameOf} />,
+    );
+    const banner = screen.getByRole("status", { name: "Work limits" });
+    expect(within(banner).getByText("1 person will be over a work limit:")).toBeTruthy();
+    rerender(<PublishChangeSummary editorRows={[]} workLimits={[]} nameOf={nameOf} />);
+    expect(screen.queryByRole("status", { name: "Work limits" })).toBeNull();
   });
 });

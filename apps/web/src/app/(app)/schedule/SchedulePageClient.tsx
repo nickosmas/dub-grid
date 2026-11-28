@@ -170,6 +170,7 @@ import {
   limitRecurringRuns,
   type WorkLimits,
   weekHoursWithPlanned,
+  workLimitBreaksAfterPublish,
   workLimitBreaksInDraft,
   workLimitWith,
   buildCoverageSuggestionInput,
@@ -7614,6 +7615,26 @@ function SchedulerContent({
     publishedDateSet,
     showPublishConfirm,
   ]);
+  // Counted only while the Publish dialog is open, on the schedule as the publish leaves it.
+  const publishWorkLimits = useMemo(() => {
+    if (!showPublishConfirm || !canEditShifts) return [];
+    const windowDateKeys = Array.from(
+      iterateDateRange(currentPublishWindow.startDate, currentPublishWindow.endDate),
+      ({ dateKey }) => dateKey,
+    );
+    return workLimitBreaksAfterPublish(
+      { shifts, assignments: Array.from(assignmentById.values()), shiftCategories },
+      windowDateKeys,
+    );
+  }, [
+    showPublishConfirm,
+    canEditShifts,
+    currentPublishWindow.startDate,
+    currentPublishWindow.endDate,
+    shifts,
+    assignmentById,
+    shiftCategories,
+  ]);
   const publishPoints = publishSummaryPoints({
     editorRows: publishEditorRows,
     activeEditors: publishActiveEditors,
@@ -10659,13 +10680,20 @@ function SchedulerContent({
                 draftBreakdown.totalChanges === 1 ? "" : "s"
               } for ${currentPublishWindow.label}?`}
               message={
-                <PublishChangeSummary editorRows={publishEditorRows} points={publishPoints} />
+                <PublishChangeSummary
+                  editorRows={publishEditorRows}
+                  points={publishPoints}
+                  workLimits={publishWorkLimits}
+                  nameOf={(employeeId) => employeeNameById.get(employeeId) ?? "Someone"}
+                />
               }
               summary={publishPoints.length > 1 ? { points: publishPoints } : undefined}
               maxWidth={560}
               wrapActions
               confirmLabel="Publish"
-              variant={allCoverageGaps.length > 0 ? "warning" : "info"}
+              variant={
+                allCoverageGaps.length > 0 || publishWorkLimits.length > 0 ? "warning" : "info"
+              }
               isLoading={isPublishing}
               onConfirm={() => {
                 setShowPublishConfirm(false);

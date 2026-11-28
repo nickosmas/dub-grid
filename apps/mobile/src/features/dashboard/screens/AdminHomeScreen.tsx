@@ -47,6 +47,7 @@ import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { SideColumnAlertsBar } from "../../schedule/components/SideColumnAlertsBar";
 import { getWeekHeading } from "../../schedule/lib/week-range-label";
 import { HomeSplitPane, useHomeSplit } from "../../schedule/components/HomeSplit";
+import { isHomeWeekEmpty } from "../../schedule/lib/home-day";
 import {
   formatScheduledHours,
   getCurrentTimeValue,
@@ -436,6 +437,16 @@ export function AdminHomeScreen() {
                 onVisibleMonthChange={month.setVisibleMonth}
               />
             </View>
+          ) : mine.isResolved &&
+            isHomeWeekEmpty({
+              entries: mine.entries,
+              teamEntries: mine.teamEntries,
+              day: homeSplit.day,
+              viewerId: mine.linkedEmployeeId,
+            }) ? (
+            // Nothing in the week and nobody on the day beside it: one empty
+            // state across the page, not an empty week beside an empty day.
+            page
           ) : (
             <SplitView
               layout={splitLayout}

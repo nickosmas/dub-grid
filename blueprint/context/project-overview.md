@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 4567250abbbab8177159dbb51201bb4a84da5ac7a1fe8709ba15db36da4252d4 -->
+<!-- blueprint:source-hash 76c3accec85e7302bc5f01cd09e0097846d3bd43bf016fc1c9f96dadabf17e49 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Every item has shipped except 40, which is
-in progress, 57, which is in progress (57a shipped), and 60, which is in progress (60a shipped).
+in progress, 57, which is in progress (57a shipped), and 60, which is in progress (60a and 60b shipped).
 
 - **1** - Multi-tenant organizations with subdomain isolation and organization-specific settings.
 - **2** - Four-tier RBAC with per-person Admin permissions.
