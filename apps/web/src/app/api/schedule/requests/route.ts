@@ -27,6 +27,7 @@ import {
   type NotificationEvent,
 } from "@/features/notifications/server";
 import { rowToShiftRequest } from "@/lib/db/mappers";
+import { loadRequestWorkLimits } from "@/features/schedule/server/request-work-limits";
 import { assertSafeFilterValue } from "@/lib/db/shared";
 import { apiErrorResponse } from "@/lib/error-handling";
 import logger from "@/lib/logger";
@@ -100,6 +101,11 @@ const requestSchema = z
     }),
     z.object({
       action: z.literal("fetchShiftRequestDraftCells"),
+      orgId: z.guid(),
+      requestId: z.guid(),
+    }),
+    z.object({
+      action: z.literal("fetchShiftRequestWorkLimits"),
       orgId: z.guid(),
       requestId: z.guid(),
     }),
@@ -672,6 +678,28 @@ export async function POST(req: NextRequest) {
           toShiftRequestDraftCell,
         );
         return NextResponse.json({ success: true, draftCells });
+      }
+
+      case "fetchShiftRequestWorkLimits": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canApproveShiftRequests,
+          { gridmasterNeedsImpersonation: true },
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const workLimits = await loadRequestWorkLimits(
+          auth.serviceClient,
+          data.orgId,
+          data.requestId,
+        );
+        return NextResponse.json({ success: true, workLimits });
       }
 
       case "cancelShiftRequest": {

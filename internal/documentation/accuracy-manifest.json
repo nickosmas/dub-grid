@@ -448,7 +448,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:3e400388280d325a2e136516b422d86a7d051925a3b2017e0573570461f2f1a6"
+      "evidenceFingerprint": "sha256:3cd71712956db41d78a6b8d1e9a114df3a8793b7f002ac42dc5d732a5701606b"
     },
     {
       "id": "recurring-shifts",
@@ -621,7 +621,7 @@
           "exclusions": []
         }
       ],
-      "evidenceFingerprint": "sha256:fc8c866270c76ca66364e6f20f9920a60e7d8c501fff86a4ecd3528e5bc0f8bb"
+      "evidenceFingerprint": "sha256:c086de7db93545db555348c4e2af849983ca1f20b1c1b6b72b91c5b6edeeb24f"
     },
     {
       "id": "dashboard",

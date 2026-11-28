@@ -20,7 +20,11 @@ import type {
   SeriesFrequency,
 } from "@/types";
 import type { ShiftRequestDraftCell } from "@dubgrid/domain";
-import type { CoverageJobPreference, CoverageShiftPreference } from "@dubgrid/schedule-core";
+import type {
+  CoverageJobPreference,
+  CoverageShiftPreference,
+  NamedRequestWorkLimitPerson,
+} from "@dubgrid/schedule-core";
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -260,6 +264,20 @@ export function fetchShiftRequestDraftCells(
     requestId,
   })
     .then((data) => data.draftCells)
+    .catch(() => null);
+}
+
+/** Who approving this request would put over a work limit (60c); `null` when the check fails. */
+export function fetchShiftRequestWorkLimits(
+  requestId: string,
+  orgId: string,
+): Promise<NamedRequestWorkLimitPerson[] | null> {
+  return requestScheduleAction<{ success: true; workLimits: NamedRequestWorkLimitPerson[] }>({
+    action: "fetchShiftRequestWorkLimits",
+    orgId,
+    requestId,
+  })
+    .then((data) => data.workLimits)
     .catch(() => null);
 }
 

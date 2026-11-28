@@ -153,3 +153,49 @@ export function computeShiftSegmentHours<A extends HoursAssignmentLike>(
   }
   return total;
 }
+
+/** The schedule-cell fields hours are read from. */
+export interface HoursScheduleState {
+  kind: string;
+  segments: ReadonlyArray<{ shiftId: number | null; jobId: number }>;
+  customStartTime?: string | null;
+  customEndTime?: string | null;
+}
+
+/**
+ * Worked hours of one stored schedule cell. Each segment's shift and job pick
+ * its assignment; a cell whose segments match none (older cells, or no job)
+ * falls back to its shifts' default times rather than counting zero.
+ */
+export function scheduleStateHours<A extends HoursAssignmentLike>(
+  state: HoursScheduleState,
+  lookups: {
+    assignmentById: Map<number, A>;
+    assignmentIdByPair: Map<string, number>;
+    shiftCategoriesById: Map<number, HoursShiftCategoryLike>;
+  },
+): number {
+  if (state.kind !== "worked") return 0;
+  let assignmentIds = state.segments
+    .map((segment) =>
+      lookups.assignmentIdByPair.get(buildShiftJobPairKey(segment.shiftId, segment.jobId)),
+    )
+    .filter((id): id is number => id != null);
+  let assignmentById: Map<number, HoursAssignmentLike> = lookups.assignmentById;
+  if (assignmentIds.length === 0) {
+    assignmentById = new Map(lookups.assignmentById);
+    assignmentIds = state.segments.flatMap((segment) => {
+      if (segment.shiftId == null) return [];
+      const id = -segment.shiftId;
+      if (!assignmentById.has(id)) assignmentById.set(id, { id, categoryId: segment.shiftId });
+      return [id];
+    });
+  }
+  return computeShiftSegmentHours(
+    assignmentIds,
+    assignmentById,
+    state.customStartTime ?? null,
+    state.customEndTime ?? null,
+    lookups.shiftCategoriesById,
+  );
+}

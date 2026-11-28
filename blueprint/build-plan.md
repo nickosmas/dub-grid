@@ -1366,6 +1366,9 @@
   - [x] 60b. **Publish** - the publish confirmation lists everyone the
         publish leaves over a limit, with the limit and the days, and
         Publish stays available.
-  - [ ] 60c. **Request approval** - the approval panel on web and the
-        approval in the mobile app warn when approving a pickup or swap
-        would put the person who gets the shift over a limit.
+  - [x] 60c1. **Request approval on web** - every web approval (the
+        requests board, the shift panel and the dashboard queue) warns when
+        approving a pickup or swap would put the person who gets the shift
+        over a limit, counted on the server from the published schedule.
+  - [ ] 60c2. **Request approval on mobile** - the mobile app's approval
+        warns the same way, from the same server check.

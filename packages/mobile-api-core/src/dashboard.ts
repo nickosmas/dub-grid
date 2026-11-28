@@ -12,11 +12,10 @@ import {
   summarizePublishChanges,
 } from "@dubgrid/domain";
 import {
-  buildShiftJobPairKey,
-  computeShiftSegmentHours,
   formatLocalDateKey,
   parseLocalDateKey,
   resolveActiveShiftRequests,
+  scheduleStateHours,
   type CoverageByFocusAreaEntry,
   type CoverageDailyEntry,
   type CoverageTotals,
@@ -228,7 +227,7 @@ type FetchMobileDashboardDraftComparisons = (
 // HoursAssignmentLike/HoursShiftCategoryLike structurally, so the same
 // assignment/category rows the coverage engine already resolves (via web's
 // fetchMobileOpenShiftContext in apps/web/src/features/mobile/server/data.ts)
-// can also drive computeShiftSegmentHours below.
+// can also drive scheduleStateHours below.
 export type DashboardAssignmentRow = {
   id: number;
   shiftId?: number | null;
@@ -466,39 +465,11 @@ export function computeStaffHoursForPeriod(
   for (const row of scheduleRows) {
     if (row.state.kind !== "worked") continue;
 
-    let assignmentIds = row.state.segments
-      .map((segment) =>
-        assignmentIdByPair.get(buildShiftJobPairKey(segment.shiftId, segment.jobId)),
-      )
-      .filter((id): id is number => id != null);
-    let hoursAssignmentById = assignmentById;
-    if (assignmentIds.length === 0) {
-      // Historical cells can predate an assignment definition or omit a job
-      // id. Their category still supplies the canonical default hours, so
-      // retain that information instead of turning real worked time into zero.
-      hoursAssignmentById = new Map(assignmentById);
-      assignmentIds = row.state.segments.flatMap((segment) => {
-        if (segment.shiftId == null) return [];
-        const id = -segment.shiftId;
-        if (!hoursAssignmentById.has(id)) {
-          hoursAssignmentById.set(id, { id, categoryId: segment.shiftId });
-        }
-        return [id];
-      });
-    }
-    // Canonical @dubgrid/schedule-core algorithm — assignment-level override
-    // time, then shift-category default time, then duration-only fields,
-    // with pipe-delimited per-segment custom-time parsing. The previous
-    // local version only ever read shift-category times directly, so it
-    // undercounted (or zeroed) hours for any org using assignment overrides
-    // or duration-only shift codes, silently missing real overtime.
-    const hours = computeShiftSegmentHours(
-      assignmentIds,
-      hoursAssignmentById,
-      row.state.customStartTime,
-      row.state.customEndTime,
-      normalizedShiftCategoriesById,
-    );
+    const hours = scheduleStateHours(row.state, {
+      assignmentById,
+      assignmentIdByPair,
+      shiftCategoriesById: normalizedShiftCategoriesById,
+    });
     if (hours <= 0) continue;
 
     const name = `${row.employees.first_name} ${row.employees.last_name}`.trim();
