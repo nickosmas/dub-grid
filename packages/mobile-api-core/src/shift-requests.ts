@@ -10,7 +10,12 @@ import type {
   MobileUpdateShiftRequestBody,
 } from "@dubgrid/contracts";
 import { toShiftRequestDraftCell, type ShiftRequestDraftCellRow } from "@dubgrid/domain";
-import { hasShiftRequestStarted, timesOverlap, type TimeRange } from "@dubgrid/schedule-core";
+import {
+  hasShiftRequestStarted,
+  timesOverlap,
+  type NamedRequestWorkLimitPerson,
+  type TimeRange,
+} from "@dubgrid/schedule-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type MobileShiftRequestEmployee = NonNullable<MobileBootstrapResponse["linkedEmployee"]>;
@@ -327,6 +332,8 @@ export async function loadMobileShiftRequestsPayload<TEmployee extends MobileShi
     fetchMobileOpenShifts: FetchMobileOpenShifts<TEmployee>;
     fetchMobileScheduleEntries: FetchMobileScheduleEntries;
     fetchMobileShiftRequests: FetchMobileShiftRequests;
+    /** Who approving each request would put over a work limit (60c); absent leaves them unchecked. */
+    loadRequestsWorkLimits?: LoadRequestsWorkLimits;
   },
 ): Promise<MobileShiftRequestsResponse> {
   const linkedEmployee = await deps.fetchLinkedEmployeeForUser(
@@ -399,32 +406,57 @@ export async function loadMobileShiftRequestsPayload<TEmployee extends MobileShi
             scheduleEntries: availabilityEntries,
             timeZone: auth.currentOrg.timezone ?? null,
           })
-        : await withApprovalDraftCells(auth, requests),
+        : await withApprovalChecks(auth, requests, deps.loadRequestsWorkLimits),
     openShifts,
   };
 }
 
+type LoadRequestsWorkLimits = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+  requestIds: string[],
+) => Promise<Map<string, NamedRequestWorkLimitPerson[]>>;
+
 /**
  * Approving publishes at once and replaces the earlier drafts of the days it
- * publishes, so an approver is warned about them first. Only an approver can
- * ask, and only a request awaiting approval has anything to approve.
+ * publishes, and it may put the person who gets the shift over a work limit
+ * (60c), so an approver is warned about both first. Only an approver can ask,
+ * and only a request awaiting approval has anything to approve. A failed
+ * work-limit check is null, which warns about nothing.
  */
-async function withApprovalDraftCells(
+async function withApprovalChecks(
   auth: MobileShiftRequestsContext,
   requests: MobileShiftRequest[],
+  loadRequestsWorkLimits: LoadRequestsWorkLimits | undefined,
 ): Promise<MobileShiftRequest[]> {
   if (!auth.permissions.canApproveShiftRequests) return requests;
-  return Promise.all(
-    requests.map(async (request) => {
-      if (request.status !== "pending_approval") return request;
-      const { data, error } = await auth.userClient.rpc("shift_request_draft_cells", {
-        p_request_id: request.id,
-      });
-      const draftCells = error
-        ? null
-        : ((data ?? []) as ShiftRequestDraftCellRow[]).map(toShiftRequestDraftCell);
-      return { ...request, draftCells };
-    }),
+  const pendingIds = requests
+    .filter((request) => request.status === "pending_approval")
+    .map((request) => request.id);
+  const workLimitsLookup =
+    loadRequestsWorkLimits && pendingIds.length > 0
+      ? loadRequestsWorkLimits(auth.serviceClient, auth.currentOrg.id, pendingIds).catch(() => null)
+      : Promise.resolve(undefined);
+  const [withCells, workLimits] = await Promise.all([
+    Promise.all(
+      requests.map(async (request) => {
+        if (request.status !== "pending_approval") return request;
+        const { data, error } = await auth.userClient.rpc("shift_request_draft_cells", {
+          p_request_id: request.id,
+        });
+        const draftCells = error
+          ? null
+          : ((data ?? []) as ShiftRequestDraftCellRow[]).map(toShiftRequestDraftCell);
+        return { ...request, draftCells };
+      }),
+    ),
+    workLimitsLookup,
+  ]);
+  if (workLimits === undefined) return withCells;
+  return withCells.map((request) =>
+    request.status === "pending_approval"
+      ? { ...request, workLimits: workLimits ? (workLimits.get(request.id) ?? []) : null }
+      : request,
   );
 }
 

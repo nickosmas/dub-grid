@@ -173,6 +173,7 @@ describe("loadMobileShiftRequestsPayload", () => {
   function payloadFor(
     permissions: Partial<MobileShiftRequestsContext["permissions"]>,
     rpcResult: unknown,
+    loadRequestsWorkLimits?: (...args: unknown[]) => Promise<Map<string, unknown[]>>,
   ) {
     const { auth, rpc } = makeContext(rpcResult);
     auth.permissions = { ...auth.permissions, ...permissions };
@@ -188,9 +189,16 @@ describe("loadMobileShiftRequestsPayload", () => {
         fetchMobileOpenShifts: vi.fn(async () => []),
         fetchMobileScheduleEntries: vi.fn(async () => []),
         fetchMobileShiftRequests: vi.fn(async () => requests),
+        ...(loadRequestsWorkLimits
+          ? {
+              loadRequestsWorkLimits: loadRequestsWorkLimits as NonNullable<
+                Parameters<typeof loadMobileShiftRequestsPayload>[2]["loadRequestsWorkLimits"]
+              >,
+            }
+          : {}),
       },
     );
-    return { load, rpc };
+    return { load, rpc, auth };
   }
 
   it("gives an approver the changed days of each request awaiting approval", async () => {
@@ -205,6 +213,43 @@ describe("loadMobileShiftRequestsPayload", () => {
     expect(requests[1]).not.toHaveProperty("draftCells");
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc).toHaveBeenCalledWith("shift_request_draft_cells", { p_request_id: PENDING_ID });
+  });
+
+  it("gives an approver the work limits each request awaiting approval would cross (60c)", async () => {
+    const person = {
+      employeeId: EMP_ID,
+      name: "Ana Diaz",
+      breaks: [{ limit: "row", days: 6, start: "2026-11-24", end: "2026-11-29" }],
+    };
+    const loader = vi.fn(async () => new Map([[PENDING_ID, [person]]]));
+    const { load, auth } = payloadFor(
+      { canApproveShiftRequests: true },
+      { data: [], error: null },
+      loader,
+    );
+
+    const { requests } = await load;
+
+    expect(requests[0].workLimits).toEqual([person]);
+    expect(requests[1]).not.toHaveProperty("workLimits");
+    expect(loader).toHaveBeenCalledWith(auth.serviceClient, auth.currentOrg.id, [PENDING_ID]);
+  });
+
+  it("marks a failed work-limit check as null, and skips it for someone who can't approve", async () => {
+    const failing = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    const approver = payloadFor(
+      { canApproveShiftRequests: true },
+      { data: [], error: null },
+      failing,
+    );
+    expect((await approver.load).requests[0].workLimits).toBeNull();
+
+    const loader = vi.fn(async () => new Map());
+    const scheduler = payloadFor({ canEditShifts: true }, { data: [], error: null }, loader);
+    expect((await scheduler.load).requests[0]).not.toHaveProperty("workLimits");
+    expect(loader).not.toHaveBeenCalled();
   });
 
   it("marks a failed check as null so the warning still shows", async () => {

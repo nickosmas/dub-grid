@@ -1353,7 +1353,7 @@
         week (their shift each day); staff see "Working with you this week"
         first and no contact details. Every pose and phone. Removed
         2026-11-18 (owner): a person's page on mobile shows no schedule.
-- [ ] 60. **Work-limit warnings** - when someone is scheduled by hand or a
+- [x] 60. **Work-limit warnings** - when someone is scheduled by hand or a
       request is approved, DubGrid warns, without blocking, when it gives a
       person more than 5 days in a row (counted across weeks and periods,
       the period before and after included), more than 5 days in a
@@ -1370,5 +1370,5 @@
         requests board, the shift panel and the dashboard queue) warns when
         approving a pickup or swap would put the person who gets the shift
         over a limit, counted on the server from the published schedule.
-  - [ ] 60c2. **Request approval on mobile** - the mobile app's approval
+  - [x] 60c2. **Request approval on mobile** - the mobile app's approval
         warns the same way, from the same server check.
