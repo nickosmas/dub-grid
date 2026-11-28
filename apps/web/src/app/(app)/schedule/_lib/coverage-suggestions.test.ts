@@ -27,6 +27,7 @@ import {
   publishedDayFromShifts,
   weekDaysWithPlanned,
   weekHoursWithPlanned,
+  workLimitBreaksAfterPublish,
   workLimitBreaksInDraft,
   workLimitWith,
 } from "./coverage-suggestions";
@@ -601,6 +602,53 @@ describe("days in a row", () => {
       { limit: "week", days: 6, start: "2026-10-18", end: "2026-10-24" },
       { limit: "hours", hours: 48, start: "2026-10-18", end: "2026-10-24" },
     ]);
+  });
+
+  describe("after a publish (60b)", () => {
+    const days = (start: string, count: number) =>
+      Array.from({ length: count }, (_, offset) => {
+        const date = new Date(`${start}T00:00:00`);
+        date.setDate(date.getDate() + offset);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      });
+    const nextTwoWeeks = days("2026-10-25", 14);
+    const draftOnly = { ...worked([DAY]), publishedAssignmentDefinitionIds: [] };
+
+    it("counts the published period before the window", () => {
+      const shifts = { ...fiveDays, "ana_2026-10-25": draftOnly, "ben_2026-10-26": worked([DAY]) };
+      expect(workLimitBreaksAfterPublish({ ...input, shifts }, nextTwoWeeks)).toEqual([
+        {
+          employeeId: "ana",
+          breaks: [{ limit: "row", days: 6, start: "2026-10-20", end: "2026-10-25" }],
+        },
+      ]);
+    });
+
+    it("leaves out a draft outside the window, which this publish doesn't publish", () => {
+      const shifts = { ...fiveDays, "ana_2026-10-20": draftOnly, "ana_2026-10-25": draftOnly };
+      expect(workLimitBreaksAfterPublish({ ...input, shifts }, nextTwoWeeks)).toEqual([]);
+    });
+
+    it("leaves out a day the draft deletes in the window", () => {
+      const shifts = { ...fiveDays, "ana_2026-10-25": { ...worked([DAY]), isDelete: true } };
+      expect(workLimitBreaksAfterPublish({ ...input, shifts }, nextTwoWeeks)).toEqual([]);
+    });
+
+    it("names each limit once, in date order", () => {
+      const thatWeek = days("2026-10-18", 7);
+      expect(workLimitBreaksAfterPublish(input, thatWeek)).toEqual([]);
+      const shifts = { ...fiveDays, "ana_2026-10-19": draftOnly };
+      expect(workLimitBreaksAfterPublish({ ...input, shifts }, thatWeek)).toEqual([
+        {
+          employeeId: "ana",
+          breaks: [
+            { limit: "week", days: 6, start: "2026-10-18", end: "2026-10-24" },
+            { limit: "hours", hours: 48, start: "2026-10-18", end: "2026-10-24" },
+            { limit: "row", days: 6, start: "2026-10-19", end: "2026-10-24" },
+          ],
+        },
+      ]);
+    });
   });
 
   it("leaves out a day the draft deletes", () => {
