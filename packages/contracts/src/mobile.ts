@@ -730,6 +730,42 @@ export const mobileShiftRequestSchema = z.object({
     )
     .nullable()
     .optional(),
+  /**
+   * For an approver, on a request awaiting approval: who approving it would
+   * put over a work limit (60c). Absent when not checked; null when the
+   * check failed, which warns about nothing.
+   */
+  workLimits: z
+    .array(
+      z.object({
+        employeeId: z.guid(),
+        name: z.string(),
+        breaks: z.array(
+          z.discriminatedUnion("limit", [
+            z.object({
+              limit: z.literal("row"),
+              days: z.number().int(),
+              start: z.string().date(),
+              end: z.string().date(),
+            }),
+            z.object({
+              limit: z.literal("week"),
+              days: z.number().int(),
+              start: z.string().date(),
+              end: z.string().date(),
+            }),
+            z.object({
+              limit: z.literal("hours"),
+              hours: z.number(),
+              start: z.string().date(),
+              end: z.string().date(),
+            }),
+          ]),
+        ),
+      }),
+    )
+    .nullable()
+    .optional(),
 });
 
 // Same thresholds as web's computeOpenShifts (apps/web/src/lib/
