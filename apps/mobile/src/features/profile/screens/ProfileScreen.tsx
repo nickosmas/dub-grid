@@ -1,10 +1,10 @@
 import { router, Stack, useIsFocused, useLocalSearchParams } from "expo-router";
 import { PROFILE_PICK_PARAM } from "../../../shared/layout/useReturnToSplit";
-import { useHeaderHeight } from "expo-router/react-navigation";
 import { useFoldEntering } from "../../../shared/layout/FoldFade";
 import { PUSHED_BY_FOLD_PARAM, shouldPushPickOnClose } from "../../../shared/layout/fold-rule";
 import { SplitView, useSplitLayout } from "../../../shared/layout/SplitView";
 import { DISCARD_CONFIRM } from "../../../shared/navigation/EditBarActions";
+import { PaneBarTitle } from "../../../shared/layout/paneHeader";
 import {
   isProfileSplitSection,
   ProfileSplitPane,
@@ -135,9 +135,6 @@ export default function ProfileScreen() {
   // details until another is picked. Folding closed with a pick pushes its
   // page; the default gives way to the list.
   const split = useSplitLayout();
-  // The native bar's height: split, the setting beside the profile starts
-  // below it, clear of its edge blur.
-  const headerHeight = useHeaderHeight();
   const foldEntering = useFoldEntering(split !== null);
   const [pickedSection, setPickedSection] = useState<ProfileSplitSection | null>(null);
   // A setting's page reached from elsewhere on the open Duo comes back here
@@ -535,12 +532,16 @@ export default function ProfileScreen() {
           {/* The native inline header is deliberately the person, not the tab.
               It stays compact and gets UIKit's scroll-edge blur from the route
               while this hero scrolls beneath it. */}
+          {split ? (
+            <PaneBarTitle title={isCompactTitleVisible ? displayName : ""} large={false} />
+          ) : null}
           <Stack.Screen
             options={{
               // Keep a real native title so UIKit never falls back to the tab
               // label or renders an empty-title placeholder. Its colour alone
               // changes when the hero passes beneath the scroll-edge bar.
-              title: displayName,
+              // Split, the list pane's own bar takes the name instead.
+              title: split ? "" : displayName,
               headerTitleStyle: {
                 color: isCompactTitleVisible ? mobileColors.textPrimary : "transparent",
                 fontFamily: mobileTypography.fontFamily.bold,
@@ -787,9 +788,11 @@ export default function ProfileScreen() {
 
   return (
     <SplitView
-      detailBarHeight={headerHeight}
+      detailBar
       entering={foldEntering}
       layout={split}
+      listLargeTitle={false}
+      listTitle=""
       list={page}
       detail={
         <ProfileSplitPane onUnsavedChange={handleDetailUnsavedChange} section={shownSection} />

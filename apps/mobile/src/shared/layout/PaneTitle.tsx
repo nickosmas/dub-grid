@@ -4,13 +4,15 @@ import { AppText } from "../components/AppText";
 import { Pressable } from "../components/Pressable";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileSpace } from "../theme/tokens";
+import { usePaneHeader } from "./paneHeader";
 
 /** A link back to the page the pane showed before, named for that page. */
 export type PaneBack = { label: string; onPress: () => void };
 
 /**
- * A split view's detail pane names its page, where the native bar belongs to
- * the list's page. Only what the list beside it doesn't show goes above.
+ * A split view's detail pane names its page. In a pane with its own native
+ * bar the title is that bar's large title, which shrinks into the bar as the
+ * page scrolls; only the eyebrow and the way back stay on the page.
  */
 export function PaneTitle({
   eyebrow,
@@ -21,6 +23,8 @@ export function PaneTitle({
   title: string;
   back?: PaneBack;
 }) {
+  const inPaneBar = usePaneHeader({ title });
+  if (inPaneBar && !back && !eyebrow) return null;
   return (
     <View style={styles.heading}>
       {back ? <PaneBackLink back={back} /> : null}
@@ -29,9 +33,11 @@ export function PaneTitle({
           {eyebrow}
         </AppText>
       ) : null}
-      <AppText accessibilityRole="header" variant="screenTitle">
-        {title}
-      </AppText>
+      {inPaneBar ? null : (
+        <AppText accessibilityRole="header" variant="screenTitle">
+          {title}
+        </AppText>
+      )}
     </View>
   );
 }

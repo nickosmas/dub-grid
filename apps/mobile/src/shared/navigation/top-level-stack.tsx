@@ -139,9 +139,10 @@ export function createDetailStackOptions(
 }
 
 /**
- * A list page's own large title in a split view too (People, Requests): the
- * bar stays clear while split, since it spans both panes and a background it
- * drew once the page beside scrolled under it would band that page's top.
+ * A list page's large title on the phone. Split, each pane has its own native
+ * bar with its own title (`SplitView`'s `listTitle`), so the page's bar,
+ * which spans both panes, keeps only its buttons, which iOS stands in the
+ * side column, and stays clear so it draws nothing over the panes.
  */
 export function createSplitTopLevelStackOptions(
   mobileColors: MobileColors,
@@ -154,10 +155,11 @@ export function createSplitTopLevelStackOptions(
   };
 }
 
-// No fill, blur or hairline in either of the bar's states: iOS may track
-// the detail pane's scroll view, and would draw its "scrolled" bar over that
-// pane alone.
+// No title, fill, blur or hairline in either of the bar's states.
 const SPLIT_CLEAR_BAR = {
+  title: "",
+  headerLargeTitle: false,
+  headerLargeTitleEnabled: false,
   headerTransparent: true,
   headerStyle: { backgroundColor: "transparent" },
   headerBlurEffect: "none",
