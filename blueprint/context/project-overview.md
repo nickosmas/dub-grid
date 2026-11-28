@@ -1,6 +1,6 @@
 # DubGrid - Project Overview
 
-<!-- blueprint:source-hash 76c3accec85e7302bc5f01cd09e0097846d3bd43bf016fc1c9f96dadabf17e49 -->
+<!-- blueprint:source-hash a1a8b44891eb3e1adbc2dbfaec3a6362be4956301951816e33b74dc2c45d7781 -->
 
 > Multi-tenant employee scheduling for care facilities, delivered through a
 > connected Next.js web app and Expo mobile app.
@@ -31,7 +31,7 @@ organization staff, managers, and platform operators.
 ## Features
 
 Items appear in build-plan order. Every item has shipped except 40, which is
-in progress, 57, which is in progress (57a shipped), and 60, which is in progress (60a and 60b shipped).
+in progress, 57, which is in progress (57a shipped), and 60, which is in progress (60a, 60b and 60c1 shipped).
 
 - **1** - Multi-tenant organizations with subdomain isolation and organization-specific settings.
 - **2** - Four-tier RBAC with per-person Admin permissions.
@@ -194,7 +194,7 @@ one it names.
 ### Work limits (item 60)
 
 - Scheduling by hand, publishing, and approving a pickup or swap on web or
-  mobile warn, never block, when someone would work more than 5 days in a
+  mobile (60c2) warn, never block, when someone would work more than 5 days in a
   row (counted across weeks and periods, the period before and after
   included), more than 5 days in a Sunday-to-Saturday week, or more than 40
   hours in that week. The counts are Auto-build's own; a worked day is a day
