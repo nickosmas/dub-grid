@@ -451,6 +451,7 @@ export function computeStaffHoursForPeriod(
   assignmentById = new Map<number, DashboardAssignmentRow>(),
   assignmentIdByPair = new Map<string, number>(),
   otThreshold = OVERTIME_THRESHOLD_HOURS,
+  timeZone: string | null = null,
 ): MobileDashboardResponse["staffHours"] {
   const normalizedShiftCategoriesById = new Map(
     Array.from(shiftCategoriesById, ([id, category]) => [
@@ -498,6 +499,7 @@ export function computeStaffHoursForPeriod(
       row.state.customStartTime,
       row.state.customEndTime,
       normalizedShiftCategoriesById,
+      { date: row.date, timeZone },
     );
     if (hours <= 0) continue;
 
@@ -812,6 +814,8 @@ export async function loadMobileDashboardPayload(
       range,
       assignmentById,
       assignmentIdByPair,
+      OVERTIME_THRESHOLD_HOURS,
+      auth.currentOrg.timezone ?? null,
     ),
     actionQueue: pendingApprovalRequests,
   };

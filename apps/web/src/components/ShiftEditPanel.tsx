@@ -136,6 +136,8 @@ import {
   cellStateToChangeDay,
   describeShiftChangeItem,
   formatShiftChangeHours,
+  formatShiftClockChange,
+  getShiftClockChange,
   shiftChangeItemMinutes,
 } from "@dubgrid/schedule-core";
 import { noteShiftOf } from "@/app/(app)/schedule/_lib/editor-session";
@@ -911,6 +913,7 @@ export default function ShiftEditPanel({
           correctedChange.after,
           formatDateKey(modal.date),
           shiftChangeResolvers,
+          publicationTimeZone,
         )
       : null;
   const publishedChangeView =
@@ -920,6 +923,7 @@ export default function ShiftEditPanel({
           shownPublishChange.toState,
           formatDateKey(modal.date),
           shiftChangeResolvers,
+          publicationTimeZone,
         )
       : null;
   const publishedChangeNotes = shownPublishChange
@@ -1061,6 +1065,7 @@ export default function ShiftEditPanel({
           }),
           formatDateKey(modal.date),
           shiftChangeResolvers,
+          publicationTimeZone,
         )
       : null;
   // Before and After only when a shift that was there is changed; an addition
@@ -3741,6 +3746,10 @@ export default function ShiftEditPanel({
                         minTime={getTimeBounds(assignment).minTime}
                         maxTime={getTimeBounds(assignment).maxTime}
                         customLabel={timeEditorLabel}
+                        shiftDay={{
+                          date: formatDateKey(modal.date),
+                          timeZone: publicationTimeZone,
+                        }}
                         onSave={(start, end) => {
                           if (editShiftTimesBesideAbsence(i, start, end)) return;
                           const newStarts = [...pillStarts];
@@ -4351,23 +4360,31 @@ export default function ShiftEditPanel({
       const window = formatShiftWindow(start, end, dateKey);
       const minutes =
         start && end
-          ? shiftChangeItemMinutes({
-              kind: "shift",
-              key: String(index),
-              shiftName: null,
-              jobName: "",
-              focusAreaName: null,
-              start,
-              end,
-              breakMinutes: resolved?.breakMinutes ?? null,
-            })
+          ? shiftChangeItemMinutes(
+              {
+                kind: "shift",
+                key: String(index),
+                shiftName: null,
+                jobName: "",
+                focusAreaName: null,
+                start,
+                end,
+                breakMinutes: resolved?.breakMinutes ?? null,
+              },
+              { date: dateKey, timeZone: publicationTimeZone },
+            )
           : null;
+      const clockChange = getShiftClockChange(start, end, {
+        date: dateKey,
+        timeZone: publicationTimeZone,
+      });
       const time = window
         ? [
             window,
             minutes != null
               ? `${formatShiftChangeHours(minutes)}${hasRestOfDayAbsence ? " worked" : ""}`
               : null,
+            clockChange != null ? formatShiftClockChange(clockChange) : null,
             isCustom && !hasRestOfDayAbsence ? "custom time" : null,
           ]
             .filter(Boolean)
@@ -4421,6 +4438,7 @@ export default function ShiftEditPanel({
       }),
       dateKey,
       shiftChangeResolvers,
+      publicationTimeZone,
     );
     return change.kind === "none" ? null : { kind: "changed", change };
   }
@@ -4956,6 +4974,10 @@ export default function ShiftEditPanel({
                         minTime={getTimeBounds(matchedCode).minTime}
                         maxTime={getTimeBounds(matchedCode).maxTime}
                         customLabel={timeEditorLabel}
+                        shiftDay={{
+                          date: formatDateKey(modal.date),
+                          timeZone: publicationTimeZone,
+                        }}
                         onSave={(start, end) => {
                           if (!editShiftTimesBesideAbsence(0, start, end)) {
                             onCustomTimeChange(start, end);

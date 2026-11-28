@@ -555,6 +555,7 @@ export default function DashboardView({
         assignmentById,
         overtimeThreshold,
         categoryById,
+        org.timezone ?? null,
       ),
     [
       activeEmployees,
@@ -563,6 +564,7 @@ export default function DashboardView({
       assignmentById,
       categoryById,
       overtimeThreshold,
+      org.timezone,
     ],
   );
 
@@ -579,6 +581,7 @@ export default function DashboardView({
             assignmentById,
             overtimeThreshold,
             categoryById,
+            org.timezone ?? null,
           ),
     [
       isUserDashboardMode,
@@ -588,6 +591,7 @@ export default function DashboardView({
       assignmentById,
       categoryById,
       overtimeThreshold,
+      org.timezone,
     ],
   );
 

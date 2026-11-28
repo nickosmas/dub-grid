@@ -34,6 +34,7 @@ function renderTab({
       employee={{ id: "emp", firstName: "Thomas" } as Employee}
       periodShifts={periodShifts === "loading" ? undefined : periodShifts}
       range={{ startDate: "2026-10-01", endDate: "2026-10-31" }}
+      timeZone={null}
       periodPhrase="this month"
       assignments={[assignment]}
       shiftCategories={[day]}

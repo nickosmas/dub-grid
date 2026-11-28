@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { NamedItem, type DirectoryPerson } from "@/types";
 import { resolveAvatarSeed } from "@dubgrid/design-tokens";
-import { formatLocalDateKey } from "@dubgrid/schedule-core";
+import { formatLocalDateKey, getShiftRangeMinutes, type ShiftDay } from "@dubgrid/schedule-core";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -184,16 +184,17 @@ export function fmt12hShort(time24: string): string {
   return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
 }
 
-/** Calculate duration between two 24h time strings. Handles overnight spans. */
+/**
+ * Calculate duration between two 24h time strings. Handles overnight spans.
+ * Given the shift's day, a night across a DST change reads its real length.
+ */
 export function calcTimeDuration(
   start: string | null | undefined,
   end: string | null | undefined,
+  day?: ShiftDay,
 ): string | null {
   if (!start || !end) return null;
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let diff = eh * 60 + em - (sh * 60 + sm);
-  if (diff <= 0) diff += 24 * 60; // overnight
+  const diff = getShiftRangeMinutes(start, end, day);
   const h = Math.floor(diff / 60);
   const m = diff % 60;
   return m ? `${h}h ${m}m` : `${h}h`;

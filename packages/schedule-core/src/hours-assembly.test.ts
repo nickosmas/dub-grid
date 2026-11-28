@@ -87,3 +87,19 @@ describe("computeShiftSegmentHours", () => {
     expect(hours).toBe(0);
   });
 });
+
+describe("computeShiftSegmentHours across a DST change", () => {
+  const night = new Map([
+    [1, makeAssignment({ id: 1, defaultStartTime: "23:00", defaultEndTime: "07:00" })],
+  ]);
+
+  it("counts the hour the fall-back night repeats", () => {
+    const day = { date: "2026-10-31", timeZone: "America/New_York" };
+    expect(computeShiftSegmentHours([1], night, null, null, new Map(), day)).toBe(9);
+    expect(computeShiftSegmentHours([1], night, "23:00", "07:00", new Map(), day)).toBe(9);
+  });
+
+  it("keeps clock hours when no day is given", () => {
+    expect(computeShiftSegmentHours([1], night, null, null, new Map())).toBe(8);
+  });
+});

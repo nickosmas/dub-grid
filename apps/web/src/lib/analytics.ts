@@ -18,6 +18,17 @@ interface ShiftWithEmployee {
   employees: { first_name: string; last_name: string };
 }
 
+/** The organization's zone, so a night across a DST change counts real hours. */
+async function fetchOrgTimeZone(orgId: string): Promise<string | null> {
+  const { data, error } = await getServiceClient()
+    .from("organizations")
+    .select("timezone")
+    .eq("id", orgId)
+    .single();
+  if (error) throw error;
+  return (data as { timezone: string | null }).timezone;
+}
+
 /**
  * Fetch weekly shift hours for an org over a given number of weeks.
  */
@@ -30,18 +41,21 @@ export async function fetchWeeklyShiftHours(
   const start = new Date();
   start.setDate(start.getDate() - weeks * 7);
 
-  const data = await fetchPublishedShiftRows(getServiceClient(), {
-    orgId,
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
-  });
+  const [data, timeZone] = await Promise.all([
+    fetchPublishedShiftRows(getServiceClient(), {
+      orgId,
+      startDate: start.toISOString().slice(0, 10),
+      endDate: end.toISOString().slice(0, 10),
+    }),
+    fetchOrgTimeZone(orgId),
+  ]);
 
   // Group by week (Monday start)
   const weekMap = new Map<string, { totalHours: number; shiftCount: number }>();
 
   for (const row of data as PublishedShiftRow[]) {
     if (hiddenStaffIds.has(row.emp_id)) continue;
-    const publishedEntry = resolvePublishedScheduleEntry(row, new Map());
+    const publishedEntry = resolvePublishedScheduleEntry(row, new Map(), undefined, timeZone);
     if (!publishedEntry || publishedEntry.kind !== "shift") continue;
 
     const d = new Date(publishedEntry.date);
@@ -76,12 +90,15 @@ export async function fetchEmployeeUtilization(
   const start = new Date();
   start.setDate(start.getDate() - weeks * 7);
 
-  const data = await fetchPublishedShiftRows(getServiceClient(), {
-    orgId,
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
-    extraSelects: ["employees!inner(org_id, first_name, last_name)"],
-  });
+  const [data, timeZone] = await Promise.all([
+    fetchPublishedShiftRows(getServiceClient(), {
+      orgId,
+      startDate: start.toISOString().slice(0, 10),
+      endDate: end.toISOString().slice(0, 10),
+      extraSelects: ["employees!inner(org_id, first_name, last_name)"],
+    }),
+    fetchOrgTimeZone(orgId),
+  ]);
 
   const empMap = new Map<string, { name: string; totalHours: number; shiftCount: number }>();
   const rows = data as unknown as ShiftWithEmployee[];
@@ -91,6 +108,8 @@ export async function fetchEmployeeUtilization(
     const publishedEntry = resolvePublishedScheduleEntry(
       row as unknown as PublishedShiftRow,
       new Map(),
+      undefined,
+      timeZone,
     );
     if (!publishedEntry || publishedEntry.kind !== "shift") continue;
 

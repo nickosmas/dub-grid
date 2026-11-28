@@ -9,6 +9,9 @@
 // undercounting who crossed the overtime threshold. Both platforms now call
 // this one function instead of maintaining that logic twice.
 
+import { getElapsedShiftMinutes } from "./dates";
+import type { ShiftDay } from "./schedule-time";
+
 export type HoursAssignmentLike = {
   id: number;
   defaultStartTime?: string | null;
@@ -54,7 +57,8 @@ function parseTimeToMinutes(time: string): number {
   return h * 60 + (m || 0);
 }
 
-function durationHoursFromTimes(startTime: string, endTime: string): number {
+function durationHoursFromTimes(startTime: string, endTime: string, day?: ShiftDay): number {
+  if (day) return getElapsedShiftMinutes(day.date, startTime, endTime, day.timeZone) / 60;
   const s = parseTimeToMinutes(startTime);
   const e = parseTimeToMinutes(endTime);
   const mins = e > s ? e - s : 1440 - s + e; // handles overnight shifts
@@ -77,6 +81,8 @@ function resolveBreakMinutes<A extends HoursAssignmentLike>(
  * (per-segment, pipe-delimited) time overrides when present, otherwise
  * falling back per assignment: its own default start/end time, then its
  * shift category's default start/end time, then a flat duration field.
+ * Pass the day the shift starts on so a night across a DST change counts the
+ * time actually worked.
  */
 export function computeShiftSegmentHours<A extends HoursAssignmentLike>(
   assignmentIds: number[],
@@ -84,6 +90,7 @@ export function computeShiftSegmentHours<A extends HoursAssignmentLike>(
   customStartTime: string | null | undefined,
   customEndTime: string | null | undefined,
   categoryById: Map<number, HoursShiftCategoryLike>,
+  day?: ShiftDay,
 ): number {
   if (customStartTime && customEndTime) {
     // Pipe-delimited per-segment custom times (e.g. "07:00|09:00" for a
@@ -99,11 +106,15 @@ export function computeShiftSegmentHours<A extends HoursAssignmentLike>(
         const assignment =
           assignmentIds[i] != null ? assignmentById.get(assignmentIds[i]) : undefined;
         if (s && e) {
-          let h = durationHoursFromTimes(s, e);
+          let h = durationHoursFromTimes(s, e, day);
           if (assignment) h = Math.max(0, h - resolveBreakMinutes(assignment, categoryById) / 60);
           total += h;
         } else if (assignment?.defaultStartTime && assignment.defaultEndTime) {
-          let h = durationHoursFromTimes(assignment.defaultStartTime, assignment.defaultEndTime);
+          let h = durationHoursFromTimes(
+            assignment.defaultStartTime,
+            assignment.defaultEndTime,
+            day,
+          );
           h = Math.max(0, h - resolveBreakMinutes(assignment, categoryById) / 60);
           total += h;
         }
@@ -111,7 +122,7 @@ export function computeShiftSegmentHours<A extends HoursAssignmentLike>(
       return total;
     }
 
-    let hours = durationHoursFromTimes(customStartTime, customEndTime);
+    let hours = durationHoursFromTimes(customStartTime, customEndTime, day);
     for (const assignmentId of assignmentIds) {
       const assignment = assignmentById.get(assignmentId);
       if (assignment) {
@@ -129,14 +140,18 @@ export function computeShiftSegmentHours<A extends HoursAssignmentLike>(
 
     if (assignment.defaultStartTime && assignment.defaultEndTime) {
       // Level 2: assignment-level override time.
-      let hours = durationHoursFromTimes(assignment.defaultStartTime, assignment.defaultEndTime);
+      let hours = durationHoursFromTimes(
+        assignment.defaultStartTime,
+        assignment.defaultEndTime,
+        day,
+      );
       hours = Math.max(0, hours - resolveBreakMinutes(assignment, categoryById) / 60);
       total += hours;
     } else if (assignment.categoryId != null) {
       // Level 1: fall back to the shift category's default time.
       const cat = categoryById.get(assignment.categoryId);
       if (cat?.startTime && cat?.endTime) {
-        let hours = durationHoursFromTimes(cat.startTime, cat.endTime);
+        let hours = durationHoursFromTimes(cat.startTime, cat.endTime, day);
         hours = Math.max(0, hours - resolveBreakMinutes(assignment, categoryById) / 60);
         total += hours;
       }

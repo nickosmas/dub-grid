@@ -7942,11 +7942,11 @@ function SchedulerContent({
             availabilityWithPlanned(adapterInput, planned),
           overtime: {
             thresholdHours: WEEKLY_OVERTIME_HOURS,
-            weekHours: weekHoursWithPlanned(adapterInput),
+            weekHours: weekHoursWithPlanned({ ...adapterInput, timeZone: orgTimeZone }),
           },
           fairness: {
             standing: fairnessStandingWithPlanned(
-              adapterInput,
+              { ...adapterInput, timeZone: orgTimeZone },
               adapterInput.matrix.dateKeys,
               history,
             ),
@@ -7959,7 +7959,7 @@ function SchedulerContent({
         },
       };
     },
-    [coverageSuggestions],
+    [coverageSuggestions, orgTimeZone],
   );
 
   // A day's Apply all: the engine plans the fixes one at a time, counting
@@ -8571,6 +8571,7 @@ function SchedulerContent({
         week2,
         spanWeeks: spanWeeks === "month" ? 1 : spanWeeks,
         todayKey,
+        timeZone: orgTimeZone,
         awayRanges,
         corrections,
         dayOffAbsenceTypeId:
