@@ -168,9 +168,47 @@ describe("MyHomeSections", () => {
     // The week is the list itself, with no heading; its hours sit in Home's header.
     expect(screen.getByLabelText("Your week")).toBeInTheDocument();
     expect(screen.queryByText("Your week")).not.toBeInTheDocument();
-    // Seven days: two with a shift, five Unscheduled.
-    expect(screen.getAllByText("Unscheduled")).toHaveLength(5);
+    // Seven days: two with a shift. Tuesday and Wednesday are free days in a
+    // row and read as one row; Sunday, today (Thursday) and Friday each keep
+    // their own.
+    expect(screen.getAllByText("No shifts")).toHaveLength(4);
+    expect(screen.getByTestId("upcoming-free-days-2026-04-14")).toBeInTheDocument();
     expect(screen.queryByText("Needs your response")).not.toBeInTheDocument();
+  });
+
+  describe("beside the day on an open iPhone Duo", () => {
+    const split = { pickShift: vi.fn(), pickDay: vi.fn(), highlightedDate: "2026-04-16" };
+
+    it("shows the empty state, not seven bare days, for a week with no shifts", () => {
+      render(
+        <MyHomeSections
+          data={makeData({ entries: [] })}
+          range={WEEK}
+          selectedDate="2026-04-16"
+          split={split}
+        />,
+      );
+
+      expect(screen.getByText("Nothing scheduled for you this week")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Your week")).not.toBeInTheDocument();
+    });
+
+    it("keeps every day its own row in a week with shifts, each still a day to pick", () => {
+      render(
+        <MyHomeSections
+          data={makeData({ entries: [shift("2026-04-13")] })}
+          range={WEEK}
+          selectedDate="2026-04-16"
+          split={split}
+        />,
+      );
+
+      expect(screen.getByLabelText("Your week")).toBeInTheDocument();
+      expect(screen.queryByTestId("upcoming-free-days-2026-04-14")).toBeNull();
+      // The day itself, picked beside the list, says what's on it.
+      expect(screen.queryByText("No shifts")).not.toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /Apr/ }).length).toBeGreaterThanOrEqual(6);
+    });
   });
 
   it("shows a swap asked of them, and answers it through the request flow", () => {

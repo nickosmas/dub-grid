@@ -38,6 +38,7 @@ export * from "./coverage-suggestion-text";
 export * from "./preference-fit";
 export * from "./requests-assembly";
 export * from "./hours-assembly";
+export * from "./work-limits";
 export * from "./pay-period";
 export * from "./dates";
 export * from "./schedule-notes";

@@ -20,7 +20,6 @@ import {
   type ReactNode,
 } from "react";
 import { Stack, router, useIsFocused, useLocalSearchParams } from "expo-router";
-import { useHeaderHeight } from "expo-router/react-navigation";
 import {
   createDetailStackOptions,
   createSplitTopLevelStackOptions,
@@ -877,12 +876,6 @@ export default function RequestsScreen({ page = false }: { page?: boolean }) {
     () => createDetailStackOptions(mobileColors, "Request"),
     [mobileColors],
   );
-  const requestsStackOptions = useMemo(
-    () => createSplitTopLevelStackOptions(mobileColors, "Requests", split !== null),
-    [mobileColors, split],
-  );
-  // The native bar's height: split, the request beside the list starts below it.
-  const headerHeight = useHeaderHeight();
   const [pickedRequestId, setPickedRequestId] = useState<string | null>(null);
   const tabRequests = useMemo((): MobileShiftRequest[] => {
     if (activeTab === "available") {
@@ -917,6 +910,17 @@ export default function RequestsScreen({ page = false }: { page?: boolean }) {
   }, [activeTab, availableOpenShiftFeed, tabRequests]);
   const shownItem =
     tabItems.find((item) => paneItemId(item) === pickedRequestId) ?? tabItems[0] ?? null;
+  // While the tab loads, the split holds its place; an empty tab is one page
+  // across the screen.
+  const tabLoading =
+    activeTab === "history"
+      ? historyContentState.kind === "loading"
+      : contentState.kind === "loading";
+  const showsSplit = split !== null && (shownItem !== null || tabLoading);
+  const requestsStackOptions = useMemo(
+    () => createSplitTopLevelStackOptions(mobileColors, "Requests", showsSplit),
+    [mobileColors, showsSplit],
+  );
   const pageRequestId = page ? (Array.isArray(params.id) ? params.id[0] : params.id) : null;
   // Opening the Duo on a request's page goes back to the list with it picked.
   useEffect(() => {
@@ -1297,17 +1301,14 @@ export default function RequestsScreen({ page = false }: { page?: boolean }) {
   // A tab with nothing in it takes the whole page: its empty state says so
   // once, with no blank pane beside it. Still loading, it keeps the split so
   // the page doesn't jump when its items arrive.
-  const tabLoading =
-    activeTab === "history"
-      ? historyContentState.kind === "loading"
-      : contentState.kind === "loading";
-  if (!split || (shownItem === null && !tabLoading)) return listScreen;
+  if (!split || !showsSplit) return listScreen;
 
   return (
     <SplitView
-      detailBarHeight={headerHeight}
+      detailBar
       entering={foldEntering}
       layout={split}
+      listTitle="Requests"
       list={listScreen}
       detail={
         shownItem ? (

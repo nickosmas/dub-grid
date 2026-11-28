@@ -170,6 +170,7 @@ import {
   limitRecurringRuns,
   type WorkLimits,
   weekHoursWithPlanned,
+  workLimitBreaksInDraft,
   workLimitWith,
   buildCoverageSuggestionInput,
   planSuggestionWrites,
@@ -6148,6 +6149,27 @@ function SchedulerContent({
   // A past day opens for a correction (53b) when this person may correct it.
   const editPanelDateKey = editPanel ? formatDateKey(editPanel.date) : null;
   const editPanelIsPast = editPanelDateKey != null && isPastDateKey(editPanelDateKey, todayKey);
+  // Counted on the cell as the editor shows it; a past day records what happened.
+  const editPanelWorkLimits = useMemo(() => {
+    if (!editPanel || !editSessionCellKey || !editPanelDateKey || editPanelIsPast) return [];
+    const draft = { ...shifts };
+    if (panelShiftEntry) draft[editSessionCellKey] = panelShiftEntry;
+    else delete draft[editSessionCellKey];
+    return workLimitBreaksInDraft(
+      { shifts: draft, assignments: Array.from(assignmentById.values()), shiftCategories },
+      editPanel.empId,
+      editPanelDateKey,
+    );
+  }, [
+    editPanel,
+    editSessionCellKey,
+    editPanelDateKey,
+    editPanelIsPast,
+    shifts,
+    panelShiftEntry,
+    assignmentById,
+    shiftCategories,
+  ]);
   const correctionWindowStart = addDaysToIsoDate(todayKey, -CORRECTION_ADMIN_WINDOW_DAYS);
   const canCorrectPanelDay =
     editPanelIsPast &&
@@ -10198,6 +10220,7 @@ function SchedulerContent({
                     }
                   : undefined
               }
+              workLimitBreaks={editPanelWorkLimits}
               empId={editPanel.empId}
               customStartTime={panelCustomStartTime}
               customEndTime={panelCustomEndTime}
