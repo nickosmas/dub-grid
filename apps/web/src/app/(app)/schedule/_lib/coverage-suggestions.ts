@@ -547,6 +547,62 @@ export function workLimitBreaksInDraft(
   });
 }
 
+/** The schedule as a publish of the window leaves it: the draft inside, the published day outside. */
+function shiftsAfterPublish(shifts: ShiftMap, windowStart: string, windowEnd: string): ShiftMap {
+  const after: ShiftMap = {};
+  for (const [key, entry] of Object.entries(shifts)) {
+    const dateKey = key.slice(key.lastIndexOf("_") + 1);
+    if (dateKey >= windowStart && dateKey <= windowEnd) {
+      after[key] = entry;
+      continue;
+    }
+    after[key] = {
+      ...entry,
+      isDelete: false,
+      assignmentIds: entry.publishedAssignmentDefinitionIds ?? [],
+      customStartTime: entry.publishedCustomStartTime ?? null,
+      customEndTime: entry.publishedCustomEndTime ?? null,
+    };
+  }
+  return after;
+}
+
+/** Each person a publish of the window leaves over a work limit, with every limit once (60b). */
+export function workLimitBreaksAfterPublish(
+  input: DraftHoursInput,
+  windowDateKeys: ReadonlyArray<string>,
+): { employeeId: string; breaks: WorkLimitBreak[] }[] {
+  if (windowDateKeys.length === 0) return [];
+  const windowStart = windowDateKeys[0];
+  const windowEnd = windowDateKeys[windowDateKeys.length - 1];
+  const after = { ...input, shifts: shiftsAfterPublish(input.shifts, windowStart, windowEnd) };
+  const employeeIds = new Set<string>();
+  for (const key of Object.keys(after.shifts)) {
+    const dateKey = key.slice(key.lastIndexOf("_") + 1);
+    if (dateKey >= windowStart && dateKey <= windowEnd) {
+      employeeIds.add(key.slice(0, key.lastIndexOf("_")));
+    }
+  }
+  const people: { employeeId: string; breaks: WorkLimitBreak[] }[] = [];
+  for (const employeeId of employeeIds) {
+    const found = new Map<string, WorkLimitBreak>();
+    for (const dateKey of windowDateKeys) {
+      for (const limit of workLimitBreaksInDraft(after, employeeId, dateKey)) {
+        found.set(`${limit.limit}|${limit.start}`, limit);
+      }
+    }
+    if (found.size === 0) continue;
+    const order = { row: 0, week: 1, hours: 2 };
+    people.push({
+      employeeId,
+      breaks: [...found.values()].sort(
+        (a, b) => a.start.localeCompare(b.start) || order[a.limit] - order[b.limit],
+      ),
+    });
+  }
+  return people;
+}
+
 /**
  * Days a person works or is away in the Sunday-to-Saturday week holding a
  * date, with the planned days written. Another absence, such as vacation,
